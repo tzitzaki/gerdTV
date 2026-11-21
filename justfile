@@ -67,6 +67,27 @@ test-docs:
 test-affected base="origin/main":
     scripts/test-affected.sh {{base}}
 
+# The core's performance budgets. A regression of more than 20 % against the saved `main` baseline fails.
+# The baseline lives outside the worktrees (CRITERION_HOME), so every worktree compares against the same one;
+# `just bench-save` records it (the wrap-up does, on main). No baseline yet: this run becomes it.
+criterion_home := env_var('HOME') + "/.cache/gerdtv-criterion"
+
+bench:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export CRITERION_HOME="{{criterion_home}}"
+    if [[ ! -d "$CRITERION_HOME/budgets" ]]; then just bench-save; exit 0; fi
+    out="$(cargo bench -q -p gerdtv-core --bench budgets -- --baseline main --noise-threshold 0.20 2>&1)"
+    grep -E 'time:|change:|regressed|improved' <<<"$out" || true
+    ! grep -q "Performance has regressed" <<<"$out"
+
+bench-save:
+    CRITERION_HOME="{{criterion_home}}" cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
+
+# Opt-in checks against the real account in the GERDTV_* environment (counts and timings only; docs/SETUP.md).
+test-live:
+    cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1
+
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 test-integration:
     {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER"'
@@ -90,6 +111,7 @@ ready body="":
     step "flutter analyze" "just l10n && (cd app && flutter analyze)"
     step "just test" "just test"
     step "licences" "just licences"
+    step "bench (budgets, ≤ 20 % regression)" "just bench"
     step "integration tests (Linux, Xvfb)" "just test-integration"
     step "Linux release build" "just build-linux"
     echo; echo "PR body lines:"; printf '%s\n' "${lines[@]}"

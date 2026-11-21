@@ -1,0 +1,328 @@
+//! Xtream Codes client and sync (the main source). Talks to `player_api.php` like every XC panel:
+//! account info first (auth, status, expiry, max_connections), then the three category lists (shown at once), then
+//! the three stream lists, written into the profile database in one transaction (db::Sync).
+//!
+//! Credentials never leave this struct: error messages drop the request URL (reqwest's `without_url`), stream URLs
+//! are built on demand (`stream_url`) and never stored. Panel quirks handled: numbers sent as strings, empty strings
+//! for missing values, `null` EPG ids, unknown ids answered with `[]`.
+//!
+//! Debug hints: `XcError::Auth` = the panel said auth 0 (wrong login); `Expired` = status/expiry; a `Parse` error
+//! names the action whose JSON didn't match (log the body length, never the body: it can hold the login).
+
+use crate::db::{self, Kind, NewItem};
+use rusqlite::Connection;
+use serde_json::Value;
+use std::time::Duration;
+
+#[derive(Debug, thiserror::Error)]
+pub enum XcError {
+    #[error("the server rejected the login")]
+    Auth,
+    #[error("the account has expired or is disabled ({0})")]
+    Expired(String),
+    #[error("the server answered HTTP {0}")]
+    Http(u16),
+    #[error("network error: {0}")]
+    Network(String),
+    #[error("unexpected answer to {0}")]
+    Parse(&'static str),
+    #[error("database error: {0}")]
+    Db(#[from] rusqlite::Error),
+}
+
+pub type Result<T> = std::result::Result<T, XcError>;
+
+/// What the panel says about the account.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Account {
+    pub status: String,
+    /// Unix seconds; None = no expiry.
+    pub expires: Option<i64>,
+    pub max_connections: u32,
+    pub active_connections: u32,
+}
+
+pub struct Xtream {
+    http: reqwest::Client,
+    base: String,
+    user: String,
+    pass: String,
+}
+
+/// reqwest is built without a TLS provider; install rustls' ring provider once per process.
+pub(crate) fn ensure_tls_provider() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default(); // Err = another one is installed: fine
+    });
+}
+
+/// A number the panel may send as a number, a numeric string, or "".
+fn num(v: &Value) -> Option<u64> {
+    match v {
+        Value::Number(n) => n.as_u64().or_else(|| n.as_f64().map(|f| f as u64)),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+fn text(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+impl Xtream {
+    /// `base` as the user typed it ("http://host:port", trailing slash and path tolerated).
+    pub fn new(base: &str, user: &str, pass: &str, user_agent: Option<&str>) -> Xtream {
+        ensure_tls_provider();
+        let base = base
+            .trim()
+            .trim_end_matches('/')
+            .trim_end_matches("/player_api.php")
+            .to_string();
+        let mut b = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(120));
+        if let Some(ua) = user_agent.filter(|u| !u.is_empty()) {
+            b = b.user_agent(ua.to_string());
+        }
+        Xtream {
+            http: b.build().expect("HTTP client"),
+            base,
+            user: user.to_string(),
+            pass: pass.to_string(),
+        }
+    }
+
+    async fn api(&self, action: Option<&'static str>, extra: &[(&str, String)]) -> Result<Value> {
+        let mut query: Vec<(&str, String)> = vec![
+            ("username", self.user.clone()),
+            ("password", self.pass.clone()),
+        ];
+        if let Some(a) = action {
+            query.push(("action", a.to_string()));
+        }
+        query.extend(extra.iter().map(|(k, v)| (*k, v.clone())));
+        let res = self
+            .http
+            .get(format!("{}/player_api.php", self.base))
+            .query(&query)
+            .send()
+            .await
+            .map_err(|e| XcError::Network(e.without_url().to_string()))?;
+        if !res.status().is_success() {
+            return Err(XcError::Http(res.status().as_u16()));
+        }
+        let bytes = res
+            .bytes()
+            .await
+            .map_err(|e| XcError::Network(e.without_url().to_string()))?;
+        serde_json::from_slice(&bytes).map_err(|_| XcError::Parse(action.unwrap_or("account info")))
+    }
+
+    /// Account info; `Auth` or `Expired` errors are hard errors (no retry loops, the user must act).
+    pub async fn account(&self) -> Result<Account> {
+        let v = self.api(None, &[]).await?;
+        let u = &v["user_info"];
+        if num(&u["auth"]) != Some(1) {
+            return Err(XcError::Auth);
+        }
+        let status = text(&u["status"]);
+        let expires = num(&u["exp_date"]).map(|e| e as i64);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if status != "Active" || expires.is_some_and(|e| e < now) {
+            return Err(XcError::Expired(status));
+        }
+        Ok(Account {
+            status,
+            expires,
+            max_connections: num(&u["max_connections"]).unwrap_or(1) as u32,
+            active_connections: num(&u["active_cons"]).unwrap_or(0) as u32,
+        })
+    }
+
+    /// The category lists for live, movies and series, in provider order: (kind, id, name).
+    pub async fn categories(&self) -> Result<Vec<(Kind, String, String)>> {
+        let mut out = Vec::new();
+        for (kind, action) in [
+            (Kind::Live, "get_live_categories"),
+            (Kind::Movie, "get_vod_categories"),
+            (Kind::Series, "get_series_categories"),
+        ] {
+            let v = self.api(Some(action), &[]).await?;
+            for c in v.as_array().ok_or(XcError::Parse(action))? {
+                out.push((kind, text(&c["category_id"]), text(&c["category_name"])));
+            }
+        }
+        Ok(out)
+    }
+
+    /// All streams of one kind (Live, Movie or Series) as catalogue rows.
+    pub async fn streams(&self, kind: Kind) -> Result<Vec<NewItem>> {
+        let action = match kind {
+            Kind::Live => "get_live_streams",
+            Kind::Movie => "get_vod_streams",
+            _ => "get_series",
+        };
+        let v = self.api(Some(action), &[]).await?;
+        let list = v.as_array().ok_or(XcError::Parse(action))?;
+        Ok(list
+            .iter()
+            .filter_map(|s| {
+                let (prefix, id) = match kind {
+                    Kind::Live => ("live", num(&s["stream_id"])?),
+                    Kind::Movie => ("movie", num(&s["stream_id"])?),
+                    _ => ("series", num(&s["series_id"])?),
+                };
+                let name = text(&s["name"]);
+                let year = name
+                    .rfind('(')
+                    .and_then(|i| name[i + 1..].get(..4))
+                    .and_then(|y| y.parse().ok())
+                    .filter(|y| (1900..2100).contains(y));
+                Some(NewItem {
+                    key: format!("{prefix}:{id}"),
+                    category: text(&s["category_id"]),
+                    logo: text(if kind == Kind::Series {
+                        &s["cover"]
+                    } else {
+                        &s["stream_icon"]
+                    }),
+                    epg_id: text(&s["epg_channel_id"]),
+                    number: if kind == Kind::Live {
+                        num(&s["num"]).map(|n| n as u32)
+                    } else {
+                        None
+                    },
+                    year,
+                    name,
+                    ..NewItem::default()
+                })
+            })
+            .collect())
+    }
+
+    /// The play URL of a stream (built at play time, never stored). Live defaults to `.ts`; the watchdog may ask
+    /// for `m3u8` instead. Movies/episodes use their container extension.
+    pub fn stream_url(&self, kind: Kind, id: u64, ext: &str) -> String {
+        let dir = match kind {
+            Kind::Live => "live",
+            Kind::Movie => "movie",
+            _ => "series",
+        };
+        format!("{}/{dir}/{}/{}/{id}.{ext}", self.base, self.user, self.pass)
+    }
+}
+
+/// A full sync: account check, categories, then every stream list, committed in one transaction.
+pub async fn sync(conn: &mut Connection, xc: &Xtream) -> Result<(Account, db::ImportStats)> {
+    let account = xc.account().await?;
+    let categories = xc.categories().await?;
+    let mut lists = Vec::new();
+    for kind in [Kind::Live, Kind::Movie, Kind::Series] {
+        lists.push((kind, xc.streams(kind).await?));
+    }
+    // All fetched: write synchronously (a SQLite transaction can't be held across awaits).
+    let mut s = db::Sync::begin(conn)?;
+    for (kind, id, name) in &categories {
+        s.category(*kind, id, name);
+    }
+    let mut stats = db::ImportStats {
+        categories: categories.len(),
+        ..Default::default()
+    };
+    for (kind, items) in &lists {
+        if items.is_empty() {
+            let kept = s.keep_kind(*kind)?;
+            if kept > 0 {
+                tracing::warn!("{kind:?} list came back empty; keeping the {kept} known entries");
+            }
+        }
+        for it in items {
+            s.item(*kind, it)?;
+            stats.entries += 1;
+        }
+    }
+    stats.removed = s.finish()?;
+    Ok((account, stats))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gerdtv_testkit::mock_xc::{MockXc, PASS, USER};
+    use std::path::Path;
+
+    #[tokio::test]
+    async fn syncs_from_a_panel_and_reports_hard_errors() {
+        let mock = MockXc::start(2000, 5).await;
+        let xc = Xtream::new(&format!("{}/", mock.base()), USER, PASS, None);
+        let mut conn = db::open(Path::new(":memory:")).unwrap();
+        let (account, stats) = sync(&mut conn, &xc).await.unwrap();
+        assert_eq!(
+            (account.max_connections, account.status.as_str()),
+            (2, "Active")
+        );
+        // 600 live + 1000 movies + the series (episodes are fetched lazily per series).
+        let live: i64 = conn
+            .query_row("SELECT count(*) FROM items WHERE kind = 0", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let movies: i64 = conn
+            .query_row("SELECT count(*) FROM items WHERE kind = 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!((live, movies), (600, 1000));
+        assert!(stats.categories > 3 && stats.entries > 1600);
+        let year: Option<u32> = conn
+            .query_row("SELECT year FROM items WHERE kind = 1 LIMIT 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert!(year.is_some_and(|y| (1960..2030).contains(&y)));
+        assert!(!db::search(&conn, "munchen", None, 5, 0).unwrap().is_empty());
+
+        // Stream URLs are built, not stored.
+        let url: String = conn
+            .query_row("SELECT url FROM items WHERE key = 'live:100000'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(url, "");
+        assert_eq!(
+            xc.stream_url(Kind::Live, 100000, "ts"),
+            format!("{}/live/{USER}/{PASS}/100000.ts", mock.base())
+        );
+
+        // A panel hiccup that answers [] for a whole list must not wipe that part of the catalogue.
+        mock.empty_once("get_vod_streams");
+        let (_, again) = sync(&mut conn, &xc).await.unwrap();
+        let movies_after: i64 = conn
+            .query_row("SELECT count(*) FROM items WHERE kind = 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!((movies_after, again.removed), (1000, 0));
+
+        // Hard errors: wrong login, expired account. The message never carries the credentials.
+        let bad = Xtream::new(&mock.base(), USER, "wrong", None);
+        assert!(matches!(bad.account().await, Err(XcError::Auth)));
+        mock.set_expired(true);
+        let e = xc.account().await.unwrap_err();
+        assert!(matches!(e, XcError::Expired(ref s) if s == "Expired"));
+        let down = Xtream::new("http://127.0.0.1:9", USER, PASS, None);
+        let e = down.account().await.unwrap_err().to_string();
+        assert!(
+            e.starts_with("network error") && !e.contains(PASS) && !e.contains(USER),
+            "{e}"
+        );
+    }
+}

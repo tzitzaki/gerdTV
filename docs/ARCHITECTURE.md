@@ -2,6 +2,9 @@
 
 ## Crates
 - `crates/gerdtv-core`: all logic, no Flutter dependency, tested headless on Linux.
+  - `m3u.rs`: the streaming M3U parser; `xtream.rs`: the Xtream Codes client and sync; `db.rs`: the profile database, sync and search (`docs/DATA_MODEL.md`); `playback.rs`: buffer presets and the watchdog.
+  - Networking: reqwest with rustls on the ring provider (no C toolchain needed for Android/iOS builds), installed once per process.
+  - Performance budgets: `crates/gerdtv-core/benches/budgets.rs` (`just bench`).
 - `crates/gerdtv-api` (package `gerdtv_api`): the flutter_rust_bridge surface; types, async functions, event streams, no logic.
 - `crates/gerdtv-testkit`: synthetic data, mock servers, fault injection, and the repository rule tests (`tests/repo_rules.rs`).
   - The fault server (`crates/gerdtv-testkit/src/fault.rs`) serves a synthetic clip as endless live TS, sliding live HLS (optionally with rotating segment URLs) and seekable VOD, and injects drops, stalls, throttling, HTTP status errors, live end of file and cuts of open streams, from Rust (`set`, `once`, `cut`) or over HTTP (`/_fault/…`). Run it by hand with `cargo run -p gerdtv-testkit --example fault_server`; `just test-integration` starts it for the app's integration tests.

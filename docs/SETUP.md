@@ -11,8 +11,11 @@
 ## macOS (for `[MAC]` sessions only)
 Full Xcode (opened once), `brew install rustup just cocoapods`, rustup as above, Flutter as above, then `just mac-check`.
 
+## Live tests
+`just test-live` runs the opt-in checks against a real Xtream Codes account from `GERDTV_XC_SERVER`, `GERDTV_XC_USER` and `GERDTV_XC_PASS` (and `GERDTV_TMDB_KEY` once TMDB lands). It prints counts and timings only. Never paste its environment anywhere.
+
 ## Building
-- `just test` (Rust + Flutter unit/widget tests), `just test-integration` (Linux build under Xvfb), `just ready` (every gate before a PR is marked ready).
+- `just bench` (the core's performance budgets, compared with the saved baseline), `just test` (Rust + Flutter unit/widget tests), `just test-integration` (Linux build under Xvfb), `just ready` (every gate before a PR is marked ready).
 - `just build-linux`, `just build-android` (debug APK, arm64). Release builds come only from `.github/workflows/release.yml`.
 - After changing `crates/gerdtv-api`: `just codegen` regenerates `app/lib/src/rust`. The native library is built by Cargokit (`app/rust_builder`) as part of every Flutter build.
 
