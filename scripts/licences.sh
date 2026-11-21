@@ -32,7 +32,7 @@ while read -r name version licence; do
   # No SPDX id (license-file crates): reviewed by hand and listed here with what the file says.
   case "$name" in allo-isolate) licence="Apache-2.0" ;; esac
   spdx_ok "$licence" || { echo "licences: Rust crate $name $version has licence '$licence'"; fail=1; }
-done < <(cargo tree -p gerdtv_api -e normal --prefix none --format '{p} {l}' | sed 's/ (\*)//; s/ (proc-macro)//; s/ v\([0-9]\)/ \1/' | sort -u)
+done < <(cargo tree -p gerdtv_api -e normal --prefix none --format '{p} {l}' | sed 's/ (\*)//g; s/ (proc-macro)//g; s/ v\([0-9]\)/ \1/' | sort -u)
 echo "licences: $n Rust crates checked"
 
 # Dart: package_config.json lists every resolved package; `flutter pub deps` says which are dev-only.
