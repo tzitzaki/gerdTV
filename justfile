@@ -39,6 +39,7 @@ doctor:
 # Regenerate the flutter_rust_bridge bindings after changing crates/gerdtv-api (output: app/lib/src/rust).
 codegen:
     cd app && flutter_rust_bridge_codegen generate
+    cargo fmt --all   # the generated Rust isn't rustfmt-clean, and `just ready` checks formatting
 
 # Format Rust and Dart in place.
 fmt:
