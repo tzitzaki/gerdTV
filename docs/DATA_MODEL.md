@@ -1,6 +1,8 @@
 # Data model
 
-One SQLite database per profile (FTS5, WAL mode) in the platform's app-support folder; images in the cache folder. Schema and queries: `crates/gerdtv-core/src/db.rs`.
+Profiles: their non-secret settings (name, source kind, server or file, EPG URLs, user agent, EPG offset, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
+
+One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; images in the cache folder. Schema and queries: `crates/gerdtv-core/src/db.rs`.
 
 ## Tables
 | Table | What | Key |

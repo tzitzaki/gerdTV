@@ -220,24 +220,40 @@ impl Xtream {
     }
 }
 
-/// A full sync: account check, categories, then every stream list, committed in one transaction.
-pub async fn sync(conn: &mut Connection, xc: &Xtream) -> Result<(Account, db::ImportStats)> {
+/// Everything a sync downloads, before anything is written (network first, then one short write).
+pub struct Fetched {
+    pub account: Account,
+    pub categories: Vec<(Kind, String, String)>,
+    pub lists: Vec<(Kind, Vec<NewItem>)>,
+}
+
+/// Downloads account, categories and every stream list. No database access, so it can run without holding the
+/// profile's connection (the UI keeps browsing the cached catalogue meanwhile).
+pub async fn fetch(xc: &Xtream) -> Result<Fetched> {
     let account = xc.account().await?;
     let categories = xc.categories().await?;
     let mut lists = Vec::new();
     for kind in [Kind::Live, Kind::Movie, Kind::Series] {
         lists.push((kind, xc.streams(kind).await?));
     }
-    // All fetched: write synchronously (a SQLite transaction can't be held across awaits).
+    Ok(Fetched {
+        account,
+        categories,
+        lists,
+    })
+}
+
+/// Writes a fetch into the catalogue in one transaction (db::Sync).
+pub fn write(conn: &mut Connection, f: &Fetched) -> Result<db::ImportStats> {
     let mut s = db::Sync::begin(conn)?;
-    for (kind, id, name) in &categories {
+    for (kind, id, name) in &f.categories {
         s.category(*kind, id, name);
     }
     let mut stats = db::ImportStats {
-        categories: categories.len(),
+        categories: f.categories.len(),
         ..Default::default()
     };
-    for (kind, items) in &lists {
+    for (kind, items) in &f.lists {
         if items.is_empty() {
             let kept = s.keep_kind(*kind)?;
             if kept > 0 {
@@ -250,7 +266,14 @@ pub async fn sync(conn: &mut Connection, xc: &Xtream) -> Result<(Account, db::Im
         }
     }
     stats.removed = s.finish()?;
-    Ok((account, stats))
+    Ok(stats)
+}
+
+/// A full sync: fetch, then write.
+pub async fn sync(conn: &mut Connection, xc: &Xtream) -> Result<(Account, db::ImportStats)> {
+    let f = fetch(xc).await?;
+    let stats = write(conn, &f)?;
+    Ok((f.account, stats))
 }
 
 #[cfg(test)]
