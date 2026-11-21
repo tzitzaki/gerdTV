@@ -5,7 +5,11 @@
 //! `tests/repo_rules.rs` holds the checks on the repository itself (workflows, docs, HANDOVER limits, ARB files).
 
 pub mod fault;
+pub mod generate;
 pub mod http;
+pub mod mock_release;
+pub mod mock_tmdb;
+pub mod mock_xc;
 
 use std::path::PathBuf;
 

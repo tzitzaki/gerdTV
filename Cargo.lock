@@ -487,7 +487,9 @@ dependencies = [
 name = "gerdtv-testkit"
 version = "0.0.0"
 dependencies = [
+ "ed25519-dalek",
  "serde_json",
+ "sha2",
  "tokio",
 ]
 
