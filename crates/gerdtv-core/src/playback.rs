@@ -107,6 +107,13 @@ pub enum State {
     Reconnecting,
 }
 
+/// mpv's messages when it can't open an audio output (ao/…). Matched loosely on purpose: the wording differs per
+/// driver, and a false negative only costs a needless reload, a false positive a missed one for an audio-only error.
+fn is_audio_output_error(message: &str) -> bool {
+    let m = message.to_ascii_lowercase();
+    m.contains("audio device") || m.contains("audio driver") || m.contains("audio output")
+}
+
 /// Reload backoff: 1, 2, 4, 8, 15, 30 s, then 30 s for every further attempt.
 pub fn backoff(attempt: u32) -> Duration {
     const STEPS: [u64; 6] = [1, 2, 4, 8, 15, 30];
@@ -140,6 +147,9 @@ impl Watchdog {
 
     pub fn on_event(&mut self, event: PlayerEvent) -> Vec<Command> {
         match (self.state, event) {
+            // While waiting to reload, mpv may still play out what it buffered; only playback after the reload
+            // counts as recovered.
+            (State::Reconnecting, PlayerEvent::Playing) => vec![],
             (_, PlayerEvent::Playing) => {
                 let was_reconnecting = self.attempts > 0;
                 self.state = State::Playing;
@@ -158,6 +168,8 @@ impl Watchdog {
                 self.state = State::Playing;
                 vec![]
             }
+            // Audio output problems (no device, driver missing) leave the stream itself fine; mpv plays on silently.
+            (_, PlayerEvent::Error(m)) if is_audio_output_error(&m) => vec![],
             // A live stream never ends on its own: an end of file is a failure. VOD ends normally.
             (_, PlayerEvent::EndOfFile) if !self.live => vec![],
             (State::Reconnecting, PlayerEvent::EndOfFile | PlayerEvent::Error(_)) => vec![],
@@ -282,6 +294,37 @@ mod tests {
                 true,
                 vec![EndOfFile, Tick, Playing],
                 vec![Command::HideReconnecting],
+                State::Playing,
+            ),
+            // After a live EOF mpv still plays out its buffer: that isn't recovery, the reload still happens.
+            (
+                true,
+                vec![Playing, EndOfFile, Playing],
+                vec![],
+                State::Reconnecting,
+            ),
+            (
+                true,
+                vec![Playing, EndOfFile, Playing, Tick],
+                vec![Command::Reload],
+                State::Starting,
+            ),
+            // No audio device (headless box, unplugged HDMI) is not a stream failure: never reload for it.
+            (
+                true,
+                vec![Error(
+                    "Could not open/initialize audio device -> no sound.".into(),
+                )],
+                vec![],
+                State::Starting,
+            ),
+            (
+                true,
+                vec![
+                    Playing,
+                    Error("Failed to initialize audio driver 'sndio'".into()),
+                ],
+                vec![],
                 State::Playing,
             ),
         ];

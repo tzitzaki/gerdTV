@@ -27,7 +27,11 @@ class WatchdogAdapter {
   Duration _lastPosition = Duration.zero;
 
   /// Opens [url] with [preset]'s buffer options and starts watching it.
-  Future<void> play(String url, {required bool live, BufferPreset preset = BufferPreset.balanced}) async {
+  Future<void> play(
+    String url, {
+    required bool live,
+    BufferPreset preset = BufferPreset.balanced,
+  }) async {
     await stop();
     _url = url;
     _watchdog = Watchdog(live: live);
@@ -41,13 +45,18 @@ class WatchdogAdapter {
         if (p > _lastPosition) _run(_watchdog?.onPlaying());
         _lastPosition = p;
       }),
-      player.stream.buffering.listen((b) => _run(_watchdog?.onBuffering(active: b))),
+      player.stream.buffering.listen(
+        (b) => _run(_watchdog?.onBuffering(active: b)),
+      ),
       player.stream.completed.listen((done) {
         if (done) _run(_watchdog?.onEndOfFile());
       }),
       player.stream.error.listen((e) => _run(_watchdog?.onError(message: e))),
     ]);
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _run(_watchdog?.onTick()));
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _run(_watchdog?.onTick()),
+    );
     await player.open(Media(url));
   }
 
