@@ -4,6 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- Outgoing connections: streams, the provider's API, TMDB, update checks. Without it the sandbox blocks
+	     every stream mpv opens. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
