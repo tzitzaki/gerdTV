@@ -3,7 +3,10 @@
 //! the thin `gerdtv-api` crate (flutter_rust_bridge). Bootstrap state: just the version and a greeting that proves the
 //! Dart → Rust call path works end to end.
 
+pub mod db;
+pub mod m3u;
 pub mod playback;
+pub mod xtream;
 
 /// The core's version, the same as the workspace version (set by each wrap-up release).
 pub fn version() -> &'static str {

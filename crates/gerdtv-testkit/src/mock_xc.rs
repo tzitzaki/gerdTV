@@ -23,6 +23,8 @@ pub const PASS: &str = "testpass";
 struct Switches {
     expired: bool,
     max_connections: u32,
+    /// The next answer to this action is `[]` (real panels do this now and then under load).
+    empty_once: Option<String>,
 }
 
 pub struct MockXc {
@@ -58,6 +60,7 @@ impl MockXc {
         let switches = Arc::new(Mutex::new(Switches {
             expired: false,
             max_connections: 2,
+            empty_once: None,
         }));
         let streams = FaultServer::start().await;
         let stream_base = streams.url("");
@@ -80,6 +83,11 @@ impl MockXc {
 
     pub fn set_expired(&self, expired: bool) {
         self.switches.lock().unwrap().expired = expired;
+    }
+
+    /// The next request for `action` (e.g. "get_vod_streams") answers `[]`.
+    pub fn empty_once(&self, action: &str) {
+        self.switches.lock().unwrap().empty_once = Some(action.to_string());
     }
 
     pub fn set_max_connections(&self, n: u32) {
@@ -157,7 +165,11 @@ async fn redirect(mut stream: tokio::net::TcpStream, to: &str) {
 }
 
 fn player_api(req: &Request, data: &Data, sw: &Mutex<Switches>) -> Value {
-    let sw = sw.lock().unwrap();
+    let mut sw = sw.lock().unwrap();
+    if sw.empty_once.is_some() && sw.empty_once.as_deref() == req.param("action") {
+        sw.empty_once = None;
+        return json!([]);
+    }
     let category = req.param("category_id").and_then(|c| c.parse::<u32>().ok());
     let of_kind = |k: Kind| data.entries.iter().filter(move |e| e.kind == k);
     let in_category = |e: &&Entry| category.is_none_or(|c| e.category_id == c);

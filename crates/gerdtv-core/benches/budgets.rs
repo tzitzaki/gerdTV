@@ -1,0 +1,47 @@
+//! The core's performance budgets (docs/SPEC.md, "Performance budgets"), measured on the synthetic fixtures.
+//! `just bench` runs this and fails on a regression of more than 20 % against the saved baseline.
+use criterion::{Criterion, criterion_group, criterion_main};
+use gerdtv_core::db;
+use gerdtv_testkit::generate::write_m3u;
+use std::path::Path;
+use std::time::Duration;
+
+fn playlist(n: usize) -> Vec<u8> {
+    let mut v = Vec::new();
+    write_m3u(&mut v, n, 1).unwrap();
+    v
+}
+
+fn budgets(c: &mut Criterion) {
+    let pl = playlist(150_000);
+    let mut g = c.benchmark_group("budgets");
+    g.sample_size(10).measurement_time(Duration::from_secs(20));
+    // Budget: ≥ 100k entries/s parse; 150k parse + import < 5 s.
+    g.bench_function("m3u_parse_150k", |b| {
+        b.iter(|| gerdtv_core::m3u::parse(pl.as_slice(), drop).unwrap())
+    });
+    g.bench_function("m3u_import_150k", |b| {
+        b.iter(|| {
+            let mut conn = db::open(Path::new(":memory:")).unwrap();
+            db::import_m3u(&mut conn, pl.as_slice(), &["testuser", "testpass"]).unwrap()
+        })
+    });
+    g.finish();
+
+    // Budget: search < 50 ms p95 on the full catalogue (EPG and TMDB rows join in Phase 4).
+    let mut conn = db::open(Path::new(":memory:")).unwrap();
+    db::import_m3u(&mut conn, pl.as_slice(), &["testuser", "testpass"]).unwrap();
+    let mut g = c.benchmark_group("search");
+    for q in ["s", "sport", "sport mu", "munchen kino", "de | reise", "12"] {
+        g.bench_function(format!("search_{q}"), |b| {
+            b.iter(|| db::search(&conn, q, None, 50, 0).unwrap())
+        });
+    }
+    g.bench_function("counts_sport", |b| {
+        b.iter(|| db::search_counts(&conn, "sport").unwrap())
+    });
+    g.finish();
+}
+
+criterion_group!(benches, budgets);
+criterion_main!(benches);

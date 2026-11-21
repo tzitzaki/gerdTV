@@ -14,6 +14,13 @@ gerdtv-core = { path = "crates/gerdtv-core" }
 ed25519-dalek = "3.0.0"
 sha2 = "0.11.1"
 serde_json = "1"
+tracing = "0.1.44"
+thiserror = "2.0.21"
+# TLS via rustls with the ring provider (no C toolchain for Android/iOS cross builds, unlike aws-lc-rs).
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "gzip", "stream", "http2", "charset", "query"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+criterion = "0.8.2"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros", "signal"] }
 
 [workspace.lints.clippy]
