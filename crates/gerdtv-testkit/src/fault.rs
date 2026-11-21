@@ -9,7 +9,8 @@
 //!   /vod/<name>.ts       the clip as a file, with Range support (seeking)
 //!   /_fault/<set|once>?kind=<none|drop|stall|throttle|status|eof>&n=<bytes|code|bytes-per-s>&secs=<stall s>
 //!                        injects a fault over HTTP, for tests that can't call `set`/`once` (the Flutter app's
-//!                        integration tests); /_stats returns the counters as `key=value` lines
+//!                        integration tests); /_fault/cut closes every open stream (see `cut`);
+//!                        /_stats returns the counters as `key=value` lines
 //!
 //! Faults apply to requests that start after they're set: `set` keeps a fault until changed, `once` affects only the
 //! next request (then the server is healthy again, which is how a reconnect is meant to succeed).
@@ -73,6 +74,8 @@ pub struct Stats {
 
 #[derive(Default)]
 struct State {
+    /// Bumped by `cut`; a stream that started under an older generation stops at its next chunk.
+    generation: u64,
     fault: Option<Fault>,
     once: Option<Fault>,
     stats: Stats,
@@ -112,6 +115,12 @@ impl FaultServer {
         self.state.lock().unwrap().once = Some(fault);
     }
 
+    /// Closes every stream that is open right now (a drop that hits a client mid-playback; new requests then get
+    /// whatever fault is set).
+    pub fn cut(&self) {
+        self.state.lock().unwrap().generation += 1;
+    }
+
     pub fn stats(&self) -> Stats {
         self.state.lock().unwrap().stats.clone()
     }
@@ -149,6 +158,10 @@ pub fn parse_fault(req: &Request) -> Option<Fault> {
 
 async fn serve(req: Request, mut stream: TcpStream, state: Arc<Mutex<State>>, started: Instant) {
     let path = req.path.clone();
+    if path == "/_fault/cut" {
+        state.lock().unwrap().generation += 1;
+        return http::respond(stream, 200, "text/plain", b"cut").await;
+    }
     if let Some(mode) = path.strip_prefix("/_fault/") {
         let Some(fault) = parse_fault(&req) else {
             return http::respond(stream, 400, "text/plain", b"bad fault").await;
@@ -201,7 +214,7 @@ async fn serve(req: Request, mut stream: TcpStream, state: Arc<Mutex<State>>, st
                 // Real time: the clip's bytes per second; the first second goes out at once, as live servers do.
                 let rate = CLIP_TS.len() / CLIP_SECS as usize;
                 let looped = CLIP_TS.iter().copied().cycle();
-                send_paced(&mut stream, looped, None, rate, rate, fault).await;
+                send_paced(&mut stream, looped, None, rate, rate, fault, &state).await;
             }
         }
         "playlist" => {
@@ -241,11 +254,12 @@ async fn serve(req: Request, mut stream: TcpStream, state: Arc<Mutex<State>>, st
                     usize::MAX,
                     0,
                     fault,
+                    &state,
                 )
                 .await;
             }
         }
-        _ => serve_vod(req, stream, fault).await,
+        _ => serve_vod(req, stream, fault, &state).await,
     }
 }
 
@@ -277,7 +291,7 @@ pub fn hls_playlist(name: &str, elapsed: Duration, rotate: bool) -> String {
     out
 }
 
-async fn serve_vod(req: Request, mut stream: TcpStream, fault: Fault) {
+async fn serve_vod(req: Request, mut stream: TcpStream, fault: Fault, state: &Mutex<State>) {
     let total = CLIP_TS.len();
     // Only the "bytes=<start>-" and "bytes=<start>-<end>" forms; that's what FFmpeg sends when seeking.
     let range = req
@@ -314,6 +328,7 @@ async fn serve_vod(req: Request, mut stream: TcpStream, fault: Fault) {
             usize::MAX,
             0,
             fault,
+            state,
         )
         .await;
     }
@@ -328,7 +343,9 @@ async fn send_paced(
     rate: usize,
     burst: usize,
     fault: Fault,
+    state: &Mutex<State>,
 ) {
+    let generation = state.lock().unwrap().generation;
     // A congested line has no start-up burst either.
     let (rate, burst) = match fault {
         Fault::Throttle { bytes_per_sec } => (bytes_per_sec.min(rate), 0),
@@ -343,6 +360,9 @@ async fn send_paced(
     while bytes.peek().is_some() {
         chunk.clear();
         chunk.extend(bytes.by_ref().take(chunk_size));
+        if state.lock().unwrap().generation != generation {
+            return; // cut: dropping the stream closes the socket
+        }
         match fault {
             Fault::Drop { after_bytes } if sent >= after_bytes => return, // dropping the stream closes the socket
             Fault::LiveEof { after_bytes } if sent >= after_bytes => {

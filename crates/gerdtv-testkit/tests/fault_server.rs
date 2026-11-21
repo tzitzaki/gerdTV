@@ -113,6 +113,19 @@ async fn faults_are_injectable() {
     let (status, n, _) = get(&srv.url("/vod/movie.ts"), 1_000_000, Duration::from_secs(2)).await;
     assert!(status == 200 && n > 300_000);
 
+    // Cut: a stream that is already playing is closed.
+    let cut = {
+        let live = live.clone();
+        tokio::spawn(async move { get(&live, 10_000_000, Duration::from_secs(4)).await })
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    srv.cut();
+    let (_, n, closed) = cut.await.unwrap();
+    assert!(
+        closed && n < 80_000,
+        "cut mid-stream, got {n} closed={closed}"
+    );
+
     // Over HTTP (for the Flutter integration tests): a one-shot 502, then healthy again.
     assert_eq!(
         get(
