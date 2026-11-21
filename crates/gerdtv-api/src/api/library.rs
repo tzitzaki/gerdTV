@@ -155,6 +155,17 @@ pub struct SyncSummary {
     pub active_connections: Option<u32>,
 }
 
+/// One stream_health row.
+pub struct HealthInfo {
+    pub at: i64,
+    pub key: String,
+    pub name: String,
+    pub trigger: String,
+    pub attempts: u32,
+    pub recovered: bool,
+    pub secs: u32,
+}
+
 /// An open profile.
 #[flutter_rust_bridge::frb(opaque)]
 pub struct Library(core::Library);
@@ -232,6 +243,48 @@ impl Library {
                 })
                 .collect(),
         })
+    }
+
+    /// Logs a recovery episode (the watchdog's Health command).
+    pub fn record_health(
+        &self,
+        key: String,
+        trigger: String,
+        attempts: u32,
+        recovered: bool,
+        secs: u32,
+    ) -> Result<(), String> {
+        self.0
+            .record_health(&key, &trigger, attempts, recovered, secs)
+            .map_err(err)
+    }
+
+    /// The newest stream_health rows (Settings → Stream health).
+    pub fn health(&self, limit: u32) -> Result<Vec<HealthInfo>, String> {
+        Ok(self
+            .0
+            .health(limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(|h| HealthInfo {
+                at: h.at,
+                key: h.key,
+                name: h.name,
+                trigger: h.trigger,
+                attempts: h.attempts,
+                recovered: h.recovered,
+                secs: h.secs,
+            })
+            .collect())
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn prefer_hls(&self, key: String) -> Result<bool, String> {
+        self.0.prefer_hls(&key).map_err(err)
+    }
+
+    pub fn set_prefer_hls(&self, key: String, hls: bool) -> Result<(), String> {
+        self.0.set_prefer_hls(&key, hls).map_err(err)
     }
 
     /// The play URL (holds credentials: pass it straight to the player, never log or show it).

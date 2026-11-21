@@ -97,7 +97,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CommandKind dco_decode_command_kind(dynamic raw);
 
   @protected
+  HealthInfo dco_decode_health_info(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
   ItemInfo dco_decode_item_info(dynamic raw);
@@ -113,6 +119,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<CategoryInfo> dco_decode_list_category_info(dynamic raw);
+
+  @protected
+  List<HealthInfo> dco_decode_list_health_info(dynamic raw);
 
   @protected
   List<ItemInfo> dco_decode_list_item_info(dynamic raw);
@@ -238,7 +247,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CommandKind sse_decode_command_kind(SseDeserializer deserializer);
 
   @protected
+  HealthInfo sse_decode_health_info(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
   ItemInfo sse_decode_item_info(SseDeserializer deserializer);
@@ -256,6 +271,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<CategoryInfo> sse_decode_list_category_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<HealthInfo> sse_decode_list_health_info(SseDeserializer deserializer);
 
   @protected
   List<ItemInfo> sse_decode_list_item_info(SseDeserializer deserializer);
@@ -395,7 +413,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_command_kind(CommandKind self, SseSerializer serializer);
 
   @protected
+  void sse_encode_health_info(HealthInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_item_info(ItemInfo self, SseSerializer serializer);
@@ -412,6 +436,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_category_info(
     List<CategoryInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_health_info(
+    List<HealthInfo> self,
     SseSerializer serializer,
   );
 

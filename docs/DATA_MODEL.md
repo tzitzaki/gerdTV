@@ -12,6 +12,8 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `items` | the catalogue: live channels, movies, episodes (M3U), series (Xtream Codes); name, category, logo, EPG id, channel number, credential-free URL (M3U only), season/episode/year, provider position, sync generation | `key` |
 | `items_fts` | contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`; rowids match `items` | rowid |
 | `favourites`, `recents` | user data: item key + `updated_at` | `key` |
+| `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), `updated_at` | `key` |
+| `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).
 

@@ -1,5 +1,6 @@
-// Spike A journey: media_kit (libmpv) plays the testkit's live stream with the Balanced preset applied, and the
-// Rust watchdog brings it back after the stream is cut and the server refuses reconnects for a while.
+// Playback journeys against the testkit's fault server, through real libmpv (media_kit) and the Rust watchdog:
+// the Balanced preset is applied and a cut live stream comes back by itself (and the recovery is logged).
+// The refused-stream case is hard_error_test.dart (own process).
 // Needs the fault server: `just test-integration` starts it and passes its URL as GERDTV_FAULT_SERVER.
 import 'dart:io';
 
@@ -32,6 +33,14 @@ Future<void> waitFor(
   }
 }
 
+/// A player as the app makes it, plus the headless-runner setting: no audio device and no video controller here,
+/// and with neither output mpv ends the file at once, so a null audio output keeps a decodable stream "playing".
+Future<Player> headlessPlayer() async {
+  final player = Player(configuration: WatchdogAdapter.playerConfiguration);
+  await (player.platform as NativePlayer).setProperty('ao', 'null');
+  return player;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
@@ -39,6 +48,7 @@ void main() {
     MediaKit.ensureInitialized();
   });
 
+  // Each test creates and disposes its player inside runAsync: real time, real platform callbacks.
   testWidgets(
     'live TS plays with the Balanced preset and recovers after a drop',
     (tester) async {
@@ -47,21 +57,26 @@ void main() {
         isNotEmpty,
         reason: 'run through `just test-integration`',
       );
-      final player = Player();
-      addTearDown(player.dispose);
-      final adapter = WatchdogAdapter(player);
-      var maxAttempt = 0;
-      adapter.reconnecting.addListener(() {
-        if (adapter.reconnecting.value > maxAttempt) {
-          maxAttempt = adapter.reconnecting.value;
-        }
-      });
-
       await tester.runAsync(() async {
-        // Headless runners have no audio device, and no video controller is attached here: with neither output,
-        // mpv ends the file at once. A null audio output keeps a decodable stream "playing".
-        await (player.platform as NativePlayer).setProperty('ao', 'null');
-        await adapter.play('$faultServer/live/ch1.ts', live: true);
+        final player = await headlessPlayer();
+        final health = <(String, bool)>[];
+        final adapter = WatchdogAdapter(
+          player,
+          onHealth: (trigger, attempts, recovered, secs) {
+            health.add((trigger, recovered));
+          },
+        );
+        var maxAttempt = 0;
+        adapter.reconnecting.addListener(() {
+          if (adapter.reconnecting.value > maxAttempt) {
+            maxAttempt = adapter.reconnecting.value;
+          }
+        });
+
+        await adapter.play(
+          ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
+          live: true,
+        );
         // Balanced: mpv waits for 8 s of cache before starting.
         final wait = await (player.platform as NativePlayer).getProperty(
           'cache-pause-wait',
@@ -93,8 +108,15 @@ void main() {
           'recovery',
         );
         expect(maxAttempt, greaterThanOrEqualTo(1));
+        expect(
+          health,
+          isNotEmpty,
+          reason: 'the recovery is logged for stream_health',
+        );
+        expect(health.last.$2, isTrue);
+        await adapter.stop();
+        await player.dispose();
       });
-      await adapter.stop();
     },
   );
 }

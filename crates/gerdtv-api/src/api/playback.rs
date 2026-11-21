@@ -48,12 +48,38 @@ pub enum CommandKind {
     Reload,
     ShowReconnecting,
     HideReconnecting,
+    Fail,
+    RememberHls,
+    Health,
 }
 
-/// A watchdog command; `attempt` is set for ShowReconnecting.
+/// A watchdog command; which fields matter depends on `kind`:
+/// Reload: `hls`, `resume_ms` · ShowReconnecting: `attempt` · Fail: `message` · RememberHls: `hls` ·
+/// Health: `trigger`, `attempt` (attempts), `recovered`, `secs`.
 pub struct WatchdogCommand {
     pub kind: CommandKind,
     pub attempt: u32,
+    pub hls: bool,
+    pub resume_ms: Option<u64>,
+    pub message: String,
+    pub trigger: String,
+    pub recovered: bool,
+    pub secs: u64,
+}
+
+impl WatchdogCommand {
+    fn of(kind: CommandKind) -> Self {
+        WatchdogCommand {
+            kind,
+            attempt: 0,
+            hls: false,
+            resume_ms: None,
+            message: String::new(),
+            trigger: String::new(),
+            recovered: false,
+            secs: 0,
+        }
+    }
 }
 
 /// One watchdog per playing stream, owned by the Dart adapter.
@@ -61,20 +87,30 @@ pub struct WatchdogCommand {
 pub struct Watchdog(Mutex<core::Watchdog>);
 
 impl Watchdog {
+    /// `target_seconds`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn new(live: bool) -> Watchdog {
-        Watchdog(Mutex::new(core::Watchdog::new(live)))
+    pub fn new(live: bool, target_seconds: u32, prefer_hls: bool) -> Watchdog {
+        Watchdog(Mutex::new(core::Watchdog::new(
+            live,
+            target_seconds,
+            prefer_hls,
+        )))
     }
 
     // One method per player event (see BufferPreset for why not one enum with fields).
     #[flutter_rust_bridge::frb(sync)]
-    pub fn on_playing(&self) -> Vec<WatchdogCommand> {
-        self.feed(core::PlayerEvent::Playing)
+    pub fn on_position(&self, position_ms: u64) -> Vec<WatchdogCommand> {
+        self.feed(core::PlayerEvent::Position(position_ms))
     }
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn on_buffering(&self, active: bool) -> Vec<WatchdogCommand> {
         self.feed(core::PlayerEvent::Buffering(active))
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn on_user_pause(&self, paused: bool) -> Vec<WatchdogCommand> {
+        self.feed(core::PlayerEvent::UserPause(paused))
     }
 
     #[flutter_rust_bridge::frb(sync)]
@@ -85,6 +121,17 @@ impl Watchdog {
     #[flutter_rust_bridge::frb(sync)]
     pub fn on_error(&self, message: String) -> Vec<WatchdogCommand> {
         self.feed(core::PlayerEvent::Error(message))
+    }
+
+    /// The app came back from sleep or the background.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn on_wake(&self) -> Vec<WatchdogCommand> {
+        self.feed(core::PlayerEvent::Wake)
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn on_network_changed(&self) -> Vec<WatchdogCommand> {
+        self.feed(core::PlayerEvent::NetworkChanged)
     }
 
     /// Call once a second while a stream is open.
@@ -100,17 +147,37 @@ impl Watchdog {
             .on_event(event)
             .into_iter()
             .map(|c| match c {
-                core::Command::Reload => WatchdogCommand {
-                    kind: CommandKind::Reload,
-                    attempt: 0,
+                core::Command::Reload { hls, resume_ms } => WatchdogCommand {
+                    hls,
+                    resume_ms,
+                    ..WatchdogCommand::of(CommandKind::Reload)
                 },
                 core::Command::ShowReconnecting(attempt) => WatchdogCommand {
-                    kind: CommandKind::ShowReconnecting,
                     attempt,
+                    ..WatchdogCommand::of(CommandKind::ShowReconnecting)
                 },
-                core::Command::HideReconnecting => WatchdogCommand {
-                    kind: CommandKind::HideReconnecting,
-                    attempt: 0,
+                core::Command::HideReconnecting => {
+                    WatchdogCommand::of(CommandKind::HideReconnecting)
+                }
+                core::Command::Fail(message) => WatchdogCommand {
+                    message,
+                    ..WatchdogCommand::of(CommandKind::Fail)
+                },
+                core::Command::RememberHls(hls) => WatchdogCommand {
+                    hls,
+                    ..WatchdogCommand::of(CommandKind::RememberHls)
+                },
+                core::Command::Health {
+                    trigger,
+                    attempts,
+                    recovered,
+                    secs,
+                } => WatchdogCommand {
+                    trigger: trigger.as_str().to_string(),
+                    attempt: attempts,
+                    recovered,
+                    secs,
+                    ..WatchdogCommand::of(CommandKind::Health)
                 },
             })
             .collect()
