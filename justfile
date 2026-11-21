@@ -67,9 +67,9 @@ test-docs:
 test-affected base="origin/main":
     scripts/test-affected.sh {{base}}
 
-# Integration tests on the Linux desktop build under Xvfb.
+# Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 test-integration:
-    cd app && {{heavy}} xvfb-run -a flutter test integration_test -d linux
+    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER"'
 
 # Fails on a private detail in the changes since <base> or in the given files (e.g. a PR body draft).
 denylist base="origin/main" *files="":
@@ -126,4 +126,5 @@ licences:
 
 # [MAC] sessions only: build and run the integration tests on a Mac.
 mac-check:
-    cd app && flutter build macos --debug && flutter test integration_test -d macos
+    cd app && flutter build macos --debug
+    scripts/with-fault-server.sh bash -c 'cd app && flutter test integration_test -d macos --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER"'

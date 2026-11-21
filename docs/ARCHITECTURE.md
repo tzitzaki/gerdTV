@@ -17,10 +17,30 @@
 - Debug: "Failed to load dynamic library" at start means Cargokit didn't build or bundle the library; build with `-v` and look for the Cargokit step.
 
 ## Playback pipeline
-Phase 2. media_kit (libmpv) plays; mpv options for the buffer presets are set through media_kit's native player properties; the Rust watchdog decides reloads. The option mapping per libmpv version lives here once Spike A has verified it.
+- One media_kit `Player`. The Rust core owns the policy (`crates/gerdtv-core/src/playback.rs`): `mpv_options` turns a buffer preset into mpv options, and `Watchdog` turns player events into commands. The Dart adapter (`app/lib/player/watchdog_adapter.dart`) sets the options through media_kit's `NativePlayer.setProperty` before `open()`, feeds position/buffering/completed/error events in, ticks it once a second, and runs its commands (reload, show/hide "Reconnecting (n)").
+- Watchdog rules so far: a live end of file or an error schedules a reload with backoff 1, 2, 4, 8, 15, 30 s; while waiting, playing out the remaining buffer doesn't count as recovered; audio-output errors (no device) are ignored; a VOD end of file is a normal end.
+- Option mapping (names verified in mpv 0.40 and FFmpeg 7.1, and limited to ones mpv 0.36 / FFmpeg 6.0 also have):
+
+| Preset setting | mpv option | Value |
+|---|---|---|
+| target buffer | `cache-secs`, `demuxer-readahead-secs`, `cache-pause-wait` | the preset's seconds (2 / 8 / 30 / 90 / 1–300) |
+| start and resume only with a full buffer | `cache`, `cache-pause`, `cache-pause-initial` | `yes` |
+| demuxer size | `demuxer-max-bytes` | target × bitrate × 1.5, at least 32 MiB (bitrate estimate 8 Mbit/s until known) |
+| large buffers on disk | `cache-on-disk` | `yes` from 30 s |
+| transport reconnect | `stream-lavf-o` | `reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=5` |
+| network timeout | `network-timeout` | 10 s |
+
+- media_kit's own start-up defaults that stay: `demuxer-lavf-o` (HLS segment retries, allowed extensions), `demuxer-max-back-bytes` (32 MiB until timeshift sets it).
+- Headless test runs set `ao=null`: with no audio device and no video controller, mpv would end the file at once.
 
 ## Native libraries
-libmpv and FFmpeg come with the media_kit libs packages chosen in Spike A; their versions, licences and build flags are listed here and in the in-app Licences screen.
+| Platform | Package | libmpv / FFmpeg | Licence of the build |
+|---|---|---|---|
+| Linux | `media_kit_libs_linux` | the system libmpv (Debian/Ubuntu package) | as packaged by the distribution |
+| Android | `media_kit_libs_android_video` | mpv (2023, between 0.36 and 0.37) / FFmpeg 6.0; arm64-v8a, armeabi-v7a, x86_64; 16 KB page aligned | LGPL-3.0 (FFmpeg), mpv built with `-Dgpl=false` |
+| macOS, iOS | `media_kit_libs_macos_video`, `media_kit_libs_ios_video` | mpv 0.36.0 / FFmpeg 6.0 (xcframeworks via CocoaPods) | LGPL |
+
+All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with the GPL-3.0 app. The in-app Licences screen will list them with these flags.
 
 ## Platform channels
 None yet. Each one lands here with its purpose, its Swift/Kotlin file and its Dart counterpart.
