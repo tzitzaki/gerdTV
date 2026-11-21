@@ -1,0 +1,7 @@
+# Flutter gen-l10n: English is the template; German alongside (CLAUDE.md: keys sorted, both files share every key;
+# crates/gerdtv-testkit/tests/repo_rules.rs checks that). Output is generated into lib/l10n at build/analyze time.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/l10n/gen
+nullable-getter: false

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Before every push (CLAUDE.md, "Dev loop"): the private denylist check on everything being pushed, then the tests
+# this branch's changes can affect. CI runs everything afterwards.
+# Turned on once per clone: git config core.hooksPath .githooks (docs/SETUP.md).
+# Debug: run the steps by hand: scripts/check-denylist.sh origin/main && just test-affected
+set -euo pipefail
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue          # deleting a remote branch: nothing to check
+  if [[ "$remote_sha" == "$zero" ]]; then base=origin/main; else base="$remote_sha"; fi
+  # Check from the base to the commit being pushed (not whatever is checked out).
+  git merge-base --is-ancestor "$local_sha" HEAD 2>/dev/null || { echo "pre-push: push from the branch you're on"; exit 1; }
+  scripts/check-denylist.sh "$base"
+done
+exec just test-affected

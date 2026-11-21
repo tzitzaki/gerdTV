@@ -1,0 +1,154 @@
+# Release on a pushed v* tag (docs/RELEASING.md). Builds every platform on GitHub's standard runners, signs with the
+# secrets of the "release" environment (only v* tags may use it), and publishes only when every platform job
+# succeeded (no half releases). Tags with a "-" (test tags) become pre-releases.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  apple:
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci-install-flutter.sh
+      - name: Import the code-signing certificate into a temporary keychain
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"; kc_pass="$(uuidgen)"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$kc_pass" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kc_pass" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pass" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          # A self-signed certificate is "not trusted" for policy checks, but codesign can still sign with it.
+          security find-identity -v "$kc" || true
+          echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: macOS app (signed, zipped)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd app && flutter build macos --release
+          app=build/macos/Build/Products/Release/gerdTV.app
+          # Re-sign the whole bundle with the stable certificate (Flutter signs ad hoc), keeping the entitlements.
+          codesign --force --deep --timestamp=none --preserve-metadata=entitlements \
+            --keychain "$KEYCHAIN" --sign "gerdTV Code Signing" "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -d -r- "$app"
+          mkdir -p ../dist && ditto -c -k --keepParent "$app" "../dist/gerdTV-macos-$version.zip"
+      - name: iOS IPA (unsigned, for a re-signing service)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd app && flutter build ios --release --no-codesign
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R build/ios/iphoneos/Runner.app "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/gerdTV-ios-unsigned-$version.ipa" Payload)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apple
+          path: dist/
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: scripts/ci-install-flutter.sh
+      - name: Release APK (arm64-v8a, release keystore)
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          # Read by app/android/app/build.gradle.kts; never committed (app/android/.gitignore).
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > app/android/key.properties
+          cd app && flutter build apk --release --target-platform android-arm64
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -i 'certificate DN'
+          mkdir -p ../dist && cp build/app/outputs/flutter-apk/app-release.apk "../dist/gerdTV-android-$version.apk"
+          rm -f android/key.properties "$RUNNER_TEMP/release.jks"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android
+          path: dist/
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: System packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libayatana-appindicator3-dev
+      - run: scripts/ci-install-flutter.sh
+      - name: Linux bundle (tar.gz)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cd app && flutter build linux --release
+          rm -rf "$RUNNER_TEMP/gerdTV" && cp -R build/linux/x64/release/bundle "$RUNNER_TEMP/gerdTV"
+          mkdir -p ../dist && tar -C "$RUNNER_TEMP" -czf "../dist/gerdTV-linux-x64-$version.tar.gz" gerdTV
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [apple, android, linux]
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Notes, signed manifest, release
+        env:
+          GERDTV_UPDATE_SIGNING_KEY: ${{ secrets.GERDTV_UPDATE_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          # Minimum OS per platform: macOS/iOS deployment targets of the Xcode projects, Android minSdk (API level).
+          cargo run -q --release -p gerdtv-release -- manifest --version "$v" --notes "$RUNNER_TEMP/notes.md" \
+            --asset macos "dist/gerdTV-macos-$v.zip" "macOS 12.0" \
+            --asset ios "dist/gerdTV-ios-unsigned-$v.ipa" "iOS 15.0" \
+            --asset android "dist/gerdTV-android-$v.apk" "Android API 24" \
+            --asset linux "dist/gerdTV-linux-x64-$v.tar.gz" "x64, glibc 2.39" > dist/latest.json
+          cargo run -q --release -p gerdtv-release -- sign dist/latest.json
+          # Verify against the committed public key, exactly as the app will.
+          cargo run -q --release -p gerdtv-release -- check keys/update-public-key.hex dist
+          (cd dist && sha256sum gerdTV-* > SHA256SUMS)
+          pre=""; [[ "$v" == *-* ]] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" dist/* --title "gerdTV $v" --notes-file "$RUNNER_TEMP/notes.md" $pre

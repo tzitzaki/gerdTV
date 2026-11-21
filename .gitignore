@@ -1,0 +1,11 @@
+# Rust build output (the app's own ignores are in app/.gitignore).
+/target/
+# Local-only files: the denylist and signing material live in ~/.config/gerdTV, never here; these catch slips.
+*.jks
+*.p12
+*.key
+key.properties
+signing.env
+
+# Session worktrees live inside the main folder.
+/.claude/worktrees/

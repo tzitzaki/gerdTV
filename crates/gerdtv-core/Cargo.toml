@@ -1,0 +1,11 @@
+[package]
+name = "gerdtv-core"
+description = "gerdTV core: all app logic, no Flutter dependency, tested headless."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

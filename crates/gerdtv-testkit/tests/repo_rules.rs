@@ -1,0 +1,244 @@
+//! Rules about the repository itself (CLAUDE.md). Each test owns one rule; extend its table rather than adding files.
+//! Run alone with `just test-docs`. A failure message names the file and what to change.
+
+use gerdtv_testkit::repo_root;
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn read(rel: &str) -> String {
+    fs::read_to_string(repo_root().join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}"))
+}
+
+fn files_in(rel_dir: &str, ext: &str) -> Vec<PathBuf> {
+    let mut v: Vec<PathBuf> = fs::read_dir(repo_root().join(rel_dir))
+        .unwrap_or_else(|e| panic!("{rel_dir}: {e}"))
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == ext))
+        .collect();
+    v.sort();
+    v
+}
+
+fn name(p: &Path) -> String {
+    p.strip_prefix(repo_root())
+        .unwrap_or(p)
+        .display()
+        .to_string()
+}
+
+/// Workflows: only GitHub's free standard runners, only GitHub-owned actions pinned by full commit SHA,
+/// never `pull_request_target`, and a default read-only token (CLAUDE.md "CI"; docs/SETUP.md "CI").
+#[test]
+fn workflows_use_standard_runners_and_pinned_github_actions() {
+    let workflows = files_in(".github/workflows", "yml");
+    assert!(!workflows.is_empty(), "no workflows found");
+    for wf in workflows {
+        let text = fs::read_to_string(&wf).unwrap();
+        let wf = name(&wf);
+        assert!(
+            !text.contains("pull_request_target"),
+            "{wf}: pull_request_target is not allowed"
+        );
+        assert!(
+            text.lines().any(|l| l == "permissions:"),
+            "{wf}: needs a top-level `permissions:` block"
+        );
+        for (n, line) in text.lines().enumerate() {
+            let line = line.trim();
+            if let Some(runner) = line.strip_prefix("runs-on:") {
+                let runner = runner.trim();
+                assert!(
+                    runner == "ubuntu-latest" || runner == "macos-latest",
+                    "{wf}:{}: runs-on {runner:?}; only ubuntu-latest or macos-latest (free standard runners)",
+                    n + 1
+                );
+            }
+            if let Some(action) = line.trim_start_matches("- ").strip_prefix("uses:") {
+                let action = action.split('#').next().unwrap().trim();
+                let (repo, sha) = action.split_once('@').unwrap_or((action, ""));
+                assert!(
+                    repo.starts_with("actions/"),
+                    "{wf}:{}: {repo} is not a GitHub-owned action",
+                    n + 1
+                );
+                assert!(
+                    sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit()),
+                    "{wf}:{}: {repo} must be pinned by a full commit SHA",
+                    n + 1
+                );
+            }
+        }
+    }
+}
+
+/// The required checks of the `main` ruleset are the ci.yml job names; renaming one blocks every merge.
+#[test]
+fn ci_keeps_the_required_job_names() {
+    let ci = read(".github/workflows/ci.yml");
+    for job in ["linux", "macos", "android"] {
+        assert!(
+            ci.contains(&format!("\n  {job}:\n")),
+            "ci.yml: job `{job}` is a required check; keep its name"
+        );
+    }
+}
+
+/// Every repo path and `just` recipe a doc names exists (docs stay current; CLAUDE.md "Docs").
+/// A backticked token counts as a path when its first segment exists at the repo root (so `origin/main` or
+/// `~/…` aren't checked); tokens with placeholders (`<`, `*`, `{`, spaces) are skipped.
+#[test]
+fn docs_name_only_existing_paths_and_recipes() {
+    let root = repo_root();
+    let recipes: BTreeSet<String> = read("justfile")
+        .lines()
+        .filter(|l| {
+            l.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+                && l.contains(':')
+                && !l.contains(":=")
+        })
+        .map(|l| l.split([' ', ':']).next().unwrap().to_string())
+        .collect();
+    let mut docs = files_in("docs", "md");
+    docs.extend([root.join("CLAUDE.md"), root.join("README.md")]);
+    let mut problems = vec![];
+    for doc in docs {
+        let text = fs::read_to_string(&doc).unwrap();
+        for (i, token) in text.split('`').enumerate() {
+            if i % 2 == 0 || token.is_empty() || token.contains(['\n']) {
+                continue;
+            }
+            if let Some(rest) = token.strip_prefix("just ") {
+                let recipe = rest.split_whitespace().next().unwrap_or("");
+                if !recipes.contains(recipe) {
+                    problems.push(format!(
+                        "{}: `{token}`: no recipe `{recipe}` in justfile",
+                        name(&doc)
+                    ));
+                }
+                continue;
+            }
+            if token.contains(['<', '*', '{', ' ', '$'])
+                || token.starts_with(['~', '/', '-', '.'])
+                    && !token.starts_with(".git")
+                    && !token.starts_with(".claude")
+            {
+                continue;
+            }
+            let path = token.trim_end_matches('/');
+            let first = path.split('/').next().unwrap();
+            if root.join(first).exists() && !root.join(path).exists() {
+                problems.push(format!("{}: `{token}` does not exist", name(&doc)));
+            }
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "stale doc references:\n{}",
+        problems.join("\n")
+    );
+}
+
+/// HANDOVER.md and DEVICE_CHECKS.md are read on a phone: ≤ 60 lines of ≤ 160 characters, no continuation lines.
+#[test]
+fn phone_docs_stay_within_their_limits() {
+    for doc in ["docs/HANDOVER.md", "docs/DEVICE_CHECKS.md"] {
+        let text = read(doc);
+        let lines: Vec<&str> = text.lines().collect();
+        assert!(
+            lines.len() <= 60,
+            "{doc}: {} lines, at most 60; send the oldest items to the owner",
+            lines.len()
+        );
+        for (n, line) in lines.iter().enumerate() {
+            assert!(
+                line.chars().count() <= 160,
+                "{doc}:{}: longer than 160 characters",
+                n + 1
+            );
+            assert!(
+                line.is_empty() || !line.starts_with([' ', '\t']),
+                "{doc}:{}: continuation line; one full-sentence item per line",
+                n + 1
+            );
+        }
+    }
+}
+
+/// The ARB files share every key, in sorted order (parallel PRs never append to a shared end), and the app's name
+/// is spelled "gerdTV" in every user-visible string.
+#[test]
+fn arb_files_match_and_are_sorted() {
+    let arbs = files_in("app/lib/l10n", "arb");
+    assert!(arbs.len() >= 2, "expected app_en.arb and app_de.arb");
+    let keys_of = |p: &PathBuf| -> Vec<String> {
+        let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap();
+        let obj = v.as_object().unwrap();
+        for (k, val) in obj {
+            if let Some(s) = val.as_str() {
+                assert!(
+                    !s.to_lowercase().contains("gerdtv") || s.contains("gerdTV"),
+                    "{}: `{k}` must spell the name gerdTV",
+                    name(p)
+                );
+            }
+        }
+        // serde_json keeps keys sorted, so read the order from the text itself.
+        let text = fs::read_to_string(p).unwrap();
+        text.lines()
+            .filter_map(|l| {
+                l.trim()
+                    .strip_prefix('"')
+                    .and_then(|r| r.split_once('"'))
+                    .map(|(k, _)| k.to_string())
+            })
+            .filter(|k| !k.starts_with('@') && obj.contains_key(k))
+            .collect()
+    };
+    let reference = keys_of(&arbs[0]);
+    let mut sorted = reference.clone();
+    sorted.sort();
+    assert_eq!(reference, sorted, "{}: keys must be sorted", name(&arbs[0]));
+    for arb in &arbs[1..] {
+        assert_eq!(
+            keys_of(arb),
+            reference,
+            "{}: keys must match {} in the same order",
+            name(arb),
+            name(&arbs[0])
+        );
+    }
+}
+
+/// Every platform shows the exact name "gerdTV" (lowercase `gerdtv` only for ids and binaries).
+#[test]
+fn platforms_show_the_name_gerdtv() {
+    let cases = [
+        (
+            "app/android/app/src/main/AndroidManifest.xml",
+            "android:label=\"gerdTV\"",
+        ),
+        (
+            "app/macos/Runner/Configs/AppInfo.xcconfig",
+            "PRODUCT_NAME = gerdTV",
+        ),
+        (
+            "app/ios/Runner/Info.plist",
+            "<key>CFBundleDisplayName</key>\n\t<string>gerdTV</string>",
+        ),
+        (
+            "app/ios/Runner/Info.plist",
+            "<key>CFBundleName</key>\n\t<string>gerdTV</string>",
+        ),
+        (
+            "app/linux/runner/my_application.cc",
+            "gtk_window_set_title(window, \"gerdTV\")",
+        ),
+    ];
+    for (file, expected) in cases {
+        assert!(
+            read(file).contains(expected),
+            "{file}: expected `{expected}`"
+        );
+    }
+}
