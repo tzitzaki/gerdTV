@@ -27,6 +27,9 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 abstract class Library implements RustOpaqueInterface {
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
+  /// The newest stream_health rows (Settings → Stream health).
+  Future<List<HealthInfo>> health({required int limit});
+
   Future<List<ItemInfo>> items({
     required ItemKind kind,
     required String category,
@@ -45,6 +48,17 @@ abstract class Library implements RustOpaqueInterface {
     secrets: secrets,
   );
 
+  bool preferHls({required String key});
+
+  /// Logs a recovery episode (the watchdog's Health command).
+  Future<void> recordHealth({
+    required String key,
+    required String trigger,
+    required int attempts,
+    required bool recovered,
+    required int secs,
+  });
+
   /// Search as the user types; `kind` None = all kinds.
   Future<SearchPage> search({
     required BigInt seq,
@@ -53,6 +67,8 @@ abstract class Library implements RustOpaqueInterface {
     required int limit,
     required int offset,
   });
+
+  Future<void> setPreferHls({required String key, required bool hls});
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});
@@ -82,6 +98,50 @@ class CategoryInfo {
           id == other.id &&
           name == other.name &&
           count == other.count;
+}
+
+/// One stream_health row.
+class HealthInfo {
+  final PlatformInt64 at;
+  final String key;
+  final String name;
+  final String trigger;
+  final int attempts;
+  final bool recovered;
+  final int secs;
+
+  const HealthInfo({
+    required this.at,
+    required this.key,
+    required this.name,
+    required this.trigger,
+    required this.attempts,
+    required this.recovered,
+    required this.secs,
+  });
+
+  @override
+  int get hashCode =>
+      at.hashCode ^
+      key.hashCode ^
+      name.hashCode ^
+      trigger.hashCode ^
+      attempts.hashCode ^
+      recovered.hashCode ^
+      secs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HealthInfo &&
+          runtimeType == other.runtimeType &&
+          at == other.at &&
+          key == other.key &&
+          name == other.name &&
+          trigger == other.trigger &&
+          attempts == other.attempts &&
+          recovered == other.recovered &&
+          secs == other.secs;
 }
 
 class ItemInfo {

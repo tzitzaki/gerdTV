@@ -12,7 +12,7 @@
 
 use crate::db::{self, Hit, ImportStats, Kind};
 use crate::xtream::{self, Account, XcError, Xtream};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -356,6 +356,87 @@ impl Library {
     }
 }
 
+/// One stream_health row.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HealthEntry {
+    pub at: i64,
+    pub key: String,
+    pub name: String,
+    pub trigger: String,
+    pub attempts: u32,
+    pub recovered: bool,
+    pub secs: u32,
+}
+
+/// How many stream_health rows are kept (older ones are pruned on insert).
+const HEALTH_KEEP: i64 = 2000;
+
+impl Library {
+    /// Logs one recovery episode (from the watchdog's Health command).
+    pub fn record_health(
+        &self,
+        key: &str,
+        trigger: &str,
+        attempts: u32,
+        recovered: bool,
+        secs: u32,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO stream_health (at, key, trigger, attempts, recovered, secs) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![now(), key, trigger, attempts, recovered, secs],
+        )?;
+        conn.execute(
+            "DELETE FROM stream_health WHERE id <= (SELECT max(id) FROM stream_health) - ?1",
+            [HEALTH_KEEP],
+        )?;
+        Ok(())
+    }
+
+    /// The newest stream_health rows first, with the item's current name.
+    pub fn health(&self, limit: usize) -> Result<Vec<HealthEntry>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare_cached(
+            "SELECT h.at, h.key, coalesce(i.name, h.key), h.trigger, h.attempts, h.recovered, h.secs
+             FROM stream_health h LEFT JOIN items i ON i.key = h.key ORDER BY h.id DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit as i64], |r| {
+            Ok(HealthEntry {
+                at: r.get(0)?,
+                key: r.get(1)?,
+                name: r.get(2)?,
+                trigger: r.get(3)?,
+                attempts: r.get(4)?,
+                recovered: r.get(5)?,
+                secs: r.get(6)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Whether this channel last worked as HLS (false = TS, the default).
+    pub fn prefer_hls(&self, key: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let v: Option<bool> = conn
+            .query_row(
+                "SELECT prefer_hls FROM stream_prefs WHERE key = ?1",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(v.unwrap_or(false))
+    }
+
+    pub fn set_prefer_hls(&self, key: &str, hls: bool) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO stream_prefs (key, prefer_hls, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET prefer_hls = ?2, updated_at = ?3",
+            params![key, hls, now()],
+        )?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433,6 +514,25 @@ mod tests {
             lib.stream_url(&page[0].key, "m3u8")
                 .unwrap()
                 .ends_with(".m3u8")
+        );
+
+        // Stream health and the per-channel URL form.
+        let key = page[0].key.clone();
+        assert!(!lib.prefer_hls(&key).unwrap());
+        lib.set_prefer_hls(&key, true).unwrap();
+        assert!(lib.prefer_hls(&key).unwrap());
+        lib.record_health(&key, "live_end", 4, true, 15).unwrap();
+        lib.record_health("live:gone", "error", 6, false, 90)
+            .unwrap();
+        let h = lib.health(10).unwrap();
+        assert_eq!(
+            (
+                h.len(),
+                h[0].name.as_str(),
+                h[1].name.as_str(),
+                h[1].recovered
+            ),
+            (2, "live:gone", page[0].name.as_str(), true)
         );
 
         // Cache-first: reopening without network shows the catalogue at once.

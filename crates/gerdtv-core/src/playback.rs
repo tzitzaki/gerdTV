@@ -73,30 +73,71 @@ pub fn mpv_options(preset: BufferPreset, bitrate_bps: u64) -> Vec<(String, Strin
     opts.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
-/// What the player reports (translated from media_kit's streams by the Dart adapter).
+/// What the player reports (translated from media_kit's streams and the platform by the Dart adapter).
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerEvent {
-    /// Playback is advancing.
+    /// Playback advanced (no position known).
     Playing,
+    /// Playback advanced to this position (VOD resumes from the last one).
+    Position(u64),
     /// mpv paused for cache (true) or resumed (false).
     Buffering(bool),
+    /// The user paused (true) or resumed (false): a paused stream is never "stalled".
+    UserPause(bool),
     /// The stream ended.
     EndOfFile,
-    /// mpv reported an error (message already redacted by the adapter's caller).
+    /// mpv reported an error (message already redacted).
     Error(String),
+    /// The app came back from sleep or the background.
+    Wake,
+    /// The device's network changed (Wi-Fi ↔ Ethernet, new address).
+    NetworkChanged,
     /// A second passed; drives timeouts and backoff.
     Tick,
+}
+
+/// Why the watchdog stepped in (stored in stream_health).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trigger {
+    Error,
+    LiveEnd,
+    Stall,
+    Wake,
+    Network,
+}
+
+impl Trigger {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Trigger::Error => "error",
+            Trigger::LiveEnd => "live_end",
+            Trigger::Stall => "stall",
+            Trigger::Wake => "wake",
+            Trigger::Network => "network",
+        }
+    }
 }
 
 /// What the adapter should do.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
-    /// Reopen the stream (live: at the live edge).
-    Reload,
+    /// Reopen the stream: live as HLS (`.m3u8`) or TS, at the live edge; VOD at `resume_ms`.
+    Reload { hls: bool, resume_ms: Option<u64> },
     /// Tell the user we're reconnecting (attempt n).
     ShowReconnecting(u32),
     /// Playback is healthy again; hide any reconnect notice.
     HideReconnecting,
+    /// Stop retrying and show this message (login refused, account blocked, too many connections …).
+    Fail(String),
+    /// The other URL form worked after a switch: remember it for this channel.
+    RememberHls(bool),
+    /// One recovery episode ended: log it (stream_health).
+    Health {
+        trigger: Trigger,
+        attempts: u32,
+        recovered: bool,
+        secs: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -105,6 +146,7 @@ pub enum State {
     Playing,
     Buffering,
     Reconnecting,
+    Failed,
 }
 
 /// mpv's messages when it can't open an audio output (ao/…). Matched loosely on purpose: the wording differs per
@@ -114,30 +156,69 @@ fn is_audio_output_error(message: &str) -> bool {
     m.contains("audio device") || m.contains("audio driver") || m.contains("audio output")
 }
 
+/// Errors retrying can't fix: the provider refused the login or the stream. Matches FFmpeg's wording only
+/// ("http: HTTP error 403 Forbidden"): mpv's other messages carry the URL, which may contain any digits.
+/// 5xx and network errors are not here: those are worth retrying.
+pub fn hard_error(message: &str) -> Option<&'static str> {
+    let m = message.to_ascii_lowercase();
+    if m.contains("http error 401") {
+        Some("The provider refused the login.")
+    } else if m.contains("http error 403") {
+        Some("The provider refused this stream (account expired, blocked, or too many connections).")
+    } else {
+        None
+    }
+}
+
 /// Reload backoff: 1, 2, 4, 8, 15, 30 s, then 30 s for every further attempt.
 pub fn backoff(attempt: u32) -> Duration {
     const STEPS: [u64; 6] = [1, 2, 4, 8, 15, 30];
     Duration::from_secs(STEPS[(attempt as usize).min(STEPS.len() - 1)])
 }
 
+/// After this many failed reloads in a row, live switches between `.ts` and `.m3u8`.
+const SWITCH_AFTER: u32 = 3;
+/// VOD gives up after this many reloads (live retries as long as the player is visible).
+const VOD_MAX_ATTEMPTS: u32 = 6;
+
 /// The watchdog for one playing stream. Feed it every event; run every command it returns.
 #[derive(Debug)]
 pub struct Watchdog {
     live: bool,
     state: State,
+    /// Seconds without progress (or stuck buffering) after which a stream counts as stalled.
+    stall_secs: u64,
+    /// The URL form currently in use (live).
+    hls: bool,
+    /// The form the stream started with, to know whether a switch happened.
+    started_hls: bool,
+    user_paused: bool,
+    /// Seconds since the last progress while playing, or since buffering began.
+    idle: u64,
     /// Reload attempts since the last healthy playback.
     attempts: u32,
     /// Seconds left until the next reload while reconnecting.
     wait: u64,
+    /// The current recovery episode: (first trigger, seconds so far).
+    episode: Option<(Trigger, u64)>,
+    last_position: Option<u64>,
 }
 
 impl Watchdog {
-    pub fn new(live: bool) -> Watchdog {
+    /// `target_secs`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.
+    pub fn new(live: bool, target_secs: u32, prefer_hls: bool) -> Watchdog {
         Watchdog {
             live,
             state: State::Starting,
+            stall_secs: (target_secs as u64 + 10).max(15),
+            hls: prefer_hls,
+            started_hls: prefer_hls,
+            user_paused: false,
+            idle: 0,
             attempts: 0,
             wait: 0,
+            episode: None,
+            last_position: None,
         }
     }
 
@@ -146,53 +227,147 @@ impl Watchdog {
     }
 
     pub fn on_event(&mut self, event: PlayerEvent) -> Vec<Command> {
+        if self.state == State::Failed {
+            return vec![]; // stopped on a hard error; a new stream gets a new watchdog
+        }
         match (self.state, event) {
+            (_, PlayerEvent::Position(ms)) => {
+                self.last_position = Some(ms);
+                self.on_event(PlayerEvent::Playing)
+            }
             // While waiting to reload, mpv may still play out what it buffered; only playback after the reload
             // counts as recovered.
             (State::Reconnecting, PlayerEvent::Playing) => vec![],
-            (_, PlayerEvent::Playing) => {
-                let was_reconnecting = self.attempts > 0;
-                self.state = State::Playing;
-                self.attempts = 0;
-                if was_reconnecting {
-                    vec![Command::HideReconnecting]
-                } else {
-                    vec![]
-                }
-            }
+            (_, PlayerEvent::Playing) => self.healthy(),
             (State::Playing, PlayerEvent::Buffering(true)) => {
                 self.state = State::Buffering;
+                self.idle = 0;
                 vec![]
             }
             (State::Buffering, PlayerEvent::Buffering(false)) => {
                 self.state = State::Playing;
+                self.idle = 0;
+                vec![]
+            }
+            (_, PlayerEvent::UserPause(p)) => {
+                self.user_paused = p;
+                self.idle = 0;
                 vec![]
             }
             // Audio output problems (no device, driver missing) leave the stream itself fine; mpv plays on silently.
             (_, PlayerEvent::Error(m)) if is_audio_output_error(&m) => vec![],
+            (_, PlayerEvent::Error(m)) if hard_error(&m).is_some() => {
+                self.fail(hard_error(&m).unwrap(), Trigger::Error)
+            }
             // A live stream never ends on its own: an end of file is a failure. VOD ends normally.
             (_, PlayerEvent::EndOfFile) if !self.live => vec![],
             (State::Reconnecting, PlayerEvent::EndOfFile | PlayerEvent::Error(_)) => vec![],
-            (_, PlayerEvent::EndOfFile | PlayerEvent::Error(_)) => self.schedule_reload(),
-            (State::Reconnecting, PlayerEvent::Tick) => {
-                self.wait = self.wait.saturating_sub(1);
-                if self.wait == 0 {
-                    // Wait in Starting for the reload to play; a new failure schedules the next attempt.
-                    self.state = State::Starting;
-                    vec![Command::Reload]
-                } else {
-                    vec![]
+            (_, PlayerEvent::EndOfFile) => self.schedule_reload(Trigger::LiveEnd),
+            (_, PlayerEvent::Error(_)) => self.schedule_reload(Trigger::Error),
+            // Back from sleep or on a new network a live connection is almost surely dead: reload at once.
+            (_, PlayerEvent::Wake) if self.live => self.reload_now(Trigger::Wake),
+            (_, PlayerEvent::NetworkChanged) if self.live => self.reload_now(Trigger::Network),
+            (_, PlayerEvent::Wake | PlayerEvent::NetworkChanged) => vec![],
+            (state, PlayerEvent::Tick) => {
+                if let Some((_, secs)) = &mut self.episode {
+                    *secs += 1;
+                }
+                match state {
+                    State::Reconnecting => {
+                        self.wait = self.wait.saturating_sub(1);
+                        if self.wait > 0 {
+                            return vec![];
+                        }
+                        // Wait in Starting for the reload to play; a new failure schedules the next attempt.
+                        self.state = State::Starting;
+                        self.idle = 0;
+                        vec![self.reload()]
+                    }
+                    State::Playing | State::Buffering | State::Starting if !self.user_paused => {
+                        self.idle += 1;
+                        if self.idle >= self.stall_secs {
+                            self.schedule_reload(Trigger::Stall)
+                        } else {
+                            vec![]
+                        }
+                    }
+                    _ => vec![],
                 }
             }
             _ => vec![],
         }
     }
 
-    fn schedule_reload(&mut self) -> Vec<Command> {
+    fn reload(&self) -> Command {
+        Command::Reload {
+            hls: self.hls,
+            resume_ms: if self.live { None } else { self.last_position },
+        }
+    }
+
+    fn healthy(&mut self) -> Vec<Command> {
+        self.state = State::Playing;
+        self.idle = 0;
+        let mut out = vec![];
+        if let Some((trigger, secs)) = self.episode.take() {
+            out.push(Command::HideReconnecting);
+            out.push(Command::Health {
+                trigger,
+                attempts: self.attempts,
+                recovered: true,
+                secs,
+            });
+            if self.live && self.hls != self.started_hls {
+                out.push(Command::RememberHls(self.hls));
+                self.started_hls = self.hls;
+            }
+        }
+        self.attempts = 0;
+        out
+    }
+
+    fn fail(&mut self, message: &str, trigger: Trigger) -> Vec<Command> {
+        let (trigger, secs) = self.episode.take().unwrap_or((trigger, 0));
+        self.state = State::Failed;
+        vec![
+            Command::HideReconnecting,
+            Command::Fail(message.to_string()),
+            Command::Health {
+                trigger,
+                attempts: self.attempts,
+                recovered: false,
+                secs,
+            },
+        ]
+    }
+
+    fn begin(&mut self, trigger: Trigger) {
+        if self.episode.is_none() {
+            self.episode = Some((trigger, 0));
+        }
+    }
+
+    fn schedule_reload(&mut self, trigger: Trigger) -> Vec<Command> {
+        self.begin(trigger);
+        if !self.live && self.attempts >= VOD_MAX_ATTEMPTS {
+            return self.fail("The video keeps failing to load.", trigger);
+        }
         self.wait = backoff(self.attempts).as_secs();
         self.attempts += 1;
+        // Every SWITCH_AFTER failed reloads, live tries the other URL form (TS ↔ HLS).
+        if self.live && self.attempts > 1 && (self.attempts - 1).is_multiple_of(SWITCH_AFTER) {
+            self.hls = !self.hls;
+        }
         self.state = State::Reconnecting;
         vec![Command::ShowReconnecting(self.attempts)]
+    }
+
+    fn reload_now(&mut self, trigger: Trigger) -> Vec<Command> {
+        self.begin(trigger);
+        self.attempts += 1;
+        self.state = State::Starting;
+        self.idle = 0;
+        vec![Command::ShowReconnecting(self.attempts), self.reload()]
     }
 }
 
@@ -239,6 +414,25 @@ mod tests {
         }
     }
 
+    const TS: Command = Command::Reload {
+        hls: false,
+        resume_ms: None,
+    };
+
+    fn ticks(n: usize) -> Vec<PlayerEvent> {
+        vec![Tick; n]
+    }
+
+    /// Feeds `events` to a fresh watchdog; returns the last commands and the state.
+    fn run(live: bool, events: &[PlayerEvent]) -> (Vec<Command>, State) {
+        let mut w = Watchdog::new(live, 8, false);
+        let mut last = vec![];
+        for e in events.iter().cloned() {
+            last = w.on_event(e);
+        }
+        (last, w.state())
+    }
+
     /// (live, events fed in order, commands expected from the last event, state after)
     #[test]
     fn watchdog_turns_events_into_commands() {
@@ -274,7 +468,7 @@ mod tests {
             (
                 true,
                 vec![Playing, EndOfFile, Tick],
-                vec![Command::Reload],
+                vec![TS],
                 State::Starting,
             ),
             // Failing again waits 2 s; a duplicate failure while waiting changes nothing.
@@ -293,7 +487,15 @@ mod tests {
             (
                 true,
                 vec![EndOfFile, Tick, Playing],
-                vec![Command::HideReconnecting],
+                vec![
+                    Command::HideReconnecting,
+                    Command::Health {
+                        trigger: Trigger::LiveEnd,
+                        attempts: 1,
+                        recovered: true,
+                        secs: 1,
+                    },
+                ],
                 State::Playing,
             ),
             // After a live EOF mpv still plays out its buffer: that isn't recovery, the reload still happens.
@@ -306,7 +508,7 @@ mod tests {
             (
                 true,
                 vec![Playing, EndOfFile, Playing, Tick],
-                vec![Command::Reload],
+                vec![TS],
                 State::Starting,
             ),
             // No audio device (headless box, unplugged HDMI) is not a stream failure: never reload for it.
@@ -329,7 +531,7 @@ mod tests {
             ),
         ];
         for (live, events, expected, state) in cases {
-            let mut w = Watchdog::new(live);
+            let mut w = Watchdog::new(live, 8, false);
             let mut last = vec![];
             for e in events.iter().cloned() {
                 last = w.on_event(e);
@@ -340,6 +542,158 @@ mod tests {
                 "live={live} events={events:?}"
             );
         }
+    }
+
+    /// Phase 2 rules: stalls, user pause, hard errors, wake/network, URL switch, VOD resume and give-up.
+    #[test]
+    fn watchdog_recovery_rules() {
+        let forbidden =
+            "The provider refused this stream (account expired, blocked, or too many connections).";
+        // Stall timeout for an 8 s target: max(15, 8 + 10) = 18 s without progress.
+        let cases: Vec<(bool, Vec<PlayerEvent>, Vec<Command>, State)> = vec![
+            (
+                true,
+                [vec![Playing], ticks(17)].concat(),
+                vec![],
+                State::Playing,
+            ),
+            (
+                true,
+                [vec![Playing], ticks(18)].concat(),
+                vec![Command::ShowReconnecting(1)],
+                State::Reconnecting,
+            ),
+            (
+                true,
+                [vec![Playing, Buffering(true)], ticks(18)].concat(),
+                vec![Command::ShowReconnecting(1)],
+                State::Reconnecting,
+            ),
+            (
+                true,
+                [vec![Playing, UserPause(true)], ticks(60)].concat(),
+                vec![],
+                State::Playing,
+            ),
+            (
+                true,
+                ticks(18),
+                vec![Command::ShowReconnecting(1)],
+                State::Reconnecting,
+            ), // never started
+            (
+                true,
+                vec![Playing, Error("http: HTTP error 403 Forbidden".into())],
+                vec![
+                    Command::HideReconnecting,
+                    Command::Fail(forbidden.into()),
+                    Command::Health {
+                        trigger: Trigger::Error,
+                        attempts: 0,
+                        recovered: false,
+                        secs: 0,
+                    },
+                ],
+                State::Failed,
+            ),
+            (
+                true,
+                vec![Error("HTTP error 403 Forbidden".into()), Tick, Playing],
+                vec![],
+                State::Failed,
+            ),
+            (
+                true,
+                vec![Playing, Error("HTTP error 503 Service Unavailable".into())],
+                vec![Command::ShowReconnecting(1)],
+                State::Reconnecting,
+            ),
+            // A URL that happens to contain 403 is not a refusal (mpv's "Failed to open <url>" carries the URL).
+            (
+                true,
+                vec![Playing, Error("Failed to open http://h.example.invalid/live/u/p/403.ts.".into())],
+                vec![Command::ShowReconnecting(1)],
+                State::Reconnecting,
+            ),
+            (
+                true,
+                vec![Playing, Wake],
+                vec![Command::ShowReconnecting(1), TS],
+                State::Starting,
+            ),
+            (
+                true,
+                vec![Playing, NetworkChanged],
+                vec![Command::ShowReconnecting(1), TS],
+                State::Starting,
+            ),
+            (false, vec![Playing, Wake], vec![], State::Playing),
+            (
+                false,
+                vec![Position(5000), Error("x".into()), Tick],
+                vec![Command::Reload {
+                    hls: false,
+                    resume_ms: Some(5000),
+                }],
+                State::Starting,
+            ),
+        ];
+        for (live, events, expected, state) in cases {
+            assert_eq!(
+                run(live, &events),
+                (expected, state),
+                "live={live} events={events:?}"
+            );
+        }
+    }
+
+    /// Three failed reloads on TS → the fourth uses HLS; when that plays, it's remembered and logged.
+    #[test]
+    fn live_switches_url_form_after_three_failures() {
+        let mut w = Watchdog::new(true, 8, false);
+        let mut reloads = vec![];
+        let mut secs = 0;
+        w.on_event(Playing);
+        for _attempt in 1..=4 {
+            w.on_event(EndOfFile);
+            loop {
+                secs += 1;
+                let out = w.on_event(Tick);
+                if let Some(Command::Reload { hls, .. }) = out.first() {
+                    reloads.push(*hls);
+                    break;
+                }
+            }
+        }
+        assert_eq!(reloads, [false, false, false, true]);
+        assert_eq!(secs, 1 + 2 + 4 + 8);
+        assert_eq!(
+            w.on_event(Playing),
+            vec![
+                Command::HideReconnecting,
+                Command::Health {
+                    trigger: Trigger::LiveEnd,
+                    attempts: 4,
+                    recovered: true,
+                    secs
+                },
+                Command::RememberHls(true),
+            ]
+        );
+    }
+
+    #[test]
+    fn vod_gives_up_after_six_reloads() {
+        let mut w = Watchdog::new(false, 8, false);
+        let mut last = vec![];
+        for _ in 0..7 {
+            last = w.on_event(Error("x".into()));
+            while w.state() == State::Reconnecting {
+                w.on_event(Tick);
+            }
+        }
+        assert!(matches!(last.get(1), Some(Command::Fail(_))), "{last:?}");
+        assert_eq!(w.state(), State::Failed);
     }
 
     #[test]

@@ -58,7 +58,7 @@ void main() {
     );
     await tester.pumpWidget(const GerdTvApp());
     await tester.pumpAndSettle();
-    final player = Player();
+    final player = Player(configuration: WatchdogAdapter.playerConfiguration);
     addTearDown(player.dispose);
     final adapter = WatchdogAdapter(player);
     final mini = MiniWindow();
@@ -67,7 +67,7 @@ void main() {
       // Headless: no audio device and no video controller; a null audio output keeps the stream playing.
       await (player.platform as NativePlayer).setProperty('ao', 'null');
       await adapter.play(
-        '$faultServer/live/mini.ts',
+        ({required hls}) => '$faultServer/live/mini.ts',
         live: true,
         preset: BufferPreset.fastZap,
       );

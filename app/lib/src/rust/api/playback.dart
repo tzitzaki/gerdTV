@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `feed`, `preset`
+// These functions are ignored because they are not marked as `pub`: `feed`, `of`, `preset`
 
 /// The mpv options to set before opening a stream (bitrate unknown → the core's default estimate).
 List<MpvOption> bufferOptions({
@@ -22,8 +22,16 @@ List<MpvOption> bufferOptions({
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Watchdog>>
 abstract class Watchdog implements RustOpaqueInterface {
-  factory Watchdog({required bool live}) =>
-      RustLib.instance.api.crateApiPlaybackWatchdogNew(live: live);
+  /// `target_seconds`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.
+  factory Watchdog({
+    required bool live,
+    required int targetSeconds,
+    required bool preferHls,
+  }) => RustLib.instance.api.crateApiPlaybackWatchdogNew(
+    live: live,
+    targetSeconds: targetSeconds,
+    preferHls: preferHls,
+  );
 
   List<WatchdogCommand> onBuffering({required bool active});
 
@@ -31,17 +39,31 @@ abstract class Watchdog implements RustOpaqueInterface {
 
   List<WatchdogCommand> onError({required String message});
 
-  List<WatchdogCommand> onPlaying();
+  List<WatchdogCommand> onNetworkChanged();
+
+  List<WatchdogCommand> onPosition({required BigInt positionMs});
 
   /// Call once a second while a stream is open.
   List<WatchdogCommand> onTick();
+
+  List<WatchdogCommand> onUserPause({required bool paused});
+
+  /// The app came back from sleep or the background.
+  List<WatchdogCommand> onWake();
 }
 
 /// A buffer preset as the UI names it. Data-free enums only on this surface: flutter_rust_bridge needs the
 /// `freezed` package for enums with fields, which isn't worth a dependency (CLAUDE.md, "Dependencies").
 enum BufferPreset { fastZap, balanced, smooth, maxSmooth, custom }
 
-enum CommandKind { reload, showReconnecting, hideReconnecting }
+enum CommandKind {
+  reload,
+  showReconnecting,
+  hideReconnecting,
+  fail,
+  rememberHls,
+  health,
+}
 
 class MpvOption {
   final String name;
@@ -61,15 +83,40 @@ class MpvOption {
           value == other.value;
 }
 
-/// A watchdog command; `attempt` is set for ShowReconnecting.
+/// A watchdog command; which fields matter depends on `kind`:
+/// Reload: `hls`, `resume_ms` · ShowReconnecting: `attempt` · Fail: `message` · RememberHls: `hls` ·
+/// Health: `trigger`, `attempt` (attempts), `recovered`, `secs`.
 class WatchdogCommand {
   final CommandKind kind;
   final int attempt;
+  final bool hls;
+  final BigInt? resumeMs;
+  final String message;
+  final String trigger;
+  final bool recovered;
+  final BigInt secs;
 
-  const WatchdogCommand({required this.kind, required this.attempt});
+  const WatchdogCommand({
+    required this.kind,
+    required this.attempt,
+    required this.hls,
+    this.resumeMs,
+    required this.message,
+    required this.trigger,
+    required this.recovered,
+    required this.secs,
+  });
 
   @override
-  int get hashCode => kind.hashCode ^ attempt.hashCode;
+  int get hashCode =>
+      kind.hashCode ^
+      attempt.hashCode ^
+      hls.hashCode ^
+      resumeMs.hashCode ^
+      message.hashCode ^
+      trigger.hashCode ^
+      recovered.hashCode ^
+      secs.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -77,5 +124,11 @@ class WatchdogCommand {
       other is WatchdogCommand &&
           runtimeType == other.runtimeType &&
           kind == other.kind &&
-          attempt == other.attempt;
+          attempt == other.attempt &&
+          hls == other.hls &&
+          resumeMs == other.resumeMs &&
+          message == other.message &&
+          trigger == other.trigger &&
+          recovered == other.recovered &&
+          secs == other.secs;
 }
