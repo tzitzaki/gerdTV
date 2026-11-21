@@ -143,6 +143,9 @@ pub struct SyncResult {
     pub account: Option<Account>,
 }
 
+/// One page of hits plus per-kind totals (totals only on the first page).
+pub type SearchResult = (Vec<Hit>, Vec<(Kind, usize)>);
+
 /// One open profile: its database and, for Xtream Codes, its client.
 pub struct Library {
     profile: Profile,
@@ -322,7 +325,7 @@ impl Library {
         kind: Option<Kind>,
         limit: usize,
         offset: usize,
-    ) -> Result<(Vec<Hit>, Vec<(Kind, usize)>)> {
+    ) -> Result<SearchResult> {
         let conn = self.conn.lock().unwrap();
         let hits = db::search(&conn, query, kind, limit, offset)?;
         let counts = if offset == 0 {
