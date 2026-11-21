@@ -12,4 +12,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   git merge-base --is-ancestor "$local_sha" HEAD 2>/dev/null || { echo "pre-push: push from the branch you're on"; exit 1; }
   scripts/check-denylist.sh "$base"
 done
+# Git exports GIT_DIR & co. to hooks; Flutter then reads *this* repo when it asks git for its own SDK version
+# ("Flutter SDK version is 0.0.0-unknown"). Drop them before running the tests.
+unset $(git rev-parse --local-env-vars)
 exec just test-affected
