@@ -162,3 +162,28 @@ pub async fn respond(mut stream: TcpStream, status: u16, content_type: &str, bod
     }
     let _ = stream.shutdown().await;
 }
+
+/// A plain GET for tests of the mock servers: (status, headers text, body). Reads until the server closes.
+pub async fn get(url: &str) -> (u16, String, Vec<u8>) {
+    let rest = url.strip_prefix("http://").expect("http URL");
+    let (host, path) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
+    let path = if path.is_empty() { "/" } else { path };
+    let mut s = TcpStream::connect(host).await.expect("connect");
+    s.write_all(format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n\r\n").as_bytes())
+        .await
+        .unwrap();
+    let mut all = Vec::new();
+    s.read_to_end(&mut all).await.unwrap();
+    let end = all
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|p| p + 4)
+        .unwrap_or(all.len());
+    let head = String::from_utf8_lossy(&all[..end]).to_string();
+    let status = head
+        .split(' ')
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .unwrap_or(0);
+    (status, head, all[end..].to_vec())
+}
