@@ -40,5 +40,8 @@
 
 All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with the GPL-3.0 app. The in-app Licences screen will list them with these flags.
 
+## Desktop windows
+`app/lib/platform/mini_window.dart` switches the main window into mini-player mode (480 × 270, hidden title bar, always on top, on all Spaces) and restores its bounds. A second window would be a second Flutter engine that can't share the media_kit player, so the stream would reopen.
+
 ## Platform channels
 None yet. Each one lands here with its purpose, its Swift/Kotlin file and its Dart counterpart.
