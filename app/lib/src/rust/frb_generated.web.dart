@@ -6,6 +6,7 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/library.dart';
 import 'api/playback.dart';
 import 'api/simple.dart';
 
@@ -25,8 +26,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   });
 
   CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_LibraryPtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary;
+
+  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_WatchdogPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog;
+
+  @protected
+  Library
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    dynamic raw,
+  );
 
   @protected
   Watchdog
@@ -35,8 +46,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Library
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    dynamic raw,
+  );
+
+  @protected
   Watchdog
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
+    dynamic raw,
+  );
+
+  @protected
+  Library
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     dynamic raw,
   );
 
@@ -53,10 +76,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  ItemKind dco_decode_box_autoadd_item_kind(dynamic raw);
+
+  @protected
+  ProfileInfo dco_decode_box_autoadd_profile_info(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
   BufferPreset dco_decode_buffer_preset(dynamic raw);
+
+  @protected
+  CategoryInfo dco_decode_category_info(dynamic raw);
 
   @protected
   CommandKind dco_decode_command_kind(dynamic raw);
@@ -65,10 +100,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  ItemInfo dco_decode_item_info(dynamic raw);
+
+  @protected
+  ItemKind dco_decode_item_kind(dynamic raw);
+
+  @protected
+  KindCount dco_decode_kind_count(dynamic raw);
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<CategoryInfo> dco_decode_list_category_info(dynamic raw);
+
+  @protected
+  List<ItemInfo> dco_decode_list_item_info(dynamic raw);
+
+  @protected
+  List<KindCount> dco_decode_list_kind_count(dynamic raw);
+
+  @protected
   List<MpvOption> dco_decode_list_mpv_option(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<ProfileInfo> dco_decode_list_profile_info(dynamic raw);
 
   @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
@@ -77,7 +136,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MpvOption dco_decode_mpv_option(dynamic raw);
 
   @protected
+  ItemKind? dco_decode_opt_box_autoadd_item_kind(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  ProfileInfo dco_decode_profile_info(dynamic raw);
+
+  @protected
+  SearchPage dco_decode_search_page(dynamic raw);
+
+  @protected
+  SourceKind dco_decode_source_kind(dynamic raw);
+
+  @protected
+  SyncSummary dco_decode_sync_summary(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -98,14 +175,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WatchdogCommand dco_decode_watchdog_command(dynamic raw);
 
   @protected
+  Library
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Watchdog
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     SseDeserializer deserializer,
   );
 
   @protected
+  Library
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Watchdog
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  Library
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     SseDeserializer deserializer,
   );
 
@@ -122,10 +217,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  ItemKind sse_decode_box_autoadd_item_kind(SseDeserializer deserializer);
+
+  @protected
+  ProfileInfo sse_decode_box_autoadd_profile_info(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
   BufferPreset sse_decode_buffer_preset(SseDeserializer deserializer);
+
+  @protected
+  CategoryInfo sse_decode_category_info(SseDeserializer deserializer);
 
   @protected
   CommandKind sse_decode_command_kind(SseDeserializer deserializer);
@@ -134,10 +241,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  ItemInfo sse_decode_item_info(SseDeserializer deserializer);
+
+  @protected
+  ItemKind sse_decode_item_kind(SseDeserializer deserializer);
+
+  @protected
+  KindCount sse_decode_kind_count(SseDeserializer deserializer);
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<CategoryInfo> sse_decode_list_category_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ItemInfo> sse_decode_list_item_info(SseDeserializer deserializer);
+
+  @protected
+  List<KindCount> sse_decode_list_kind_count(SseDeserializer deserializer);
+
+  @protected
   List<MpvOption> sse_decode_list_mpv_option(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<ProfileInfo> sse_decode_list_profile_info(SseDeserializer deserializer);
 
   @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
@@ -148,7 +281,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MpvOption sse_decode_mpv_option(SseDeserializer deserializer);
 
   @protected
+  ItemKind? sse_decode_opt_box_autoadd_item_kind(SseDeserializer deserializer);
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  ProfileInfo sse_decode_profile_info(SseDeserializer deserializer);
+
+  @protected
+  SearchPage sse_decode_search_page(SseDeserializer deserializer);
+
+  @protected
+  SourceKind sse_decode_source_kind(SseDeserializer deserializer);
+
+  @protected
+  SyncSummary sse_decode_sync_summary(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -170,6 +321,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    Library self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
     SseSerializer serializer,
@@ -177,8 +335,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    Library self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    Library self,
     SseSerializer serializer,
   );
 
@@ -196,16 +368,61 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_item_kind(
+    ItemKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_profile_info(
+    ProfileInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_buffer_preset(BufferPreset self, SseSerializer serializer);
 
   @protected
+  void sse_encode_category_info(CategoryInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_command_kind(CommandKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_item_info(ItemInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_item_kind(ItemKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_kind_count(KindCount self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_category_info(
+    List<CategoryInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_item_info(List<ItemInfo> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_kind_count(
+    List<KindCount> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_mpv_option(
@@ -220,6 +437,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_profile_info(
+    List<ProfileInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -229,7 +452,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_mpv_option(MpvOption self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_item_kind(
+    ItemKind? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_profile_info(ProfileInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_page(SearchPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_source_kind(SourceKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_sync_summary(SyncSummary self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -259,6 +503,22 @@ class RustLibWire implements BaseWire {
   RustLibWire.fromExternalLibrary(ExternalLibrary lib);
 
   void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+        ptr,
+      );
+
+  void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     int ptr,
   ) => wasmModule
@@ -281,6 +541,16 @@ external RustLibWasmModule get wasmModule;
 @JS()
 @anonymous
 extension type RustLibWasmModule._(JSObject _) implements JSObject {
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
+    int ptr,
+  );
+
   external void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     int ptr,

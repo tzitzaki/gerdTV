@@ -2,7 +2,7 @@
 
 ## Crates
 - `crates/gerdtv-core`: all logic, no Flutter dependency, tested headless on Linux.
-  - `m3u.rs`: the streaming M3U parser; `xtream.rs`: the Xtream Codes client and sync; `db.rs`: the profile database, sync and search (`docs/DATA_MODEL.md`); `playback.rs`: buffer presets and the watchdog.
+  - `library.rs`: profiles (non-secret settings in `profiles.json`) and the open profile's library (cache-first open, sync that downloads before locking the database, browse, search, play URLs); `m3u.rs`: the streaming M3U parser; `xtream.rs`: the Xtream Codes client and sync; `db.rs`: the profile database, sync and search (`docs/DATA_MODEL.md`); `playback.rs`: buffer presets and the watchdog.
   - Networking: reqwest with rustls on the ring provider (no C toolchain needed for Android/iOS builds), installed once per process.
   - Performance budgets: `crates/gerdtv-core/benches/budgets.rs` (`just bench`).
 - `crates/gerdtv-api` (package `gerdtv_api`): the flutter_rust_bridge surface; types, async functions, event streams, no logic.
@@ -16,6 +16,7 @@
 ## The seam (Rust ↔ Flutter)
 - `app/flutter_rust_bridge.yaml` points the codegen at `crates/gerdtv-api`; `just codegen` writes the Dart side to `app/lib/src/rust`.
 - `app/rust_builder` is a Flutter FFI plugin using Cargokit: every Flutter build (Linux, macOS, Android, iOS) compiles `gerdtv_api` for its targets and bundles `libgerdtv_api`.
+- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs). Errors cross as credential-free messages.
 - `RustLib.init()` loads the library before the first frame. Widget tests replace it with `RustLib.initMock` and a fake (`app/test/support/fake_core.dart`), so they need no native build.
 - Debug: "Failed to load dynamic library" at start means Cargokit didn't build or bundle the library; build with `-v` and look for the Cargokit step.
 

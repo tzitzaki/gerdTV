@@ -793,6 +793,7 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "rustls",
+ "serde",
  "serde_json",
  "thiserror",
  "tokio",
