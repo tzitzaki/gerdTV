@@ -51,8 +51,13 @@ test: test-rust test-flutter
 test-rust:
     cargo test --workspace --quiet
 
-test-flutter:
+test-flutter: l10n
     cd app && flutter test
+
+# Generate the localisation code (app/lib/l10n/gen, not committed). `flutter test` and `analyze` don't do it on a
+# fresh clone; builds do.
+l10n:
+    cd app && flutter gen-l10n
 
 # The repository rule tests (doc paths, HANDOVER/DEVICE_CHECKS limits, workflow rules, ARB files, names).
 test-docs:
@@ -82,7 +87,7 @@ ready body="":
     step "denylist" "scripts/check-denylist.sh origin/main {{body}}"
     step "cargo fmt --check" "cargo fmt --all --check"
     step "clippy -D warnings" "cargo clippy --workspace --all-targets --quiet -- -D warnings"
-    step "flutter analyze" "(cd app && flutter analyze)"
+    step "flutter analyze" "just l10n && (cd app && flutter analyze)"
     step "just test" "just test"
     step "licences" "just licences"
     step "integration tests (Linux, Xvfb)" "just test-integration"
@@ -94,6 +99,7 @@ ci-linux:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --quiet -- -D warnings
     just test
+    just l10n
     cd app && flutter analyze
     just licences
     just test-integration

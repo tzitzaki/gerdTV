@@ -18,4 +18,4 @@ while IFS= read -r f; do
 done <<<"$changed"
 echo "test-affected: rust=$rust flutter=$flutter rules=$rules (changed since $base)"
 if [[ $rust == 1 ]]; then cargo test --workspace --quiet; elif [[ $rules == 1 ]]; then just test-docs; fi
-if [[ $flutter == 1 ]]; then (cd app && flutter analyze && flutter test); fi
+if [[ $flutter == 1 ]]; then (just l10n && cd app && flutter analyze && flutter test); fi
