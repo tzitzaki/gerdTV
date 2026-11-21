@@ -164,7 +164,9 @@ pub fn hard_error(message: &str) -> Option<&'static str> {
     if m.contains("http error 401") {
         Some("The provider refused the login.")
     } else if m.contains("http error 403") {
-        Some("The provider refused this stream (account expired, blocked, or too many connections).")
+        Some(
+            "The provider refused this stream (account expired, blocked, or too many connections).",
+        )
     } else {
         None
     }
@@ -611,7 +613,10 @@ mod tests {
             // A URL that happens to contain 403 is not a refusal (mpv's "Failed to open <url>" carries the URL).
             (
                 true,
-                vec![Playing, Error("Failed to open http://h.example.invalid/live/u/p/403.ts.".into())],
+                vec![
+                    Playing,
+                    Error("Failed to open http://h.example.invalid/live/u/p/403.ts.".into()),
+                ],
                 vec![Command::ShowReconnecting(1)],
                 State::Reconnecting,
             ),
