@@ -4,6 +4,9 @@
 //!
 //! `tests/repo_rules.rs` holds the checks on the repository itself (workflows, docs, HANDOVER limits, ARB files).
 
+pub mod fault;
+pub mod http;
+
 use std::path::PathBuf;
 
 /// The repository root, found from this crate's manifest dir (crates/gerdtv-testkit → ../..).
