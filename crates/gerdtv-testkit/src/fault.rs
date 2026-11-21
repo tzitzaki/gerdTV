@@ -7,6 +7,9 @@
 //!   /live/<name>.m3u8    live HLS: a 3-segment sliding window of 2 s segments, looping the clip with discontinuities
 //!   /hls/<name>/<n>.ts   HLS segment n (with `?rotate=1` on the playlist, URLs carry a changing token: /<n>-<t>.ts)
 //!   /vod/<name>.ts       the clip as a file, with Range support (seeking)
+//!   /_fault/<set|once>?kind=<none|drop|stall|throttle|status|eof>&n=<bytes|code|bytes-per-s>&secs=<stall s>
+//!                        injects a fault over HTTP, for tests that can't call `set`/`once` (the Flutter app's
+//!                        integration tests); /_stats returns the counters as `key=value` lines
 //!
 //! Faults apply to requests that start after they're set: `set` keeps a fault until changed, `once` affects only the
 //! next request (then the server is healthy again, which is how a reconnect is meant to succeed).
@@ -124,8 +127,47 @@ fn take_fault(state: &Mutex<State>) -> Fault {
     fault
 }
 
+/// Parses a fault from the control query (see the module docs).
+pub fn parse_fault(req: &Request) -> Option<Fault> {
+    let n: usize = req.param("n").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let secs: u64 = req.param("secs").and_then(|v| v.parse().ok()).unwrap_or(30);
+    Some(match req.param("kind")? {
+        "none" => Fault::None,
+        "drop" => Fault::Drop { after_bytes: n },
+        "stall" => Fault::Stall {
+            after_bytes: n,
+            duration: Duration::from_secs(secs),
+        },
+        "throttle" => Fault::Throttle {
+            bytes_per_sec: n.max(1),
+        },
+        "status" => Fault::Status { code: n as u16 },
+        "eof" => Fault::LiveEof { after_bytes: n },
+        _ => return None,
+    })
+}
+
 async fn serve(req: Request, mut stream: TcpStream, state: Arc<Mutex<State>>, started: Instant) {
     let path = req.path.clone();
+    if let Some(mode) = path.strip_prefix("/_fault/") {
+        let Some(fault) = parse_fault(&req) else {
+            return http::respond(stream, 400, "text/plain", b"bad fault").await;
+        };
+        match mode {
+            "set" => state.lock().unwrap().fault = Some(fault),
+            "once" => state.lock().unwrap().once = Some(fault),
+            _ => return http::respond(stream, 404, "text/plain", b"set or once").await,
+        }
+        return http::respond(stream, 200, "text/plain", format!("{fault:?}").as_bytes()).await;
+    }
+    if path == "/_stats" {
+        let s = state.lock().unwrap().stats.clone();
+        let body = format!(
+            "live_ts={}\nlive_hls_playlists={}\nhls_segments={}\nvod={}\nfaulted={}\n",
+            s.live_ts, s.live_hls_playlists, s.hls_segments, s.vod, s.faulted
+        );
+        return http::respond(stream, 200, "text/plain", body.as_bytes()).await;
+    }
     let kind = if path.starts_with("/live/") && path.ends_with(".ts") {
         "live_ts"
     } else if path.starts_with("/live/") && path.ends_with(".m3u8") {

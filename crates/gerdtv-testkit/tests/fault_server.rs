@@ -113,6 +113,29 @@ async fn faults_are_injectable() {
     let (status, n, _) = get(&srv.url("/vod/movie.ts"), 1_000_000, Duration::from_secs(2)).await;
     assert!(status == 200 && n > 300_000);
 
+    // Over HTTP (for the Flutter integration tests): a one-shot 502, then healthy again.
+    assert_eq!(
+        get(
+            &srv.url("/_fault/once?kind=status&n=502"),
+            100,
+            Duration::from_secs(1)
+        )
+        .await
+        .0,
+        200
+    );
+    assert_eq!(get(&live, 0, Duration::from_secs(1)).await.0, 502);
+    assert_eq!(
+        get(
+            &srv.url("/_fault/once?kind=bogus"),
+            100,
+            Duration::from_secs(1)
+        )
+        .await
+        .0,
+        400
+    );
+
     let stats = srv.stats();
     assert!(
         stats.live_ts >= 10
