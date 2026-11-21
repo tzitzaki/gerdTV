@@ -1,0 +1,23 @@
+# gerdTV Rust workspace. All logic lives in gerdtv-core; gerdtv-api is the thin flutter_rust_bridge surface.
+# The version is set by the wrap-up PR (0.YYMMDD.<PR#>, docs/RELEASING.md) together with app/pubspec.yaml.
+[workspace]
+resolver = "3"
+members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[workspace.dependencies]
+gerdtv-core = { path = "crates/gerdtv-core" }
+ed25519-dalek = "3.0.0"
+sha2 = "0.11.1"
+serde_json = "1"
+
+[workspace.lints.clippy]
+# CI and `just ready` run clippy with -D warnings; nothing extra is enabled here on purpose.
+
+[profile.release]
+# Smaller, faster native library for the app; the core has no panics we rely on unwinding for.
+lto = "thin"

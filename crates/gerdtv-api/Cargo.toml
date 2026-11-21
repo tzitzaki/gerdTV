@@ -1,0 +1,20 @@
+# The flutter_rust_bridge surface: types, async functions and event streams only, no logic (that is gerdtv-core).
+# The package name keeps the underscore because Cargokit (app/rust_builder) names the native library after the
+# package: libgerdtv_api.so / .dylib / .a, which the generated Dart loader looks for.
+[package]
+name = "gerdtv_api"
+description = "gerdTV: the flutter_rust_bridge surface over gerdtv-core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.13.0"
+gerdtv-core.workspace = true
+
+[lints.rust]
+# frb_expand is a cfg flutter_rust_bridge's codegen sets while it expands macros.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

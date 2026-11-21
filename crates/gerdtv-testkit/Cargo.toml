@@ -1,0 +1,15 @@
+[package]
+name = "gerdtv-testkit"
+description = "gerdTV test kit: synthetic data, mock servers, fault injection, and the repository rule tests."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "gerdtv-release"
+description = "gerdTV release tool: update key generation, latest.json assembly, signing and verification."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+ed25519-dalek.workspace = true
+sha2.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

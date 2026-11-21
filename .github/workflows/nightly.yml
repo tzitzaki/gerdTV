@@ -1,0 +1,35 @@
+# Nightly (02:30 UTC) and on demand: the long checks. Now: everything ci.yml's linux job runs; the soak and the
+# benchmarks join as they are built (docs/SETUP.md, "CI").
+name: nightly
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/flutter
+            ~/.pub-cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
+          restore-keys: linux-
+      - name: System packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
+            libayatana-appindicator3-dev xvfb xauth just jq
+      - run: scripts/ci-install-flutter.sh
+      - run: just ci-linux

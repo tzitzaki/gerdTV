@@ -1,0 +1,5 @@
+# Pinned so every machine and CI build with the same compiler. Bump in its own PR.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

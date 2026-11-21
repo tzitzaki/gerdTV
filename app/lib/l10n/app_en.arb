@@ -1,0 +1,8 @@
+{
+  "@@locale": "en",
+  "appTitle": "gerdTV",
+  "coreGreeting": "The core says: {greeting}",
+  "@coreGreeting": {
+    "placeholders": { "greeting": { "type": "String" } }
+  }
+}
