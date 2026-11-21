@@ -25,11 +25,19 @@ Future<int> liveRequests() async {
   return int.parse(RegExp(r'live_ts=(\d+)').firstMatch(body)!.group(1)!);
 }
 
+/// Playback advances for 3 s. Adds up only forward steps: the test clip loops every 10 s and restarts its
+/// timestamps, which older mpv builds (macOS/iOS) report as the position jumping back.
 Future<void> playsOn(Player player, String phase) async {
-  final before = player.state.position;
-  await Future<void>.delayed(const Duration(seconds: 3));
+  var advanced = Duration.zero;
+  var last = player.state.position;
+  for (var i = 0; i < 30; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    final now = player.state.position;
+    if (now > last) advanced += now - last;
+    last = now;
+  }
   expect(
-    player.state.position - before,
+    advanced,
     greaterThan(const Duration(seconds: 2)),
     reason: 'still playing $phase',
   );
