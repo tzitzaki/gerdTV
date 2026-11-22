@@ -1,5 +1,5 @@
-// A guide programme's sheet, from the guide grid and from search: title, episode, channel and time, genre,
-// description, and what can be watched. Running: Watch (live) and, on catch-up channels, From the start. Past: Watch
+// A guide programme's sheet, from the guide grid and from search: title, episode, channel and time, genre, what can
+// be watched (above the description, which can be long), and the description. Running: Watch (live) and, on catch-up channels, From the start. Past: Watch
 // from the archive when the channel has one that reaches back far enough, else the channel live. Future: the
 // channel live (reminders come next). Whether the archive reaches is the core's decision (Library.catchupUrl).
 
@@ -78,10 +78,6 @@ Future<void> showProgrammeSheet(
               ),
               if (p.category.isNotEmpty)
                 Text(p.category, style: text.bodySmall),
-              if (p.desc.isNotEmpty) ...[
-                const SizedBox(height: Tokens.space),
-                Text(p.desc, style: text.bodyMedium),
-              ],
               const SizedBox(height: Tokens.space * 2),
               Wrap(
                 spacing: Tokens.space,
@@ -114,6 +110,10 @@ Future<void> showProgrammeSheet(
                     ),
                 ],
               ),
+              if (p.desc.isNotEmpty) ...[
+                const SizedBox(height: Tokens.space),
+                Text(p.desc, style: text.bodyMedium),
+              ],
             ],
           ),
         ),

@@ -251,7 +251,8 @@ void main() {
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
     await tapReady(tester, find.byKey(const Key('player.stop')));
-    await waitFor(tester, find.byKey(const Key('search.field')));
+    // Back in search for real (the field also exists underneath an open player).
+    await waitFor(tester, find.byKey(const Key('search.field')).hitTestable());
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: programme search played its channel');
