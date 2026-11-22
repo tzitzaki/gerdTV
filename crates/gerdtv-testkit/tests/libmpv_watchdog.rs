@@ -174,11 +174,16 @@ impl Harness {
         None
     }
 
+    /// Waits until `secs` of real playback have happened. Adds up forward position steps: after a reload the new
+    /// connection's clock starts again near 0, so comparing with the position before the fault would never match.
     fn playing_for(&mut self, secs: f64, limit: Duration) -> Duration {
-        let mut from: Option<f64> = None;
+        let (mut played, mut last) = (0.0, self.position);
         self.run_until(limit, |h| {
-            let since = *from.get_or_insert(h.position);
-            h.watchdog.state() == State::Playing && h.position - since >= secs
+            if h.position > last && h.position - last < 2.0 {
+                played += h.position - last; // a jump of 2 s or more is a seek or a new stream, not playback
+            }
+            last = h.position;
+            h.watchdog.state() == State::Playing && played >= secs
         })
     }
 }
