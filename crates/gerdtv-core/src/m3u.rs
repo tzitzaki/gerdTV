@@ -41,6 +41,8 @@ pub struct Entry {
 pub struct Stats {
     pub entries: usize,
     pub skipped: usize,
+    /// The playlist's guide URL from the header (`#EXTM3U url-tvg="…"` or `x-tvg-url`), if any.
+    pub tvg_url: Option<String>,
 }
 
 /// Parses `input`, calling `on_entry` for every complete entry. I/O errors end the parse and are returned.
@@ -74,6 +76,14 @@ pub fn parse(mut input: impl BufRead, mut on_entry: impl FnMut(Entry)) -> std::i
             if let Some(ua) = opt.strip_prefix("http-user-agent=") {
                 user_agent = ua.to_string();
             }
+        } else if let Some(h) = l.strip_prefix("#EXTM3U") {
+            stats.tvg_url = attributes(h)
+                .into_iter()
+                .find(|(k, _)| {
+                    k.eq_ignore_ascii_case("url-tvg") || k.eq_ignore_ascii_case("x-tvg-url")
+                })
+                .map(|(_, v)| v.split(',').next().unwrap_or("").trim().to_string()) // several URLs: the first
+                .filter(|v| !v.is_empty());
         } else if l.starts_with('#') {
             // #EXTM3U and other directives: nothing to keep.
         } else if let Some(mut e) = pending.take() {
@@ -299,7 +309,8 @@ mod tests {
             stats,
             Stats {
                 entries: 3,
-                skipped: 5
+                skipped: 5,
+                tvg_url: Some("x".into()), // the header's url-tvg
             }
         );
     }

@@ -79,6 +79,7 @@ test-affected base="origin/main":
 # The core's performance budgets. A regression of more than 20 % against the saved `main` baseline fails.
 # The baseline lives outside the worktrees (CRITERION_HOME), so every worktree compares against the same one;
 # `just bench-save` records it (the wrap-up does, on main). No baseline yet: this run becomes it.
+# Lenient: a benchmark added since the baseline is measured, not compared (strict mode aborts on it).
 criterion_home := env_var('HOME') + "/.cache/gerdtv-criterion"
 
 bench:
@@ -86,12 +87,17 @@ bench:
     set -euo pipefail
     export CRITERION_HOME="{{criterion_home}}"
     if [[ ! -d "$CRITERION_HOME/budgets" ]]; then just bench-save; exit 0; fi
-    out="$(cargo bench -q -p gerdtv-core --bench budgets -- --baseline main --noise-threshold 0.20 2>&1)"
+    out="$(cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20 2>&1)" ||
+        { echo "$out"; exit 1; }
     grep -E 'time:|change:|regressed|improved' <<<"$out" || true
     ! grep -q "Performance has regressed" <<<"$out"
 
 bench-save:
     CRITERION_HOME="{{criterion_home}}" cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
+
+# The full-scale guide import budget (2,000 channels × 7 days in < 60 s); slow, also in the nightly.
+test-epg-budget:
+    cargo test -q -p gerdtv-core --release --test epg_budget -- --ignored --nocapture
 
 # Opt-in checks against the real account in the GERDTV_* environment (counts and timings only; docs/SETUP.md).
 test-live:

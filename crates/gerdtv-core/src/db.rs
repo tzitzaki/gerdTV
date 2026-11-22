@@ -59,6 +59,27 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
      ALTER TABLE stream_prefs ADD COLUMN buffer TEXT NOT NULL DEFAULT '';
      ALTER TABLE stream_prefs ADD COLUMN bitrate INTEGER NOT NULL DEFAULT 0;",
+    // 3 → 4: the TV guide (epg.rs): XMLTV channels and their display names (normalised, for matching), programmes
+    // with a contentless FTS index, the sources (built-in + extra URLs), the user's manual mapping (user data) and the
+    // resolved item → guide channel matches.
+    "CREATE TABLE epg_channels (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT '',
+        source INTEGER NOT NULL);
+     CREATE INDEX epg_channels_lower ON epg_channels (lower(id));
+     CREATE TABLE epg_names (norm TEXT PRIMARY KEY, channel TEXT NOT NULL);
+     CREATE TABLE programmes (id INTEGER PRIMARY KEY, channel TEXT NOT NULL, start INTEGER NOT NULL,
+        stop INTEGER NOT NULL, title TEXT NOT NULL, sub_title TEXT NOT NULL DEFAULT '', descr TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT '', episode TEXT NOT NULL DEFAULT '', icon TEXT NOT NULL DEFAULT '',
+        source INTEGER NOT NULL);
+     CREATE INDEX programmes_by_channel ON programmes (channel, start);
+     CREATE INDEX programmes_by_stop ON programmes (stop);
+     CREATE VIRTUAL TABLE programmes_fts USING fts5(title, sub_title, descr, content='', contentless_delete=1,
+        tokenize='unicode61 remove_diacritics 2');
+     CREATE TABLE epg_sources (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, builtin INTEGER NOT NULL,
+        last_fetch INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT '', channels INTEGER NOT NULL DEFAULT 0,
+        programmes INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+     CREATE TABLE epg_map (item_key TEXT PRIMARY KEY, channel TEXT NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE item_epg (item_key TEXT PRIMARY KEY, channel TEXT NOT NULL);
+     CREATE INDEX item_epg_by_channel ON item_epg (channel);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -223,6 +244,8 @@ pub struct ImportStats {
     pub skipped: usize,
     pub removed: usize,
     pub categories: usize,
+    /// M3U: the playlist's guide URL (header `url-tvg`), if any.
+    pub tvg_url: Option<String>,
 }
 
 /// One catalogue row as a source delivers it (M3U entry or Xtream Codes stream).
@@ -388,6 +411,7 @@ pub fn import_m3u(
         return Err(io(e));
     }
     stats.skipped = parsed.skipped;
+    stats.tvg_url = parsed.tvg_url;
     stats.categories = sync.categories.len();
     stats.removed = sync.finish().map_err(io)?;
     Ok(stats)

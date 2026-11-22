@@ -35,4 +35,5 @@ jobs:
       - run: scripts/ci-install-flutter.sh
       - run: just ci-linux
       - run: just soak
+      - run: just test-epg-budget
       - run: just bench

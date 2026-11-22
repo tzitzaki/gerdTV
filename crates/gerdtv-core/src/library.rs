@@ -11,6 +11,7 @@
 //! (write to .tmp, rename), so a crash mid-save leaves the previous file.
 
 use crate::db::{self, Hit, ImportStats, Kind};
+use crate::epg;
 use crate::xtream::{self, Account, XcError, Xtream};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -206,8 +207,46 @@ impl Library {
         v
     }
 
-    /// Downloads and writes the catalogue. The database is only locked for the final write.
+    /// Downloads `url` to a temp file (streamed), so a big playlist or guide never sits in memory and the current data
+    /// stays usable until the download is complete. The caller removes the file.
+    async fn download(&self, url: &str, name: &str) -> Result<PathBuf> {
+        xtream::ensure_tls_provider();
+        let net = |e: reqwest::Error| XcError::Network(e.without_url().to_string());
+        let ua = if self.profile.user_agent.is_empty() {
+            "gerdTV"
+        } else {
+            &self.profile.user_agent
+        };
+        let client = reqwest::Client::builder()
+            .user_agent(ua)
+            .build()
+            .map_err(net)?;
+        let mut res = client.get(url).send().await.map_err(net)?;
+        if !res.status().is_success() {
+            return Err(XcError::Http(res.status().as_u16()).into());
+        }
+        let tmp = std::env::temp_dir()
+            .join("gerdtv")
+            .join(format!("{}-{name}", self.profile.id));
+        std::fs::create_dir_all(tmp.parent().unwrap())?;
+        use std::io::Write;
+        let mut f = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+        while let Some(chunk) = res.chunk().await.map_err(net)? {
+            f.write_all(&chunk)?;
+        }
+        f.flush()?;
+        Ok(tmp)
+    }
+
+    /// Downloads and writes the catalogue (the database is only locked for the final write), then re-matches the
+    /// channels to the guide, since items may have changed.
     pub async fn sync(&self) -> Result<SyncResult> {
+        let r = self.sync_catalogue().await?;
+        epg::rebuild_matches(&mut self.conn.lock().unwrap())?;
+        Ok(r)
+    }
+
+    async fn sync_catalogue(&self) -> Result<SyncResult> {
         match self.profile.source {
             SourceKind::Xtream => {
                 let f = xtream::fetch(self.xc.as_ref().unwrap()).await?;
@@ -218,47 +257,23 @@ impl Library {
                 })
             }
             SourceKind::M3uUrl => {
-                // Download to a temp file first (streamed), then parse: the old catalogue stays usable meanwhile.
-                xtream::ensure_tls_provider();
-                let client = reqwest::Client::builder()
-                    .user_agent(if self.profile.user_agent.is_empty() {
-                        "gerdTV"
-                    } else {
-                        &self.profile.user_agent
-                    })
-                    .build()
-                    .map_err(|e| XcError::Network(e.without_url().to_string()))?;
-                let mut res = client
-                    .get(&self.secrets[0])
-                    .send()
-                    .await
-                    .map_err(|e| XcError::Network(e.without_url().to_string()))?;
-                if !res.status().is_success() {
-                    return Err(XcError::Http(res.status().as_u16()).into());
-                }
-                let tmp = db_path(
-                    Path::new(&std::env::temp_dir()),
-                    &format!("{}-download", self.profile.id),
-                )
-                .with_extension("m3u");
-                std::fs::create_dir_all(tmp.parent().unwrap())?;
-                {
-                    use std::io::Write;
-                    let mut f = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
-                    while let Some(chunk) = res
-                        .chunk()
-                        .await
-                        .map_err(|e| XcError::Network(e.without_url().to_string()))?
-                    {
-                        f.write_all(&chunk)?;
-                    }
-                    f.flush()?;
-                }
+                // Download first (the old catalogue stays usable meanwhile), then parse.
+                let tmp = self
+                    .download(&self.secrets[0].clone(), "playlist.m3u")
+                    .await?;
                 let r = std::io::BufReader::new(std::fs::File::open(&tmp)?);
                 let stats = db::import_m3u(&mut self.conn.lock().unwrap(), r, &self.secret_refs());
                 let _ = std::fs::remove_file(&tmp);
+                let stats = stats?;
+                // Remember the playlist's own guide URL (credentials templated out) for the guide refresh.
+                if let Some(u) = &stats.tvg_url {
+                    self.set_setting(
+                        SETTING_M3U_TVG,
+                        &db::template_secrets(u, &self.secret_refs()),
+                    )?;
+                }
                 Ok(SyncResult {
-                    stats: stats?,
+                    stats,
                     account: None,
                 })
             }
@@ -409,6 +424,25 @@ impl Library {
 pub const SETTING_BUFFER: &str = "buffer_preset";
 pub const SETTING_ADAPTIVE: &str = "adaptive_buffer";
 pub const SETTING_TIMESHIFT: &str = "timeshift_secs";
+/// M3U profiles: the playlist header's guide URL (templated).
+pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
+
+/// One guide source as Settings → Guide shows it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GuideSource {
+    pub id: i64,
+    /// The URL for extra sources (credentials templated out); empty for the provider's built-in guide.
+    pub url: String,
+    pub builtin: bool,
+    pub last_fetch: i64,
+    /// Empty when the last import worked, else what went wrong.
+    pub status: String,
+    pub channels: u32,
+    pub programmes: u32,
+}
+
+/// The built-in guide's row in epg_sources (its real URL holds the login and is built when needed).
+const BUILTIN: &str = "builtin";
 
 /// One stream_health row.
 #[derive(Debug, Clone, PartialEq)]
@@ -426,6 +460,185 @@ pub struct HealthEntry {
 const HEALTH_KEEP: i64 = 2000;
 
 impl Library {
+    /// The provider's own guide URL: Xtream Codes xmltv.php, or the M3U header's url-tvg; None for M3U files without.
+    fn builtin_guide_url(&self) -> Result<Option<String>> {
+        if let Some(xc) = &self.xc {
+            return Ok(Some(xc.xmltv_url()));
+        }
+        Ok(self
+            .setting(SETTING_M3U_TVG)?
+            .map(|u| db::fill_secrets(&u, &self.secret_refs())))
+    }
+
+    /// The guide sources, the provider's first (its row is created as soon as the provider offers a guide).
+    pub fn guide_sources(&self) -> Result<Vec<GuideSource>> {
+        if self.builtin_guide_url()?.is_some() {
+            self.conn.lock().unwrap().execute(
+                "INSERT OR IGNORE INTO epg_sources (url, builtin, updated_at) VALUES (?1, 1, ?2)",
+                params![BUILTIN, now()],
+            )?;
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare_cached(
+            "SELECT id, url, builtin, last_fetch, status, channels, programmes FROM epg_sources
+             ORDER BY builtin DESC, id",
+        )?;
+        let rows = st.query_map([], |r| {
+            let builtin: bool = r.get(2)?;
+            Ok(GuideSource {
+                id: r.get(0)?,
+                url: if builtin { String::new() } else { r.get(1)? },
+                builtin,
+                last_fetch: r.get(3)?,
+                status: r.get(4)?,
+                channels: r.get(5)?,
+                programmes: r.get(6)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Adds an extra XMLTV URL (imported on the next refresh). Credentials in it are templated out on disk.
+    pub fn add_guide_url(&self, url: &str) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT OR IGNORE INTO epg_sources (url, builtin, updated_at) VALUES (?1, 0, ?2)",
+            params![db::template_secrets(url.trim(), &self.secret_refs()), now()],
+        )?;
+        Ok(())
+    }
+
+    /// Removes an extra source and its programmes (the provider's built-in guide can't be removed).
+    pub fn remove_guide_source(&self, id: i64) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM programmes_fts WHERE rowid IN (SELECT id FROM programmes WHERE source = ?1)", [id])?;
+        conn.execute("DELETE FROM programmes WHERE source = ?1", [id])?;
+        conn.execute("DELETE FROM epg_names WHERE channel IN (SELECT id FROM epg_channels WHERE source = ?1)", [id])?;
+        conn.execute("DELETE FROM epg_channels WHERE source = ?1", [id])?;
+        conn.execute(
+            "DELETE FROM epg_sources WHERE id = ?1 AND builtin = 0",
+            [id],
+        )?;
+        epg::rebuild_matches(&mut conn)?;
+        Ok(())
+    }
+
+    /// Downloads and imports every guide source (the provider's first), keeps `days_ahead` days (and 2 back), prunes,
+    /// and rebuilds the channel matches. A failing source keeps its previous data and records the error.
+    pub async fn refresh_guide(&self, days_ahead: i64) -> Result<Vec<GuideSource>> {
+        let sources = self.guide_sources()?;
+        let offset = self.profile.epg_offset_hours as i64 * 3600;
+        for src in &sources {
+            let url = if src.builtin {
+                self.builtin_guide_url()?.unwrap_or_default()
+            } else {
+                db::fill_secrets(&src.url, &self.secret_refs())
+            };
+            let outcome = match self.download(&url, &format!("guide-{}.xml", src.id)).await {
+                Ok(tmp) => {
+                    let r = std::fs::File::open(&tmp)
+                        .map_err(LibraryError::from)
+                        .and_then(|f| {
+                            epg::import(
+                                &mut self.conn.lock().unwrap(),
+                                src.id,
+                                f,
+                                now(),
+                                2,
+                                days_ahead,
+                                offset,
+                            )
+                            .map_err(LibraryError::from)
+                        });
+                    let _ = std::fs::remove_file(&tmp);
+                    r
+                }
+                Err(e) => Err(e),
+            };
+            let conn = self.conn.lock().unwrap();
+            match outcome {
+                Ok(st) => conn.execute(
+                    "UPDATE epg_sources SET last_fetch = ?2, status = '', channels = ?3, programmes = ?4, updated_at = ?2
+                     WHERE id = ?1",
+                    params![src.id, now(), st.channels as i64, st.programmes as i64],
+                )?,
+                Err(e) => conn.execute(
+                    "UPDATE epg_sources SET status = ?2, updated_at = ?3 WHERE id = ?1",
+                    params![src.id, e.to_string(), now()],
+                )?,
+            };
+        }
+        {
+            let mut conn = self.conn.lock().unwrap();
+            epg::prune(&conn, now(), 2)?;
+            epg::rebuild_matches(&mut conn)?;
+        }
+        self.guide_sources()
+    }
+
+    /// Seconds since the oldest successful guide import (None: never imported) — drives the 12 h refresh.
+    pub fn guide_age(&self) -> Result<Option<i64>> {
+        let oldest: Option<i64> = self.conn.lock().unwrap().query_row(
+            "SELECT min(last_fetch) FROM epg_sources WHERE last_fetch > 0",
+            [],
+            |r| r.get(0),
+        )?;
+        Ok(oldest.map(|t| now() - t))
+    }
+
+    pub fn now_next(
+        &self,
+        keys: &[String],
+    ) -> Result<Vec<(Option<epg::Programme>, Option<epg::Programme>)>> {
+        Ok(epg::now_next(&self.conn.lock().unwrap(), keys, now())?)
+    }
+
+    pub fn guide_window(
+        &self,
+        keys: &[String],
+        from: i64,
+        to: i64,
+    ) -> Result<Vec<Vec<epg::Programme>>> {
+        Ok(epg::window(&self.conn.lock().unwrap(), keys, from, to)?)
+    }
+
+    pub fn programme(&self, id: i64) -> Result<Option<epg::Programme>> {
+        Ok(epg::programme(&self.conn.lock().unwrap(), id)?)
+    }
+
+    pub fn search_programmes(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(epg::Programme, String)>> {
+        Ok(epg::search(
+            &self.conn.lock().unwrap(),
+            query,
+            now(),
+            limit,
+        )?)
+    }
+
+    pub fn unmatched_channels(&self, limit: usize, offset: usize) -> Result<Vec<(String, String)>> {
+        Ok(epg::unmatched(&self.conn.lock().unwrap(), limit, offset)?)
+    }
+
+    pub fn find_guide_channels(&self, query: &str, limit: usize) -> Result<Vec<(String, String)>> {
+        Ok(epg::find_channels(
+            &self.conn.lock().unwrap(),
+            query,
+            limit,
+        )?)
+    }
+
+    pub fn map_channel(&self, item_key: &str, channel: Option<&str>) -> Result<()> {
+        Ok(epg::map_channel(
+            &mut self.conn.lock().unwrap(),
+            item_key,
+            channel,
+            now(),
+        )?)
+    }
+
     /// Logs one recovery episode (from the watchdog's Health command).
     pub fn record_health(
         &self,
@@ -711,6 +924,41 @@ mod tests {
         assert_eq!(lib.bitrate(&key).unwrap(), 0);
         lib.set_bitrate(&key, 6_500_000).unwrap();
         assert_eq!(lib.bitrate(&key).unwrap(), 6_500_000);
+
+        // The guide: the panel's xmltv.php is the built-in source; after a refresh, matched channels have now/next.
+        let sources = lib.refresh_guide(7).await.unwrap();
+        assert_eq!(sources.len(), 1);
+        assert!(
+            sources[0].builtin && sources[0].status.is_empty() && sources[0].programmes > 1000,
+            "{sources:?}"
+        );
+        assert!(lib.guide_age().unwrap().unwrap() < 60);
+        let live: Vec<String> = lib
+            .items(Kind::Live, &cats[0].id, 50, 0)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.key)
+            .collect();
+        let nn = lib.now_next(&live).unwrap();
+        assert!(
+            nn.iter().any(|(now, next)| now.is_some() && next.is_some()),
+            "some channels show now/next"
+        );
+        assert!(
+            !lib.unmatched_channels(100, 0).unwrap().is_empty(),
+            "channels without epg id stay unmatched"
+        );
+        let hits = lib.search_programmes("sport", 5).unwrap();
+        assert!(!hits.is_empty());
+        lib.add_guide_url("http://127.0.0.1:9/extra.xml").unwrap();
+        let sources = lib.refresh_guide(7).await.unwrap();
+        assert_eq!(sources.len(), 2);
+        assert!(
+            sources[1].status.starts_with("network error"),
+            "a failing extra source records its error"
+        );
+        lib.remove_guide_source(sources[1].id).unwrap();
+        assert_eq!(lib.guide_sources().unwrap().len(), 1);
 
         // Cache-first: reopening without network shows the catalogue at once.
         drop(lib);
