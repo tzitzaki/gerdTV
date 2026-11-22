@@ -152,10 +152,18 @@ void main() {
   // A hang fails the test after 5 minutes instead of running into CI's job limit (the binding has no timeout).
   IntegrationTestWidgetsFlutterBinding.ensureInitialized().defaultTestTimeout =
       const Timeout(Duration(minutes: 5));
+  // One session (and so one media_kit Player) for all three sizes, like the app: a second Player in one process
+  // misbehaves (docs/HANDOVER.md), and with one per size the desktop run hung in CI. The account is removed
+  // between sizes, so each starts at the setup screen.
+  late Directory dir;
+  late Session session;
   setUpAll(() async {
     await RustLib.init();
     MediaKit.ensureInitialized();
+    dir = await Directory.systemTemp.createTemp('gerdtv-screens');
+    session = Session(secrets: MemorySecrets(), appDir: dir.path);
   });
+  tearDownAll(() => dir.delete(recursive: true));
 
   for (final MapEntry(key: form, value: size) in formFactors.entries) {
     testWidgets('every screen on $form', (tester) async {
@@ -165,9 +173,12 @@ void main() {
       // English texts, whatever the machine's language (the finders below use them).
       tester.platformDispatcher.localesTestValue = [const Locale('en')];
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-      final dir = await Directory.systemTemp.createTemp('gerdtv-screens');
-      final session = Session(secrets: MemorySecrets(), appDir: dir.path);
-      await tester.runAsync(session.start);
+      await tester.runAsync(() async {
+        if (session.state == SessionState.ready) await session.removeProfile();
+        await session.start();
+      });
+      final guideBefore =
+          session.guideGeneration; // this size's account imports its own guide
       await tester.pumpWidget(
         RepaintBoundary(
           key: _boundary,
@@ -201,6 +212,19 @@ void main() {
         await checkScreen(tester, form, 'group-$mode', size);
         await tapReady(tester, find.byKey(const Key('list.mode')));
       }
+      // The player over the picture: the now/next banner, then the channel list (OK).
+      await tapReady(tester, find.byType(ItemRow));
+      await waitFor(tester, find.byKey(const Key('player.banner')));
+      await checkScreen(tester, form, 'player', size);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await waitFor(tester, find.byKey(const Key('player.panel')));
+      await checkScreen(tester, form, 'player-channels', size);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tapReady(tester, find.byKey(const Key('player.stop')));
+      await waitFor(tester, find.byType(ItemRow).hitTestable());
+      await settle(
+        tester,
+      ); // the player is still closing (two Back buttons until then)
       await tester.pageBack();
       await settle(tester);
 
@@ -220,7 +244,7 @@ void main() {
       await section('Search');
       // Programmes are searched when the query changes: wait for the background guide import first.
       final end = DateTime.now().add(const Duration(seconds: 30));
-      while (session.guideGeneration == 0) {
+      while (session.guideGeneration == guideBefore) {
         if (DateTime.now().isAfter(end)) {
           fail('$form: the guide never imported');
         }
@@ -321,8 +345,6 @@ void main() {
       );
       await waitFor(tester, find.byType(PickGuideChannelScreen));
       await checkScreen(tester, form, 'guide-pick', size);
-
-      await tester.runAsync(() => dir.delete(recursive: true));
     });
   }
 }

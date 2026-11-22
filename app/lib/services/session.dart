@@ -20,7 +20,13 @@ import 'secrets.dart';
 enum SessionState { loading, needsSetup, ready }
 
 class Session extends ChangeNotifier {
-  Session({Secrets? secrets, this.appDir}) : secrets = secrets ?? Secrets();
+  Session({Secrets? secrets, this.appDir}) : secrets = secrets ?? Secrets() {
+    // Every start and stop reaches the native side in one place: Android keeps its foreground service (playback
+    // with the screen off) and enters Picture-in-Picture on leaving only while something plays.
+    nowPlaying.addListener(
+      () => unawaited(platform.setPlaying(nowPlaying.value?.name)),
+    );
+  }
 
   final Secrets secrets;
 
@@ -95,6 +101,9 @@ class Session extends ChangeNotifier {
     },
   );
   String? _playingKey;
+
+  /// The channels Up/Down switch through in the player: the group (or guide rows) the channel was opened from.
+  List<ItemInfo> zapList = const [];
 
   /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
   /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
@@ -318,7 +327,6 @@ class Session extends ChangeNotifier {
   Future<void> stopPlayback() async {
     _playingKey = null;
     nowPlaying.value = null;
-    unawaited(platform.setPlaying(null));
     await _adapter?.stop();
     await _player?.stop();
   }
