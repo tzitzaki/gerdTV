@@ -32,6 +32,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Android phone
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
+- Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 
 ## Shield

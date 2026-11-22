@@ -65,6 +65,8 @@
   "playerZapHint": "↑ ↓ Sender · OK Senderliste",
   "programmeFromStart": "Von Anfang an",
   "programmeNow": "Jetzt",
+  "programmeRemind": "Erinnern",
+  "programmeReminded": "Erinnerung gesetzt",
   "remove": "Entfernen",
   "restore": "Normale Größe",
   "retry": "Erneut versuchen",

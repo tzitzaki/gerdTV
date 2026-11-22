@@ -83,6 +83,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  ItemInfo dco_decode_box_autoadd_item_info(dynamic raw);
+
+  @protected
   ItemKind dco_decode_box_autoadd_item_kind(dynamic raw);
 
   @protected
@@ -206,6 +209,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
+  ItemInfo? dco_decode_opt_box_autoadd_item_info(dynamic raw);
+
+  @protected
   ItemKind? dco_decode_opt_box_autoadd_item_kind(dynamic raw);
 
   @protected
@@ -305,6 +311,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  ItemInfo sse_decode_box_autoadd_item_info(SseDeserializer deserializer);
 
   @protected
   ItemKind sse_decode_box_autoadd_item_kind(SseDeserializer deserializer);
@@ -448,6 +457,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  ItemInfo? sse_decode_opt_box_autoadd_item_info(SseDeserializer deserializer);
+
+  @protected
   ItemKind? sse_decode_opt_box_autoadd_item_kind(SseDeserializer deserializer);
 
   @protected
@@ -557,6 +569,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_i_64(
     PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_item_info(
+    ItemInfo self,
     SseSerializer serializer,
   );
 
@@ -737,6 +755,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_item_info(
+    ItemInfo? self,
     SseSerializer serializer,
   );
 
