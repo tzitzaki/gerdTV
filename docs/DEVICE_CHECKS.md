@@ -13,6 +13,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
+- Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
@@ -38,3 +39,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
+- Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.

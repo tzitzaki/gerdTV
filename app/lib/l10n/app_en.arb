@@ -45,9 +45,13 @@
   "chipAll": "All",
   "chipProgrammes": "Programmes",
   "clear": "Clear",
+  "dayToday": "Today",
+  "dayTomorrow": "Tomorrow",
+  "dayYesterday": "Yesterday",
   "episodesEmpty": "This series has no episodes.",
   "filterHint": "Filter this list",
   "guideAddUrl": "Extra XMLTV URL",
+  "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
   "@guideFailed": {
     "placeholders": {
@@ -96,6 +100,8 @@
   "guideUnmatched": "Channels without guide",
   "guideUnmatchedNone": "Every channel has a guide.",
   "guideUrlHint": "https://… (.xml or .xml.gz)",
+  "guideWatch": "Watch",
+  "guideWatchChannel": "Watch the channel",
   "healthEmpty": "No recoveries logged yet.",
   "healthFailed": "gave up after {attempts} attempts",
   "@healthFailed": {
@@ -122,6 +128,7 @@
   "listModeList": "List",
   "listModeTiles": "Tiles",
   "miniPlayer": "Mini player",
+  "navGuide": "Guide",
   "navLive": "Live TV",
   "navMovies": "Movies",
   "navSearch": "Search",
