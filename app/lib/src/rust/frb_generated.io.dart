@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/library.dart';
+import 'api/logos.dart';
 import 'api/playback.dart';
 import 'api/simple.dart';
 
@@ -77,10 +78,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BufferPreset dco_decode_box_autoadd_buffer_preset(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+
+  @protected
   ItemKind dco_decode_box_autoadd_item_kind(dynamic raw);
 
   @protected
   ProfileInfo dco_decode_box_autoadd_profile_info(dynamic raw);
+
+  @protected
+  ProgrammeInfo dco_decode_box_autoadd_programme_info(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -98,10 +105,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CategoryInfo dco_decode_category_info(dynamic raw);
 
   @protected
+  ChannelRef dco_decode_channel_ref(dynamic raw);
+
+  @protected
   CommandKind dco_decode_command_kind(dynamic raw);
 
   @protected
   double dco_decode_f_64(dynamic raw);
+
+  @protected
+  GuideRow dco_decode_guide_row(dynamic raw);
+
+  @protected
+  GuideSourceInfo dco_decode_guide_source_info(dynamic raw);
 
   @protected
   HealthInfo dco_decode_health_info(dynamic raw);
@@ -128,6 +144,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<CategoryInfo> dco_decode_list_category_info(dynamic raw);
 
   @protected
+  List<ChannelRef> dco_decode_list_channel_ref(dynamic raw);
+
+  @protected
+  List<GuideRow> dco_decode_list_guide_row(dynamic raw);
+
+  @protected
+  List<GuideSourceInfo> dco_decode_list_guide_source_info(dynamic raw);
+
+  @protected
   List<HealthInfo> dco_decode_list_health_info(dynamic raw);
 
   @protected
@@ -140,10 +165,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MpvOption> dco_decode_list_mpv_option(dynamic raw);
 
   @protected
+  List<NowNext> dco_decode_list_now_next(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
   List<ProfileInfo> dco_decode_list_profile_info(dynamic raw);
+
+  @protected
+  List<ProgrammeHit> dco_decode_list_programme_hit(dynamic raw);
+
+  @protected
+  List<ProgrammeInfo> dco_decode_list_programme_info(dynamic raw);
 
   @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
@@ -152,13 +186,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MpvOption dco_decode_mpv_option(dynamic raw);
 
   @protected
+  NowNext dco_decode_now_next(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
   BufferPreset? dco_decode_opt_box_autoadd_buffer_preset(dynamic raw);
 
   @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
   ItemKind? dco_decode_opt_box_autoadd_item_kind(dynamic raw);
+
+  @protected
+  ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
@@ -168,6 +211,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProfileInfo dco_decode_profile_info(dynamic raw);
+
+  @protected
+  ProgrammeHit dco_decode_programme_hit(dynamic raw);
+
+  @protected
+  ProgrammeInfo dco_decode_programme_info(dynamic raw);
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
@@ -244,10 +293,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   ItemKind sse_decode_box_autoadd_item_kind(SseDeserializer deserializer);
 
   @protected
   ProfileInfo sse_decode_box_autoadd_profile_info(SseDeserializer deserializer);
+
+  @protected
+  ProgrammeInfo sse_decode_box_autoadd_programme_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -265,10 +322,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CategoryInfo sse_decode_category_info(SseDeserializer deserializer);
 
   @protected
+  ChannelRef sse_decode_channel_ref(SseDeserializer deserializer);
+
+  @protected
   CommandKind sse_decode_command_kind(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  GuideRow sse_decode_guide_row(SseDeserializer deserializer);
+
+  @protected
+  GuideSourceInfo sse_decode_guide_source_info(SseDeserializer deserializer);
 
   @protected
   HealthInfo sse_decode_health_info(SseDeserializer deserializer);
@@ -297,6 +363,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ChannelRef> sse_decode_list_channel_ref(SseDeserializer deserializer);
+
+  @protected
+  List<GuideRow> sse_decode_list_guide_row(SseDeserializer deserializer);
+
+  @protected
+  List<GuideSourceInfo> sse_decode_list_guide_source_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<HealthInfo> sse_decode_list_health_info(SseDeserializer deserializer);
 
   @protected
@@ -309,10 +386,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MpvOption> sse_decode_list_mpv_option(SseDeserializer deserializer);
 
   @protected
+  List<NowNext> sse_decode_list_now_next(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
   List<ProfileInfo> sse_decode_list_profile_info(SseDeserializer deserializer);
+
+  @protected
+  List<ProgrammeHit> sse_decode_list_programme_hit(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ProgrammeInfo> sse_decode_list_programme_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
@@ -323,6 +413,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MpvOption sse_decode_mpv_option(SseDeserializer deserializer);
 
   @protected
+  NowNext sse_decode_now_next(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -331,7 +424,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   ItemKind? sse_decode_opt_box_autoadd_item_kind(SseDeserializer deserializer);
+
+  @protected
+  ProgrammeInfo? sse_decode_opt_box_autoadd_programme_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
@@ -341,6 +442,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProfileInfo sse_decode_profile_info(SseDeserializer deserializer);
+
+  @protected
+  ProgrammeHit sse_decode_programme_hit(SseDeserializer deserializer);
+
+  @protected
+  ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
@@ -424,6 +531,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_item_kind(
     ItemKind self,
     SseSerializer serializer,
@@ -432,6 +545,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_profile_info(
     ProfileInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_programme_info(
+    ProgrammeInfo self,
     SseSerializer serializer,
   );
 
@@ -451,10 +570,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_category_info(CategoryInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_channel_ref(ChannelRef self, SseSerializer serializer);
+
+  @protected
   void sse_encode_command_kind(CommandKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_guide_row(GuideRow self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_guide_source_info(
+    GuideSourceInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_health_info(HealthInfo self, SseSerializer serializer);
@@ -484,6 +615,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_channel_ref(
+    List<ChannelRef> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_guide_row(List<GuideRow> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_guide_source_info(
+    List<GuideSourceInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_health_info(
     List<HealthInfo> self,
     SseSerializer serializer,
@@ -505,6 +651,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_now_next(List<NowNext> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -513,6 +662,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_profile_info(
     List<ProfileInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_programme_hit(
+    List<ProgrammeHit> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_programme_info(
+    List<ProgrammeInfo> self,
     SseSerializer serializer,
   );
 
@@ -526,6 +687,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_mpv_option(MpvOption self, SseSerializer serializer);
 
   @protected
+  void sse_encode_now_next(NowNext self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -535,8 +699,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_item_kind(
     ItemKind? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_programme_info(
+    ProgrammeInfo? self,
     SseSerializer serializer,
   );
 
@@ -548,6 +724,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_profile_info(ProfileInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_programme_hit(ProgrammeHit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);

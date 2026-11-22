@@ -15,12 +15,12 @@ Full Xcode (opened once), `brew install rustup just cocoapods`, rustup as above,
 `just test-live` runs the opt-in checks against a real Xtream Codes account from `GERDTV_XC_SERVER`, `GERDTV_XC_USER` and `GERDTV_XC_PASS` (and `GERDTV_TMDB_KEY` once TMDB lands). It prints counts and timings only. Never paste its environment anywhere.
 
 ## Building
-- `just test-harness` (libmpv driven by the watchdog against the fault server, about 2 min), `just soak` (30 min), `just bench` (the core's performance budgets, compared with the saved baseline), `just test` (Rust + Flutter unit/widget tests), `just test-integration` (Linux build under Xvfb), `just ready` (every gate before a PR is marked ready).
+- `just test-harness` (libmpv driven by the watchdog against the fault server, about 2 min), `just soak` (30 min), `just test-epg-budget` (full-scale guide import), `just bench` (the core's performance budgets, compared with the saved baseline), `just test` (Rust + Flutter unit/widget tests), `just test-integration` (Linux build under Xvfb), `just ready` (every gate before a PR is marked ready).
 - `just build-linux`, `just build-android` (debug APK, arm64). Release builds come only from `.github/workflows/release.yml`.
 - After changing `crates/gerdtv-api`: `just codegen` regenerates `app/lib/src/rust`. The native library is built by Cargokit (`app/rust_builder`) as part of every Flutter build.
 
 ## CI
-- `.github/workflows/ci.yml` on every pull request push (a newer push cancels the older run): jobs `linux` (fmt, clippy, Rust tests, analyze, Flutter tests, licences, Linux build + integration tests under Xvfb), `macos` (macOS build + integration tests), `android` (debug APK). A first step in each job detects a docs-only change and ends the job green at once.
-- `.github/workflows/nightly.yml` (02:30 UTC + manual): everything long: the linux CI job's checks, `just soak` (30 min of random faults) and `just bench`.
+- `.github/workflows/ci.yml` on every pull request push (a newer push cancels the older run): jobs `linux` (fmt, clippy, Rust tests, analyze, Flutter tests, licences, Linux build + integration tests under Xvfb), `macos` (macOS build + integration tests), `android` (debug APK). A first step in each job detects a docs-only change and ends the job green at once. Pushes to `main` run only `android`, which saves its Gradle, pub and cargo cache where release tags can restore it (`release.yml` restores it before the APK build).
+- `.github/workflows/nightly.yml` (02:30 UTC + manual): everything long: the linux CI job's checks, `just soak` (30 min of random faults), the full-scale guide import budget and `just bench`.
 - Hardening: only `ubuntu-latest`/`macos-latest` (free standard runners); only GitHub-owned actions pinned by commit SHA; `permissions: contents: read` by default; `pull_request`, never `pull_request_target`; no secrets outside the `release` environment. `just test-docs` enforces the runner and action rules.
 - Flutter is installed in CI by cloning the pinned tag (no third-party setup action); the Rust toolchain comes from `rust-toolchain.toml` via the runner's rustup.

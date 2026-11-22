@@ -239,6 +239,14 @@ impl Xtream {
         Ok(out)
     }
 
+    /// The panel's own guide (XMLTV), built when needed and never stored (it holds the login).
+    pub fn xmltv_url(&self) -> String {
+        format!(
+            "{}/xmltv.php?username={}&password={}",
+            self.base, self.user, self.pass
+        )
+    }
+
     /// The play URL of a stream (built at play time, never stored). Live defaults to `.ts`; the watchdog may ask
     /// for `m3u8` instead. Movies/episodes use their container extension.
     pub fn stream_url(&self, kind: Kind, id: u64, ext: &str) -> String {

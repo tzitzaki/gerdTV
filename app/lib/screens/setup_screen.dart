@@ -59,9 +59,7 @@ class _SetupScreenState extends State<SetupScreen> {
       name: _xtream ? (Uri.tryParse(server)?.host ?? 'Xtream Codes') : 'M3U',
       source: _xtream ? SourceKind.xtream : SourceKind.m3UUrl,
       server: _xtream ? server : '',
-      epgUrls: const [],
       userAgent: '',
-      epgOffsetHours: 0,
     );
     final secrets = _xtream
         ? [_user.text.trim(), _pass.text]

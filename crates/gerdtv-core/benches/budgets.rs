@@ -43,5 +43,44 @@ fn budgets(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, budgets);
+/// The guide: import of 200 channels × 7 days (the full 2,000-channel budget is a timed test, `epg_budget.rs`),
+/// the grid's window query (50 channels × 3 h; budget < 20 ms) and now/next for 100 channels (budget < 5 ms).
+fn guide(c: &mut Criterion) {
+    use gerdtv_core::epg;
+    let now = 1_763_683_200 + 86_400; // inside the generated guide's first days
+    let mut xml = Vec::new();
+    gerdtv_testkit::generate::write_xmltv(&mut xml, 200, 7, now - 86_400, 1).unwrap();
+    let mut pl = Vec::new();
+    write_m3u(&mut pl, 2000, 1).unwrap(); // 600 live channels, epg ids ch0, ch10 … match the guide's channels
+    let mut g = c.benchmark_group("guide");
+    g.sample_size(10);
+    g.bench_function("import_200ch_7d", |b| {
+        b.iter(|| {
+            let mut conn = db::open(Path::new(":memory:")).unwrap();
+            epg::import(&mut conn, 1, xml.as_slice(), now, 2, 7, 0).unwrap()
+        })
+    });
+    let mut conn = db::open(Path::new(":memory:")).unwrap();
+    db::import_m3u(&mut conn, pl.as_slice(), &[]).unwrap();
+    epg::import(&mut conn, 1, xml.as_slice(), now, 2, 7, 0).unwrap();
+    epg::rebuild_matches(&mut conn).unwrap();
+    let keys: Vec<String> = {
+        let mut st = conn
+            .prepare("SELECT item_key FROM item_epg LIMIT 100")
+            .unwrap();
+        st.query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect()
+    };
+    g.bench_function("now_next_100", |b| {
+        b.iter(|| epg::now_next(&conn, &keys, now).unwrap())
+    });
+    g.bench_function("window_50ch_3h", |b| {
+        b.iter(|| epg::window(&conn, &keys[..50], now, now + 3 * 3600).unwrap())
+    });
+    g.finish();
+}
+
+criterion_group!(benches, budgets, guide);
 criterion_main!(benches);

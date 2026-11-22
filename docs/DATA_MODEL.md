@@ -1,8 +1,8 @@
 # Data model
 
-Profiles: their non-secret settings (name, source kind, server or file, EPG URLs, user agent, EPG offset, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
+Profiles: their non-secret settings (name, source kind, server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
 
-One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; images in the cache folder. Schema and queries: `crates/gerdtv-core/src/db.rs`.
+One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; logos and posters in the cache folder (`logos/`, one file per URL named by its FNV-1a hash, `crates/gerdtv-core/src/logos.rs`). Schema and queries: `crates/gerdtv-core/src/db.rs`.
 
 ## Tables
 | Table | What | Key |
@@ -13,7 +13,12 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `items_fts` | contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`; rowids match `items` | rowid |
 | `favourites`, `recents` | user data: item key + `updated_at` | `key` |
 | `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
-| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs` (values as text), `updated_at` | `key` |
+| `epg_channels`, `epg_names` | guide channels per source (id, first display name, icon) and every display name normalised for matching | `id` / `norm` |
+| `programmes`, `programmes_fts` | guide programmes (channel, start/stop UTC, title, sub-title, description, category, episode, icon, source) with an FTS index over title, sub-title and description; kept 2 days back to 7 ahead | `id` |
+| `epg_sources` | the provider's built-in guide (its URL is built when needed) and extra XMLTV URLs (credentials templated out), each with last import, status and counts | `id` |
+| `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
+| `item_epg` | the resolved match per live item (rebuilt after every import and sync) | `item_key` |
+| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `list_mode_live`, `list_mode_movie`, `list_mode_series`, `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
 | `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).
@@ -31,5 +36,5 @@ M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `
 - Rows not seen in a sync are removed, except: when a source list comes back empty while the catalogue has rows of that kind, those rows are kept (panels answer `[]` now and then under load).
 
 ## Migrations
-Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`.
+Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables.
 - Xtream Codes episodes are fetched when a series opens and kept until the next full sync.

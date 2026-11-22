@@ -4,6 +4,11 @@
 set -euo pipefail
 version="$(cat app/FLUTTER_VERSION)"
 dir="$HOME/flutter"
+# A cache restored by prefix (restore-keys) can hold an older Flutter after a version bump: start over then.
+if [[ -d "$dir" && "$(git -C "$dir" describe --tags --exact-match 2>/dev/null)" != "$version" ]]; then
+  echo "cached Flutter is not $version: cloning again"
+  rm -rf "${dir:?}"
+fi
 if [[ ! -x "$dir/bin/flutter" ]]; then
   git clone --depth 1 --branch "$version" https://github.com/flutter/flutter.git "$dir"
 fi

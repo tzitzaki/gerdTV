@@ -41,6 +41,21 @@ class Session extends ChangeNotifier {
   /// Bumped after each sync so lists reload.
   int generation = 0;
 
+  /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
+  bool guideRefreshing = false;
+
+  /// Bumped after each guide import so now/next and the grid reload.
+  int guideGeneration = 0;
+
+  /// Checks hourly whether the guide is older than [guideMaxAge] (the app may stay open for days).
+  Timer? _guideTimer;
+
+  /// The guide is refreshed when its oldest source is older than this (and once a profile is open without one).
+  static const guideMaxAge = Duration(hours: 12);
+
+  /// Days of guide kept ahead: a week on desktop, 3 days on phones and TVs (smaller storage, slower imports).
+  static int get guideDaysAhead => isDesktop ? 7 : 3;
+
   Player? _player;
   VideoController? _video;
   WatchdogAdapter? _adapter;
@@ -163,6 +178,9 @@ class Session extends ChangeNotifier {
     generation++;
     state = SessionState.ready;
     notifyListeners();
+    unawaited(
+      refreshGuide(),
+    ); // the first guide loads while the user starts browsing
     return null;
   }
 
@@ -179,6 +197,33 @@ class Session extends ChangeNotifier {
       syncError = '$e';
     } finally {
       syncing = false;
+      notifyListeners();
+    }
+    await refreshGuide();
+  }
+
+  /// Refreshes the guide when it is missing or older than [guideMaxAge] (or always with [force]: "Refresh now").
+  /// Failures are kept per source (Settings → Guide shows them); the previous guide stays meanwhile.
+  Future<void> refreshGuide({bool force = false}) async {
+    final lib = library;
+    _guideTimer ??= Timer.periodic(
+      const Duration(hours: 1),
+      (_) => unawaited(refreshGuide()),
+    );
+    if (lib == null || guideRefreshing) return;
+    final age = await lib.guideAge();
+    if (!force && age != null && age < guideMaxAge.inSeconds) return;
+    guideRefreshing = true;
+    notifyListeners();
+    try {
+      await lib.refreshGuide(daysAhead: guideDaysAhead);
+      guideGeneration++;
+    } catch (e) {
+      debugPrint(
+        'guide refresh: $e',
+      ); // a database error; download errors are recorded per source instead
+    } finally {
+      guideRefreshing = false;
       notifyListeners();
     }
   }

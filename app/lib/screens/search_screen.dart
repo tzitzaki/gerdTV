@@ -1,5 +1,6 @@
 // The global search: one field, results narrow with every keystroke, type chips with counts, Enter plays the top
-// result. Hidden/PIN groups and EPG programmes join in later phases.
+// result. The Programmes chip lists guide programmes (running and upcoming first); tapping one plays its channel.
+// Hidden/PIN groups join in a later phase.
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -11,6 +12,7 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'browse_screen.dart';
 import 'item_tile.dart';
+import 'programme_text.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, required this.session, this.focus});
@@ -33,6 +35,32 @@ class _SearchScreenState extends State<SearchScreen> {
   );
   final _field = TextEditingController();
 
+  /// Guide programmes for the current query (at most [_programmeLimit]); shown under the Programmes chip.
+  List<ProgrammeHit> _programmes = const [];
+  bool _showProgrammes = false;
+  static const _programmeLimit = 100;
+
+  void _changed(String q) {
+    _model.set(q);
+    _findProgrammes(q);
+  }
+
+  /// Answers to an older query are dropped (the field moved on), like the item search's sequence numbers.
+  Future<void> _findProgrammes(String q) async {
+    final lib = widget.session.library;
+    if (lib == null || q.trim().isEmpty) {
+      setState(() => _programmes = const []);
+      return;
+    }
+    final hits = await lib.searchProgrammes(query: q, limit: _programmeLimit);
+    if (mounted && q == _field.text) setState(() => _programmes = hits);
+  }
+
+  void _setKind(ItemKind? kind) {
+    setState(() => _showProgrammes = false);
+    _model.setKind(kind);
+  }
+
   @override
   void dispose() {
     _model.dispose();
@@ -41,7 +69,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _playTop() {
-    if (_model.hits.isNotEmpty) {
+    if (_showProgrammes) {
+      if (_programmes.isNotEmpty) {
+        openItem(context, widget.session, _programmes.first.item);
+      }
+    } else if (_model.hits.isNotEmpty) {
       openItem(context, widget.session, _model.hits.first);
     }
   }
@@ -85,16 +117,16 @@ class _SearchScreenState extends State<SearchScreen> {
                             tooltip: l10n.clear,
                             onPressed: () {
                               _field.clear();
-                              _model.set('');
+                              _changed('');
                             },
                           ),
                   ),
-                  onChanged: _model.set,
+                  onChanged: _changed,
                   onSubmitted: (_) => _playTop(),
                 ),
               ),
             ),
-            if (_model.counts.isNotEmpty)
+            if (_model.counts.isNotEmpty || _programmes.isNotEmpty)
               SizedBox(
                 height: 48,
                 child: ListView(
@@ -107,8 +139,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       padding: const EdgeInsets.only(right: Tokens.space),
                       child: ChoiceChip(
                         label: Text('${l10n.chipAll} $total'),
-                        selected: _model.kind == null,
-                        onSelected: (_) => _model.setKind(null),
+                        selected: !_showProgrammes && _model.kind == null,
+                        onSelected: (_) => _setKind(null),
                       ),
                     ),
                     for (final c in _model.counts)
@@ -117,9 +149,19 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: ChoiceChip(
                           key: Key('search.chip.${c.kind.name}'),
                           label: Text('${_kindName(l10n, c.kind)} ${c.count}'),
-                          selected: _model.kind == c.kind,
-                          onSelected: (_) => _model.setKind(c.kind),
+                          selected: !_showProgrammes && _model.kind == c.kind,
+                          onSelected: (_) => _setKind(c.kind),
                         ),
+                      ),
+                    if (_programmes.isNotEmpty)
+                      ChoiceChip(
+                        key: const Key('search.chip.programmes'),
+                        label: Text(
+                          '${l10n.chipProgrammes} ${_programmes.length}${_programmes.length == _programmeLimit ? '+' : ''}',
+                        ),
+                        selected: _showProgrammes,
+                        onSelected: (_) =>
+                            setState(() => _showProgrammes = true),
                       ),
                   ],
                 ),
@@ -127,6 +169,8 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: _model.query.trim().isEmpty
                   ? Center(child: Text(l10n.searchEmpty))
+                  : _showProgrammes
+                  ? _programmeList(l10n)
                   : _model.hits.isEmpty
                   ? Center(child: Text(l10n.searchNoResults(_model.query)))
                   : NotificationListener<ScrollNotification>(
@@ -148,6 +192,25 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  /// Programme hits: title, channel and when; a tap plays the channel (the programme sheet comes with the grid).
+  Widget _programmeList(AppLocalizations l10n) {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return ListView.builder(
+      itemCount: _programmes.length,
+      itemBuilder: (context, i) {
+        final h = _programmes[i];
+        return ItemTile(
+          key: Key('search.programme.${h.programme.id}'),
+          item: h.item,
+          title: h.programme.title,
+          subtitle:
+              '${h.item.name} · ${programmeWhen(l10n, locale, h.programme)}',
+          onTap: () => openItem(context, widget.session, h.item),
         );
       },
     );
