@@ -35,6 +35,14 @@ abstract class Library implements RustOpaqueInterface {
   /// The buffer for an item: its override, else the profile's preset, else Balanced.
   BufferChoice bufferFor({required String key});
 
+  /// The catch-up URL of a programme on a live channel, or None (no archive, out of reach, not started, not
+  /// Xtream Codes). Holds credentials: pass it straight to the player, never log or show it.
+  String? catchupUrl({
+    required String key,
+    required PlatformInt64 start,
+    required PlatformInt64 stop,
+  });
+
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
@@ -108,6 +116,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});
 
+  /// Reminders still to come, soonest first.
+  Future<List<ReminderInfo>> reminders();
+
   Future<void> removeGuideSource({required PlatformInt64 id});
 
   /// Search as the user types; `kind` None = all kinds.
@@ -135,6 +146,9 @@ abstract class Library implements RustOpaqueInterface {
   });
 
   Future<void> setPreferHls({required String key, required bool hls});
+
+  /// Sets or clears a reminder.
+  Future<void> setReminder({required ReminderInfo reminder, required bool on_});
 
   void setSetting({required String key, required String value});
 
@@ -313,6 +327,9 @@ class ItemInfo {
   final String logo;
   final int? number;
 
+  /// Live channels: catch-up days (0 = none).
+  final int archiveDays;
+
   const ItemInfo({
     required this.key,
     required this.kind,
@@ -320,6 +337,7 @@ class ItemInfo {
     required this.category,
     required this.logo,
     this.number,
+    required this.archiveDays,
   });
 
   @override
@@ -329,7 +347,8 @@ class ItemInfo {
       name.hashCode ^
       category.hashCode ^
       logo.hashCode ^
-      number.hashCode;
+      number.hashCode ^
+      archiveDays.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -341,7 +360,8 @@ class ItemInfo {
           name == other.name &&
           category == other.category &&
           logo == other.logo &&
-          number == other.number;
+          number == other.number &&
+          archiveDays == other.archiveDays;
 }
 
 enum ItemKind { live, movie, episode, series }
@@ -492,6 +512,35 @@ class ProgrammeInfo {
           desc == other.desc &&
           category == other.category &&
           episode == other.episode;
+}
+
+/// A reminder for a guide programme: the channel, start and stop (UTC seconds) and the title.
+class ReminderInfo {
+  final String itemKey;
+  final PlatformInt64 start;
+  final PlatformInt64 stop;
+  final String title;
+
+  const ReminderInfo({
+    required this.itemKey,
+    required this.start,
+    required this.stop,
+    required this.title,
+  });
+
+  @override
+  int get hashCode =>
+      itemKey.hashCode ^ start.hashCode ^ stop.hashCode ^ title.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReminderInfo &&
+          runtimeType == other.runtimeType &&
+          itemKey == other.itemKey &&
+          start == other.start &&
+          stop == other.stop &&
+          title == other.title;
 }
 
 /// One page of search results. `seq` echoes the caller's sequence number, so the UI drops answers to keystrokes

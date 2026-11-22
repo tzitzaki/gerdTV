@@ -112,6 +112,8 @@ pub struct ItemInfo {
     pub category: String,
     pub logo: String,
     pub number: Option<u32>,
+    /// Live channels: catch-up days (0 = none).
+    pub archive_days: u32,
 }
 
 impl From<gerdtv_core::db::Hit> for ItemInfo {
@@ -123,6 +125,7 @@ impl From<gerdtv_core::db::Hit> for ItemInfo {
             category: h.category,
             logo: h.logo,
             number: h.number,
+            archive_days: h.archive_days,
         }
     }
 }
@@ -231,6 +234,14 @@ pub struct GuideRow {
 pub struct ProgrammeHit {
     pub programme: ProgrammeInfo,
     pub item: ItemInfo,
+}
+
+/// A reminder for a guide programme: the channel, start and stop (UTC seconds) and the title.
+pub struct ReminderInfo {
+    pub item_key: String,
+    pub start: i64,
+    pub stop: i64,
+    pub title: String,
 }
 
 /// A channel by id and name: a live item without a guide, or a guide channel to map it to.
@@ -560,6 +571,45 @@ impl Library {
                 .find_guide_channels(&query, limit as usize)
                 .map_err(err)?,
         ))
+    }
+
+    /// The catch-up URL of a programme on a live channel, or None (no archive, out of reach, not started, not
+    /// Xtream Codes). Holds credentials: pass it straight to the player, never log or show it.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn catchup_url(
+        &self,
+        key: String,
+        start: i64,
+        stop: i64,
+    ) -> Result<Option<String>, String> {
+        self.0.catchup_url(&key, start, stop).map_err(err)
+    }
+
+    /// Reminders still to come, soonest first.
+    pub fn reminders(&self) -> Result<Vec<ReminderInfo>, String> {
+        Ok(self
+            .0
+            .reminders()
+            .map_err(err)?
+            .into_iter()
+            .map(|r| ReminderInfo {
+                item_key: r.item_key,
+                start: r.start,
+                stop: r.stop,
+                title: r.title,
+            })
+            .collect())
+    }
+
+    /// Sets or clears a reminder.
+    pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {
+        let r = core::Reminder {
+            item_key: reminder.item_key,
+            start: reminder.start,
+            stop: reminder.stop,
+            title: reminder.title,
+        };
+        self.0.set_reminder(&r, on).map_err(err)
     }
 
     /// Maps a live item to a guide channel by hand (None: back to automatic matching).

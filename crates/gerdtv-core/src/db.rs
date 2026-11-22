@@ -80,6 +80,11 @@ const MIGRATIONS: &[&str] = &[
      CREATE TABLE epg_map (item_key TEXT PRIMARY KEY, channel TEXT NOT NULL, updated_at INTEGER NOT NULL);
      CREATE TABLE item_epg (item_key TEXT PRIMARY KEY, channel TEXT NOT NULL);
      CREATE INDEX item_epg_by_channel ON item_epg (channel);",
+    // 4 → 5: catch-up: how many days back a live channel's archive reaches (0 = none); reminders for guide programmes
+    // (user data), by channel and start time, since programme ids change with every guide import.
+    "ALTER TABLE items ADD COLUMN archive_days INTEGER NOT NULL DEFAULT 0;
+     CREATE TABLE reminders (item_key TEXT NOT NULL, start INTEGER NOT NULL, stop INTEGER NOT NULL,
+        title TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (item_key, start));",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -266,6 +271,8 @@ pub struct NewItem {
     pub year: Option<u32>,
     /// Xtream Codes movies/episodes: the container extension for the play URL.
     pub ext: String,
+    /// Live channels: days the provider keeps for catch-up (0 = none).
+    pub archive_days: u32,
 }
 
 /// One sync of a profile's catalogue: everything inside one transaction (diff + upsert by key), so readers see the
@@ -305,14 +312,16 @@ impl<'c> Sync<'c> {
 
     pub fn item(&mut self, kind: Kind, it: &NewItem) -> Result<()> {
         let rowid: i64 = self.tx.prepare_cached(
-            "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext,
+               archive_days)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT (key) DO UPDATE SET kind = ?2, name = ?3, category = ?4, logo = ?5, epg_id = ?6,
-               number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13, ext = ?14
+               number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13, ext = ?14,
+               archive_days = ?15
              RETURNING rowid",
         )?.query_row(
             params![it.key, kind as i64, it.name, it.category, it.logo, it.epg_id, it.number, it.url, it.season,
-                    it.episode, it.year, self.position, self.generation, it.ext],
+                    it.episode, it.year, self.position, self.generation, it.ext, it.archive_days],
             |r| r.get(0),
         )?;
         self.tx
@@ -401,6 +410,12 @@ pub fn import_m3u(
             url,
             year: None,
             ext: String::new(),
+            // A catchup attribute without catchup-days says nothing about the reach: no catch-up then.
+            archive_days: if e.catchup.is_empty() {
+                0
+            } else {
+                e.catchup_days.unwrap_or(0)
+            },
         };
         match sync.item(kind, &item) {
             Ok(()) => stats.entries += 1,
@@ -426,6 +441,8 @@ pub struct Hit {
     pub category: String,
     pub logo: String,
     pub number: Option<u32>,
+    /// Live channels: catch-up days (0 = none).
+    pub archive_days: u32,
 }
 
 /// The FTS5 query for user input: every word a quoted prefix (`ard sport` → `"ard"* "sport"*`), so quotes, `-`
@@ -454,7 +471,7 @@ pub fn search(
     let number: Option<i64> = input.trim().parse().ok();
     let prefix = format!("{}%", input.trim());
     let mut stmt = conn.prepare_cached(
-        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
          FROM items i
          LEFT JOIN favourites f ON f.key = i.key
          LEFT JOIN recents r ON r.key = i.key
@@ -483,6 +500,7 @@ pub fn search(
                 category: r.get(3)?,
                 logo: r.get(4)?,
                 number: r.get(5)?,
+                archive_days: r.get(6)?,
             })
         },
     )?;
