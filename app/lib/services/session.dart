@@ -96,6 +96,9 @@ class Session extends ChangeNotifier {
   );
   String? _playingKey;
 
+  /// The channels Up/Down switch through in the player: the group (or guide rows) the channel was opened from.
+  List<ItemInfo> zapList = const [];
+
   /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
   /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
   final ValueNotifier<ItemInfo?> nowPlaying = ValueNotifier(null);
