@@ -242,3 +242,76 @@ fn platforms_show_the_name_gerdtv() {
         );
     }
 }
+
+/// Release notes start at the previous *published* release: a tag whose release run failed (no release) must not
+/// cut the PRs it carried out of the next notes. A fake `gh` knows which tags have a release.
+#[test]
+fn release_notes_skip_tags_without_a_release() {
+    let dir = std::env::temp_dir().join(format!("gerdtv-notes-{}", std::process::id()));
+    let repo = dir.join("repo");
+    let bin = dir.join("bin");
+    fs::create_dir_all(&repo).unwrap();
+    fs::create_dir_all(&bin).unwrap();
+    // `gh release view <tag>` succeeds only for v0.1.
+    let gh = bin.join("gh");
+    fs::write(&gh, "#!/bin/sh\n[ \"$1 $2 $3\" = \"release view v0.1\" ]\n").unwrap();
+    fs::set_permissions(&gh, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args(args)
+            .current_dir(&repo)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["commit", "-q", "--allow-empty", "-m", "start"]);
+    // Each "PR" is a side branch merged with GitHub's message: subject, blank line, PR title.
+    let merge = |n: u32, tag: Option<&str>| {
+        git(&["checkout", "-q", "-b", &format!("pr{n}")]);
+        git(&["commit", "-q", "--allow-empty", "-m", &format!("work {n}")]);
+        git(&["checkout", "-q", "main"]);
+        git(&[
+            "merge",
+            "-q",
+            "--no-ff",
+            &format!("pr{n}"),
+            "-m",
+            &format!("Merge pull request #{n} from x/pr{n}"),
+            "-m",
+            &format!("Title {n}"),
+        ]);
+        if let Some(t) = tag {
+            git(&["tag", t]);
+        }
+    };
+    merge(1, Some("v0.1")); // released
+    merge(2, None);
+    merge(3, Some("v0.2")); // its release run failed: no release
+    merge(4, Some("v0.3")); // the release being made
+    let out = std::process::Command::new(repo_root().join("scripts/release-notes.sh"))
+        .arg("v0.3")
+        .current_dir(&repo)
+        .env(
+            "PATH",
+            format!("{}:{}", bin.display(), std::env::var("PATH").unwrap()),
+        )
+        .output()
+        .unwrap();
+    let notes = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success(),
+        "{notes}{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for want in ["Title 2 (#2)", "Title 3 (#3)", "Title 4 (#4)"] {
+        assert!(notes.contains(want), "missing {want}:\n{notes}");
+    }
+    assert!(
+        !notes.contains("Title 1"),
+        "v0.1 was released before:\n{notes}"
+    );
+    fs::remove_dir_all(&dir).unwrap();
+}
