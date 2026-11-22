@@ -4,8 +4,6 @@
 // the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc).
 // Platforms without a native side ignore the calls.
 
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -35,7 +33,12 @@ class PlatformBridge {
 
   /// Something started (title) or stopped (null). Android keeps a foreground service alive while playing.
   Future<void> setPlaying(String? title) async {
-    if (kIsWeb || !(Platform.isAndroid || Platform.isIOS)) return;
+    // The target platform (not dart:io's): tests can stand in for Android.
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
     try {
       await channel.invokeMethod('setPlaying', {
         'playing': title != null,
@@ -51,13 +54,10 @@ class PlatformBridge {
   Future<void> setLogo(AppLogo logo) async {
     if (kIsWeb) return;
     final args = <String, Object>{'name': logo.name};
-    if (Platform.isMacOS) {
-      args['png'] = await renderLogoPng(
-        logo,
-        512,
-        inset: 0.1,
-      ); // the margin macOS icons keep
-    } else if (Platform.isLinux) {
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      // The margin macOS icons keep.
+      args['png'] = await renderLogoPng(logo, 512, inset: 0.1);
+    } else if (defaultTargetPlatform == TargetPlatform.linux) {
       args['png'] = await renderLogoPng(logo, 256);
     }
     try {

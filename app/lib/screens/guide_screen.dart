@@ -220,7 +220,12 @@ class _GuideScreenState extends State<GuideScreen> {
                   ),
                   onPressed: () {
                     Navigator.of(context).pop();
-                    openItem(this.context, widget.session, channel);
+                    openItem(
+                      this.context,
+                      widget.session,
+                      channel,
+                      channels: _channels,
+                    );
                   },
                 ),
               ],

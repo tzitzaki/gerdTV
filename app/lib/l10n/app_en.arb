@@ -138,6 +138,15 @@
   "navSearch": "Search",
   "navSeries": "Series",
   "navSettings": "Settings",
+  "playerChannels": "Channels",
+  "playerNext": "Next: {title}",
+  "@playerNext": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "playerReconnecting": "Reconnecting ({attempt})…",
   "@playerReconnecting": {
     "placeholders": {
@@ -146,6 +155,7 @@
       }
     }
   },
+  "playerZapHint": "↑ ↓ channels · OK channel list",
   "programmeNow": "Now",
   "remove": "Remove",
   "restore": "Full size",

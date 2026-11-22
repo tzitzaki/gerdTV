@@ -63,7 +63,12 @@ void main() {
     setUpAll(useFakeCore);
 
     // Without an open library only Account, Stream health and About exist; enough to see layout and search.
-    Future<Session> pump(WidgetTester tester, Size size) async {
+    // [beside]: a rail of that width left of Settings, as in the shell.
+    Future<Session> pump(
+      WidgetTester tester,
+      Size size, {
+      double beside = 0,
+    }) async {
       final session = Session(appDir: 'unused-by-the-fake');
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
@@ -76,7 +81,14 @@ void main() {
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: SettingsScreen(session: session)),
+          home: Scaffold(
+            body: Row(
+              children: [
+                SizedBox(width: beside),
+                Expanded(child: SettingsScreen(session: session)),
+              ],
+            ),
+          ),
         ),
       );
       return session;
@@ -118,6 +130,15 @@ void main() {
         find.text('Licences'),
         findsOneWidget,
       ); // back to the chosen category
+    });
+
+    // Regression (macOS CI, 800 px window): the shell shows its rail, so Settings must be wide too, though it gets
+    // less than 720 px beside the rail; it opened full pages over the rail instead.
+    testWidgets('wide window with the rail: categories beside the content', (
+      tester,
+    ) async {
+      await pump(tester, const Size(800, 600), beside: 81);
+      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
     });
 
     testWidgets('phone: a category list that opens a page', (tester) async {

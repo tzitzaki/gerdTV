@@ -336,9 +336,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final categories = _categories(l10n);
         final searching = _query.text.trim().isNotEmpty;
         final matches = filterSettings(categories, _query.text);
-        return LayoutBuilder(
-          builder: (context, c) {
-            if (c.maxWidth >= Tokens.wideLayout) {
+        return Builder(
+          builder: (context) {
+            // The window's width, like the shell's rail/bar switch: beside the rail Settings gets less than 720 px.
+            if (MediaQuery.sizeOf(context).width >= Tokens.wideLayout) {
               // Master-detail: categories left, the selected one (or the search results) right.
               final shown = searching ? matches : categories;
               final selected = categories.firstWhere(
