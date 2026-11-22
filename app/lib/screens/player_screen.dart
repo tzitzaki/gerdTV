@@ -3,7 +3,11 @@
 // Leaving the screen keeps the stream playing (the now-playing bar takes over); only Stop or another stream end it.
 // Picture mode (desktop: P or the mini-player button) shrinks the window to a floating, always-on-top mini player that
 // shows only the picture, Restore and Stop; drag it anywhere. Android Picture-in-Picture uses the same mode.
-// Keys: Esc/Back leaves (keeps playing; in picture mode it restores first), S stops, Space pauses, P mini player.
+// Live channels opened from a group or the guide: Up/Down switch to the previous/next channel of that list, a banner
+// shows what's on now and next (5 s after each start or switch, and on OK), OK opens the channel list beside the
+// picture. media_kit's own controls keep Space, Left/Right (seek), J/I and F; their Up/Down (volume) and Esc are ours.
+// Keys: Esc/Back leaves (keeps playing; it closes the channel list or restores picture mode first), S stops,
+// Space pauses, P mini player, Up/Down channels, OK (Enter/Select) the channel list.
 
 import 'dart:async';
 
@@ -19,6 +23,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'buffer_picker.dart';
+import 'list_modes.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key, required this.session, required this.item});
@@ -31,6 +36,15 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   bool _paused = false;
+
+  /// What's on, for the banner (the playing channel) and the channel list (every channel of the list).
+  bool _banner = false;
+  Timer? _bannerTimer;
+  bool _panel = false;
+  final Map<String, NowNext> _nowNext = {};
+
+  ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
+  List<ItemInfo> get _channels => widget.session.zapList;
   static final _miniWindow = MiniWindow();
 
   @override
@@ -42,7 +56,55 @@ class _PlayerScreenState extends State<PlayerScreen> {
     scheduleMicrotask(() {
       session.playerOpen.value = true;
       session.play(item); // sets nowPlaying, which the bar also listens to
+      _showBanner();
     });
+  }
+
+  /// Shows the banner for 5 s with what's on now on the playing channel (live only).
+  Future<void> _showBanner() async {
+    final it = _current;
+    if (it.kind != ItemKind.live || !mounted) return;
+    _bannerTimer?.cancel();
+    setState(() => _banner = true);
+    _bannerTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _banner = false);
+    });
+    await _loadNowNext([it]);
+  }
+
+  Future<void> _loadNowNext(List<ItemInfo> items) async {
+    final lib = widget.session.library;
+    if (lib == null || items.isEmpty) return;
+    final keys = [for (final i in items) i.key];
+    final rows = await lib.nowNext(keys: keys);
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < keys.length; i++) {
+        _nowNext[keys[i]] = rows[i];
+      }
+    });
+  }
+
+  /// Up/Down: the previous/next channel of the list it was opened from (wrapping around).
+  Future<void> _zap(int delta) async {
+    final list = _channels;
+    final i = list.indexWhere((c) => c.key == _current.key);
+    if (list.length < 2 || i < 0) return;
+    await _switchTo(list[(i + delta + list.length) % list.length]);
+  }
+
+  Future<void> _switchTo(ItemInfo channel) async {
+    await widget.session.play(channel);
+    await _showBanner();
+  }
+
+  void _togglePanel() {
+    if (_channels.length < 2) {
+      _showBanner();
+      return;
+    }
+    setState(() => _panel = !_panel);
+    if (_panel) _loadNowNext(_channels);
   }
 
   /// Desktop: into the floating mini player and back. (Android/iOS Picture-in-Picture set pictureMode themselves.)
@@ -54,6 +116,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _back() {
+    if (_panel) {
+      setState(() => _panel = false);
+      return;
+    }
     if (widget.session.pictureMode.value && isDesktop) {
       _toggleMini();
       return;
@@ -63,6 +129,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    _bannerTimer?.cancel();
     if (_miniWindow.isMini) {
       _miniWindow.exit();
       widget.session.pictureMode.value = false;
@@ -143,6 +210,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  /// media_kit's desktop controls without their Up/Down (volume) and Esc, which switch channels and leave here.
+  MaterialDesktopVideoControlsThemeData get _desktopControls {
+    final p = widget.session.player;
+    void seek(int secs) => p.seek(p.state.position + Duration(seconds: secs));
+    return MaterialDesktopVideoControlsThemeData(
+      keyboardShortcuts: {
+        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): p.playOrPause,
+        const SingleActivator(LogicalKeyboardKey.space): p.playOrPause,
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => seek(-2),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () => seek(2),
+        const SingleActivator(LogicalKeyboardKey.keyJ): () => seek(-10),
+        const SingleActivator(LogicalKeyboardKey.keyI): () => seek(10),
+      },
+    );
+  }
+
   Future<void> _togglePause() async {
     final a = widget.session.adapter;
     _paused ? await a.resume() : await a.pause();
@@ -159,6 +242,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SingleActivator(LogicalKeyboardKey.keyP): _toggleMini,
         const SingleActivator(LogicalKeyboardKey.space): _togglePause,
         const SingleActivator(LogicalKeyboardKey.keyS): _stop,
+        // Only while the channel list is closed: inside it these keys move the focus and pick a channel.
+        if (!_panel) ...{
+          const SingleActivator(LogicalKeyboardKey.arrowUp): () => _zap(-1),
+          const SingleActivator(LogicalKeyboardKey.arrowDown): () => _zap(1),
+          const SingleActivator(LogicalKeyboardKey.enter): _togglePanel,
+          const SingleActivator(LogicalKeyboardKey.select): _togglePanel,
+        },
       },
       child: Focus(
         autofocus: true,
@@ -171,9 +261,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   body: Stack(
                     children: [
                       Positioned.fill(
-                        child: Video(
-                          controller: widget.session.video,
-                          controls: AdaptiveVideoControls,
+                        child: MaterialDesktopVideoControlsTheme(
+                          normal: _desktopControls,
+                          fullscreen: _desktopControls,
+                          child: Video(
+                            controller: widget.session.video,
+                            controls: AdaptiveVideoControls,
+                          ),
                         ),
                       ),
                       SafeArea(
@@ -190,7 +284,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               const SizedBox(width: Tokens.space),
                               Expanded(
                                 child: Text(
-                                  widget.item.name,
+                                  _current.name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.titleMedium
@@ -236,6 +330,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ),
                         ),
                       ),
+                      if (_banner && !_panel)
+                        Positioned(
+                          top: 72,
+                          left: Tokens.space * 2,
+                          right: Tokens.space * 2,
+                          child: _NowNextBanner(
+                            channel: _current,
+                            nowNext: _nowNext[_current.key],
+                            showHint: _channels.length > 1,
+                          ),
+                        ),
+                      if (_panel)
+                        Positioned(
+                          top: 72,
+                          bottom: Tokens.space * 2,
+                          right: Tokens.space * 2,
+                          width: 360,
+                          child: _ChannelPanel(
+                            channels: _channels,
+                            current: _current,
+                            nowNext: _nowNext,
+                            onPick: (c) {
+                              setState(() => _panel = false);
+                              _switchTo(c);
+                            },
+                          ),
+                        ),
                       // Buffered seconds vs. the target (bottom left): the stream's cushion right now.
                       Positioned(
                         left: Tokens.space * 2,
@@ -349,6 +470,152 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What's on now (with progress) and next on the playing channel.
+class _NowNextBanner extends StatelessWidget {
+  const _NowNextBanner({
+    required this.channel,
+    required this.nowNext,
+    required this.showHint,
+  });
+  final ItemInfo channel;
+  final NowNext? nowNext;
+  final bool showHint;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+    final now = nowNext?.now;
+    final next = nowNext?.next;
+    return Card(
+      key: const Key('player.banner'),
+      child: Padding(
+        padding: const EdgeInsets.all(Tokens.space * 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              channel.number == null
+                  ? channel.name
+                  : '${channel.number}  ${channel.name}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: text.titleMedium,
+            ),
+            if (now != null) ...[
+              const SizedBox(height: Tokens.space / 2),
+              Text(now.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: Tokens.space / 2),
+              LinearProgressIndicator(
+                value: progressOf(now, DateTime.now()),
+                minHeight: 3,
+              ),
+            ],
+            if (next != null)
+              Padding(
+                padding: const EdgeInsets.only(top: Tokens.space / 2),
+                child: Text(
+                  l10n.playerNext(next.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.bodySmall,
+                ),
+              ),
+            if (showHint)
+              Padding(
+                padding: const EdgeInsets.only(top: Tokens.space / 2),
+                child: Text(l10n.playerZapHint, style: text.labelSmall),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The channel list beside the picture: each channel with what's on now; the playing one is selected and focused.
+class _ChannelPanel extends StatefulWidget {
+  const _ChannelPanel({
+    required this.channels,
+    required this.current,
+    required this.nowNext,
+    required this.onPick,
+  });
+  final List<ItemInfo> channels;
+  final ItemInfo current;
+  final Map<String, NowNext> nowNext;
+  final void Function(ItemInfo) onPick;
+
+  @override
+  State<_ChannelPanel> createState() => _ChannelPanelState();
+}
+
+class _ChannelPanelState extends State<_ChannelPanel> {
+  // Created once (opens at the playing channel), so a rebuild after now/next loads keeps the scroll position.
+  late final _scroll = ScrollController(
+    initialScrollOffset:
+        widget.channels
+            .indexWhere((c) => c.key == widget.current.key)
+            .clamp(0, 1 << 30) *
+        64.0,
+  );
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final channels = widget.channels;
+    final current = widget.current;
+    final nowNext = widget.nowNext;
+    return Card(
+      key: const Key('player.panel'),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              l10n.playerChannels,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              controller: _scroll,
+              itemExtent: 64,
+              itemCount: channels.length,
+              itemBuilder: (context, i) {
+                final c = channels[i];
+                return ListTile(
+                  key: Key('player.panel.${c.key}'),
+                  autofocus: c.key == current.key,
+                  selected: c.key == current.key,
+                  title: Text(
+                    c.number == null ? c.name : '${c.number}  ${c.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    nowNext[c.key]?.now?.title ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => widget.onPick(c),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
