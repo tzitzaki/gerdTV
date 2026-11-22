@@ -512,7 +512,7 @@ pub fn search(
         return Ok(vec![]);
     };
     let mut st = conn.prepare_cached(&format!(
-        "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number
+        "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
          FROM programmes p
          JOIN items i ON i.key = (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1)
          WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1)
@@ -528,6 +528,7 @@ pub fn search(
                 category: r.get(12)?,
                 logo: r.get(13)?,
                 number: r.get(14)?,
+                archive_days: r.get(15)?,
             },
         ))
     })?

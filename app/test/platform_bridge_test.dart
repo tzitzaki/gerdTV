@@ -47,6 +47,7 @@ void main() {
         name: 'Channel One',
         category: 'g',
         logo: '',
+        archiveDays: 0,
       );
       session.nowPlaying.value = null;
       await Future<void>.delayed(Duration.zero);

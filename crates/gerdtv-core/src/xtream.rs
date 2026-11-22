@@ -40,6 +40,9 @@ pub struct Account {
     pub expires: Option<i64>,
     pub max_connections: u32,
     pub active_connections: u32,
+    /// The server's clock against UTC in seconds (its local time − UTC, in 15-minute steps; 0 when it doesn't say):
+    /// catch-up URLs name the start in the server's local time.
+    pub time_offset: i64,
 }
 
 pub struct Xtream {
@@ -144,6 +147,7 @@ impl Xtream {
             expires,
             max_connections: num(&u["max_connections"]).unwrap_or(1) as u32,
             active_connections: num(&u["active_cons"]).unwrap_or(0) as u32,
+            time_offset: server_offset(&v["server_info"]),
         })
     }
 
@@ -195,6 +199,11 @@ impl Xtream {
                         &s["stream_icon"]
                     }),
                     epg_id: text(&s["epg_channel_id"]),
+                    archive_days: if kind == Kind::Live && num(&s["tv_archive"]) == Some(1) {
+                        num(&s["tv_archive_duration"]).unwrap_or(0) as u32
+                    } else {
+                        0
+                    },
                     number: if kind == Kind::Live {
                         num(&s["num"]).map(|n| n as u32)
                     } else {
@@ -244,6 +253,26 @@ impl Xtream {
         format!(
             "{}/xmltv.php?username={}&password={}",
             self.base, self.user, self.pass
+        )
+    }
+
+    /// The catch-up URL of a live channel's archive: `duration` minutes from `start` (UTC seconds), the start named
+    /// in the server's local time (`time_offset` from the account): /timeshift/<user>/<pass>/<minutes>/
+    /// <YYYY-MM-DD:HH-MM>/<id>.ts. `just test-live` checks a real panel answers it with MPEG-TS (it may start
+    /// mid-packet); that the start minute is right shows only by watching (docs/DEVICE_CHECKS.md).
+    pub fn catchup_url(
+        &self,
+        stream_id: u64,
+        start: i64,
+        minutes: u32,
+        time_offset: i64,
+    ) -> String {
+        format!(
+            "{}/timeshift/{}/{}/{minutes}/{}/{stream_id}.ts",
+            self.base,
+            self.user,
+            self.pass,
+            server_time(start + time_offset)
         )
     }
 
@@ -315,11 +344,73 @@ pub async fn sync(conn: &mut Connection, xc: &Xtream) -> Result<(Account, db::Im
     Ok((f.account, stats))
 }
 
+/// The server's offset from UTC: its `time_now` (local, "YYYY-MM-DD HH:MM:SS") against `timestamp_now` (UTC),
+/// rounded to 15 minutes; 0 when either is missing.
+fn server_offset(info: &Value) -> i64 {
+    let digits: String = text(&info["time_now"])
+        .chars()
+        .filter(char::is_ascii_digit)
+        .collect();
+    match (crate::epg::parse_time(&digits), num(&info["timestamp_now"])) {
+        (Some(local), Some(utc)) => ((local - utc as i64) as f64 / 900.0).round() as i64 * 900,
+        _ => 0,
+    }
+}
+
+/// "YYYY-MM-DD:HH-MM" for seconds since the epoch, as the timeshift URL wants it (civil_from_days, H. Hinnant).
+fn server_time(secs: i64) -> String {
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!(
+        "{y:04}-{m:02}-{d:02}:{:02}-{:02}",
+        rem / 3600,
+        rem % 3600 / 60
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use gerdtv_testkit::mock_xc::{MockXc, PASS, USER};
     use std::path::Path;
+
+    #[test]
+    fn catch_up_times_follow_the_server_clock() {
+        // (UTC seconds, the server's local time as the timeshift URL names it) for an offset of +1 h.
+        let table = [
+            (1_763_830_800, "2025-11-22:18-00"), // 17:00 UTC
+            (1_767_222_000, "2026-01-01:00-00"), // the year changes in local time only
+            (951_825_600, "2000-02-29:13-00"),   // leap day
+        ];
+        for (utc, want) in table {
+            assert_eq!(server_time(utc + 3600), want, "{utc}");
+        }
+        // The offset: local time_now against UTC timestamp_now, in 15-minute steps, 0 without both.
+        let info = |now: &str, ts: i64| serde_json::json!({"time_now": now, "timestamp_now": ts});
+        assert_eq!(
+            server_offset(&info("2025-11-22 18:00:07", 1_763_830_800)),
+            3600
+        );
+        assert_eq!(
+            server_offset(&info("2025-11-22 22:29:50", 1_763_830_800)),
+            5 * 3600 + 1800
+        );
+        assert_eq!(server_offset(&serde_json::json!({})), 0);
+        let xc = Xtream::new("http://xc.example.invalid:8080", "u", "p", None);
+        assert_eq!(
+            xc.catchup_url(42, 1_763_830_800, 90, 3600),
+            "http://xc.example.invalid:8080/timeshift/u/p/90/2025-11-22:18-00/42.ts"
+        );
+    }
 
     #[tokio::test]
     async fn syncs_from_a_panel_and_reports_hard_errors() {

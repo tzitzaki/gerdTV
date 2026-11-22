@@ -92,6 +92,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo dco_decode_box_autoadd_programme_info(dynamic raw);
 
   @protected
+  ReminderInfo dco_decode_box_autoadd_reminder_info(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -182,6 +185,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ProgrammeInfo> dco_decode_list_programme_info(dynamic raw);
 
   @protected
+  List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
+
+  @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
 
   @protected
@@ -219,6 +225,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo dco_decode_programme_info(dynamic raw);
+
+  @protected
+  ReminderInfo dco_decode_reminder_info(dynamic raw);
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
@@ -305,6 +314,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo sse_decode_box_autoadd_programme_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReminderInfo sse_decode_box_autoadd_reminder_info(
     SseDeserializer deserializer,
   );
 
@@ -407,6 +421,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ReminderInfo> sse_decode_list_reminder_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
     SseDeserializer deserializer,
   );
@@ -450,6 +469,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
+
+  @protected
+  ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
@@ -553,6 +575,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_programme_info(
     ProgrammeInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_reminder_info(
+    ReminderInfo self,
     SseSerializer serializer,
   );
 
@@ -680,6 +708,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_reminder_info(
+    List<ReminderInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -732,6 +766,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);

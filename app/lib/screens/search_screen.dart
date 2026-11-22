@@ -1,5 +1,5 @@
 // The global search: one field, results narrow with every keystroke, type chips with counts, Enter plays the top
-// result. The Programmes chip lists guide programmes (running and upcoming first); tapping one plays its channel.
+// result. The Programmes chip lists guide programmes (running and upcoming first); tapping one opens its sheet.
 // Hidden/PIN groups join in a later phase.
 
 import 'package:flutter/services.dart';
@@ -12,6 +12,7 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'browse_screen.dart';
 import 'item_tile.dart';
+import 'programme_sheet.dart';
 import 'programme_text.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -210,7 +211,8 @@ class _SearchScreenState extends State<SearchScreen> {
           title: h.programme.title,
           subtitle:
               '${h.item.name} · ${programmeWhen(l10n, locale, h.programme)}',
-          onTap: () => openItem(context, widget.session, h.item),
+          onTap: () =>
+              showProgrammeSheet(context, widget.session, h.programme, h.item),
         );
       },
     );

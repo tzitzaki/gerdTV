@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Licence gate (CLAUDE.md, "Public repo hygiene"): every library bundled into the app must be GPL-3.0 compatible.
-# Rust: the normal (shipped) dependency tree of gerdtv_api, by SPDX expression from Cargo metadata.
-# Dart: every non-dev package the app resolves, by its LICENSE text. The native libraries (libmpv, FFmpeg) are
-# checked by hand per Spike A and listed in docs/ARCHITECTURE.md until the in-app Licences screen lists them.
+# Rust: the normal (shipped) dependency tree of gerdtv_api, by SPDX expression from Cargo metadata; the same list is
+# the in-app Licences screen's `app/assets/licences/rust.txt` (`scripts/licences.sh --write` updates it, the check
+# fails while it is stale). Dart: every non-dev package the app resolves, by its LICENSE text (Flutter's own
+# registry shows them in the app). The native libraries (libmpv, FFmpeg) were checked by hand per Spike A: their
+# builds are in docs/ARCHITECTURE.md and `app/assets/licences/native.txt`.
 # Debug: a refused crate prints its name and licence; if it is genuinely compatible, add the SPDX id below.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -25,15 +27,23 @@ spdx_ok() {
   return 1
 }
 
+# "name version licence" per shipped crate; crates without an SPDX id (a license file) were reviewed by hand.
+crates="$(cargo tree --color never -p gerdtv_api -e normal --prefix none --format '{p} {l}' |
+  sed 's/ (\*)//g; s/ (proc-macro)//g; s/ v\([0-9]\)/ \1/' | sort -u | grep -v '^gerdtv' |
+  sed 's/^\(allo-isolate [^ ]*\) *$/\1 Apache-2.0/')"
 n=0
 while read -r name version licence; do
   n=$((n + 1))
-  [[ "$name" == gerdtv* ]] && continue
-  # No SPDX id (license-file crates): reviewed by hand and listed here with what the file says.
-  case "$name" in allo-isolate) licence="Apache-2.0" ;; esac
   spdx_ok "$licence" || { echo "licences: Rust crate $name $version has licence '$licence'"; fail=1; }
-done < <(cargo tree --color never -p gerdtv_api -e normal --prefix none --format '{p} {l}' | sed 's/ (\*)//g; s/ (proc-macro)//g; s/ v\([0-9]\)/ \1/' | sort -u)
+done <<<"$crates"
 echo "licences: $n Rust crates checked"
+asset=app/assets/licences/rust.txt
+if [[ "${1:-}" == "--write" ]]; then
+  printf '%s\n' "$crates" > "$asset"
+  echo "licences: wrote $asset"
+elif [[ "$(cat "$asset" 2>/dev/null)" != "$crates" ]]; then
+  echo "licences: $asset is out of date: run scripts/licences.sh --write"; fail=1
+fi
 
 # Dart: package_config.json lists every resolved package; `flutter pub deps` says which are dev-only.
 (cd app && flutter pub get >/dev/null)
