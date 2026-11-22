@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/list_modes.dart';
-import 'package:gerdtv/screens/settings_screen.dart';
+import 'package:gerdtv/theme.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
@@ -312,19 +312,45 @@ void main() {
       await settle(tester);
 
       await section('Settings');
+      await checkScreen(tester, form, 'settings', size);
+      // Each category (wide: beside the list; phone: its own page), then a search across all of them.
+      final wide = size.width >= Tokens.wideLayout;
+      for (final cat in [
+        'account',
+        'playback',
+        'guide',
+        'appearance',
+        'updates',
+        'health',
+        'about',
+      ]) {
+        await tapReady(tester, find.byKey(Key('settings.cat.$cat')));
+        await settle(tester);
+        await checkScreen(tester, form, 'settings-$cat', size);
+        if (!wide) {
+          await tester.pageBack();
+          await settle(tester);
+        }
+      }
+      await tester.enterText(find.byKey(const Key('settings.search')), 'guide');
+      await settle(tester);
+      await checkScreen(tester, form, 'settings-search', size);
+      await tapReady(tester, find.byTooltip('Clear'));
+      await settle(tester);
+      await tapReady(tester, find.byKey(const Key('settings.cat.guide')));
+      await settle(tester);
       final list = find
           .descendant(
-            of: find.byType(SettingsScreen),
+            of: find.byKey(const Key('settings.content')),
             matching: find.byType(Scrollable),
           )
           .first;
-      await checkScreen(tester, form, 'settings', size);
       await tester.scrollUntilVisible(
         find.byKey(const Key('guide.unmatched')),
         300,
         scrollable: list,
       );
-      await checkScreen(tester, form, 'settings-guide', size);
+      await checkScreen(tester, form, 'settings-guide-end', size);
       await tapReady(tester, find.byKey(const Key('guide.unmatched')));
       await waitFor(tester, find.byType(UnmatchedChannelsScreen));
       await checkScreen(tester, form, 'guide-unmatched', size);
