@@ -19,7 +19,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
-- Logo: the Dock and Finder show the TV-screen icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
+- Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
 ## iPhone
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
@@ -46,4 +46,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
-- Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the TV screen).
+- Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).

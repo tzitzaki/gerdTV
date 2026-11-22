@@ -4,7 +4,9 @@
 import 'package:material_ui/material_ui.dart';
 
 class Tokens {
-  static const accent = Color(0xFF4F8CFF);
+  static const accent = Color(
+    0xFFFF7A1A,
+  ); // orange: the logo's and the app's one accent
 
   /// The logo's tile and the Android TV banner's background.
   static const ink = Color(0xFF12121A);

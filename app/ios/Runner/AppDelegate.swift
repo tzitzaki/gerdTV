@@ -64,12 +64,12 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
         result(self.startPip(u))
       case "setLogo":
         // iOS shows its own "You have changed the icon" alert; that can't be turned off.
-        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "screen"
+        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "gtv"
         guard UIApplication.shared.supportsAlternateIcons else {
           result(nil)
           return
         }
-        UIApplication.shared.setAlternateIconName(name == "screen" ? nil : "AppIcon-\(name)") { _ in result(nil) }
+        UIApplication.shared.setAlternateIconName(name == "gtv" ? nil : "AppIcon-\(name)") { _ in result(nil) }
       case "stopPip":
         self.pip?.stopPictureInPicture()
         result(nil)

@@ -67,10 +67,10 @@ void main() {
     await tester.pump();
     // Settings → Appearance: another logo, stored app-wide and sent to the Linux window as its icon.
     await tapReady(tester, find.byKey(const Key('settings.cat.appearance')));
-    await tapReady(tester, find.byKey(const Key('settings.logo.frame')));
+    await tapReady(tester, find.byKey(const Key('settings.logo.signal')));
     await tester.pump();
-    expect(session.logo, AppLogo.frame);
-    expect(appSetting(dir: dir.path, key: Session.settingAppLogo), 'frame');
+    expect(session.logo, AppLogo.signal);
+    expect(appSetting(dir: dir.path, key: Session.settingAppLogo), 'signal');
     // The rail's Live TV (Appearance lists the sections by name too).
     await tester.tap(
       find.descendant(

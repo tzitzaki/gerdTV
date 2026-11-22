@@ -13,7 +13,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 
-const defaultLogo = AppLogo.screen;
+const defaultLogo = AppLogo.gtv;
 
 Future<void> write(String path, List<int> bytes) async {
   final f = File(path);

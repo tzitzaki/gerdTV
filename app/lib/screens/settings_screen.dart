@@ -547,10 +547,10 @@ class _LogoPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final names = {
+      AppLogo.gtv: l10n.logoGtv,
       AppLogo.screen: l10n.logoScreen,
       AppLogo.monogram: l10n.logoMonogram,
       AppLogo.signal: l10n.logoSignal,
-      AppLogo.frame: l10n.logoFrame,
     };
     return RadioGroup<AppLogo>(
       groupValue: session.logo,

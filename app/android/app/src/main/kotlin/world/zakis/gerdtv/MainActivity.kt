@@ -40,7 +40,7 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "setLogo" -> {
-                        setLogo(call.argument<String>("name") ?: "screen")
+                        setLogo(call.argument<String>("name") ?: "gtv")
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -52,8 +52,8 @@ class MainActivity : FlutterActivity() {
     /// Enables the chosen logo's launcher alias and disables the others. DONT_KILL_APP keeps this process running;
     /// the launcher picks up the new icon after a moment (some launchers drop a home-screen shortcut of the old one).
     private fun setLogo(name: String) {
-        val aliases = mapOf("screen" to "LogoScreen", "monogram" to "LogoMonogram", "signal" to "LogoSignal", "frame" to "LogoFrame")
-        val chosen = aliases[name] ?: "LogoScreen"
+        val aliases = mapOf("gtv" to "LogoGtv", "screen" to "LogoScreen", "monogram" to "LogoMonogram", "signal" to "LogoSignal")
+        val chosen = aliases[name] ?: "LogoGtv"
         // Enable first, then disable the rest: there is always a launcher entry, even if the app dies in between.
         for (alias in listOf(chosen) + aliases.values.filter { it != chosen }) {
             packageManager.setComponentEnabledSetting(

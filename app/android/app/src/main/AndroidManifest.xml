@@ -39,7 +39,7 @@
              MainActivity.setLogo switches them; `just logos` renders the icons. Their names are stored nowhere, but
              MainActivity maps logo names to them, so rename both together. -->
         <activity-alias
-            android:name=".LogoScreen"
+            android:name=".LogoGtv"
             android:targetActivity=".MainActivity"
             android:enabled="true"
             android:exported="true"
@@ -81,12 +81,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LogoFrame"
+            android:name=".LogoScreen"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_frame"
-            android:banner="@drawable/banner_frame">
+            android:icon="@mipmap/ic_launcher_screen"
+            android:banner="@drawable/banner_screen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
