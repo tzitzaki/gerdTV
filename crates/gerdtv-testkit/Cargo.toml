@@ -14,3 +14,9 @@ tokio.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# The libmpv harness (tests/libmpv_watchdog.rs): real libmpv driven by the real watchdog. Dev-only, so the
+# library itself never links libmpv. (gerdtv-core dev-depends on this crate too; Cargo allows that cycle for dev.)
+gerdtv-core = { path = "../gerdtv-core" }
+libmpv2.workspace = true

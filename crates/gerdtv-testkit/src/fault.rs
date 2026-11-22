@@ -35,6 +35,153 @@ const CLIP_SECS: u64 = 10;
 const SEGMENT_SECS: u64 = 2;
 const WINDOW: u64 = 3;
 
+// ---- an endless live TS with continuous timestamps ----
+//
+// Looping the clip's bytes as they are would restart its timestamps every 10 s; mpv then sees a discontinuity per
+// loop (positions jump back, the cache never holds more than one loop). A real channel's timestamps keep counting,
+// so on each loop n the PTS/DTS of every PES header and the PCR of every adaptation field are shifted by n × the
+// clip's span, and continuity counters run on per PID.
+
+const TS: usize = 188;
+const PTS_WRAP: u64 = 1 << 33;
+
+/// Reads a 5-byte PES timestamp (33 bits with marker bits).
+fn read_ts(b: &[u8]) -> u64 {
+    (((b[0] as u64 >> 1) & 0x07) << 30)
+        | ((b[1] as u64) << 22)
+        | (((b[2] as u64) >> 1) << 15)
+        | ((b[3] as u64) << 7)
+        | ((b[4] as u64) >> 1)
+}
+
+/// Writes a 5-byte PES timestamp, keeping the 4-bit prefix of the original first byte.
+fn write_ts(b: &mut [u8], v: u64) {
+    let v = v % PTS_WRAP;
+    b[0] = (b[0] & 0xf0) | (((v >> 30) as u8 & 0x07) << 1) | 1;
+    b[1] = (v >> 22) as u8;
+    b[2] = (((v >> 15) as u8) << 1) | 1;
+    b[3] = (v >> 7) as u8;
+    b[4] = ((v as u8) << 1) | 1;
+}
+
+/// Where a packet's payload starts, and whether it has a PCR (offset 6..12) — None for malformed packets.
+fn layout(p: &[u8]) -> Option<(usize, bool)> {
+    if p.len() != TS || p[0] != 0x47 {
+        return None;
+    }
+    let afc = (p[3] >> 4) & 3;
+    let (start, pcr) = if afc & 2 != 0 {
+        let len = p[4] as usize;
+        (5 + len, len > 0 && p[5] & 0x10 != 0)
+    } else {
+        (4, false)
+    };
+    (start <= TS).then_some((start, pcr))
+}
+
+/// Visits each PES timestamp field (PTS, DTS) of a packet that starts a PES packet: (byte offset in the packet).
+fn pes_timestamps(p: &[u8]) -> Vec<usize> {
+    let Some((start, _)) = layout(p) else {
+        return vec![];
+    };
+    let pusi = p[1] & 0x40 != 0;
+    let q = &p[start..];
+    if !pusi || q.len() < 19 || q[..3] != [0, 0, 1] || !(0xc0..=0xef).contains(&q[3]) {
+        return vec![];
+    }
+    match q[7] >> 6 {
+        2 => vec![start + 9],
+        3 => vec![start + 9, start + 14],
+        _ => vec![],
+    }
+}
+
+/// The clip's timestamp span: from its first to just past its last PES timestamp (one video frame, 40 ms).
+fn clip_span(clip: &[u8]) -> u64 {
+    let (mut lo, mut hi) = (u64::MAX, 0);
+    for p in clip.as_chunks::<TS>().0 {
+        for off in pes_timestamps(p) {
+            let t = read_ts(&p[off..off + 5]);
+            lo = lo.min(t);
+            hi = hi.max(t);
+        }
+    }
+    hi - lo + 3600
+}
+
+/// The live stream: the clip forever, loop n shifted by n × span, continuity counters continuous per PID.
+pub struct LiveTs {
+    span: u64,
+    index: usize,
+    loops: u64,
+    cc: std::collections::HashMap<u16, u8>,
+}
+
+impl LiveTs {
+    pub fn new() -> LiveTs {
+        LiveTs {
+            span: clip_span(CLIP_TS),
+            index: 0,
+            loops: 0,
+            cc: Default::default(),
+        }
+    }
+
+    /// The next 188-byte packet.
+    pub fn next_packet(&mut self) -> [u8; TS] {
+        let packets = CLIP_TS.len() / TS;
+        if self.index == packets {
+            self.index = 0;
+            self.loops += 1;
+        }
+        let mut p = [0u8; TS];
+        p.copy_from_slice(&CLIP_TS[self.index * TS..(self.index + 1) * TS]);
+        self.index += 1;
+        let shift = self.loops * self.span;
+        if shift > 0 {
+            for off in pes_timestamps(&p) {
+                let t = read_ts(&p[off..off + 5]);
+                write_ts(&mut p[off..off + 5], t + shift);
+            }
+            if let Some((_, true)) = layout(&p) {
+                // PCR base: 33 bits in bytes 6..10 plus the top bit of byte 10.
+                let base = ((p[6] as u64) << 25)
+                    | ((p[7] as u64) << 17)
+                    | ((p[8] as u64) << 9)
+                    | ((p[9] as u64) << 1)
+                    | ((p[10] as u64) >> 7);
+                let b = (base + shift) % PTS_WRAP;
+                p[6] = (b >> 25) as u8;
+                p[7] = (b >> 17) as u8;
+                p[8] = (b >> 9) as u8;
+                p[9] = (b >> 1) as u8;
+                p[10] = (p[10] & 0x7f) | (((b & 1) as u8) << 7);
+            }
+        }
+        // Continuity counters: count on per PID across loops (only packets with payload advance them).
+        let pid = (((p[1] & 0x1f) as u16) << 8) | p[2] as u16;
+        if (p[3] >> 4) & 1 != 0 {
+            let cc = self.cc.entry(pid).or_insert(p[3] & 0x0f);
+            p[3] = (p[3] & 0xf0) | *cc;
+            *cc = (*cc + 1) & 0x0f;
+        }
+        p
+    }
+}
+
+impl Default for LiveTs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LiveTs {
+    /// The stream as an endless byte iterator (what the paced sender consumes).
+    pub fn bytes(mut self) -> impl Iterator<Item = u8> {
+        std::iter::from_fn(move || Some(self.next_packet())).flat_map(|p| p.into_iter())
+    }
+}
+
 /// What goes wrong for the requests that start while it is set.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Fault {
@@ -213,8 +360,16 @@ async fn serve(req: Request, mut stream: TcpStream, state: Arc<Mutex<State>>, st
             {
                 // Real time: the clip's bytes per second; the first second goes out at once, as live servers do.
                 let rate = CLIP_TS.len() / CLIP_SECS as usize;
-                let looped = CLIP_TS.iter().copied().cycle();
-                send_paced(&mut stream, looped, None, rate, rate, fault, &state).await;
+                send_paced(
+                    &mut stream,
+                    LiveTs::new().bytes(),
+                    None,
+                    rate,
+                    rate,
+                    fault,
+                    &state,
+                )
+                .await;
             }
         }
         "playlist" => {
@@ -397,6 +552,61 @@ async fn send_paced(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_ts_timestamps_keep_counting_across_loops() {
+        assert_eq!(
+            read_ts(&{
+                let mut b = [0x21, 0, 1, 0, 1];
+                write_ts(&mut b, 123_456_789);
+                b
+            }),
+            123_456_789
+        );
+        let span = clip_span(CLIP_TS);
+        assert!(
+            (900_000..910_000).contains(&span),
+            "about 10 s at 90 kHz: {span}"
+        );
+        let packets = CLIP_TS.len() / TS;
+        let mut live = LiveTs::new();
+        let first: Vec<[u8; TS]> = (0..packets).map(|_| live.next_packet()).collect();
+        let second: Vec<[u8; TS]> = (0..packets).map(|_| live.next_packet()).collect();
+        // Every PES timestamp of loop 2 is loop 1's plus the span.
+        let mut checked = 0;
+        for (a, b) in first.iter().zip(&second) {
+            for off in pes_timestamps(a) {
+                assert_eq!(read_ts(&b[off..off + 5]), read_ts(&a[off..off + 5]) + span);
+                checked += 1;
+            }
+        }
+        assert!(
+            checked > 250,
+            "video (250 frames) and audio PES headers seen: {checked}"
+        );
+        // Continuity counters run on per PID across the loop point.
+        let pid = |p: &[u8; TS]| (((p[1] & 0x1f) as u16) << 8) | p[2] as u16;
+        let last_of = |pid_: u16| {
+            first
+                .iter()
+                .rev()
+                .find(|p| pid(p) == pid_ && (p[3] >> 4) & 1 != 0)
+                .unwrap()[3]
+                & 0x0f
+        };
+        let next_of = |pid_: u16| {
+            second
+                .iter()
+                .find(|p| pid(p) == pid_ && (p[3] >> 4) & 1 != 0)
+                .unwrap()[3]
+                & 0x0f
+        };
+        let video = pid(first
+            .iter()
+            .find(|p| !pes_timestamps(&p[..]).is_empty())
+            .unwrap());
+        assert_eq!(next_of(video), (last_of(video) + 1) & 0x0f);
+    }
 
     #[test]
     fn hls_window_slides_and_counts_loops() {

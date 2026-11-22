@@ -73,6 +73,50 @@ pub fn mpv_options(preset: BufferPreset, bitrate_bps: u64) -> Vec<(String, Strin
     opts.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
+/// Default timeshift windows (pause/rewind live): desktop 60 min, phone/tablet/TV 30 min.
+pub const TIMESHIFT_DESKTOP_SECS: u32 = 60 * 60;
+pub const TIMESHIFT_MOBILE_SECS: u32 = 30 * 60;
+
+/// The mpv options for pausing and rewinding live TV: a back buffer of `window_secs` at `bitrate_bps`, kept on disk
+/// in `cache_dir` (empty = in RAM; the app passes its cache folder), never more than a quarter of `free_disk_bytes` (a recording
+/// or the system needs the rest). `force-seekable` lets mpv seek inside a live stream's cache.
+/// Window 0 turns timeshift off (back buffer 0, live streams not seekable).
+pub fn timeshift_options(
+    window_secs: u32,
+    bitrate_bps: u64,
+    free_disk_bytes: u64,
+    cache_dir: &str,
+) -> Vec<(String, String)> {
+    let wanted = window_secs as u64 * bitrate_bps / 8;
+    let back = wanted.min(free_disk_bytes / 4);
+    let mut opts = vec![
+        ("demuxer-max-back-bytes".to_string(), back.to_string()),
+        (
+            "force-seekable".to_string(),
+            if back > 0 { "yes" } else { "no" }.to_string(),
+        ),
+    ];
+    if back > 0 {
+        // Seek inside the cached range, never at the server: a live HTTP stream can't seek. (mpv's default "auto"
+        // usually does the same; explicit so it doesn't depend on that default.)
+        opts.push(("demuxer-seekable-cache".to_string(), "yes".to_string()));
+        // On disk only with a folder: embedded libmpv has no default cache location ("Failed to create file
+        // cache"), and then the back buffer silently disappears. Without a folder it stays in RAM.
+        if !cache_dir.is_empty() {
+            opts.push(("cache-on-disk".to_string(), "yes".to_string()));
+            opts.push(("demuxer-cache-dir".to_string(), cache_dir.to_string()));
+        }
+    }
+    opts
+}
+
+/// Seconds behind live for the overlay ("−12:34 behind live"): the live edge minus the position. The live edge is
+/// the newest `demuxer-cache-time` seen before the user paused or rewound, plus the time since: after a seek mpv
+/// reports the end of the cached range around the new position instead.
+pub fn behind_live(cache_end_secs: f64, position_secs: f64) -> u32 {
+    (cache_end_secs - position_secs).max(0.0).round() as u32
+}
+
 /// What the player reports (translated from media_kit's streams and the platform by the Dart adapter).
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerEvent {
@@ -699,6 +743,42 @@ mod tests {
         }
         assert!(matches!(last.get(1), Some(Command::Fail(_))), "{last:?}");
         assert_eq!(w.state(), State::Failed);
+    }
+
+    #[test]
+    fn timeshift_window_and_disk_cap() {
+        let opt = |o: &[(String, String)], k: &str| {
+            o.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone())
+        };
+        // 60 min at 8 Mbit/s = 3.6 GB when the disk has room …
+        let o = timeshift_options(TIMESHIFT_DESKTOP_SECS, 8_000_000, 100_000_000_000, "/cache");
+        assert_eq!(
+            opt(&o, "demuxer-max-back-bytes").as_deref(),
+            Some("3600000000")
+        );
+        assert_eq!(opt(&o, "force-seekable").as_deref(), Some("yes"));
+        assert_eq!(opt(&o, "demuxer-cache-dir").as_deref(), Some("/cache"));
+        assert_eq!(opt(&o, "demuxer-seekable-cache").as_deref(), Some("yes"));
+        // … a quarter of the free space when it hasn't …
+        let o = timeshift_options(TIMESHIFT_DESKTOP_SECS, 8_000_000, 4_000_000_000, "");
+        assert_eq!(
+            opt(&o, "demuxer-max-back-bytes").as_deref(),
+            Some("1000000000")
+        );
+        assert_eq!(
+            (opt(&o, "demuxer-cache-dir"), opt(&o, "cache-on-disk")),
+            (None, None)
+        );
+        // … and off when the window is 0.
+        let o = timeshift_options(0, 8_000_000, 100_000_000_000, "/cache");
+        assert_eq!(
+            (
+                opt(&o, "demuxer-max-back-bytes").as_deref(),
+                opt(&o, "force-seekable").as_deref()
+            ),
+            (Some("0"), Some("no"))
+        );
+        assert_eq!((behind_live(754.4, 0.0), behind_live(10.0, 12.0)), (754, 0));
     }
 
     #[test]

@@ -20,6 +20,32 @@ List<MpvOption> bufferOptions({
   bitrateBps: bitrateBps,
 );
 
+/// Options for pausing/rewinding live TV (window 0 = off; the window comes from settings, default below).
+List<MpvOption> timeshiftOptions({
+  required int windowSeconds,
+  BigInt? bitrateBps,
+  required BigInt freeDiskBytes,
+  required String cacheDir,
+}) => RustLib.instance.api.crateApiPlaybackTimeshiftOptions(
+  windowSeconds: windowSeconds,
+  bitrateBps: bitrateBps,
+  freeDiskBytes: freeDiskBytes,
+  cacheDir: cacheDir,
+);
+
+/// The default timeshift window for this form factor, in seconds.
+int defaultTimeshiftSeconds({required bool desktop}) => RustLib.instance.api
+    .crateApiPlaybackDefaultTimeshiftSeconds(desktop: desktop);
+
+/// Seconds behind live, for the overlay.
+int behindLive({
+  required double cacheEndSeconds,
+  required double positionSeconds,
+}) => RustLib.instance.api.crateApiPlaybackBehindLive(
+  cacheEndSeconds: cacheEndSeconds,
+  positionSeconds: positionSeconds,
+);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Watchdog>>
 abstract class Watchdog implements RustOpaqueInterface {
   /// `target_seconds`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.

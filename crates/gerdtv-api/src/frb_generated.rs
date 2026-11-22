@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 471565925;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 370365517;
 
 // Section: executor
 
@@ -1005,6 +1005,40 @@ fn wire__crate__api__playback__Watchdog_on_wake_impl(
         },
     )
 }
+fn wire__crate__api__playback__behind_live_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "behind_live",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_cache_end_seconds = <f64>::sse_decode(&mut deserializer);
+            let api_position_seconds = <f64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::playback::behind_live(
+                    api_cache_end_seconds,
+                    api_position_seconds,
+                ))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__playback__buffer_options_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1065,6 +1099,37 @@ fn wire__crate__api__simple__core_version_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::simple::core_version())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__playback__default_timeshift_seconds_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "default_timeshift_seconds",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_desktop = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Ok::<_, ()>(crate::api::playback::default_timeshift_seconds(api_desktop))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -1235,6 +1300,44 @@ fn wire__crate__api__library__save_profile_impl(
         },
     )
 }
+fn wire__crate__api__playback__timeshift_options_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "timeshift_options",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_window_seconds = <u32>::sse_decode(&mut deserializer);
+            let api_bitrate_bps = <Option<u64>>::sse_decode(&mut deserializer);
+            let api_free_disk_bytes = <u64>::sse_decode(&mut deserializer);
+            let api_cache_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::playback::timeshift_options(
+                    api_window_seconds,
+                    api_bitrate_bps,
+                    api_free_disk_bytes,
+                    api_cache_dir,
+                ))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 
 // Section: related_funcs
 
@@ -1342,6 +1445,13 @@ impl SseDecode for crate::api::playback::CommandKind {
             5 => crate::api::playback::CommandKind::Health,
             _ => unreachable!("Invalid variant for CommandKind: {}", inner),
         };
+    }
+}
+
+impl SseDecode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f64::<NativeEndian>().unwrap()
     }
 }
 
@@ -1734,10 +1844,10 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         10 => wire__crate__api__library__Library_sync_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__library__delete_profile_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__library__list_profiles_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__library__delete_profile_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__library__list_profiles_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1765,9 +1875,14 @@ fn pde_ffi_dispatcher_sync_impl(
         17 => wire__crate__api__playback__Watchdog_on_tick_impl(ptr, rust_vec_len, data_len),
         18 => wire__crate__api__playback__Watchdog_on_user_pause_impl(ptr, rust_vec_len, data_len),
         19 => wire__crate__api__playback__Watchdog_on_wake_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__playback__buffer_options_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__simple__core_version_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__playback__behind_live_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__playback__buffer_options_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__simple__core_version_impl(ptr, rust_vec_len, data_len),
+        23 => {
+            wire__crate__api__playback__default_timeshift_seconds_impl(ptr, rust_vec_len, data_len)
+        }
+        25 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2201,6 +2316,13 @@ impl SseEncode for crate::api::playback::CommandKind {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f64::<NativeEndian>(self).unwrap();
     }
 }
 

@@ -44,6 +44,41 @@ pub fn buffer_options(
     .collect()
 }
 
+/// Options for pausing/rewinding live TV (window 0 = off; the window comes from settings, default below).
+#[flutter_rust_bridge::frb(sync)]
+pub fn timeshift_options(
+    window_seconds: u32,
+    bitrate_bps: Option<u64>,
+    free_disk_bytes: u64,
+    cache_dir: String,
+) -> Vec<MpvOption> {
+    core::timeshift_options(
+        window_seconds,
+        bitrate_bps.unwrap_or(core::DEFAULT_BITRATE_BPS),
+        free_disk_bytes,
+        &cache_dir,
+    )
+    .into_iter()
+    .map(|(name, value)| MpvOption { name, value })
+    .collect()
+}
+
+/// The default timeshift window for this form factor, in seconds.
+#[flutter_rust_bridge::frb(sync)]
+pub fn default_timeshift_seconds(desktop: bool) -> u32 {
+    if desktop {
+        core::TIMESHIFT_DESKTOP_SECS
+    } else {
+        core::TIMESHIFT_MOBILE_SECS
+    }
+}
+
+/// Seconds behind live, for the overlay.
+#[flutter_rust_bridge::frb(sync)]
+pub fn behind_live(cache_end_seconds: f64, position_seconds: f64) -> u32 {
+    core::behind_live(cache_end_seconds, position_seconds)
+}
+
 pub enum CommandKind {
     Reload,
     ShowReconnecting,

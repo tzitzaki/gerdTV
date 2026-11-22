@@ -71,7 +71,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 471565925;
+  int get rustContentHash => 370365517;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -186,6 +186,11 @@ abstract class RustLibApi extends BaseApi {
     required Watchdog that,
   });
 
+  int crateApiPlaybackBehindLive({
+    required double cacheEndSeconds,
+    required double positionSeconds,
+  });
+
   List<MpvOption> crateApiPlaybackBufferOptions({
     required BufferPreset preset,
     required int customSeconds,
@@ -193,6 +198,8 @@ abstract class RustLibApi extends BaseApi {
   });
 
   String crateApiSimpleCoreVersion();
+
+  int crateApiPlaybackDefaultTimeshiftSeconds({required bool desktop});
 
   Future<void> crateApiLibraryDeleteProfile({
     required String dir,
@@ -208,6 +215,13 @@ abstract class RustLibApi extends BaseApi {
   Future<ProfileInfo> crateApiLibrarySaveProfile({
     required String dir,
     required ProfileInfo profile,
+  });
+
+  List<MpvOption> crateApiPlaybackTimeshiftOptions({
+    required int windowSeconds,
+    BigInt? bitrateBps,
+    required BigInt freeDiskBytes,
+    required String cacheDir,
   });
 
   RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Library;
@@ -905,6 +919,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "Watchdog_on_wake", argNames: ["that"]);
 
   @override
+  int crateApiPlaybackBehindLive({
+    required double cacheEndSeconds,
+    required double positionSeconds,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_f_64(cacheEndSeconds, serializer);
+          sse_encode_f_64(positionSeconds, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPlaybackBehindLiveConstMeta,
+        argValues: [cacheEndSeconds, positionSeconds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlaybackBehindLiveConstMeta => const TaskConstMeta(
+    debugName: "behind_live",
+    argNames: ["cacheEndSeconds", "positionSeconds"],
+  );
+
+  @override
   List<MpvOption> crateApiPlaybackBufferOptions({
     required BufferPreset preset,
     required int customSeconds,
@@ -917,7 +960,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_buffer_preset(preset, serializer);
           sse_encode_u_32(customSeconds, serializer);
           sse_encode_opt_box_autoadd_u_64(bitrateBps, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_mpv_option,
@@ -942,7 +985,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -959,6 +1002,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "core_version", argNames: []);
 
   @override
+  int crateApiPlaybackDefaultTimeshiftSeconds({required bool desktop}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(desktop, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPlaybackDefaultTimeshiftSecondsConstMeta,
+        argValues: [desktop],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlaybackDefaultTimeshiftSecondsConstMeta =>
+      const TaskConstMeta(
+        debugName: "default_timeshift_seconds",
+        argNames: ["desktop"],
+      );
+
+  @override
   Future<void> crateApiLibraryDeleteProfile({
     required String dir,
     required String id,
@@ -972,7 +1041,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 24,
             port: port_,
           );
         },
@@ -997,7 +1066,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1022,7 +1091,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1050,7 +1119,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1082,7 +1151,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1101,6 +1170,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     debugName: "save_profile",
     argNames: ["dir", "profile"],
   );
+
+  @override
+  List<MpvOption> crateApiPlaybackTimeshiftOptions({
+    required int windowSeconds,
+    BigInt? bitrateBps,
+    required BigInt freeDiskBytes,
+    required String cacheDir,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(windowSeconds, serializer);
+          sse_encode_opt_box_autoadd_u_64(bitrateBps, serializer);
+          sse_encode_u_64(freeDiskBytes, serializer);
+          sse_encode_String(cacheDir, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_mpv_option,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPlaybackTimeshiftOptionsConstMeta,
+        argValues: [windowSeconds, bitrateBps, freeDiskBytes, cacheDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlaybackTimeshiftOptionsConstMeta =>
+      const TaskConstMeta(
+        debugName: "timeshift_options",
+        argNames: ["windowSeconds", "bitrateBps", "freeDiskBytes", "cacheDir"],
+      );
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_Library => wire
@@ -1231,6 +1334,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CommandKind dco_decode_command_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return CommandKind.values[raw as int];
+  }
+
+  @protected
+  double dco_decode_f_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as double;
   }
 
   @protected
@@ -1612,6 +1721,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return CommandKind.values[inner];
+  }
+
+  @protected
+  double sse_decode_f_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getFloat64();
   }
 
   @protected
@@ -2075,6 +2190,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_command_kind(CommandKind self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_f_64(double self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putFloat64(self);
   }
 
   @protected
