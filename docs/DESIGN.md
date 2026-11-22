@@ -1,6 +1,6 @@
 # Design
 
-The shell (`app/lib/screens/shell.dart`): a navigation rail on windows at least 720 px wide (desktop, tablet, TV), a bottom bar below that (phones). Sections: Live TV, Movies, Series, Search, Settings. Tokens: `app/lib/theme.dart` (accent, spacing unit 8, radius 12, motion 150 ms, the wide-layout breakpoint). The rules it follows:
+The shell (`app/lib/screens/shell.dart`): a navigation rail on windows at least 720 px wide (desktop, tablet, TV), a bottom bar below that (phones). Sections: Live TV, Guide, Movies, Series, Search, Settings. Tokens: `app/lib/theme.dart` (accent, spacing unit 8, radius 12, motion 150 ms, the wide-layout breakpoint). The rules it follows:
 - Form factors: desktop/tablet (left sidebar, global search on top), phone (bottom navigation), TV (10-foot layout, left menu, D-pad only, no touch-only controls).
 - Calm and uncluttered: the platform's default font, a small type scale, generous spacing, one accent colour, dark (default) and light themes at WCAG AA contrast, visible focus rings, large hit targets. Posters and logos do the visual work.
 - Keyboard and remote: Tab and the arrow keys reach every control, and the focused one is always scrolled into view from either side (`revealFocus` in `app/lib/main.dart`).
