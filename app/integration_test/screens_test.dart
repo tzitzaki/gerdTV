@@ -201,6 +201,19 @@ void main() {
         await checkScreen(tester, form, 'group-$mode', size);
         await tapReady(tester, find.byKey(const Key('list.mode')));
       }
+      // The player over the picture: the now/next banner, then the channel list (OK).
+      await tapReady(tester, find.byType(ItemRow));
+      await waitFor(tester, find.byKey(const Key('player.banner')));
+      await checkScreen(tester, form, 'player', size);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await waitFor(tester, find.byKey(const Key('player.panel')));
+      await checkScreen(tester, form, 'player-channels', size);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tapReady(tester, find.byKey(const Key('player.stop')));
+      await waitFor(tester, find.byType(ItemRow).hitTestable());
+      await settle(
+        tester,
+      ); // the player is still closing (two Back buttons until then)
       await tester.pageBack();
       await settle(tester);
 
