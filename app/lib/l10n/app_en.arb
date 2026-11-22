@@ -154,6 +154,8 @@
   "playerZapHint": "↑ ↓ channels · OK channel list",
   "programmeFromStart": "From the start",
   "programmeNow": "Now",
+  "programmeRemind": "Remind me",
+  "programmeReminded": "Reminder set",
   "remove": "Remove",
   "restore": "Full size",
   "retry": "Retry",
