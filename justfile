@@ -104,8 +104,9 @@ test-live:
     cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1
 
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
+# Expanded reporter: every test's output (the JOURNEY steps) prints as it happens, so a hang shows where it stopped.
 test-integration:
-    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'
+    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --reporter expanded --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'
 
 # Fails on a private detail in the changes since <base> or in the given files (e.g. a PR body draft).
 denylist base="origin/main" *files="":
