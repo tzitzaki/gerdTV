@@ -318,6 +318,7 @@ void main() {
         'playback',
         'guide',
         'appearance',
+        'updates',
         'health',
         'about',
       ]) {

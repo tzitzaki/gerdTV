@@ -1,4 +1,5 @@
-// Settings, in categories: Account, Playback, TV guide, Appearance, Stream health, About (docs/SPEC.md, "Settings").
+// Settings, in categories: Account, Playback, TV guide, Appearance, Updates, Stream health,
+// About (docs/SPEC.md, "Settings").
 // Wide windows (desktop, TV) show the categories on the left and the chosen one on the right; phones show the
 // categories as a list that opens a page. A search field on top filters every entry of every category as you type
 // (settings_model.dart) and shows the matches grouped by category.
@@ -17,6 +18,7 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'settings_model.dart';
+import 'update_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session});
@@ -165,6 +167,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keywords: l10n.settingsKeywordsLists,
               build: (_) => _ListSettings(session: session),
             ),
+        ],
+      ),
+      SettingsCategory(
+        id: 'updates',
+        icon: Icons.system_update_outlined,
+        title: l10n.settingsUpdates,
+        entries: [
+          SettingsEntry(
+            id: 'updates',
+            title: l10n.updateCheck,
+            keywords: l10n.settingsKeywordsUpdates,
+            build: (_) => const UpdateSettings(),
+          ),
         ],
       ),
       SettingsCategory(
