@@ -45,6 +45,7 @@
   "setupTitle": "Anbieter hinzufügen",
   "setupUsername": "Benutzername",
   "setupXtream": "Xtream Codes",
+  "stop": "Stopp",
   "syncFailed": "Aktualisierung fehlgeschlagen: {message}",
   "syncing": "Katalog wird aktualisiert…"
 }

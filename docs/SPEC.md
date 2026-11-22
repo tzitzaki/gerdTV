@@ -16,7 +16,8 @@ What gerdTV does, per platform. Sections fill in as features are built; this is 
 - **Start:** the saved account opens from its cached catalogue at once; a background sync refreshes it (a thin bar shows while it runs; a failed sync says so with Retry).
 - **Browse:** Live TV, Movies, Series: the provider's groups in provider order with counts, then a group's items (paged, instant filter field); series open their episodes (fetched when opened).
 - **Search:** one field finds live channels, movies, series and episodes as you type (prefix per word, umlaut-insensitive, a channel number finds that channel); type chips with counts; Enter plays the top result (a series opens its episodes). `/` or Ctrl/Cmd+F jumps to search on desktop.
-- **Player:** full screen with media_kit's controls; the watchdog recovers drops and stalls by itself and shows "Reconnecting (n)…"; a refused stream shows the reason instead of retrying; Esc/Back leaves, Space pauses.
+- **Player:** full screen with media_kit's controls; the watchdog recovers drops and stalls by itself and shows "Reconnecting (n)…"; a refused stream shows the reason instead of retrying; Space pauses, S or the Stop button stops.
+- **Playback keeps going:** only Stop or starting another stream ends it. Leaving the player (Esc/Back) keeps the stream running in the now-playing bar below every screen (live picture, title, watchdog state, Stop); tapping the bar reopens the player without restarting the stream.
 - **Settings:** update now, last sync, stream health (every recovery), remove the account, licences, version.
 - English and German, following the system language; dark theme.
 

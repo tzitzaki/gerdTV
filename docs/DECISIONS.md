@@ -7,6 +7,12 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Standalone apps now, a home hub later: every device runs the full core; user data uses stable content keys and `updated_at` so a hub can sync it later.
 - Crates: `gerdtv-core` (all logic), `gerdtv-api` (bridge surface only; package `gerdtv_api` because Cargokit names the native library after it), `gerdtv-testkit`, `gerdtv-release`.
 - Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform; the pub.dev forks are abandoned and the newer mpv_kit is too young to adopt.
+- Playback ends only by Stop or by starting another stream; leaving the player keeps it running (now-playing bar, floating mini player, background playback).
+- Floating/background playback: desktop floating always-on-top window, Android system Picture-in-Picture with a foreground service, iPhone/iPad hand-over to AVPlayer Picture-in-Picture (live as .m3u8; .mkv falls back to sound only).
+- Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).
+- Channel lists: four display modes (compact list, list, tiles, large tiles) per section, with a quick toggle in the list bar.
+- Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
+- The macOS sandbox goes off with the first feature that needs it (the updater).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
