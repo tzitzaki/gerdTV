@@ -157,6 +157,7 @@
   "remove": "Remove",
   "restore": "Full size",
   "retry": "Retry",
+  "searchEarlier": "Earlier",
   "searchEmpty": "Type to search all channels, movies and series.",
   "searchHint": "Search channels, movies, series",
   "searchNoResults": "Nothing found for “{query}”.",

@@ -68,6 +68,7 @@
   "remove": "Entfernen",
   "restore": "Normale Größe",
   "retry": "Erneut versuchen",
+  "searchEarlier": "Früher",
   "searchEmpty": "Tippe, um alle Sender, Filme und Serien zu durchsuchen.",
   "searchHint": "Sender, Filme, Serien suchen",
   "searchNoResults": "Nichts gefunden für „{query}“.",

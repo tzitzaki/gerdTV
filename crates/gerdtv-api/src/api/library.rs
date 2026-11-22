@@ -533,15 +533,17 @@ impl Library {
         Ok(self.0.programme(id).map_err(err)?.map(Into::into))
     }
 
-    /// Programmes whose title, sub-title or description match, ongoing and upcoming first.
+    /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
+    /// the ended ones, most recent first.
     pub fn search_programmes(
         &self,
         query: String,
         limit: u32,
+        earlier: bool,
     ) -> Result<Vec<ProgrammeHit>, String> {
         Ok(self
             .0
-            .search_programmes(&query, limit as usize)
+            .search_programmes(&query, limit as usize, earlier)
             .map_err(err)?
             .into_iter()
             .map(|(p, hit)| ProgrammeHit {
