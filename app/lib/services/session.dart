@@ -210,6 +210,36 @@ class Session extends ChangeNotifier {
     );
   }
 
+  /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
+  /// ends, mpv resumes the same item. Live channels go as .m3u8 (AVPlayer can't play raw TS).
+  Future<void> startApplePip() async {
+    final item = nowPlaying.value;
+    final lib = library;
+    if (item == null || lib == null) return;
+    final url = lib.streamUrl(
+      key: item.key,
+      preferHls: item.kind == ItemKind.live,
+    );
+    await _adapter?.stop();
+    await _player?.stop();
+    platform.onApplePipEnded = (_) => _resume(item);
+    if (!await platform.startApplePip(url)) await _resume(item);
+  }
+
+  /// Plays [item] again even though it is still nowPlaying (after Apple PiP handed the stream back).
+  Future<void> _resume(ItemInfo item) async {
+    final lib = library;
+    if (lib == null || nowPlaying.value?.key != item.key) {
+      return; // stopped or replaced meanwhile
+    }
+    final live = item.kind == ItemKind.live;
+    await adapter.play(
+      ({required hls}) => lib.streamUrl(key: item.key, preferHls: hls),
+      live: live,
+      preferHls: live && lib.preferHls(key: item.key),
+    );
+  }
+
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
     _playingKey = null;
@@ -225,6 +255,9 @@ class Session extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// True on iPhone/iPad (Apple Picture-in-Picture hand-over).
+bool get isApple => !kIsWeb && Platform.isIOS;
 
 /// True on desktop platforms (window-sized layouts, keyboard first).
 bool get isDesktop =>

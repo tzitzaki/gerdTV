@@ -16,8 +16,11 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV and a movie play in full screen with sound; logos show in the lists.
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
+- Background: locking the phone while a channel plays keeps the sound going; the lock screen shows it.
+- PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
 
 ## iPad
+- PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
 
 ## Android phone
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.

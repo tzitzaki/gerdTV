@@ -142,6 +142,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
+                              if (isApple) ...[
+                                IconButton.filledTonal(
+                                  key: const Key('player.applePip'),
+                                  tooltip: l10n.miniPlayer,
+                                  icon: const Icon(
+                                    Icons.picture_in_picture_alt,
+                                  ),
+                                  onPressed: widget.session.startApplePip,
+                                ),
+                                const SizedBox(width: Tokens.space),
+                              ],
                               IconButton.filledTonal(
                                 key: const Key('player.stop'),
                                 tooltip: l10n.stop,

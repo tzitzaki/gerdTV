@@ -75,6 +75,9 @@ jobs:
       - if: steps.scope.outputs.code == 'true'
         # The main target on every PR: macOS build + integration tests in the runner's GUI session.
         run: just mac-check
+      - if: steps.scope.outputs.code == 'true'
+        # iPhone/iPad: compile the app (Swift platform code included) without signing; no simulator run.
+        run: cd app && flutter build ios --debug --no-codesign
 
   android:
     runs-on: ubuntu-latest

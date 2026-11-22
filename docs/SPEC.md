@@ -19,6 +19,7 @@ What gerdTV does, per platform. Sections fill in as features are built; this is 
 - **Player:** full screen with media_kit's controls; the watchdog recovers drops and stalls by itself and shows "Reconnecting (n)…"; a refused stream shows the reason instead of retrying; Space pauses, S or the Stop button stops.
 - **Playback keeps going:** only Stop or starting another stream ends it. Leaving the player (Esc/Back) keeps the stream running in the now-playing bar below every screen (live picture, title, watchdog state, Stop); tapping the bar reopens the player without restarting the stream.
 - **Picture-in-Picture and background (Android phone and TV):** leaving the app while something plays shrinks it to the system's floating window; with the screen off or in another app the stream keeps playing (a "gerdTV" notification shows while it runs) until Stop.
+- **Background and Picture-in-Picture (iPhone/iPad):** sound keeps playing with the screen locked or in another app; the player's PiP button hands the stream to Apple's player in a floating window (live channels and most VOD; `.mkv` movies continue in gerdTV instead), and closing PiP continues in gerdTV.
 - **Mini player (desktop):** the player's mini-player button (or P) shrinks the window to a floating, always-on-top picture (on every Space on macOS) with Restore and Stop; drag it anywhere; playback continues.
 - **Settings:** update now, last sync, stream health (every recovery), remove the account, licences, version.
 - English and German, following the system language; dark theme.
