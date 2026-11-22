@@ -12,6 +12,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
+- Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
