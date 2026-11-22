@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
 import 'package:gerdtv/platform/mini_window.dart';
+import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/item_tile.dart';
+import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
@@ -235,9 +237,103 @@ void main() {
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: search played top result');
-    // Settings: remove the account → back to setup.
-    await tester.tap(find.text('Settings'));
+    // Programmes: the guide loaded in the background after setup; its hits play their channel.
+    await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
+    await tester.pump();
+    await tapReady(
+      tester,
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
+      ),
+    );
+    await waitFor(tester, find.byKey(const Key('player.back')));
+    await tester.tap(find.byKey(const Key('player.stop')));
+    await waitFor(tester, find.byKey(const Key('search.field')));
+    expect(session.nowPlaying.value, isNull);
+
+    debugPrint('JOURNEY: programme search played its channel');
+    // Settings → Guide: the provider's guide imported; an extra XMLTV URL imports too and can be removed again.
+    // (The stopped player is still closing: wait until the rail can take the tap.)
+    await tapReady(tester, find.text('Settings'));
     await tester.pumpAndSettle();
+    final settingsList = find
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('guide.unmatched')),
+      200,
+      scrollable: settingsList,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('guide.source.builtin')),
+        matching: find.textContaining('programmes'),
+      ),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.byKey(const Key('guide.add')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('guide.url')),
+      '$mockXc/xmltv.php?username=testuser&password=testpass',
+    );
+    await tester.pumpAndSettle(); // the focused field scrolls itself into view
+    await tapReady(tester, find.byKey(const Key('guide.add')));
+    await waitFor(
+      tester,
+      find.byWidgetPredicate(
+        (w) =>
+            w is ListTile &&
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('guide.source.') &&
+            w.key != const ValueKey('guide.source.builtin') &&
+            w.subtitle is Text &&
+            ((w.subtitle! as Text).data ?? '').contains('programmes'),
+      ),
+    );
+    final sources = await tester.runAsync(session.library!.guideSources);
+    expect(sources!.length, 2);
+    await tester.ensureVisible(find.byTooltip('Remove'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Remove'));
+    await tester.pump(const Duration(milliseconds: 300));
+    // Mapping by hand: a channel without a guide id gets a guide channel and leaves the list.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('guide.unmatched')),
+      200,
+      scrollable: settingsList,
+    );
+    await tester.tap(find.byKey(const Key('guide.unmatched')));
+    final unmatched = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('guide.unmatched.'),
+    );
+    await waitFor(tester, unmatched.hitTestable());
+    final first = tester.widget(unmatched.first).key!;
+    await tester.tap(find.byKey(first));
+    final guideChannel = find.descendant(
+      of: find.byType(PickGuideChannelScreen),
+      matching: find.byType(ListTile),
+    );
+    await tapReady(tester, guideChannel);
+    await waitFor(tester, unmatched.hitTestable());
+    expect(find.byKey(first), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    debugPrint('JOURNEY: guide settings');
+    // Settings: remove the account → back to setup.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings.remove')),
+      -200,
+      scrollable: settingsList,
+    );
     await tester.tap(find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
