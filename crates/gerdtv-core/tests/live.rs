@@ -1,9 +1,16 @@
 //! Opt-in checks against a real Xtream Codes account (`just test-live`; ignored otherwise). Reads GERDTV_XC_SERVER,
 //! GERDTV_XC_USER, GERDTV_XC_PASS. Prints counts and timings only: never names, URLs or credentials (the output
 //! may be pasted into a public PR).
-use gerdtv_core::db::{self, Kind};
+use gerdtv_core::db::{self, Hit, Kind};
 use gerdtv_core::xtream::{self, Xtream};
 use std::time::Instant;
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+}
 
 fn env(name: &str) -> String {
     std::env::var(name)
@@ -166,6 +173,79 @@ async fn live_library_and_one_playback_probe() {
         100 * (live_keys.len() - unmatched) / live_keys.len().max(1),
         on_now
     );
+
+    // Catch-up: which URL form this panel answers, for a slot two hours back on up to three archive channels. One
+    // request at a time, at most 20 s each; prints status codes and whether TS bytes came back, nothing else.
+    let archive: Vec<Hit> = lib
+        .categories(Kind::Live)
+        .unwrap()
+        .iter()
+        .flat_map(|c| lib.items(Kind::Live, &c.id, 10_000, 0).unwrap())
+        .filter(|h| h.archive_days > 0)
+        .collect();
+    println!("catch-up: {} live channels have an archive", archive.len());
+    let start = (now_secs() - 7200) / 1800 * 1800;
+    let http = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .unwrap();
+    'catchup: for ch in archive.iter().skip(5).take(3) {
+        let Some(a) = lib.catchup_url(&ch.key, start, start + 1800).unwrap() else {
+            continue;
+        };
+        // The other common form, built from the same parts: /streaming/timeshift.php?…
+        let (base, rest) = a.split_once("/timeshift/").unwrap();
+        let p: Vec<&str> = rest.split('/').collect();
+        let b = format!(
+            "{base}/streaming/timeshift.php?username={}&password={}&stream={}&start={}&duration={}",
+            p[0],
+            p[1],
+            p[4].trim_end_matches(".ts"),
+            p[3],
+            p[2]
+        );
+        for (form, url) in [("timeshift path", a), ("timeshift.php", b)] {
+            let mut kind = String::new();
+            let (status, ts) = match http.get(&url).send().await {
+                Ok(mut res) => {
+                    let status = res.status().as_u16();
+                    let ctype = res
+                        .headers()
+                        .get("content-type")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("-")
+                        .to_string();
+                    let mut bytes = Vec::new();
+                    while bytes.len() < 188 * 4 {
+                        match res.chunk().await {
+                            Ok(Some(c)) => bytes.extend_from_slice(&c),
+                            _ => break,
+                        }
+                    }
+                    // What came back, without content: type, size, and a playlist or the first two bytes.
+                    let head = if bytes.starts_with(b"#EXTM3U") {
+                        "HLS playlist".to_string()
+                    } else {
+                        bytes.iter().take(2).map(|b| format!("{b:02x}")).collect()
+                    };
+                    kind = format!(", {ctype}, {} bytes, starts {head}", bytes.len());
+                    // MPEG-TS packets are 188 bytes, each starting with 0x47; an archive may start mid-packet, so look
+                    // for that rhythm at any offset within the first packet.
+                    let ts =
+                        (0..188).any(|k| (0..3).all(|i| bytes.get(k + i * 188) == Some(&0x47)));
+                    (status, ts)
+                }
+                Err(e) => (if e.is_timeout() { 0 } else { 1 }, false),
+            };
+            println!(
+                "catch-up probe ({form}): status {status}, TS {}{kind}",
+                if ts { "yes" } else { "no" }
+            );
+            if ts {
+                break 'catchup;
+            }
+        }
+    }
 
     // One probe at a time, each at most 20 s (the provider allows few connections). The first channels of a list
     // are often separators or offline placeholders, so try a channel from each of the first groups, TS then HLS.

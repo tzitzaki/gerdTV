@@ -14,10 +14,10 @@ import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
-import 'browse_screen.dart';
 import 'guide_math.dart';
 import 'list_modes.dart';
 import 'logo.dart';
+import 'programme_sheet.dart';
 import 'programme_text.dart';
 
 class GuideScreen extends StatefulWidget {
@@ -172,69 +172,14 @@ class _GuideScreenState extends State<GuideScreen> {
     return null;
   }
 
-  Future<void> _openProgramme(ProgrammeInfo p, ItemInfo channel) async {
-    final l10n = AppLocalizations.of(context);
-    final locale = Localizations.localeOf(context).toLanguageTag();
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final running = p.start <= now && now < p.stop;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        final text = Theme.of(context).textTheme;
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(Tokens.space * 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(p.title, style: text.titleLarge),
-                if (p.subTitle.isNotEmpty || p.episode.isNotEmpty)
-                  Text(
-                    [
-                      p.subTitle,
-                      p.episode,
-                    ].where((s) => s.isNotEmpty).join(' · '),
-                    style: text.titleSmall,
-                  ),
-                const SizedBox(height: Tokens.space),
-                Text(
-                  '${channel.name} · ${programmeWhen(l10n, locale, p)}',
-                  style: text.bodyMedium,
-                ),
-                if (p.category.isNotEmpty)
-                  Text(p.category, style: text.bodySmall),
-                if (p.desc.isNotEmpty) ...[
-                  const SizedBox(height: Tokens.space),
-                  Text(p.desc, style: text.bodyMedium),
-                ],
-                const SizedBox(height: Tokens.space * 2),
-                FilledButton.icon(
-                  key: const Key('guide.sheet.watch'),
-                  autofocus: true,
-                  icon: const Icon(Icons.play_arrow),
-                  // Past and future programmes play the channel live for now; catch-up and reminders come later.
-                  label: Text(
-                    running ? l10n.guideWatch : l10n.guideWatchChannel,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    openItem(
-                      this.context,
-                      widget.session,
-                      channel,
-                      channels: _channels,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Future<void> _openProgramme(ProgrammeInfo p, ItemInfo channel) =>
+      showProgrammeSheet(
+        context,
+        widget.session,
+        p,
+        channel,
+        channels: _channels,
+      );
 
   String _dayLabel(AppLocalizations l10n, String locale, DateTime d) {
     final diff = d.difference(_today()).inDays;
