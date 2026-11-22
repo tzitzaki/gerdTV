@@ -250,6 +250,21 @@ void main() {
       await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
       await checkScreen(tester, form, 'search-programmes', size);
 
+      // The guide grid (the guide imported above) and a programme's sheet.
+      await section('Guide');
+      final cell = find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('guide.cell.'),
+      );
+      await waitFor(tester, cell.hitTestable());
+      await checkScreen(tester, form, 'guide', size);
+      await tapReady(tester, cell);
+      await waitFor(tester, find.byKey(const Key('guide.sheet.watch')));
+      await checkScreen(tester, form, 'guide-sheet', size);
+      await tester.tapAt(const Offset(10, 10)); // the sheet's barrier closes it
+      await settle(tester);
+
       await section('Settings');
       final list = find
           .descendant(
