@@ -1,5 +1,5 @@
 # gerdTV task runner. `just` lists the recipes. Gates and their order: CLAUDE.md ("Dev loop") and docs/SETUP.md.
-# Heavy jobs (Android/Gradle builds, integration tests) take ~/.gerdTV-heavy.lock so only one runs at a time on a
+# Heavy jobs (Android/Gradle builds, integration tests, benchmarks) take ~/.gerdTV-heavy.lock so only one runs at a time on a
 # shared dev machine; CI runners have the lock to themselves.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
@@ -87,13 +87,14 @@ bench:
     set -euo pipefail
     export CRITERION_HOME="{{criterion_home}}"
     if [[ ! -d "$CRITERION_HOME/budgets" ]]; then just bench-save; exit 0; fi
-    out="$(cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20 2>&1)" ||
+    # Under the heavy lock: a build or test run beside it skews the timings (seen: false regressions of +25–39 %).
+    out="$({{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20 2>&1)" ||
         { echo "$out"; exit 1; }
     grep -E 'time:|change:|regressed|improved' <<<"$out" || true
     ! grep -q "Performance has regressed" <<<"$out"
 
 bench-save:
-    CRITERION_HOME="{{criterion_home}}" cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
+    CRITERION_HOME="{{criterion_home}}" {{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
 
 # The full-scale guide import budget (2,000 channels × 7 days in < 60 s); slow, also in the nightly.
 test-epg-budget:
