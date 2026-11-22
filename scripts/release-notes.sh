@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Release notes for <tag>: the titles of the PRs merged since the previous tag (GitHub merge commits carry the PR
 # title as the first body line), then the install hints. Usage: scripts/release-notes.sh <tag>
+# "Previous" is the newest earlier v* tag with a published release (`gh release view`; the publish job has a token):
+# a tag whose release run failed has none, and its PRs belong in these notes.
 set -euo pipefail
 tag="$1"
-prev="$(git describe --tags --abbrev=0 --match 'v*' "$tag^" 2>/dev/null || true)"
+prev=""
+for t in $(git tag --merged "$tag^" --list 'v*' --sort=-version:refname); do
+  if gh release view "$t" >/dev/null 2>&1; then prev="$t"; break; fi
+done
 range="${prev:+$prev..}$tag"
 echo "## Changes"
 git log --first-parent --merges --format='%s%x1f%b%x1e' "$range" | while IFS=$'\x1f' read -r -d $'\x1e' subject body; do
