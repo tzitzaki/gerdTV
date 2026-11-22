@@ -199,6 +199,7 @@
   "settingsRemove": "Remove this account",
   "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",
   "settingsSyncNow": "Update now",
+  "settingsUpdates": "Updates",
   "setupBadUrl": "Enter an address starting with http:// or https://",
   "setupConnect": "Connect",
   "setupConnecting": "Connecting and loading the catalogue…",
@@ -238,5 +239,36 @@
       }
     }
   },
-  "timeshiftOff": "Off"
+  "timeshiftOff": "Off",
+  "updateAvailable": "Version {version} is available",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateCheck": "Check for updates",
+  "updateChecking": "Checking…",
+  "updateDownload": "Download",
+  "updateDownloaded": "Downloaded and verified: {file}",
+  "@updateDownloaded": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownloading": "Downloading…",
+  "updateFailed": "Update failed: {error}",
+  "@updateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
+  "updateNone": "gerdTV is up to date.",
+  "updateShowFolder": "Show in folder"
 }

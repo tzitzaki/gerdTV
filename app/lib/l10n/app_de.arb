@@ -86,6 +86,7 @@
   "settingsRemove": "Dieses Konto entfernen",
   "settingsRemoveConfirm": "Konto und Katalog von diesem Gerät entfernen? Die Anmeldung muss dann neu eingegeben werden.",
   "settingsSyncNow": "Jetzt aktualisieren",
+  "settingsUpdates": "Updates",
   "setupBadUrl": "Gib eine Adresse ein, die mit http:// oder https:// beginnt",
   "setupConnect": "Verbinden",
   "setupConnecting": "Verbinde und lade den Katalog…",
@@ -104,5 +105,15 @@
   "syncing": "Katalog wird aktualisiert…",
   "timeshift": "Live-TV pausieren und zurückspulen",
   "timeshiftMinutes": "{minutes} min",
-  "timeshiftOff": "Aus"
+  "timeshiftOff": "Aus",
+  "updateAvailable": "Version {version} ist verfügbar",
+  "updateCheck": "Nach Updates suchen",
+  "updateChecking": "Wird gesucht…",
+  "updateDownload": "Herunterladen",
+  "updateDownloaded": "Geladen und geprüft: {file}",
+  "updateDownloading": "Wird geladen…",
+  "updateFailed": "Update fehlgeschlagen: {error}",
+  "updateIosHint": "Die neue IPA mit dem Re-Signing-Dienst signieren und installieren.",
+  "updateNone": "gerdTV ist aktuell.",
+  "updateShowFolder": "Im Ordner zeigen"
 }
