@@ -14,15 +14,17 @@ import '../theme.dart';
 /// The profile setting with the guide's time offset in whole hours (gerdtv_core SETTING_GUIDE_OFFSET).
 const settingGuideOffset = 'guide_offset_hours';
 
-class GuideSettings extends StatefulWidget {
-  const GuideSettings({super.key, required this.session});
+/// The guide sources with their last import, and the field that adds an extra XMLTV URL. Rebuilt by the settings
+/// screen's ListenableBuilder on the session, so a finished refresh shows its new status.
+class GuideSources extends StatefulWidget {
+  const GuideSources({super.key, required this.session});
   final Session session;
 
   @override
-  State<GuideSettings> createState() => _GuideSettingsState();
+  State<GuideSources> createState() => _GuideSourcesState();
 }
 
-class _GuideSettingsState extends State<GuideSettings> {
+class _GuideSourcesState extends State<GuideSources> {
   final _url = TextEditingController();
   Library get _lib => widget.session.library!;
 
@@ -55,19 +57,9 @@ class _GuideSettingsState extends State<GuideSettings> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final s = widget.session;
-    final offset =
-        int.tryParse(_lib.setting(key: settingGuideOffset) ?? '') ?? 0;
-    // Rebuilt by the parent's ListenableBuilder on the session, so a finished refresh shows its new status.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          title: Text(
-            l10n.settingsGuide,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
         FutureBuilder<List<GuideSourceInfo>>(
           // A new future on every rebuild (the session notifies after each import): the list reloads, and keeps
           // showing the previous rows while it does.
@@ -127,54 +119,94 @@ class _GuideSettingsState extends State<GuideSettings> {
             ],
           ),
         ),
-        ListTile(
-          title: Text(l10n.guideOffset),
-          subtitle: Text(l10n.guideOffsetHint),
-          trailing: DropdownButton<int>(
-            key: const Key('guide.offset'),
-            value: offset.clamp(-12, 12),
-            items: [
-              for (var h = -12; h <= 12; h++)
-                DropdownMenuItem(
-                  value: h,
-                  child: Text(l10n.guideOffsetHours(h > 0 ? '+$h' : '$h')),
-                ),
-            ],
-            onChanged: (h) async {
-              _lib.setSetting(key: settingGuideOffset, value: '${h ?? 0}');
-              setState(() {});
-              await s.refreshGuide(
-                force: true,
-              ); // stored times carry the offset: re-import
-            },
-          ),
-        ),
-        ListTile(
-          key: const Key('guide.refresh'),
-          leading: s.guideRefreshing
-              ? const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh),
-          title: Text(
-            s.guideRefreshing ? l10n.guideRefreshing : l10n.guideRefresh,
-          ),
-          enabled: !s.guideRefreshing,
-          onTap: () => s.refreshGuide(force: true),
-        ),
-        ListTile(
-          key: const Key('guide.unmatched'),
-          leading: const Icon(Icons.link_off),
-          title: Text(l10n.guideUnmatched),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => UnmatchedChannelsScreen(library: _lib),
-            ),
-          ),
-        ),
       ],
+    );
+  }
+}
+
+/// The profile's guide time offset in whole hours; changing it re-imports (stored times carry the offset).
+class GuideOffset extends StatefulWidget {
+  const GuideOffset({super.key, required this.session});
+  final Session session;
+
+  @override
+  State<GuideOffset> createState() => _GuideOffsetState();
+}
+
+class _GuideOffsetState extends State<GuideOffset> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final lib = widget.session.library!;
+    final offset =
+        int.tryParse(lib.setting(key: settingGuideOffset) ?? '') ?? 0;
+    return ListTile(
+      title: Text(l10n.guideOffset),
+      subtitle: Text(l10n.guideOffsetHint),
+      trailing: DropdownButton<int>(
+        key: const Key('guide.offset'),
+        value: offset.clamp(-12, 12),
+        items: [
+          for (var h = -12; h <= 12; h++)
+            DropdownMenuItem(
+              value: h,
+              child: Text(l10n.guideOffsetHours(h > 0 ? '+$h' : '$h')),
+            ),
+        ],
+        onChanged: (h) async {
+          lib.setSetting(key: settingGuideOffset, value: '${h ?? 0}');
+          setState(() {});
+          await widget.session.refreshGuide(
+            force: true,
+          ); // stored times carry the offset: re-import
+        },
+      ),
+    );
+  }
+}
+
+/// "Refresh now", with a spinner while an import runs.
+class GuideRefresh extends StatelessWidget {
+  const GuideRefresh({super.key, required this.session});
+  final Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final s = session;
+    return ListTile(
+      key: const Key('guide.refresh'),
+      leading: s.guideRefreshing
+          ? const SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh),
+      title: Text(s.guideRefreshing ? l10n.guideRefreshing : l10n.guideRefresh),
+      enabled: !s.guideRefreshing,
+      onTap: () => s.refreshGuide(force: true),
+    );
+  }
+}
+
+/// Opens the channels without a guide, where each can be mapped by hand.
+class GuideUnmatched extends StatelessWidget {
+  const GuideUnmatched({super.key, required this.session});
+  final Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ListTile(
+      key: const Key('guide.unmatched'),
+      leading: const Icon(Icons.link_off),
+      title: Text(l10n.guideUnmatched),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => UnmatchedChannelsScreen(library: session.library!),
+        ),
+      ),
     );
   }
 }
