@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext HTTP is allowed app-wide on purpose: IPTV providers serve their API, logos and streams over plain HTTP
+     on a host the user types in, so it can't be narrowed to a domain list here. (Streams and the API go through the
+     Rust core and libmpv, which don't use Android's network stack; this matters for Flutter's own HTTP client, which
+     loads the channel logos and follows this setting.) -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

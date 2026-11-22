@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- IPTV providers serve logos (and their API and streams) over plain HTTP on a host the user enters, so ATS
+	     can't be narrowed to listed domains. Streams/API go through libmpv and the Rust core (not subject to ATS);
+	     this is for Flutter's HTTP client, which loads the logos and follows ATS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
