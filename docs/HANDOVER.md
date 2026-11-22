@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version VERSION_PLACEHOLDER: catch-up (past programmes and From the start on archive channels) and a complete Licences screen.
+- Version 0.261122.34: catch-up (past programmes and From the start on archive channels) and a complete Licences screen.
 - Before: the TV guide everywhere: a grid section, now/next in lists, zapping with a banner and channel list in the player.
 - Channel lists in four modes with logos from a disk cache; Settings → Guide with extra XMLTV URLs, offset and mapping; programmes in search.
 - Android background playback and auto-PiP work again (since #14 no start reached the platform; fixed in #27).
