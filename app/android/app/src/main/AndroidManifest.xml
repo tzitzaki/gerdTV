@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Streams, the provider API, logos, TMDB and update checks. Cleartext HTTP: res/xml/network_security_config.xml. -->
+    <!-- Streams, the provider API, logos, TMDB and update checks. All of it goes through libmpv and the Rust core, which
+         don't use Android's network stack, so plain-HTTP providers need no cleartext setting here (owner decision). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Background playback (PlaybackService): the foreground service, its notification, CPU and Wi-Fi locks. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,8 +14,7 @@
         android:label="gerdTV"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:banner="@drawable/banner"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:banner="@drawable/banner">
         <activity
             android:name=".MainActivity"
             android:exported="true"
