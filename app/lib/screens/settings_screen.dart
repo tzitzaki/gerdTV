@@ -1,4 +1,4 @@
-// Settings for the MVP: the account (update now, last sync, remove), stream health, about.
+// Settings: the account (update now, last sync, remove), playback, the TV guide, stream health, about.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -9,6 +9,7 @@ import '../src/rust/api/playback.dart';
 import '../src/rust/api/simple.dart';
 import '../theme.dart';
 import 'buffer_picker.dart';
+import 'guide_settings.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.session});
@@ -80,6 +81,8 @@ class SettingsScreen extends StatelessWidget {
             ),
             const Divider(),
             if (session.library != null) _PlaybackSettings(session: session),
+            const Divider(),
+            if (session.library != null) GuideSettings(session: session),
             const Divider(),
             ListTile(
               title: Text(

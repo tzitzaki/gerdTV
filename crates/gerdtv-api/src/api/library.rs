@@ -42,9 +42,7 @@ pub struct ProfileInfo {
     pub name: String,
     pub source: SourceKind,
     pub server: String,
-    pub epg_urls: Vec<String>,
     pub user_agent: String,
-    pub epg_offset_hours: i32,
     pub max_connections: Option<u32>,
 }
 
@@ -59,9 +57,7 @@ impl From<core::Profile> for ProfileInfo {
                 core::SourceKind::M3uFile => SourceKind::M3uFile,
             },
             server: p.server,
-            epg_urls: p.epg_urls,
             user_agent: p.user_agent,
-            epg_offset_hours: p.epg_offset_hours,
             max_connections: p.max_connections,
         }
     }
@@ -90,9 +86,7 @@ pub fn save_profile(dir: String, profile: ProfileInfo) -> Result<ProfileInfo, St
             SourceKind::M3uFile => core::SourceKind::M3uFile,
         },
         server: profile.server,
-        epg_urls: profile.epg_urls,
         user_agent: profile.user_agent,
-        epg_offset_hours: profile.epg_offset_hours,
         max_connections: profile.max_connections,
         updated_at: 0,
     };
@@ -164,6 +158,91 @@ pub struct HealthInfo {
     pub attempts: u32,
     pub recovered: bool,
     pub secs: u32,
+}
+
+/// One guide source as Settings → Guide shows it (the provider's built-in guide first, its URL left empty).
+pub struct GuideSourceInfo {
+    pub id: i64,
+    pub url: String,
+    pub builtin: bool,
+    /// UTC seconds of the last successful import; 0 = never.
+    pub last_fetch: i64,
+    /// Empty when the last import worked, else what went wrong (free of credentials).
+    pub status: String,
+    pub channels: u32,
+    pub programmes: u32,
+}
+
+impl From<core::GuideSource> for GuideSourceInfo {
+    fn from(g: core::GuideSource) -> Self {
+        GuideSourceInfo {
+            id: g.id,
+            url: g.url,
+            builtin: g.builtin,
+            last_fetch: g.last_fetch,
+            status: g.status,
+            channels: g.channels,
+            programmes: g.programmes,
+        }
+    }
+}
+
+/// A guide programme; times are UTC seconds.
+pub struct ProgrammeInfo {
+    pub id: i64,
+    pub channel: String,
+    pub start: i64,
+    pub stop: i64,
+    pub title: String,
+    pub sub_title: String,
+    pub desc: String,
+    pub category: String,
+    pub episode: String,
+}
+
+impl From<gerdtv_core::epg::Programme> for ProgrammeInfo {
+    fn from(p: gerdtv_core::epg::Programme) -> Self {
+        ProgrammeInfo {
+            id: p.id,
+            channel: p.channel,
+            start: p.start,
+            stop: p.stop,
+            title: p.title,
+            sub_title: p.sub_title,
+            desc: p.desc,
+            category: p.category,
+            episode: p.episode,
+        }
+    }
+}
+
+/// What is on a channel now and next (either may be missing).
+pub struct NowNext {
+    pub now: Option<ProgrammeInfo>,
+    pub next: Option<ProgrammeInfo>,
+}
+
+/// One channel's programmes in a time window (the guide grid's row).
+pub struct GuideRow {
+    pub programmes: Vec<ProgrammeInfo>,
+}
+
+/// A programme search hit with the live channel that shows it (ready to play).
+pub struct ProgrammeHit {
+    pub programme: ProgrammeInfo,
+    pub item: ItemInfo,
+}
+
+/// A channel by id and name: a live item without a guide, or a guide channel to map it to.
+pub struct ChannelRef {
+    pub id: String,
+    pub name: String,
+}
+
+fn refs(v: Vec<(String, String)>) -> Vec<ChannelRef> {
+    v.into_iter()
+        .map(|(id, name)| ChannelRef { id, name })
+        .collect()
 }
 
 /// An open profile.
@@ -366,6 +445,127 @@ impl Library {
     pub fn stream_url(&self, key: String, prefer_hls: bool) -> Result<String, String> {
         self.0
             .stream_url(&key, if prefer_hls { "m3u8" } else { "ts" })
+            .map_err(err)
+    }
+
+    // The guide (logic: gerdtv_core::epg). Settings → Guide, now/next in lists, the grid and programme search.
+
+    /// The guide sources, the provider's first.
+    pub fn guide_sources(&self) -> Result<Vec<GuideSourceInfo>, String> {
+        Ok(self
+            .0
+            .guide_sources()
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    pub fn add_guide_url(&self, url: String) -> Result<(), String> {
+        self.0.add_guide_url(&url).map_err(err)
+    }
+
+    pub fn remove_guide_source(&self, id: i64) -> Result<(), String> {
+        self.0.remove_guide_source(id).map_err(err)
+    }
+
+    /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
+    pub async fn refresh_guide(&self, days_ahead: u32) -> Result<Vec<GuideSourceInfo>, String> {
+        Ok(self
+            .0
+            .refresh_guide(days_ahead as i64)
+            .await
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// Seconds since the oldest successful import (None: never); the app refreshes when it is over 12 h.
+    pub fn guide_age(&self) -> Result<Option<i64>, String> {
+        self.0.guide_age().map_err(err)
+    }
+
+    /// Now and next for each item key, in the same order.
+    pub fn now_next(&self, keys: Vec<String>) -> Result<Vec<NowNext>, String> {
+        Ok(self
+            .0
+            .now_next(&keys)
+            .map_err(err)?
+            .into_iter()
+            .map(|(now, next)| NowNext {
+                now: now.map(Into::into),
+                next: next.map(Into::into),
+            })
+            .collect())
+    }
+
+    /// Each item key's programmes overlapping `from`..`to` (UTC seconds), in the same order.
+    pub fn guide_window(
+        &self,
+        keys: Vec<String>,
+        from: i64,
+        to: i64,
+    ) -> Result<Vec<GuideRow>, String> {
+        Ok(self
+            .0
+            .guide_window(&keys, from, to)
+            .map_err(err)?
+            .into_iter()
+            .map(|v| GuideRow {
+                programmes: v.into_iter().map(Into::into).collect(),
+            })
+            .collect())
+    }
+
+    pub fn programme(&self, id: i64) -> Result<Option<ProgrammeInfo>, String> {
+        Ok(self.0.programme(id).map_err(err)?.map(Into::into))
+    }
+
+    /// Programmes whose title, sub-title or description match, ongoing and upcoming first.
+    pub fn search_programmes(
+        &self,
+        query: String,
+        limit: u32,
+    ) -> Result<Vec<ProgrammeHit>, String> {
+        Ok(self
+            .0
+            .search_programmes(&query, limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(|(p, hit)| ProgrammeHit {
+                programme: p.into(),
+                item: hit.into(),
+            })
+            .collect())
+    }
+
+    /// Live channels without a guide match, in provider order (the mapping screen).
+    pub fn unmatched_channels(&self, limit: u32, offset: u32) -> Result<Vec<ChannelRef>, String> {
+        Ok(refs(
+            self.0
+                .unmatched_channels(limit as usize, offset as usize)
+                .map_err(err)?,
+        ))
+    }
+
+    /// Guide channels whose name or id contains the query.
+    pub fn find_guide_channels(
+        &self,
+        query: String,
+        limit: u32,
+    ) -> Result<Vec<ChannelRef>, String> {
+        Ok(refs(
+            self.0
+                .find_guide_channels(&query, limit as usize)
+                .map_err(err)?,
+        ))
+    }
+
+    /// Maps a live item to a guide channel by hand (None: back to automatic matching).
+    pub fn map_channel(&self, item_key: String, channel: Option<String>) -> Result<(), String> {
+        self.0
+            .map_channel(&item_key, channel.as_deref())
             .map_err(err)
     }
 }
