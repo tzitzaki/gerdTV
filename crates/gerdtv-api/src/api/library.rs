@@ -75,6 +75,17 @@ pub fn list_profiles(dir: String) -> Result<Vec<ProfileInfo>, String> {
         .collect())
 }
 
+/// An app-wide setting (`<dir>/app.json`, not per profile), or None when never set.
+#[flutter_rust_bridge::frb(sync)]
+pub fn app_setting(dir: String, key: String) -> Result<Option<String>, String> {
+    core::app_setting(&PathBuf::from(dir), &key).map_err(err)
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn set_app_setting(dir: String, key: String, value: String) -> Result<(), String> {
+    core::set_app_setting(&PathBuf::from(dir), &key, &value).map_err(err)
+}
+
 /// Adds (empty id) or replaces a profile; returns it with its id.
 pub fn save_profile(dir: String, profile: ProfileInfo) -> Result<ProfileInfo, String> {
     let p = core::Profile {

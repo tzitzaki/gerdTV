@@ -14,17 +14,32 @@ class FakeCore implements RustLibApi {
   @override
   Future<void> crateApiSimpleInitApp() async {}
 
+  /// App-wide settings (app.json in the real core), by key; tests read what the UI stored.
+  final appSettings = <String, String>{};
+
+  @override
+  String? crateApiLibraryAppSetting({
+    required String dir,
+    required String key,
+  }) => appSettings[key];
+
+  @override
+  void crateApiLibrarySetAppSetting({
+    required String dir,
+    required String key,
+    required String value,
+  }) => appSettings[key] = value;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
     'FakeCore: no fake for ${invocation.memberName}',
   );
 }
 
-bool _initialised = false;
+FakeCore? _core;
 
-/// Installs [FakeCore] once per test process (RustLib can only be initialised once).
-void useFakeCore() {
-  if (_initialised) return;
-  RustLib.initMock(api: FakeCore());
-  _initialised = true;
+/// Installs [FakeCore] once per test process (RustLib can only be initialised once) and returns it.
+FakeCore useFakeCore() {
+  if (_core == null) RustLib.initMock(api: _core = FakeCore());
+  return _core!;
 }

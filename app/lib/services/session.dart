@@ -12,6 +12,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../platform/platform_bridge.dart';
+import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
@@ -131,9 +132,26 @@ class Session extends ChangeNotifier {
   Future<String> _dir() async =>
       appDir ??= (await getApplicationSupportDirectory()).path;
 
+  /// The app's logo (app-wide setting, Settings → Appearance), shown in the shell and on the setup screen.
+  AppLogo logo = AppLogo.screen;
+
+  /// The app-wide setting that stores [logo] (gerdtv_core::library::set_app_setting, app.json).
+  static const settingAppLogo = 'app_logo';
+
+  /// Stores the logo and switches the launcher icon (Android, iOS) or the Dock/window icon (macOS, Linux).
+  Future<void> setLogo(AppLogo l) async {
+    setAppSetting(dir: await _dir(), key: settingAppLogo, value: l.name);
+    logo = l;
+    notifyListeners();
+    await platform.setLogo(l);
+  }
+
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
+    logo = parseAppLogo(appSetting(dir: dir, key: settingAppLogo));
+    // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
+    if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
     final profiles = await listProfiles(dir: dir);
     for (final p in profiles) {
       final s = await secrets.read(p.id);

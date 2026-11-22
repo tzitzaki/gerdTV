@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
+import 'app_logo.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 
@@ -89,6 +90,11 @@ class _SetupScreenState extends State<SetupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AppLogoMark(logo: widget.session.logo, size: 64),
+                    ),
+                    const SizedBox(height: Tokens.space * 2),
                     Text(
                       l10n.setupTitle,
                       style: Theme.of(context).textTheme.headlineMedium,
