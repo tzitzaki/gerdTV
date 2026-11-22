@@ -15,7 +15,7 @@ Open the APK from the browser's downloads and allow the install.
 Download `gerdTV-ios-unsigned-<version>.ipa` and re-sign and install it with a re-signing service. Always use the same signing certificate: with a different one the stored login and TMDB key can't be read and must be entered again. The app only notifies about updates; repeat this per update.
 
 ## Linux (x64)
-Unpack `gerdTV-linux-x64-<version>.tar.gz` anywhere and run `gerdTV/gerdtv`. Needs libmpv, GTK 3 and (for the tray icon) AppIndicator. To update, replace the folder.
+Unpack `gerdTV-linux-x64-<version>.tar.gz` anywhere and run `gerdTV/gerdtv`. Needs libmpv, GTK 3, libsecret (the login is kept in the desktop keyring) and (for the tray icon) AppIndicator. To update, replace the folder.
 
 ## Checking a download
 Each release has `latest.json` with every asset's SHA-256 (signed in `latest.json.sig`); `shasum -a 256 <file>` must match.

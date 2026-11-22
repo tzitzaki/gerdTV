@@ -27,6 +27,9 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 abstract class Library implements RustOpaqueInterface {
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
+  /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
+  Future<List<ItemInfo>> episodes({required String seriesKey});
+
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
 

@@ -208,6 +208,37 @@ impl Xtream {
             .collect())
     }
 
+    /// A series' episodes (get_series_info), as catalogue rows with `category` = the series key, in season and
+    /// episode order. Fetched lazily when a series opens.
+    pub async fn episodes(&self, series_id: u64) -> Result<Vec<NewItem>> {
+        let v = self
+            .api(
+                Some("get_series_info"),
+                &[("series_id", series_id.to_string())],
+            )
+            .await?;
+        let mut out = Vec::new();
+        if let Some(seasons) = v["episodes"].as_object() {
+            for list in seasons.values() {
+                for e in list.as_array().into_iter().flatten() {
+                    let Some(id) = num(&e["id"]) else { continue };
+                    out.push(NewItem {
+                        key: format!("episode:{id}"),
+                        name: text(&e["title"]),
+                        category: format!("series:{series_id}"),
+                        logo: text(&e["info"]["movie_image"]),
+                        season: num(&e["season"]).map(|n| n as u32),
+                        episode: num(&e["episode_num"]).map(|n| n as u32),
+                        ext: text(&e["container_extension"]),
+                        ..NewItem::default()
+                    });
+                }
+            }
+        }
+        out.sort_by_key(|e| (e.season, e.episode));
+        Ok(out)
+    }
+
     /// The play URL of a stream (built at play time, never stored). Live defaults to `.ts`; the watchdog may ask
     /// for `m3u8` instead. Movies/episodes use their container extension.
     pub fn stream_url(&self, kind: Kind, id: u64, ext: &str) -> String {

@@ -1,7 +1,7 @@
 # Setup: toolchains, building, CI
 
 ## Toolchains (Linux dev machine)
-- Debian/Ubuntu packages: `clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-14-dev libmpv-dev mpv libayatana-appindicator3-dev xvfb xauth unzip zip jq just openjdk-21-jdk-headless`.
+- Debian/Ubuntu packages: `clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-14-dev libmpv-dev mpv libayatana-appindicator3-dev libsecret-1-dev xvfb xauth unzip zip jq just openjdk-21-jdk-headless`.
 - Rust via rustup (minimal profile + clippy, rustfmt); the compiler version is pinned in `rust-toolchain.toml`. Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`. Tools: `cargo install cargo-ndk flutter_rust_bridge_codegen --locked` (codegen version = the `flutter_rust_bridge` version in `app/pubspec.yaml`).
 - Flutter stable at the version in `app/FLUTTER_VERSION` (`git clone -b <version> https://github.com/flutter/flutter`), then `flutter config --no-analytics`, `flutter precache --linux --android`.
 - Android: the "command line tools only" package unpacked to `$ANDROID_HOME/cmdline-tools/latest`, then `sdkmanager "platform-tools"`; the first Android build fetches the SDK platform, build tools and NDK it needs. `ANDROID_HOME` and the tool folders on `PATH`.

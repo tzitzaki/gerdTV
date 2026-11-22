@@ -49,7 +49,13 @@ impl From<m3u::Kind> for Kind {
     }
 }
 
-const SCHEMA_VERSION: i64 = 1;
+/// Forward-only migrations: entry i takes the schema from version i + 1 to i + 2. The base SCHEMA is version 1.
+/// Never edit a released entry; append a new one (docs/DATA_MODEL.md, "Migrations").
+const MIGRATIONS: &[&str] = &[
+    // 1 → 2: the container extension of Xtream Codes movies and episodes (play URLs need it: mp4, mkv …).
+    "ALTER TABLE items ADD COLUMN ext TEXT NOT NULL DEFAULT ''",
+];
+const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -95,13 +101,31 @@ pub fn open(path: &Path) -> Result<Connection> {
             r.get(0)
         })
         .optional()?;
-    if version.is_none() {
-        conn.execute(
-            "INSERT INTO meta (key, value) VALUES ('schema', ?1)",
-            [SCHEMA_VERSION.to_string()],
-        )?;
+    let fresh = version.is_none();
+    let mut current: i64 = version.and_then(|v| v.parse().ok()).unwrap_or(1);
+    if current < SCHEMA_VERSION && !fresh && path != Path::new(":memory:") {
+        // Hard to undo: copy the database first (data safety rule). The WAL is checkpointed into it beforehand.
+        conn.pragma_update(None, "wal_checkpoint", "TRUNCATE")?;
+        let backup = path.with_extension(format!("db.bak-{}", unix_now()));
+        std::fs::copy(path, &backup)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     }
+    while current < SCHEMA_VERSION {
+        conn.execute_batch(MIGRATIONS[(current - 1) as usize])?;
+        current += 1;
+    }
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
+        [current.to_string()],
+    )?;
     Ok(conn)
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// FNV-1a 64: a stable hash for keys (std's hasher may change between Rust versions; keys must not).
@@ -212,6 +236,8 @@ pub struct NewItem {
     pub season: Option<u32>,
     pub episode: Option<u32>,
     pub year: Option<u32>,
+    /// Xtream Codes movies/episodes: the container extension for the play URL.
+    pub ext: String,
 }
 
 /// One sync of a profile's catalogue: everything inside one transaction (diff + upsert by key), so readers see the
@@ -251,14 +277,14 @@ impl<'c> Sync<'c> {
 
     pub fn item(&mut self, kind: Kind, it: &NewItem) -> Result<()> {
         let rowid: i64 = self.tx.prepare_cached(
-            "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+            "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT (key) DO UPDATE SET kind = ?2, name = ?3, category = ?4, logo = ?5, epg_id = ?6,
-               number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13
+               number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13, ext = ?14
              RETURNING rowid",
         )?.query_row(
             params![it.key, kind as i64, it.name, it.category, it.logo, it.epg_id, it.number, it.url, it.season,
-                    it.episode, it.year, self.position, self.generation],
+                    it.episode, it.year, self.position, self.generation, it.ext],
             |r| r.get(0),
         )?;
         self.tx
@@ -280,6 +306,17 @@ impl<'c> Sync<'c> {
             "UPDATE items SET seen = ?1 WHERE kind = ?2",
             params![self.generation, kind as i64],
         )
+    }
+
+    /// Adds rows outside a full sync (a series' episodes, fetched when the series opens). They carry the current
+    /// generation, so the next full sync removes them again and they are fetched afresh.
+    pub fn add_items(conn: &mut Connection, kind: Kind, items: &[NewItem]) -> Result<()> {
+        let mut s = Sync::begin(conn)?;
+        s.generation -= 1; // = the last full sync's generation: these rows count as part of it
+        for it in items {
+            s.item(kind, it)?;
+        }
+        s.tx.commit()
     }
 
     /// Removes rows the provider no longer has, replaces the categories, commits. Returns rows removed.
@@ -335,6 +372,7 @@ pub fn import_m3u(
             name: e.name,
             url,
             year: None,
+            ext: String::new(),
         };
         match sync.item(kind, &item) {
             Ok(()) => stats.entries += 1,
@@ -584,6 +622,62 @@ http://other.example.invalid/stream?token=s3cret
             ["Kino Welt", "Kino Plus"],
             "paging"
         );
+    }
+
+    /// A version-1 database on disk gets the new column, a backup copy, and keeps its rows.
+    #[test]
+    fn migrates_forward_with_a_backup() {
+        let dir = std::env::temp_dir().join(format!("gerdtv-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("p.db");
+        {
+            // A schema-1 fixture: the base schema and one row, as release 0.261121.9 wrote it.
+            let c = Connection::open(&path).unwrap();
+            c.execute_batch(SCHEMA).unwrap();
+            c.execute("INSERT INTO meta VALUES ('schema', '1')", [])
+                .unwrap();
+            c.execute("INSERT INTO items (key, kind, name, category, position, seen) VALUES ('live:1', 0, 'Arte', 'g', 0, 1)", []).unwrap();
+        }
+        let c = open(&path).unwrap();
+        let (name, ext): (String, String) = c
+            .query_row("SELECT name, ext FROM items", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((name.as_str(), ext.as_str()), ("Arte", ""));
+        let v: String = c
+            .query_row("SELECT value FROM meta WHERE key = 'schema'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(v, SCHEMA_VERSION.to_string());
+        let backups = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter(|e| {
+                e.as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".bak-")
+            })
+            .count();
+        assert_eq!(backups, 1);
+        drop(c);
+        // Opening again migrates nothing and makes no new backup.
+        drop(open(&path).unwrap());
+        let backups = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter(|e| {
+                e.as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".bak-")
+            })
+            .count();
+        assert_eq!(backups, 1);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

@@ -1,22 +1,30 @@
-// gerdTV app entry point. Bootstrap state: loads the Rust core (flutter_rust_bridge) and shows its greeting, which
-// proves the native library builds and loads on every platform. The real shell (docs/SPEC.md) replaces this screen.
+// gerdTV app entry point: loads the Rust core and libmpv, opens the saved account (cache first, then a background
+// sync) or shows the first-run setup.
 //
 // Debug hints: a crash before the first frame in RustLib.init() means the native library wasn't bundled or found
 // (Cargokit, app/rust_builder; see docs/ARCHITECTURE.md, "The seam"). Missing German strings: app/lib/l10n/*.arb.
 
 import 'package:material_ui/material_ui.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'l10n/gen/app_localizations.dart';
-import 'src/rust/api/simple.dart';
+import 'screens/setup_screen.dart';
+import 'screens/shell.dart';
+import 'services/session.dart';
 import 'src/rust/frb_generated.dart';
+import 'theme.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  runApp(const GerdTvApp());
+  MediaKit.ensureInitialized();
+  final session = Session()..start();
+  runApp(GerdTvApp(session: session));
 }
 
 class GerdTvApp extends StatelessWidget {
-  const GerdTvApp({super.key});
+  const GerdTvApp({super.key, required this.session});
+  final Session session;
 
   @override
   Widget build(BuildContext context) {
@@ -30,21 +38,19 @@ class GerdTvApp extends StatelessWidget {
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: ThemeData(brightness: Brightness.dark),
-      home: const _HelloScreen(),
-    );
-  }
-}
-
-class _HelloScreen extends StatelessWidget {
-  const _HelloScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.appTitle)),
-      body: Center(child: Text(l10n.coreGreeting(greet(name: 'gerdTV')))),
+      theme: gerdTheme(Brightness.light),
+      darkTheme: gerdTheme(Brightness.dark),
+      themeMode: ThemeMode.dark,
+      home: ListenableBuilder(
+        listenable: session,
+        builder: (context, _) => switch (session.state) {
+          SessionState.loading => const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+          SessionState.needsSetup => SetupScreen(session: session),
+          SessionState.ready => Shell(session: session),
+        },
+      ),
     );
   }
 }
