@@ -11,6 +11,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/platform_bridge.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import 'secrets.dart';
@@ -85,6 +86,12 @@ class Session extends ChangeNotifier {
 
   /// True while the full player screen is open (the now-playing bar hides then).
   final ValueNotifier<bool> playerOpen = ValueNotifier(false);
+
+  /// True while only the picture is shown: the desktop floating mini player, or system Picture-in-Picture.
+  final ValueNotifier<bool> pictureMode = ValueNotifier(false);
+
+  /// Native background playback / Picture-in-Picture (Android); attached in main().
+  late final PlatformBridge platform = PlatformBridge(pictureMode: pictureMode);
 
   /// The app's navigator: the now-playing bar sits below all routes (MaterialApp.builder) and opens the player here.
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -203,10 +210,41 @@ class Session extends ChangeNotifier {
     );
   }
 
+  /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
+  /// ends, mpv resumes the same item. Live channels go as .m3u8 (AVPlayer can't play raw TS).
+  Future<void> startApplePip() async {
+    final item = nowPlaying.value;
+    final lib = library;
+    if (item == null || lib == null) return;
+    final url = lib.streamUrl(
+      key: item.key,
+      preferHls: item.kind == ItemKind.live,
+    );
+    await _adapter?.stop();
+    await _player?.stop();
+    platform.onApplePipEnded = (_) => _resume(item);
+    if (!await platform.startApplePip(url)) await _resume(item);
+  }
+
+  /// Plays [item] again even though it is still nowPlaying (after Apple PiP handed the stream back).
+  Future<void> _resume(ItemInfo item) async {
+    final lib = library;
+    if (lib == null || nowPlaying.value?.key != item.key) {
+      return; // stopped or replaced meanwhile
+    }
+    final live = item.kind == ItemKind.live;
+    await adapter.play(
+      ({required hls}) => lib.streamUrl(key: item.key, preferHls: hls),
+      live: live,
+      preferHls: live && lib.preferHls(key: item.key),
+    );
+  }
+
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
     _playingKey = null;
     nowPlaying.value = null;
+    unawaited(platform.setPlaying(null));
     await _adapter?.stop();
     await _player?.stop();
   }
@@ -217,6 +255,9 @@ class Session extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// True on iPhone/iPad (Apple Picture-in-Picture hand-over).
+bool get isApple => !kIsWeb && Platform.isIOS;
 
 /// True on desktop platforms (window-sized layouts, keyboard first).
 bool get isDesktop =>

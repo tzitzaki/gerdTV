@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Sound (and Apple Picture-in-Picture) keep playing with the screen locked or in another app. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<!-- IPTV providers serve logos (and their API and streams) over plain HTTP on a host the user enters, so ATS
 	     can't be narrowed to listed domains. Streams/API go through libmpv and the Rust core (not subject to ATS);
 	     this is for Flutter's HTTP client, which loads the logos and follows ATS. -->

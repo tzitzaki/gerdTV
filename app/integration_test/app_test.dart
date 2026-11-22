@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
+import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/item_tile.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
@@ -93,6 +94,32 @@ void main() {
       );
       await tester.pump();
     }
+    // Desktop mini player: the window shrinks to the floating player, playback continues, Restore brings it back.
+    final mini = MiniWindow();
+    final fullWidth = mini.size.width;
+    await tester.tap(find.byKey(const Key('player.mini')));
+    await waitFor(tester, find.byKey(const Key('player.restore')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 800)),
+    );
+    expect(mini.size.width, closeTo(MiniWindow.miniWidth, 1));
+    final inMini = session.player.state.position;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 2)),
+    );
+    await tester.pump();
+    expect(
+      session.player.state.position,
+      greaterThan(inMini),
+      reason: 'plays on in the mini player',
+    );
+    await tester.tap(find.byKey(const Key('player.restore')));
+    await waitFor(tester, find.byKey(const Key('player.back')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 800)),
+    );
+    expect(mini.size.width, closeTo(fullWidth, 1));
+
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));

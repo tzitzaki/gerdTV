@@ -37,6 +37,7 @@
     }
   },
   "kindEpisodes": "Episodes",
+  "miniPlayer": "Mini player",
   "navLive": "Live TV",
   "navMovies": "Movies",
   "navSearch": "Search",
@@ -51,6 +52,7 @@
     }
   },
   "remove": "Remove",
+  "restore": "Full size",
   "retry": "Retry",
   "searchEmpty": "Type to search all channels, movies and series.",
   "searchHint": "Search channels, movies, series",
