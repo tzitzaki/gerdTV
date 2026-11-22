@@ -55,6 +55,10 @@ test-rust:
 test-flutter: l10n
     cd app && flutter test
 
+# Render the logo mockups (app/lib/screens/app_logo.dart) into the launcher icon files and app/build/logos/preview.png.
+logos:
+    cd app && flutter test tool/render_logos_test.dart
+
 # Generate the localisation code (app/lib/l10n/gen, not committed). `flutter test` and `analyze` don't do it on a
 # fresh clone; builds do.
 l10n:

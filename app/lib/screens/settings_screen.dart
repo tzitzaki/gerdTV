@@ -13,6 +13,7 @@ import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
 import '../src/rust/api/simple.dart';
 import '../theme.dart';
+import 'app_logo.dart';
 import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
@@ -158,6 +159,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         icon: Icons.palette_outlined,
         title: l10n.settingsAppearance,
         entries: [
+          SettingsEntry(
+            id: 'logo',
+            title: l10n.settingsLogo,
+            keywords: l10n.settingsKeywordsLogo,
+            build: (_) => _LogoPicker(session: session),
+          ),
           if (lib != null)
             SettingsEntry(
               id: 'lists',
@@ -189,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             id: 'version',
             title: l10n.aboutVersion(coreVersion()),
             build: (_) => ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: AppLogoMark(logo: session.logo, size: 32),
               title: Text(l10n.aboutVersion(coreVersion())),
             ),
           ),
@@ -526,6 +533,48 @@ class _HealthList extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Settings → Appearance → Logo: the four mockups (app_logo.dart); picking one also switches the app icon.
+class _LogoPicker extends StatelessWidget {
+  const _LogoPicker({required this.session});
+  final Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final names = {
+      AppLogo.screen: l10n.logoScreen,
+      AppLogo.monogram: l10n.logoMonogram,
+      AppLogo.signal: l10n.logoSignal,
+      AppLogo.frame: l10n.logoFrame,
+    };
+    return RadioGroup<AppLogo>(
+      groupValue: session.logo,
+      onChanged: (l) {
+        if (l != null) session.setLogo(l);
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            title: Text(
+              l10n.settingsLogo,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            subtitle: Text(l10n.settingsLogoHint),
+          ),
+          for (final logo in AppLogo.values)
+            RadioListTile<AppLogo>(
+              key: Key('settings.logo.${logo.name}'),
+              value: logo,
+              title: Text(names[logo]!),
+              secondary: AppLogoMark(logo: logo, size: 40),
+            ),
+        ],
+      ),
     );
   }
 }

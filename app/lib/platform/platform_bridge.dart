@@ -1,12 +1,15 @@
 // The Dart end of the "gerdtv/platform" channel (Android: MainActivity.kt, iOS: AppDelegate.swift). Tells the platform
 // whether something plays (background playback, Android Picture-in-Picture) and hears back when PiP starts or ends.
-// iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv.
+// iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
+// the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc).
 // Platforms without a native side ignore the calls.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import '../screens/app_logo.dart';
 
 class PlatformBridge {
   PlatformBridge({required this.pictureMode});
@@ -38,6 +41,27 @@ class PlatformBridge {
         'playing': title != null,
         'title': title ?? '',
       });
+    } on MissingPluginException {
+      // Tests and builds without the native side.
+    }
+  }
+
+  /// Switches the app icon to [logo]. Android enables the logo's launcher activity alias, iOS sets the alternate
+  /// icon (the system says so in an alert); both last. macOS (Dock) and Linux (window) get a PNG for this run only.
+  Future<void> setLogo(AppLogo logo) async {
+    if (kIsWeb) return;
+    final args = <String, Object>{'name': logo.name};
+    if (Platform.isMacOS) {
+      args['png'] = await renderLogoPng(
+        logo,
+        512,
+        inset: 0.1,
+      ); // the margin macOS icons keep
+    } else if (Platform.isLinux) {
+      args['png'] = await renderLogoPng(logo, 256);
+    }
+    try {
+      await channel.invokeMethod('setLogo', args);
     } on MissingPluginException {
       // Tests and builds without the native side.
     }

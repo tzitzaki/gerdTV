@@ -5,6 +5,9 @@ import 'package:material_ui/material_ui.dart';
 
 class Tokens {
   static const accent = Color(0xFF4F8CFF);
+
+  /// The logo's tile and the Android TV banner's background.
+  static const ink = Color(0xFF12121A);
   static const space = 8.0; // the spacing unit: paddings are multiples of it
   static const radius = 12.0;
   static const motion = Duration(milliseconds: 150);
