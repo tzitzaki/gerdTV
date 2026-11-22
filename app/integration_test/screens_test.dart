@@ -108,13 +108,13 @@ Future<void> checkScreen(
   }
   // Keyboard / D-pad: every Tab lands on a control inside the window (scrolled into view if needed).
   final seen = <FocusNode>{};
+  // From a clean start: focus left by the previous screen may sit in a text field the test scrolled away, and on
+  // macOS a Tab inside a text field goes to the system's text input instead of moving focus.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump();
   for (var i = 0; i < 25; i++) {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    // Measured after the scroll settles: a text field animates itself into view (~100 ms), slow runners take longer.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     final node = FocusManager.instance.primaryFocus;
     if (node == null || node.context == null || !seen.add(node)) continue;
     final box = node.context!.findRenderObject();
