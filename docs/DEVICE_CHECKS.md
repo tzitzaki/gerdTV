@@ -18,6 +18,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
+- Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
