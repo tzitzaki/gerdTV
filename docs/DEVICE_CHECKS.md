@@ -20,8 +20,11 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## iPad
 
 ## Android phone
+- PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
+- Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 
 ## Shield
 - Install: the APK installs and gerdTV appears in the TV launcher row with its banner.
 - Remote: the D-pad reaches every section, list and the setup fields; OK opens; Back leaves the player.
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
+- PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.

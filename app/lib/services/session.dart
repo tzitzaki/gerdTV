@@ -11,6 +11,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/platform_bridge.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import 'secrets.dart';
@@ -88,6 +89,9 @@ class Session extends ChangeNotifier {
 
   /// True while only the picture is shown: the desktop floating mini player, or system Picture-in-Picture.
   final ValueNotifier<bool> pictureMode = ValueNotifier(false);
+
+  /// Native background playback / Picture-in-Picture (Android); attached in main().
+  late final PlatformBridge platform = PlatformBridge(pictureMode: pictureMode);
 
   /// The app's navigator: the now-playing bar sits below all routes (MaterialApp.builder) and opens the player here.
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -210,6 +214,7 @@ class Session extends ChangeNotifier {
   Future<void> stopPlayback() async {
     _playingKey = null;
     nowPlaying.value = null;
+    unawaited(platform.setPlaying(null));
     await _adapter?.stop();
     await _player?.stop();
   }

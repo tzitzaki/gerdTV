@@ -58,4 +58,4 @@ All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with 
 `app/lib/platform/mini_window.dart` switches the main window into mini-player mode (480 × 270, hidden title bar, always on top, on all Spaces) and restores its bounds. A second window would be a second Flutter engine that can't share the media_kit player, so the stream would reopen.
 
 ## Platform channels
-None yet. Each one lands here with its purpose, its Swift/Kotlin file and its Dart counterpart.
+- `gerdtv/platform` (Android: `app/android/app/src/main/kotlin/world/zakis/gerdtv/MainActivity.kt`, Dart: `app/lib/platform/platform_bridge.dart`): Dart reports playback start/stop (`setPlaying`); Android enters Picture-in-Picture when the user leaves while playing (auto-enter on Android 12+, `onUserLeaveHint` before) and reports `pictureMode`, which makes the player show only the picture. While playing, `PlaybackService.kt` runs as a foreground service (type mediaPlayback) with a notification, a partial wake lock and a Wi-Fi lock, so playback continues with the screen off.

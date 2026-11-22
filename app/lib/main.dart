@@ -20,6 +20,7 @@ Future<void> main() async {
   await RustLib.init();
   MediaKit.ensureInitialized();
   final session = Session()..start();
+  session.platform.attach();
   runApp(GerdTvApp(session: session));
 }
 
