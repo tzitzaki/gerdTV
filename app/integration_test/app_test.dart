@@ -11,7 +11,6 @@ import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/programme_sheet.dart';
 import 'package:gerdtv/screens/list_modes.dart';
-import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
@@ -60,6 +59,8 @@ void main() {
     debugPrint('JOURNEY: synced, shell shown');
     // Settings → Playback: Fast zap for the whole profile.
     await tester.tap(find.text('Settings'));
+    await waitFor(tester, find.byKey(const Key('settings.cat.playback')));
+    await tester.tap(find.byKey(const Key('settings.cat.playback')));
     await waitFor(tester, find.byKey(const Key('buffer.fastZap')));
     await tester.tap(find.byKey(const Key('buffer.fastZap')));
     await tester.pump();
@@ -344,9 +345,12 @@ void main() {
     // (The stopped player is still closing: wait until the rail can take the tap.)
     await tapReady(tester, find.text('Settings'));
     await tester.pumpAndSettle();
+    await tapReady(tester, find.byKey(const Key('settings.cat.guide')));
+    await tester.pumpAndSettle();
+    // The category's entries (the categories beside them scroll separately).
     final settingsList = find
         .descendant(
-          of: find.byType(SettingsScreen),
+          of: find.byKey(const Key('settings.content')),
           matching: find.byType(Scrollable),
         )
         .first;
@@ -415,14 +419,10 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: guide settings');
-    // Settings: remove the account → back to setup.
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('settings.remove')),
-      -200,
-      scrollable: settingsList,
-    );
-    await tester.ensureVisible(find.byKey(const Key('settings.remove')));
+    // Settings: found by search, remove the account → back to setup.
+    await tester.enterText(find.byKey(const Key('settings.search')), 'remove');
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('guide.unmatched')), findsNothing);
     await tapReady(tester, find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));

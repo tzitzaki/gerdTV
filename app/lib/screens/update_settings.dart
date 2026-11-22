@@ -75,12 +75,7 @@ class _UpdateSettingsState extends State<UpdateSettings> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          title: Text(
-            l10n.settingsUpdates,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
+        // No heading: the settings category "Updates" shows it.
         ListTile(
           key: const Key('update.check'),
           leading: _busy
