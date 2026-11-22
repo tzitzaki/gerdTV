@@ -13,6 +13,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_rust_bridge: 2.13.0
+  flutter_secure_storage: ^11.2.0
   gerdtv_api:
     path: rust_builder
   intl: any
@@ -20,6 +21,7 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_libs_video: ^1.0.7
   media_kit_video: ^2.0.1
+  path_provider: ^2.1.6
   window_manager: ^0.7.0
 
 dev_dependencies:

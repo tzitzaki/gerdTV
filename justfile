@@ -99,7 +99,7 @@ test-live:
 
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 test-integration:
-    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER"'
+    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'
 
 # Fails on a private detail in the changes since <base> or in the given files (e.g. a PR body draft).
 denylist base="origin/main" *files="":
@@ -160,4 +160,4 @@ licences:
 # [MAC] sessions only: build and run the integration tests on a Mac.
 mac-check:
     cd app && flutter build macos --debug
-    scripts/with-fault-server.sh bash -c 'cd app && flutter test integration_test -d macos --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER"'
+    scripts/with-fault-server.sh bash -c 'cd app && flutter test integration_test -d macos --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'

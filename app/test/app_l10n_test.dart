@@ -1,26 +1,43 @@
-// Owns: the app follows the system language (English template + German), with the core reached through the bridge.
+// Owns: the app follows the system language (English template + German) and the first-run form validates its
+// fields before anything reaches the core.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
+import 'package:gerdtv/services/session.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_core.dart';
 
+Session setupSession() =>
+    Session(appDir: '/nonexistent')..state = SessionState.needsSetup;
+
 void main() {
   setUpAll(useFakeCore);
 
-  for (final (locale, expected) in [
-    (const Locale('en'), 'The core says: fake greeting for gerdTV'),
-    (const Locale('de'), 'Der Kern sagt: fake greeting for gerdTV'),
+  for (final (locale, title, required) in [
+    (const Locale('en'), 'Add your provider', 'Required'),
+    (const Locale('de'), 'Anbieter hinzufügen', 'Pflichtfeld'),
   ]) {
     testWidgets(
-      'shows the ${locale.languageCode} strings and the name gerdTV',
+      'setup screen in ${locale.languageCode} validates before connecting',
       (tester) async {
         tester.platformDispatcher.localesTestValue = [locale];
         addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-        await tester.pumpWidget(const GerdTvApp());
+        await tester.pumpWidget(GerdTvApp(session: setupSession()));
         await tester.pumpAndSettle();
-        expect(find.text('gerdTV'), findsOneWidget);
-        expect(find.text(expected), findsOneWidget);
+        expect(find.text(title), findsOneWidget);
+        await tester.tap(find.byKey(const Key('setup.connect')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(required),
+          findsNWidgets(3),
+        ); // server, username, password
+        await tester.enterText(
+          find.byKey(const Key('setup.server')),
+          'not a url',
+        );
+        await tester.tap(find.byKey(const Key('setup.connect')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('http://'), findsWidgets);
       },
     );
   }

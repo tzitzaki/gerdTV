@@ -219,6 +219,18 @@ impl Library {
             .collect())
     }
 
+    /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
+    pub async fn episodes(&self, series_key: String) -> Result<Vec<ItemInfo>, String> {
+        Ok(self
+            .0
+            .episodes(&series_key)
+            .await
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
     /// Search as the user types; `kind` None = all kinds.
     pub fn search(
         &self,

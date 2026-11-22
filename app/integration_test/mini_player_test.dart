@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
+import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
@@ -56,7 +57,9 @@ void main() {
       isNotEmpty,
       reason: 'run through `just test-integration`',
     );
-    await tester.pumpWidget(const GerdTvApp());
+    await tester.pumpWidget(
+      GerdTvApp(session: Session()..state = SessionState.needsSetup),
+    );
     await tester.pumpAndSettle();
     final player = Player(configuration: WatchdogAdapter.playerConfiguration);
     addTearDown(player.dispose);

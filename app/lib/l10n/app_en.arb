@@ -1,8 +1,112 @@
 {
   "@@locale": "en",
+  "aboutVersion": "gerdTV {version}",
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "appTitle": "gerdTV",
-  "coreGreeting": "The core says: {greeting}",
-  "@coreGreeting": {
-    "placeholders": { "greeting": { "type": "String" } }
-  }
+  "back": "Back",
+  "browseEmpty": "Nothing here yet. The first update may still be running; check Settings.",
+  "cancel": "Cancel",
+  "chipAll": "All",
+  "clear": "Clear",
+  "episodesEmpty": "This series has no episodes.",
+  "filterHint": "Filter this list",
+  "healthEmpty": "No recoveries logged yet.",
+  "healthFailed": "gave up after {attempts} attempts",
+  "@healthFailed": {
+    "placeholders": {
+      "attempts": {
+        "type": "int"
+      }
+    }
+  },
+  "healthRecovered": "recovered after {attempts} attempts, {secs} s",
+  "@healthRecovered": {
+    "placeholders": {
+      "attempts": {
+        "type": "int"
+      },
+      "secs": {
+        "type": "int"
+      }
+    }
+  },
+  "kindEpisodes": "Episodes",
+  "navLive": "Live TV",
+  "navMovies": "Movies",
+  "navSearch": "Search",
+  "navSeries": "Series",
+  "navSettings": "Settings",
+  "playerReconnecting": "Reconnecting ({attempt})…",
+  "@playerReconnecting": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      }
+    }
+  },
+  "remove": "Remove",
+  "retry": "Retry",
+  "searchEmpty": "Type to search all channels, movies and series.",
+  "searchHint": "Search channels, movies, series",
+  "searchNoResults": "Nothing found for “{query}”.",
+  "@searchNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAbout": "About",
+  "settingsAccount": "Account",
+  "settingsHealth": "Stream health",
+  "settingsLastSync": "{entries} entries in {categories} groups",
+  "@settingsLastSync": {
+    "placeholders": {
+      "entries": {
+        "type": "int"
+      },
+      "categories": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsLicences": "Licences",
+  "settingsRemove": "Remove this account",
+  "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",
+  "settingsSyncNow": "Update now",
+  "setupBadUrl": "Enter an address starting with http:// or https://",
+  "setupConnect": "Connect",
+  "setupConnecting": "Connecting and loading the catalogue…",
+  "setupFailed": "Couldn't connect: {message}",
+  "@setupFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "setupIntro": "Enter the login your provider gave you. It is stored only in this device's secure storage.",
+  "setupM3u": "M3U playlist",
+  "setupM3uUrl": "Playlist URL",
+  "setupPassword": "Password",
+  "setupRequired": "Required",
+  "setupServer": "Server address",
+  "setupTitle": "Add your provider",
+  "setupUsername": "Username",
+  "setupXtream": "Xtream Codes",
+  "syncFailed": "Update failed: {message}",
+  "@syncFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "syncing": "Updating the catalogue…"
 }

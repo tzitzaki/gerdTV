@@ -336,6 +336,36 @@ impl Library {
         Ok((hits, counts))
     }
 
+    /// A series' episodes in season/episode order. Xtream Codes fetches them now (and caches them until the next
+    /// sync); for M3U the episodes are already in the catalogue under their group.
+    pub async fn episodes(&self, series_key: &str) -> Result<Vec<Hit>> {
+        if let (Some(xc), Some(id)) = (
+            &self.xc,
+            series_key
+                .strip_prefix("series:")
+                .and_then(|i| i.parse().ok()),
+        ) {
+            let items = xc.episodes(id).await?;
+            db::Sync::add_items(&mut self.conn.lock().unwrap(), Kind::Episode, &items)?;
+        }
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare_cached(
+            "SELECT key, kind, name, category, logo, number FROM items
+             WHERE kind = 2 AND category = ?1 ORDER BY season, episode, position",
+        )?;
+        let rows = stmt.query_map([series_key], |r| {
+            Ok(Hit {
+                key: r.get(0)?,
+                kind: Kind::from_i64(r.get(1)?),
+                name: r.get(2)?,
+                category: r.get(3)?,
+                logo: r.get(4)?,
+                number: r.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// The URL to play an item (live: `.ts` by default, `m3u8` when the watchdog asks; VOD: its container).
     pub fn stream_url(&self, key: &str, live_ext: &str) -> Result<String> {
         if let Some(xc) = &self.xc {
@@ -343,11 +373,30 @@ impl Library {
             let id: u64 = id
                 .parse()
                 .map_err(|_| LibraryError::NoProfile(key.to_string()))?;
-            return Ok(match prefix {
-                "live" => xc.stream_url(Kind::Live, id, live_ext),
-                "movie" => xc.stream_url(Kind::Movie, id, "mkv"),
-                _ => xc.stream_url(Kind::Episode, id, "mp4"),
-            });
+            if prefix == "live" {
+                return Ok(xc.stream_url(Kind::Live, id, live_ext));
+            }
+            // Movies and episodes use their own container (mp4, mkv …); fall back to the panel's usual default.
+            let ext: String = self
+                .conn
+                .lock()
+                .unwrap()
+                .query_row("SELECT ext FROM items WHERE key = ?1", [key], |r| r.get(0))
+                .optional()?
+                .filter(|e: &String| !e.is_empty())
+                .unwrap_or_else(|| {
+                    if prefix == "movie" {
+                        "mkv".into()
+                    } else {
+                        "mp4".into()
+                    }
+                });
+            let kind = if prefix == "movie" {
+                Kind::Movie
+            } else {
+                Kind::Episode
+            };
+            return Ok(xc.stream_url(kind, id, &ext));
         }
         let conn = self.conn.lock().unwrap();
         let url: String =
