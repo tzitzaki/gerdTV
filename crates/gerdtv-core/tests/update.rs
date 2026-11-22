@@ -56,3 +56,18 @@ async fn the_updater_offers_only_signed_newer_releases_and_verified_files() {
     ));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Opt-in (`cargo test -p gerdtv-core --test update -- --ignored`): the real latest release passes the real key, so
+/// the release job's signature and the app's check agree. Reads only public release files.
+#[tokio::test]
+#[ignore]
+async fn the_real_latest_release_verifies() {
+    let r = update::check(update::RELEASES, "0.0.1", "linux", update::PUBLIC_KEY_HEX)
+        .await
+        .expect("the published latest.json verifies")
+        .expect("a release newer than 0.0.1");
+    println!(
+        "latest release {} verifies; linux asset {} bytes",
+        r.version, r.size
+    );
+}
