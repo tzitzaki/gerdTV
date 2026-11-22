@@ -3,7 +3,6 @@
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv.
 // Platforms without a native side ignore the calls.
 
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -32,7 +31,12 @@ class PlatformBridge {
 
   /// Something started (title) or stopped (null). Android keeps a foreground service alive while playing.
   Future<void> setPlaying(String? title) async {
-    if (kIsWeb || !(Platform.isAndroid || Platform.isIOS)) return;
+    // The target platform (not dart:io's): tests can stand in for Android.
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
     try {
       await channel.invokeMethod('setPlaying', {
         'playing': title != null,
