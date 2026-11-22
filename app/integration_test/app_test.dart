@@ -45,6 +45,13 @@ Future<void> waitFor(
   }
 }
 
+/// Waits until [found] can take a tap at its centre, then taps the first such match. Routes and sheets slide in (macOS from the right,
+/// sheets from below): a widget that merely exists may still be outside the window, and the tap would miss.
+Future<void> tapReady(WidgetTester tester, Finder found) async {
+  await waitFor(tester, found.hitTestable());
+  await tester.tap(found.hitTestable().first);
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
@@ -89,8 +96,7 @@ void main() {
     // Browse: the first live group, then its first channel plays.
     await waitFor(tester, find.byType(ListTile));
     await tester.tap(find.byType(ListTile).first);
-    await waitFor(tester, find.byType(ItemTile));
-    await tester.tap(find.byType(ItemTile).first);
+    await tapReady(tester, find.byType(ItemTile));
     await waitFor(tester, find.byKey(const Key('player.back')));
     debugPrint('JOURNEY: player opened');
     final end = DateTime.now().add(const Duration(seconds: 30));
@@ -112,8 +118,7 @@ void main() {
     );
     expect(await pauseWait(), 2);
     await tester.tap(find.byKey(const Key('player.buffer')));
-    await waitFor(tester, find.byKey(const Key('buffer.smooth')));
-    await tester.tap(find.byKey(const Key('buffer.smooth')));
+    await tapReady(tester, find.byKey(const Key('buffer.smooth')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
     );
