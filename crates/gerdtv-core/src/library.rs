@@ -38,12 +38,7 @@ pub struct Profile {
     #[serde(default)]
     pub server: String,
     #[serde(default)]
-    pub epg_urls: Vec<String>,
-    #[serde(default)]
     pub user_agent: String,
-    /// Hours added to guide times from this provider (some send local time as UTC).
-    #[serde(default)]
-    pub epg_offset_hours: i32,
     /// M3U only: the provider's connection limit (Xtream Codes reports it itself).
     #[serde(default)]
     pub max_connections: Option<u32>,
@@ -424,6 +419,8 @@ impl Library {
 pub const SETTING_BUFFER: &str = "buffer_preset";
 pub const SETTING_ADAPTIVE: &str = "adaptive_buffer";
 pub const SETTING_TIMESHIFT: &str = "timeshift_secs";
+/// Hours added to every guide time of this profile (some providers send local time as UTC); Settings → Guide.
+pub const SETTING_GUIDE_OFFSET: &str = "guide_offset_hours";
 /// M3U profiles: the playlist header's guide URL (templated).
 pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
 
@@ -526,7 +523,11 @@ impl Library {
     /// and rebuilds the channel matches. A failing source keeps its previous data and records the error.
     pub async fn refresh_guide(&self, days_ahead: i64) -> Result<Vec<GuideSource>> {
         let sources = self.guide_sources()?;
-        let offset = self.profile.epg_offset_hours as i64 * 3600;
+        let offset = self
+            .setting(SETTING_GUIDE_OFFSET)?
+            .and_then(|h| h.parse::<i64>().ok())
+            .unwrap_or(0)
+            * 3600;
         for src in &sources {
             let url = if src.builtin {
                 self.builtin_guide_url()?.unwrap_or_default()
@@ -609,7 +610,7 @@ impl Library {
         &self,
         query: &str,
         limit: usize,
-    ) -> Result<Vec<(epg::Programme, String)>> {
+    ) -> Result<Vec<(epg::Programme, Hit)>> {
         Ok(epg::search(
             &self.conn.lock().unwrap(),
             query,
@@ -816,9 +817,7 @@ mod tests {
             name: "Test".into(),
             source,
             server: server.into(),
-            epg_urls: vec![],
             user_agent: String::new(),
-            epg_offset_hours: 0,
             max_connections: None,
             updated_at: 0,
         }
@@ -950,6 +949,20 @@ mod tests {
         );
         let hits = lib.search_programmes("sport", 5).unwrap();
         assert!(!hits.is_empty());
+        // The profile's guide offset shifts every imported time.
+        let w = lib.guide_window(&live, 0, i64::MAX).unwrap();
+        let (i, first) = w
+            .iter()
+            .enumerate()
+            .find_map(|(i, v)| v.first().map(|p| (i, p.clone())))
+            .unwrap();
+        lib.set_setting(SETTING_GUIDE_OFFSET, "1").unwrap();
+        lib.refresh_guide(7).await.unwrap();
+        let shifted = &lib.guide_window(&live[i..=i], 0, i64::MAX).unwrap()[0][0];
+        assert_eq!(
+            (shifted.title.as_str(), shifted.start),
+            (first.title.as_str(), first.start + 3600)
+        );
         lib.add_guide_url("http://127.0.0.1:9/extra.xml").unwrap();
         let sources = lib.refresh_guide(7).await.unwrap();
         assert_eq!(sources.len(), 2);
