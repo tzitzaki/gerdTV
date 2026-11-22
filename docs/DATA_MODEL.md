@@ -2,7 +2,7 @@
 
 Profiles: their non-secret settings (name, source kind, server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
 
-One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; images in the cache folder. Schema and queries: `crates/gerdtv-core/src/db.rs`.
+One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; logos and posters in the cache folder (`logos/`, one file per URL named by its FNV-1a hash, `crates/gerdtv-core/src/logos.rs`). Schema and queries: `crates/gerdtv-core/src/db.rs`.
 
 ## Tables
 | Table | What | Key |
@@ -18,7 +18,7 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `epg_sources` | the provider's built-in guide (its URL is built when needed) and extra XMLTV URLs (credentials templated out), each with last import, status and counts | `id` |
 | `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
 | `item_epg` | the resolved match per live item (rebuilt after every import and sync) | `item_key` |
-| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
+| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `list_mode_live`, `list_mode_movie`, `list_mode_series`, `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
 | `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).

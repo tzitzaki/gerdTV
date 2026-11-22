@@ -4,6 +4,7 @@
 - `crates/gerdtv-core`: all logic, no Flutter dependency, tested headless on Linux.
   - `epg.rs`: the guide: streaming XMLTV parser (quick-xml; gzip detected by its magic bytes), import per source in one transaction (a source replaces its own rows; a channel another source already covers is skipped; only the window is stored), matching (manual map → id → id ignoring case → normalised display name), and the queries for now/next, the grid window, programme details, programme search and the mapping screen. Budgets: full 300 MB import < 60 s (`just test-epg-budget`), window and now/next in `benches/budgets.rs`.
   - `library.rs`: profiles (non-secret settings in `profiles.json`) and the open profile's library (cache-first open, sync that downloads before locking the database, browse, search, play URLs); `m3u.rs`: the streaming M3U parser; `xtream.rs`: the Xtream Codes client and sync; `db.rs`: the profile database, sync and search (`docs/DATA_MODEL.md`); `playback.rs`: buffer presets and the watchdog.
+  - `logos.rs`: the logo disk cache: one file per URL (FNV-1a name) in the cache folder, at most 6 downloads at once, 2 MB cap, failed URLs not retried until restart.
   - Networking: reqwest with rustls on the ring provider (no C toolchain needed for Android/iOS builds), installed once per process.
   - Performance budgets: `crates/gerdtv-core/benches/budgets.rs` (`just bench`).
 - `crates/gerdtv-api` (package `gerdtv_api`): the flutter_rust_bridge surface; types, async functions, event streams, no logic.
@@ -18,14 +19,14 @@
 ## The seam (Rust ↔ Flutter)
 - `app/flutter_rust_bridge.yaml` points the codegen at `crates/gerdtv-api`; `just codegen` writes the Dart side to `app/lib/src/rust`.
 - `app/rust_builder` is a Flutter FFI plugin using Cargokit: every Flutter build (Linux, macOS, Android, iOS) compiles `gerdtv_api` for its targets and bundles `libgerdtv_api`.
-- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs). Errors cross as credential-free messages.
+- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/logos.rs` (the logo cache: `init_logo_cache` once at start, `logo_file` per URL), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs). Errors cross as credential-free messages.
 - `RustLib.init()` loads the library before the first frame. Widget tests replace it with `RustLib.initMock` and a fake (`app/test/support/fake_core.dart`), so they need no native build.
 - Debug: "Failed to load dynamic library" at start means Cargokit didn't build or bundle the library; build with `-v` and look for the Cargokit step.
 
 ## The app (Flutter)
 - `app/lib/services/session.dart`: the app's state (`ChangeNotifier`): the open profile's `Library`, sync status, and the one media_kit player and `WatchdogAdapter` the whole app uses. `app/lib/services/secrets.dart`: profile secrets in `flutter_secure_storage` (macOS: the legacy keychain, which needs no provisioning profile). `app/lib/services/search_model.dart`: numbered search queries, stale answers dropped.
 - Screens in `app/lib/screens`: setup (first run), shell (rail/bottom bar), browse/items/episodes, search, player, settings.
-- Cleartext HTTP is allowed app-wide on Android (`network_security_config.xml`) and in ATS on iOS/macOS: providers use plain HTTP on a user-entered host; only Flutter's HTTP client (logos) is affected, the core and libmpv use their own networking.
+- Cleartext HTTP is allowed app-wide on Android (`network_security_config.xml`) and in ATS on iOS/macOS: providers use plain HTTP on a user-entered host; it matters for the platform's own players (AVPlayer for the iOS Picture-in-Picture hand-over); the core (sync, guide, the logo cache) and libmpv use their own networking, and Flutter itself fetches nothing.
 
 ## Playback pipeline
 - One media_kit `Player`. The Rust core owns the policy (`crates/gerdtv-core/src/playback.rs`): `mpv_options` turns a buffer preset into mpv options, and `Watchdog` turns player events into commands. The Dart adapter (`app/lib/player/watchdog_adapter.dart`) sets the options through media_kit's `NativePlayer.setProperty` before `open()`, feeds position/buffering/completed/error events in, ticks it once a second, and runs its commands (reload, show/hide "Reconnecting (n)").
