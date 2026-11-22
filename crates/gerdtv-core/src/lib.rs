@@ -9,6 +9,7 @@ pub mod library;
 pub mod logos;
 pub mod m3u;
 pub mod playback;
+pub mod update;
 pub mod xtream;
 
 /// The core's version, the same as the workspace version (set by each wrap-up release).

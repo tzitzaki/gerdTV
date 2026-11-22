@@ -18,6 +18,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
+- Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
 
 ## iPhone
@@ -32,6 +33,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Android phone
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
+- Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 
 ## Shield
