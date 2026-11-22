@@ -596,6 +596,11 @@ impl Library {
         self.0.catchup_url(&key, start, stop).map_err(err)
     }
 
+    /// One item by its key (a reminder's channel); None when it is gone from the catalogue.
+    pub fn item(&self, key: String) -> Result<Option<ItemInfo>, String> {
+        Ok(self.0.item(&key).map_err(err)?.map(Into::into))
+    }
+
     /// Reminders still to come, soonest first.
     pub fn reminders(&self) -> Result<Vec<ReminderInfo>, String> {
         Ok(self

@@ -336,6 +336,39 @@ void main() {
     await waitFor(tester, find.byKey(const Key('search.field')));
 
     debugPrint('JOURNEY: catch-up played a past programme');
+    // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.
+    final soon = await tester.runAsync(
+      () => lib.guideWindow(
+        keys: [onChannel!.key],
+        from: nowSecs + 3600,
+        to: nowSecs + 6 * 3600,
+      ),
+    );
+    final upcoming = soon!.first.programmes.firstWhere(
+      (p) => p.start > nowSecs + 3600,
+    );
+    unawaited(
+      showProgrammeSheet(
+        session.navigatorKey.currentContext!,
+        session,
+        upcoming,
+        onChannel,
+      ),
+    );
+    await tapReady(tester, find.byKey(const Key('programme.remind')));
+    await waitFor(tester, find.text('Reminder set'));
+    final set = await tester.runAsync(lib.reminders);
+    expect(
+      set!.map((r) => (r.itemKey, r.start)),
+      contains((onChannel.key, upcoming.start)),
+    );
+    await tapReady(tester, find.byKey(const Key('programme.remind')));
+    await waitFor(tester, find.text('Remind me'));
+    expect(await tester.runAsync(lib.reminders), isEmpty);
+    await tester.tapAt(const Offset(10, 10)); // close the sheet
+    await tester.pumpAndSettle();
+
+    debugPrint('JOURNEY: a reminder was set and cleared');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.text('Guide'));
     await tapReady(tester, find.byKey(const Key('guide.now')));

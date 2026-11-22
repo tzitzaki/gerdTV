@@ -16,6 +16,7 @@ import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
+import 'reminders.dart';
 import 'secrets.dart';
 
 enum SessionState { loading, needsSetup, ready }
@@ -103,6 +104,9 @@ class Session extends ChangeNotifier {
   );
   String? _playingKey;
 
+  /// Programme reminders (set by main(); null in tests without notifications).
+  Reminders? reminders;
+
   /// The channels Up/Down switch through in the player: the group (or guide rows) the channel was opened from.
   List<ItemInfo> zapList = const [];
 
@@ -171,6 +175,9 @@ class Session extends ChangeNotifier {
       profile = p;
       state = SessionState.ready;
       notifyListeners();
+      unawaited(
+        reminders?.watchLinux(library!),
+      ); // Linux shows reminders itself while the app runs
       return true;
     } catch (e) {
       syncError = '$e';

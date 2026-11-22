@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import Flutter
 import UIKit
+import UserNotifications
 
 // iPhone/iPad side of "playback keeps going" (docs/ARCHITECTURE.md, "Platform channels"):
 // - Background sound: the audio session's category is .playback and UIBackgroundModes has "audio", so mpv keeps
@@ -26,6 +27,8 @@ import UIKit
   ) -> Bool {
     // Sound continues in the background (needs UIBackgroundModes/audio in Info.plist).
     try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+    // Reminders (flutter_local_notifications): show while the app is open and report taps (its README's setup).
+    UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

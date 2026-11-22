@@ -332,6 +332,30 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// One item by its key (a reminder names its channel by key); None when it is gone from the catalogue.
+    pub fn item(&self, key: &str) -> Result<Option<Hit>> {
+        Ok(self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT key, kind, name, category, logo, number, archive_days FROM items WHERE key = ?1",
+                [key],
+                |r| {
+                    Ok(Hit {
+                        key: r.get(0)?,
+                        kind: Kind::from_i64(r.get(1)?),
+                        name: r.get(2)?,
+                        category: r.get(3)?,
+                        logo: r.get(4)?,
+                        number: r.get(5)?,
+                        archive_days: r.get(6)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
     /// One page of a category's items in provider order.
     pub fn items(
         &self,
@@ -1152,6 +1176,9 @@ mod tests {
         );
         lib.set_reminder(&r(t + 3600), false).unwrap();
         assert_eq!(lib.reminders().unwrap().len(), 1);
+        // A reminder's channel comes back by key; a key that's gone gives None.
+        assert_eq!(lib.item(&archive.key).unwrap().unwrap().name, archive.name);
+        assert!(lib.item("live:0").unwrap().is_none());
         assert_eq!(lib.guide_sources().unwrap().len(), 1);
 
         // Cache-first: reopening without network shows the catalogue at once.
