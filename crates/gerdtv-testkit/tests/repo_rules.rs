@@ -243,6 +243,52 @@ fn platforms_show_the_name_gerdtv() {
     }
 }
 
+/// The denylist check (CLAUDE.md "Public repo hygiene") refuses what it cannot check: a base it can't resolve or an
+/// extra file it can't read must fail, never print "clean". A probe pattern stands in for the private list.
+#[test]
+fn denylist_check_fails_closed() {
+    let dir = std::env::temp_dir().join(format!("gerdtv-denylist-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let list = dir.join("denylist");
+    // Assembled at run time: written out literally, it would sit in this file's diff and match itself.
+    let probe = ["zz", "denylist", "probe", "zz"].join("-");
+    fs::write(&list, format!("{probe}\n")).unwrap();
+    let hit = dir.join("hit.md");
+    fs::write(&hit, format!("a body naming {}\n", probe.to_uppercase())).unwrap();
+    let ok = dir.join("ok.md");
+    fs::write(&ok, "a harmless body\n").unwrap();
+    let missing = dir.join("missing.md");
+    let run = |args: &[&str]| {
+        std::process::Command::new(repo_root().join("scripts/check-denylist.sh"))
+            .args(args)
+            .current_dir(repo_root())
+            .env("GERDTV_DENYLIST", &list)
+            .output()
+            .unwrap()
+    };
+    let s = |p: &Path| p.display().to_string();
+    // (arguments, should pass)
+    let cases: Vec<(Vec<String>, bool)> = vec![
+        (vec!["HEAD".into(), s(&ok)], true),
+        (vec!["HEAD".into(), s(&hit)], false),
+        (vec!["--file".into(), s(&ok)], false),
+        (vec!["no-such-ref".into()], false),
+        (vec!["HEAD".into(), s(&missing)], false),
+    ];
+    for (args, pass) in cases {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let out = run(&args);
+        assert_eq!(
+            out.status.success(),
+            pass,
+            "check-denylist.sh {args:?}: {}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    fs::remove_dir_all(&dir).unwrap();
+}
+
 /// Release notes start at the previous *published* release: a tag whose release run failed (no release) must not
 /// cut the PRs it carried out of the next notes. A fake `gh` knows which tags have a release.
 #[test]
