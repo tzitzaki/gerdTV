@@ -1,0 +1,284 @@
+// The shared screen check (CLAUDE.md "Tests"): every screen, once per form factor (phone, desktop, TV), against
+// the mock panel. Per screen: no exception (overflows are exceptions), no text below the readable size, no two
+// texts drawn over each other, and Tab moves focus only to controls inside the window. A screenshot of each screen
+// goes to GERDTV_SCREENS_DIR (`just test-integration` sets ~/gerdTV-screens/<branch>/) for a look by eye.
+// Debugging: a failure names the form factor and the screen; the screenshot shows the state it saw.
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/main.dart';
+import 'package:gerdtv/screens/guide_settings.dart';
+import 'package:gerdtv/screens/list_modes.dart';
+import 'package:gerdtv/screens/settings_screen.dart';
+import 'package:gerdtv/services/session.dart';
+import 'package:gerdtv/src/rust/frb_generated.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:media_kit/media_kit.dart';
+
+import 'support.dart';
+
+const screensDir = String.fromEnvironment('GERDTV_SCREENS_DIR');
+
+/// Logical sizes: a phone, a desktop window, and a 1080p TV at density 2 (the Shield).
+const formFactors = {
+  'phone': Size(390, 844),
+  'desktop': Size(1280, 800),
+  'tv': Size(960, 540),
+};
+
+/// Smallest readable text in logical pixels (Material's smallest style is 11; captions below that are a bug).
+const minFontSize = 11.0;
+
+final _boundary = GlobalKey();
+
+/// Lets animations and async loads settle for a moment in real time (pumpAndSettle can't: progress indicators spin).
+Future<void> settle(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+/// The visible texts: their window rects and smallest font size.
+List<(Rect, double, String)> visibleTexts(WidgetTester tester, Size window) {
+  final out = <(Rect, double, String)>[];
+  for (final e in find.byType(RichText).hitTestable().evaluate()) {
+    final rp = e.renderObject! as RenderParagraph;
+    if (!rp.attached || !rp.hasSize || rp.size.isEmpty) continue;
+    final text = rp.text.toPlainText().trim();
+    if (text.isEmpty) continue; // icons are glyphs in RichText too, but carry no plain text worth checking
+    final rect = MatrixUtils.transformRect(
+      rp.getTransformTo(null),
+      Offset.zero & rp.size,
+    );
+    if (!(Offset.zero & window).overlaps(rect)) continue;
+    var size = double.infinity;
+    rp.text.visitChildren((span) {
+      final f = span.style?.fontSize;
+      if (f != null && f < size) size = f;
+      return true;
+    });
+    // Icons (MaterialIcons font) are single private-use glyphs: not text.
+    if (text.runes.length == 1 && text.runes.first >= 0xE000) continue;
+    out.add((rect, rp.textScaler.scale(size), text));
+  }
+  return out;
+}
+
+Future<void> checkScreen(
+  WidgetTester tester,
+  String form,
+  String screen,
+  Size window,
+) async {
+  await settle(tester);
+  final where = '$form / $screen';
+  // First, so a failing check leaves the picture it failed on.
+  await screenshot(tester, '$form-$screen');
+  expect(
+    tester.takeException(),
+    isNull,
+    reason: '$where: an exception (overflow?)',
+  );
+  final texts = visibleTexts(tester, window);
+  expect(texts, isNotEmpty, reason: '$where: nothing readable on screen');
+  for (final (_, size, text) in texts) {
+    expect(
+      size,
+      greaterThanOrEqualTo(minFontSize),
+      reason: '$where: "$text" is ${size}px',
+    );
+  }
+  // Two texts drawn over each other: a layout that doesn't fit (rects shrunk by 1 px against touching neighbours).
+  for (var i = 0; i < texts.length; i++) {
+    for (var j = i + 1; j < texts.length; j++) {
+      final a = texts[i].$1.deflate(1), b = texts[j].$1.deflate(1);
+      expect(
+        a.overlaps(b),
+        isFalse,
+        reason: '$where: "${texts[i].$3}" overlaps "${texts[j].$3}"',
+      );
+    }
+  }
+  // Keyboard / D-pad: every Tab lands on a control inside the window (scrolled into view if needed).
+  final seen = <FocusNode>{};
+  for (var i = 0; i < 25; i++) {
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump(const Duration(milliseconds: 50));
+    final node = FocusManager.instance.primaryFocus;
+    if (node == null || node.context == null || !seen.add(node)) continue;
+    final box = node.context!.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) continue;
+    final rect = MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+    if (!(Offset.zero & window).inflate(1).contains(rect.center)) {
+      await screenshot(tester, '$form-$screen-focus');
+      final owner =
+          node.context!.findAncestorWidgetOfExactType<ListTile>() ??
+          node.context!.findAncestorWidgetOfExactType<Card>() ??
+          node.context!.widget;
+      fail('$where: Tab ${i + 1} focused $owner at $rect, outside $window');
+    }
+  }
+  expect(seen, isNotEmpty, reason: '$where: Tab reaches no control');
+}
+
+Future<void> screenshot(WidgetTester tester, String name) async {
+  if (screensDir.isEmpty) return;
+  final boundary =
+      _boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  await tester.runAsync(() async {
+    final image = await boundary.toImage();
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    final f = File('$screensDir/$name.png');
+    await f.parent.create(recursive: true);
+    await f.writeAsBytes(png!.buffer.asUint8List());
+  });
+}
+
+void main() {
+  // A hang fails the test after 5 minutes instead of running into CI's job limit (the binding has no timeout).
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized().defaultTestTimeout =
+      const Timeout(Duration(minutes: 5));
+  setUpAll(() async {
+    await RustLib.init();
+    MediaKit.ensureInitialized();
+  });
+
+  for (final MapEntry(key: form, value: size) in formFactors.entries) {
+    testWidgets('every screen on $form', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      // English texts, whatever the machine's language (the finders below use them).
+      tester.platformDispatcher.localesTestValue = [const Locale('en')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      final dir = await Directory.systemTemp.createTemp('gerdtv-screens');
+      final session = Session(secrets: MemorySecrets(), appDir: dir.path);
+      await tester.runAsync(session.start);
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: _boundary,
+          child: GerdTvApp(session: session),
+        ),
+      );
+      await waitFor(tester, find.text('Add your provider'));
+      await checkScreen(tester, form, 'setup', size);
+
+      // Sign in to the mock panel; the guide loads in the background.
+      await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
+      await tester.enterText(
+        find.byKey(const Key('setup.username')),
+        'testuser',
+      );
+      await tester.enterText(
+        find.byKey(const Key('setup.password')),
+        'testpass',
+      );
+      await tester.ensureVisible(find.byKey(const Key('setup.connect')));
+      await tapReady(tester, find.byKey(const Key('setup.connect')));
+      final rail = size.width >= 720;
+      await waitFor(tester, find.byType(rail ? NavigationRail : NavigationBar));
+      await waitFor(tester, find.byType(ListTile));
+      await checkScreen(tester, form, 'live', size);
+
+      // A group in each list mode (the guide's now/next shows in the list mode once imported).
+      await tapReady(tester, find.byType(ListTile));
+      await waitFor(tester, find.byType(ItemRow).hitTestable());
+      for (final mode in ['list', 'tiles', 'largeTiles', 'compact']) {
+        await checkScreen(tester, form, 'group-$mode', size);
+        await tapReady(tester, find.byKey(const Key('list.mode')));
+      }
+      await tester.pageBack();
+      await settle(tester);
+
+      Future<void> section(String label) async {
+        await tapReady(tester, find.text(label));
+        await settle(tester);
+      }
+
+      for (final (label, name) in [
+        ('Movies', 'movies'),
+        ('Series', 'series'),
+      ]) {
+        await section(label);
+        await checkScreen(tester, form, name, size);
+      }
+
+      await section('Search');
+      // Programmes are searched when the query changes: wait for the background guide import first.
+      final end = DateTime.now().add(const Duration(seconds: 30));
+      while (session.guideGeneration == 0) {
+        if (DateTime.now().isAfter(end)) {
+          fail('$form: the guide never imported');
+        }
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+      }
+      await tester.enterText(find.byKey(const Key('search.field')), 'sport');
+      // The chip row scrolls sideways; on a phone the Programmes chip starts out of reach (not built yet).
+      // (Found from a chip: the search field has a sideways Scrollable of its own.)
+      final chips = find.ancestor(
+        of: find.byKey(const Key('search.chip.live')),
+        matching: find.byType(Scrollable),
+      );
+      await waitFor(tester, chips);
+      // The programme search answers asynchronously: swipe the row along until the chip is there.
+      final programmes = find.byKey(const Key('search.chip.programmes'));
+      final until = DateTime.now().add(const Duration(seconds: 30));
+      while (programmes.hitTestable().evaluate().isEmpty) {
+        if (DateTime.now().isAfter(until)) {
+          await screenshot(tester, '$form-search-nochip');
+          fail('$form: no Programmes chip');
+        }
+        await tester.drag(chips.first, const Offset(-200, 0));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
+      }
+      await checkScreen(tester, form, 'search', size);
+      await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
+      await checkScreen(tester, form, 'search-programmes', size);
+
+      await section('Settings');
+      final list = find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await checkScreen(tester, form, 'settings', size);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('guide.unmatched')),
+        300,
+        scrollable: list,
+      );
+      await checkScreen(tester, form, 'settings-guide', size);
+      await tapReady(tester, find.byKey(const Key('guide.unmatched')));
+      await waitFor(tester, find.byType(UnmatchedChannelsScreen));
+      await checkScreen(tester, form, 'guide-unmatched', size);
+      await tapReady(
+        tester,
+        find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('guide.unmatched.'),
+        ),
+      );
+      await waitFor(tester, find.byType(PickGuideChannelScreen));
+      await checkScreen(tester, form, 'guide-pick', size);
+
+      await tester.runAsync(() => dir.delete(recursive: true));
+    });
+  }
+}
