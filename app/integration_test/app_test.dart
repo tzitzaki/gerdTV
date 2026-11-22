@@ -248,8 +248,8 @@ void main() {
             (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
       ),
     );
-    await waitFor(tester, find.byKey(const Key('player.back')));
-    await tester.tap(find.byKey(const Key('player.stop')));
+    // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
+    await tapReady(tester, find.byKey(const Key('player.stop')));
     await waitFor(tester, find.byKey(const Key('search.field')));
     expect(session.nowPlaying.value, isNull);
 
