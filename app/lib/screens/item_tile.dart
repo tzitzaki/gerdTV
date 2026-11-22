@@ -12,10 +12,14 @@ class ItemTile extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.subtitle,
+    this.title,
   });
   final ItemInfo item;
   final VoidCallback onTap;
   final String? subtitle;
+
+  /// Shown instead of the item's name (search shows a programme's title on its channel's tile).
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,11 @@ class ItemTile extends StatelessWidget {
         : Icon(icon);
     return ListTile(
       leading: SizedBox(width: 48, height: 48, child: Center(child: logo)),
-      title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        title ?? item.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: subtitle == null
           ? null
           : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),

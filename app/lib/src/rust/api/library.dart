@@ -9,8 +9,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'playback.dart';
 
-// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `to_core`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `to_core`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`
 
 Future<List<ProfileInfo>> listProfiles({required String dir}) =>
     RustLib.instance.api.crateApiLibraryListProfiles(dir: dir);
@@ -27,6 +27,8 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>>
 abstract class Library implements RustOpaqueInterface {
+  Future<void> addGuideUrl({required String url});
+
   /// The item's last measured video bitrate (bit/s, 0 = unknown).
   BigInt bitrate({required String key});
 
@@ -37,6 +39,25 @@ abstract class Library implements RustOpaqueInterface {
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
+
+  /// Guide channels whose name or id contains the query.
+  Future<List<ChannelRef>> findGuideChannels({
+    required String query,
+    required int limit,
+  });
+
+  /// Seconds since the oldest successful import (None: never); the app refreshes when it is over 12 h.
+  Future<PlatformInt64?> guideAge();
+
+  /// The guide sources, the provider's first.
+  Future<List<GuideSourceInfo>> guideSources();
+
+  /// Each item key's programmes overlapping `from`..`to` (UTC seconds), in the same order.
+  Future<List<GuideRow>> guideWindow({
+    required List<String> keys,
+    required PlatformInt64 from,
+    required PlatformInt64 to,
+  });
 
   /// Whether the item has its own buffer (else it follows the profile's preset).
   bool hasChannelBuffer({required String key});
@@ -51,6 +72,12 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
   });
 
+  /// Maps a live item to a guide channel by hand (None: back to automatic matching).
+  Future<void> mapChannel({required String itemKey, String? channel});
+
+  /// Now and next for each item key, in the same order.
+  Future<List<NowNext>> nowNext({required List<String> keys});
+
   /// Opens a profile's cached catalogue at once; `secrets` from secure storage (see gerdtv_core::library).
   static Future<Library> open({
     required String dir,
@@ -64,6 +91,8 @@ abstract class Library implements RustOpaqueInterface {
 
   bool preferHls({required String key});
 
+  Future<ProgrammeInfo?> programme({required PlatformInt64 id});
+
   /// Adaptive mode: one step more buffer for this item; returns the new choice.
   BufferChoice raiseBuffer({required String key});
 
@@ -76,6 +105,11 @@ abstract class Library implements RustOpaqueInterface {
     required int secs,
   });
 
+  /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
+  Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});
+
+  Future<void> removeGuideSource({required PlatformInt64 id});
+
   /// Search as the user types; `kind` None = all kinds.
   Future<SearchPage> search({
     required BigInt seq,
@@ -83,6 +117,12 @@ abstract class Library implements RustOpaqueInterface {
     ItemKind? kind,
     required int limit,
     required int offset,
+  });
+
+  /// Programmes whose title, sub-title or description match, ongoing and upcoming first.
+  Future<List<ProgrammeHit>> searchProgrammes({
+    required String query,
+    required int limit,
   });
 
   void setBitrate({required String key, required BigInt bps});
@@ -105,6 +145,12 @@ abstract class Library implements RustOpaqueInterface {
   String streamUrl({required String key, required bool preferHls});
 
   Future<SyncSummary> sync_();
+
+  /// Live channels without a guide match, in provider order (the mapping screen).
+  Future<List<ChannelRef>> unmatchedChannels({
+    required int limit,
+    required int offset,
+  });
 }
 
 class CategoryInfo {
@@ -129,6 +175,90 @@ class CategoryInfo {
           id == other.id &&
           name == other.name &&
           count == other.count;
+}
+
+/// A channel by id and name: a live item without a guide, or a guide channel to map it to.
+class ChannelRef {
+  final String id;
+  final String name;
+
+  const ChannelRef({required this.id, required this.name});
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChannelRef &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name;
+}
+
+/// One channel's programmes in a time window (the guide grid's row).
+class GuideRow {
+  final List<ProgrammeInfo> programmes;
+
+  const GuideRow({required this.programmes});
+
+  @override
+  int get hashCode => programmes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GuideRow &&
+          runtimeType == other.runtimeType &&
+          programmes == other.programmes;
+}
+
+/// One guide source as Settings → Guide shows it (the provider's built-in guide first, its URL left empty).
+class GuideSourceInfo {
+  final PlatformInt64 id;
+  final String url;
+  final bool builtin;
+
+  /// UTC seconds of the last successful import; 0 = never.
+  final PlatformInt64 lastFetch;
+
+  /// Empty when the last import worked, else what went wrong (free of credentials).
+  final String status;
+  final int channels;
+  final int programmes;
+
+  const GuideSourceInfo({
+    required this.id,
+    required this.url,
+    required this.builtin,
+    required this.lastFetch,
+    required this.status,
+    required this.channels,
+    required this.programmes,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      url.hashCode ^
+      builtin.hashCode ^
+      lastFetch.hashCode ^
+      status.hashCode ^
+      channels.hashCode ^
+      programmes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GuideSourceInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          url == other.url &&
+          builtin == other.builtin &&
+          lastFetch == other.lastFetch &&
+          status == other.status &&
+          channels == other.channels &&
+          programmes == other.programmes;
 }
 
 /// One stream_health row.
@@ -234,15 +364,32 @@ class KindCount {
           count == other.count;
 }
 
+/// What is on a channel now and next (either may be missing).
+class NowNext {
+  final ProgrammeInfo? now;
+  final ProgrammeInfo? next;
+
+  const NowNext({this.now, this.next});
+
+  @override
+  int get hashCode => now.hashCode ^ next.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NowNext &&
+          runtimeType == other.runtimeType &&
+          now == other.now &&
+          next == other.next;
+}
+
 /// A profile's non-secret settings (secrets stay in the app's secure storage).
 class ProfileInfo {
   final String id;
   final String name;
   final SourceKind source;
   final String server;
-  final List<String> epgUrls;
   final String userAgent;
-  final int epgOffsetHours;
   final int? maxConnections;
 
   const ProfileInfo({
@@ -250,9 +397,7 @@ class ProfileInfo {
     required this.name,
     required this.source,
     required this.server,
-    required this.epgUrls,
     required this.userAgent,
-    required this.epgOffsetHours,
     this.maxConnections,
   });
 
@@ -262,9 +407,7 @@ class ProfileInfo {
       name.hashCode ^
       source.hashCode ^
       server.hashCode ^
-      epgUrls.hashCode ^
       userAgent.hashCode ^
-      epgOffsetHours.hashCode ^
       maxConnections.hashCode;
 
   @override
@@ -276,10 +419,79 @@ class ProfileInfo {
           name == other.name &&
           source == other.source &&
           server == other.server &&
-          epgUrls == other.epgUrls &&
           userAgent == other.userAgent &&
-          epgOffsetHours == other.epgOffsetHours &&
           maxConnections == other.maxConnections;
+}
+
+/// A programme search hit with the live channel that shows it (ready to play).
+class ProgrammeHit {
+  final ProgrammeInfo programme;
+  final ItemInfo item;
+
+  const ProgrammeHit({required this.programme, required this.item});
+
+  @override
+  int get hashCode => programme.hashCode ^ item.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProgrammeHit &&
+          runtimeType == other.runtimeType &&
+          programme == other.programme &&
+          item == other.item;
+}
+
+/// A guide programme; times are UTC seconds.
+class ProgrammeInfo {
+  final PlatformInt64 id;
+  final String channel;
+  final PlatformInt64 start;
+  final PlatformInt64 stop;
+  final String title;
+  final String subTitle;
+  final String desc;
+  final String category;
+  final String episode;
+
+  const ProgrammeInfo({
+    required this.id,
+    required this.channel,
+    required this.start,
+    required this.stop,
+    required this.title,
+    required this.subTitle,
+    required this.desc,
+    required this.category,
+    required this.episode,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      channel.hashCode ^
+      start.hashCode ^
+      stop.hashCode ^
+      title.hashCode ^
+      subTitle.hashCode ^
+      desc.hashCode ^
+      category.hashCode ^
+      episode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProgrammeInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          channel == other.channel &&
+          start == other.start &&
+          stop == other.stop &&
+          title == other.title &&
+          subTitle == other.subTitle &&
+          desc == other.desc &&
+          category == other.category &&
+          episode == other.episode;
 }
 
 /// One page of search results. `seq` echoes the caller's sequence number, so the UI drops answers to keystrokes

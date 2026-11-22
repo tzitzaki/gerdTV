@@ -500,24 +500,38 @@ pub fn programme(conn: &Connection, id: i64) -> Result<Option<Programme>> {
     .optional()
 }
 
-/// Programme search for the global search: (programme, the live item that shows it), ongoing and upcoming first.
+/// Programme search for the global search: (programme, the live item that shows it, ready to play), ongoing and
+/// upcoming first.
 pub fn search(
     conn: &Connection,
     input: &str,
     now: i64,
     limit: usize,
-) -> Result<Vec<(Programme, String)>> {
+) -> Result<Vec<(Programme, crate::db::Hit)>> {
     let Some(q) = crate::db::fts_query(input) else {
         return Ok(vec![]);
     };
     let mut st = conn.prepare_cached(&format!(
-        "SELECT {COLS}, (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1) AS item
+        "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number
          FROM programmes p
-         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) AND item IS NOT NULL
+         JOIN items i ON i.key = (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1)
+         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1)
          ORDER BY p.stop < ?2, p.start LIMIT ?3"
     ))?;
-    st.query_map(params![q, now, limit as i64], |r| Ok((row(r)?, r.get(9)?)))?
-        .collect()
+    st.query_map(params![q, now, limit as i64], |r| {
+        Ok((
+            row(r)?,
+            crate::db::Hit {
+                key: r.get(9)?,
+                kind: crate::db::Kind::from_i64(r.get(10)?),
+                name: r.get(11)?,
+                category: r.get(12)?,
+                logo: r.get(13)?,
+                number: r.get(14)?,
+            },
+        ))
+    })?
+    .collect()
 }
 
 /// Live items without a guide match (the mapping screen), in provider order.
@@ -699,7 +713,7 @@ mod tests {
             (hits.len(), hits[0].0.title.as_str()),
             (1, "Tagesschau & Wetter")
         );
-        assert!(hits[0].1 == "live:1" || hits[0].1 == "live:3");
+        assert!(hits[0].1.key == "live:1" || hits[0].1.key == "live:3");
         // Manual mapping wins and survives a rebuild; unmatched lists the rest.
         assert_eq!(
             unmatched(&c, 10, 0).unwrap(),
