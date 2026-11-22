@@ -19,7 +19,10 @@ import 'package:media_kit/media_kit.dart';
 import 'support.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // A hang fails the test after 5 minutes, with its name and output, instead of running into CI's job limit
+  // (the integration binding's default is no timeout at all; the CLI's --timeout doesn't reach it).
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized().defaultTestTimeout =
+      const Timeout(Duration(minutes: 5));
   setUpAll(() async {
     await RustLib.init();
     MediaKit.ensureInitialized();
