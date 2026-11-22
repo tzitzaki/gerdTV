@@ -1,7 +1,6 @@
 //! The guide import budget at full scale (docs/SPEC.md budgets): 2,000 channels × 7 days ≈ 300 MB of XMLTV imported
 //! in under 60 s. Ignored by default (it writes ~300 MB through SQLite); `just test-epg-budget` and the nightly run it.
 use gerdtv_core::{db, epg};
-use std::path::Path;
 use std::time::{Duration, Instant};
 
 #[test]
