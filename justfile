@@ -160,4 +160,4 @@ licences:
 # [MAC] sessions only: build and run the integration tests on a Mac.
 mac-check:
     cd app && flutter build macos --debug
-    scripts/with-fault-server.sh bash -c 'cd app && flutter test integration_test -d macos --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'
+    scripts/with-fault-server.sh bash -c 'cd app && flutter test integration_test -d macos --reporter expanded --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC"'
