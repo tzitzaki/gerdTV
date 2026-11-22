@@ -1,7 +1,8 @@
 // The shared screen check (CLAUDE.md "Tests"): every screen, once per form factor (phone, desktop, TV), against
 // the mock panel. Per screen: no exception (overflows are exceptions), no text below the readable size, no two
-// texts drawn over each other, and Tab moves focus only to controls inside the window. A screenshot of each screen
-// goes to GERDTV_SCREENS_DIR (`just test-integration` sets ~/gerdTV-screens/<branch>/) for a look by eye.
+// texts drawn over each other (only what clipping leaves visible counts), and Tab moves focus only to controls
+// inside the window. A screenshot of each screen goes to GERDTV_SCREENS_DIR (`just test-integration` sets
+// ~/gerdTV-screens/<branch>/) for a look by eye.
 // Debugging: a failure names the form factor and the screen; the screenshot shows the state it saw.
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -46,6 +47,24 @@ Future<void> settle(WidgetTester tester) async {
 }
 
 /// The visible texts: their window rects and smallest font size.
+/// A render box's rect in window coordinates, cut to what its scrolling and clipping ancestors actually show (a
+/// guide title that starts under the channel column is clipped there, not drawn over it).
+Rect drawnRect(RenderBox box) {
+  Rect global(RenderBox b) =>
+      MatrixUtils.transformRect(b.getTransformTo(null), Offset.zero & b.size);
+  var rect = global(box);
+  for (RenderObject? p = box.parent; p != null; p = p.parent) {
+    if (p is RenderBox &&
+        p.hasSize &&
+        (p is RenderAbstractViewport ||
+            p is RenderClipRect ||
+            p is RenderClipRRect)) {
+      rect = rect.intersect(global(p));
+    }
+  }
+  return rect;
+}
+
 List<(Rect, double, String)> visibleTexts(WidgetTester tester, Size window) {
   final out = <(Rect, double, String)>[];
   for (final e in find.byType(RichText).hitTestable().evaluate()) {
@@ -53,11 +72,8 @@ List<(Rect, double, String)> visibleTexts(WidgetTester tester, Size window) {
     if (!rp.attached || !rp.hasSize || rp.size.isEmpty) continue;
     final text = rp.text.toPlainText().trim();
     if (text.isEmpty) continue; // icons are glyphs in RichText too, but carry no plain text worth checking
-    final rect = MatrixUtils.transformRect(
-      rp.getTransformTo(null),
-      Offset.zero & rp.size,
-    );
-    if (!(Offset.zero & window).overlaps(rect)) continue;
+    final rect = drawnRect(rp);
+    if (rect.isEmpty || !(Offset.zero & window).overlaps(rect)) continue;
     var size = double.infinity;
     rp.text.visitChildren((span) {
       final f = span.style?.fontSize;
