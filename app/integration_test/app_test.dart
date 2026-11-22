@@ -67,6 +67,7 @@ void main() {
     await tester.pumpWidget(GerdTvApp(session: session));
     await tester.pumpAndSettle();
 
+    debugPrint('JOURNEY: setup screen');
     // First run: the Xtream Codes login.
     expect(find.text('Add your provider'), findsOneWidget);
     await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
@@ -76,12 +77,14 @@ void main() {
     await waitFor(tester, find.byType(NavigationRail));
     expect(session.lastSync!.entries, greaterThan(1000));
 
+    debugPrint('JOURNEY: synced, shell shown');
     // Browse: the first live group, then its first channel plays.
     await waitFor(tester, find.byType(ListTile));
     await tester.tap(find.byType(ListTile).first);
     await waitFor(tester, find.byType(ItemTile));
     await tester.tap(find.byType(ItemTile).first);
     await waitFor(tester, find.byKey(const Key('player.back')));
+    debugPrint('JOURNEY: player opened');
     final end = DateTime.now().add(const Duration(seconds: 30));
     while (session.player.state.position < const Duration(seconds: 1)) {
       if (DateTime.now().isAfter(end)) fail('no playback');
@@ -95,6 +98,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
+    debugPrint('JOURNEY: played, back in browse');
     // Search: each keystroke narrows, Enter plays the top result.
     await tester.tap(find.text('Search'));
     await tester.pumpAndSettle();
@@ -132,6 +136,7 @@ void main() {
     await tester.tap(find.byKey(const Key('player.back')));
     await tester.pumpAndSettle();
 
+    debugPrint('JOURNEY: search played top result');
     // Settings: remove the account → back to setup.
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
@@ -139,6 +144,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
     await waitFor(tester, find.text('Add your provider'));
+    debugPrint('JOURNEY: account removed');
     await tester.runAsync(() => dir.delete(recursive: true));
+    debugPrint('JOURNEY: done');
   });
 }
