@@ -34,3 +34,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    # Shown on the Licences screen next to the Dart packages (lib/licences.dart; scripts/licences.sh keeps rust.txt).
+    - assets/licences/

@@ -3,7 +3,6 @@
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv.
 // Platforms without a native side ignore the calls.
 
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
