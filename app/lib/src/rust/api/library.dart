@@ -15,6 +15,20 @@ import 'playback.dart';
 Future<List<ProfileInfo>> listProfiles({required String dir}) =>
     RustLib.instance.api.crateApiLibraryListProfiles(dir: dir);
 
+/// An app-wide setting (`<dir>/app.json`, not per profile), or None when never set.
+String? appSetting({required String dir, required String key}) =>
+    RustLib.instance.api.crateApiLibraryAppSetting(dir: dir, key: key);
+
+void setAppSetting({
+  required String dir,
+  required String key,
+  required String value,
+}) => RustLib.instance.api.crateApiLibrarySetAppSetting(
+  dir: dir,
+  key: key,
+  value: value,
+);
+
 /// Adds (empty id) or replaces a profile; returns it with its id.
 Future<ProfileInfo> saveProfile({
   required String dir,

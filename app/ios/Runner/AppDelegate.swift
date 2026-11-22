@@ -11,6 +11,8 @@ import UserNotifications
 //   (the provider allows few connections) and calls startPip(url); AVPlayer takes the same stream (live as .m3u8) and
 //   PiP starts as soon as it is possible. When PiP ends (or AVPlayer can't play the stream, e.g. .mkv), Dart is told
 //   "pipEnded" and resumes mpv.
+// - The app icon: setLogo(name) picks the alternate icon "AppIcon-<name>" (asset catalog sets rendered by
+//   `just logos`, listed in ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES); the default logo is the primary icon.
 // Code lives in this file because new Swift files would have to be added to the Xcode project by hand.
 // Debug hints: PiP needs the player layer in the window hierarchy (a tiny host view here) and a real device;
 // the simulator supports PiP on recent Xcode versions.
@@ -38,7 +40,8 @@ import UserNotifications
   }
 }
 
-/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip; → pipEnded.
+/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip, setLogo(name);
+/// → pipEnded.
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
   private let channel: FlutterMethodChannel
   private var player: AVPlayer?
@@ -62,6 +65,14 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
           return
         }
         result(self.startPip(u))
+      case "setLogo":
+        // iOS shows its own "You have changed the icon" alert; that can't be turned off.
+        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "gtv"
+        guard UIApplication.shared.supportsAlternateIcons else {
+          result(nil)
+          return
+        }
+        UIApplication.shared.setAlternateIconName(name == "gtv" ? nil : "AppIcon-\(name)") { _ in result(nil) }
       case "stopPip":
         self.pip?.stopPictureInPicture()
         result(nil)

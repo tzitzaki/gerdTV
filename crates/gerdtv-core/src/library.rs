@@ -90,6 +90,36 @@ fn store_profiles(dir: &Path, profiles: &[Profile]) -> Result<()> {
     Ok(())
 }
 
+// ---- app settings ----
+// App-wide (not per-profile) settings, e.g. `app_logo`: a flat string map in `<app-support>/app.json`, rewritten
+// atomically like profiles.json. They exist before any profile does (the logo shows on the setup screen).
+
+fn load_app_settings(dir: &Path) -> Result<std::collections::BTreeMap<String, String>> {
+    match std::fs::read(dir.join("app.json")) {
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes).map_err(std::io::Error::other)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Default::default()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// An app-wide setting, or None when never set.
+pub fn app_setting(dir: &Path, key: &str) -> Result<Option<String>> {
+    Ok(load_app_settings(dir)?.remove(key))
+}
+
+pub fn set_app_setting(dir: &Path, key: &str, value: &str) -> Result<()> {
+    let mut all = load_app_settings(dir)?;
+    all.insert(key.to_string(), value.to_string());
+    std::fs::create_dir_all(dir)?;
+    let tmp = dir.join("app.json.tmp");
+    std::fs::write(
+        &tmp,
+        serde_json::to_vec_pretty(&all).map_err(std::io::Error::other)?,
+    )?;
+    std::fs::rename(tmp, dir.join("app.json"))?; // atomic on the same filesystem
+    Ok(())
+}
+
 /// Adds or replaces a profile (by id); an empty id gets a new one. Returns the stored profile.
 pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
     let mut all = load_profiles(dir)?;
@@ -961,6 +991,22 @@ mod tests {
                 .unwrap()
                 .contains(PASS)
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn app_settings_round_trip() {
+        let dir = tempdir("app-settings");
+        assert_eq!(app_setting(&dir, "app_logo").unwrap(), None); // no app.json yet
+        set_app_setting(&dir, "app_logo", "signal").unwrap();
+        set_app_setting(&dir, "other", "1").unwrap();
+        set_app_setting(&dir, "app_logo", "frame").unwrap();
+        assert_eq!(
+            app_setting(&dir, "app_logo").unwrap().as_deref(),
+            Some("frame")
+        );
+        assert_eq!(app_setting(&dir, "other").unwrap().as_deref(), Some("1"));
+        assert!(!dir.join("app.json.tmp").exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
