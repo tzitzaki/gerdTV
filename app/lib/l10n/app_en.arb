@@ -117,6 +117,10 @@
     }
   },
   "kindEpisodes": "Episodes",
+  "listModeCompact": "Compact list",
+  "listModeLargeTiles": "Large tiles",
+  "listModeList": "List",
+  "listModeTiles": "Tiles",
   "miniPlayer": "Mini player",
   "navLive": "Live TV",
   "navMovies": "Movies",
@@ -170,6 +174,7 @@
     }
   },
   "settingsLicences": "Licences",
+  "settingsLists": "Lists",
   "settingsPlayback": "Playback",
   "settingsRemove": "Remove this account",
   "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",

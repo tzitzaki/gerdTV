@@ -1,10 +1,12 @@
 // One row in every list (browse, episodes, search): logo or poster, name, group, channel number.
-// Logos load from the provider's URL as given (disk caching by the core comes with the images work).
+// Logos come from the core's disk cache (logo.dart).
 
 import 'package:material_ui/material_ui.dart';
 
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'list_modes.dart';
+import 'logo.dart';
 
 class ItemTile extends StatelessWidget {
   const ItemTile({
@@ -23,23 +25,9 @@ class ItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (item.kind) {
-      ItemKind.live => Icons.live_tv,
-      ItemKind.movie => Icons.movie_outlined,
-      ItemKind.series => Icons.video_library_outlined,
-      ItemKind.episode => Icons.play_circle_outline,
-    };
-    final logo = item.logo.startsWith('http')
-        ? Image.network(
-            item.logo,
-            width: 48,
-            height: 48,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => Icon(icon),
-          )
-        : Icon(icon);
+    final logo = Logo(url: item.logo, size: 48, icon: kindIcon(item.kind));
     return ListTile(
-      leading: SizedBox(width: 48, height: 48, child: Center(child: logo)),
+      leading: logo,
       title: Text(
         title ?? item.name,
         maxLines: 1,

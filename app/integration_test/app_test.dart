@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
 import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
-import 'package:gerdtv/screens/item_tile.dart';
+import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
@@ -98,7 +98,22 @@ void main() {
     // Browse: the first live group, then its first channel plays.
     await waitFor(tester, find.byType(ListTile));
     await tester.tap(find.byType(ListTile).first);
-    await tapReady(tester, find.byType(ItemTile));
+    // Live TV opens as a list with what's on now (the mock guide covers most channels) and its progress.
+    await waitFor(
+      tester,
+      find.descendant(
+        of: find.byType(ItemRow),
+        matching: find.byType(LinearProgressIndicator),
+      ),
+    );
+    // The list bar's toggle cycles list → tiles → large tiles → compact → list, remembered per section.
+    for (final want in [ItemCard, ItemCard, ItemRow, ItemRow]) {
+      await tapReady(tester, find.byKey(const Key('list.mode')));
+      await tester.pump();
+      expect(find.byType(want), findsWidgets);
+    }
+    expect(session.library!.setting(key: 'list_mode_live'), 'list');
+    await tapReady(tester, find.byType(ItemRow));
     await waitFor(tester, find.byKey(const Key('player.back')));
     debugPrint('JOURNEY: player opened');
     final end = DateTime.now().add(const Duration(seconds: 30));
@@ -335,7 +350,9 @@ void main() {
       -200,
       scrollable: settingsList,
     );
-    await tester.tap(find.byKey(const Key('settings.remove')));
+    await tester.ensureVisible(find.byKey(const Key('settings.remove')));
+    await tester.pumpAndSettle();
+    await tapReady(tester, find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
     await waitFor(tester, find.text('Add your provider'));
