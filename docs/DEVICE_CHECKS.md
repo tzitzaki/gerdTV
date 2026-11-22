@@ -10,6 +10,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Search: typing narrows the list at once, umlauts don't matter, Enter plays the top result.
 - Movies and series: a movie plays; a series opens its episodes and one plays.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
+- Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 
 ## iPhone
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.

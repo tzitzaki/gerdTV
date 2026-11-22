@@ -86,6 +86,9 @@ class Session extends ChangeNotifier {
   /// True while the full player screen is open (the now-playing bar hides then).
   final ValueNotifier<bool> playerOpen = ValueNotifier(false);
 
+  /// True while only the picture is shown: the desktop floating mini player, or system Picture-in-Picture.
+  final ValueNotifier<bool> pictureMode = ValueNotifier(false);
+
   /// The app's navigator: the now-playing bar sits below all routes (MaterialApp.builder) and opens the player here.
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
