@@ -1328,6 +1328,7 @@ fn wire__crate__api__library__Library_search_programmes_impl(
             >>::sse_decode(&mut deserializer);
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_earlier = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -1349,6 +1350,7 @@ fn wire__crate__api__library__Library_search_programmes_impl(
                         &*api_that_guard,
                         api_query,
                         api_limit,
+                        api_earlier,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())

@@ -130,10 +130,12 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
   });
 
-  /// Programmes whose title, sub-title or description match, ongoing and upcoming first.
+  /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
+  /// the ended ones, most recent first.
   Future<List<ProgrammeHit>> searchProgrammes({
     required String query,
     required int limit,
+    required bool earlier,
   });
 
   void setBitrate({required String key, required BigInt bps});

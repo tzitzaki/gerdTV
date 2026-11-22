@@ -323,15 +323,25 @@ void main() {
 
     debugPrint('JOURNEY: catch-up played a past programme');
     // Search finds that ended programme under "Earlier" (missed shows aren't pushed out by upcoming ones).
-    await tester.enterText(find.byKey(const Key('search.field')), '${past.title} ${past.subTitle}');
+    await tester.enterText(
+      find.byKey(const Key('search.field')),
+      '${past.title} ${past.subTitle}',
+    );
     final pastHit = find.byKey(Key('search.programme.${past.id}'));
     await waitFor(tester, find.byKey(const Key('search.chip.programmes')));
     // The chip may still be the previous query's: wait until this query's programmes have arrived.
     final until = DateTime.now().add(const Duration(seconds: 30));
     while (pastHit.evaluate().isEmpty) {
-      if (DateTime.now().isAfter(until)) fail('the ended programme is not in the search');
-      await tester.tap(find.byKey(const Key('search.chip.programmes')), warnIfMissed: false);
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      if (DateTime.now().isAfter(until)) {
+        fail('the ended programme is not in the search');
+      }
+      await tester.tap(
+        find.byKey(const Key('search.chip.programmes')),
+        warnIfMissed: false,
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
       await tester.pump();
     }
     expect(find.byKey(const Key('search.earlier')), findsOneWidget);

@@ -223,6 +223,7 @@ abstract class RustLibApi extends BaseApi {
     required Library that,
     required String query,
     required int limit,
+    required bool earlier,
   });
 
   void crateApiLibraryLibrarySetBitrate({
@@ -1298,6 +1299,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required Library that,
     required String query,
     required int limit,
+    required bool earlier,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1309,6 +1311,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(query, serializer);
           sse_encode_u_32(limit, serializer);
+          sse_encode_bool(earlier, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1321,7 +1324,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibrarySearchProgrammesConstMeta,
-        argValues: [that, query, limit],
+        argValues: [that, query, limit, earlier],
         apiImpl: this,
       ),
     );
@@ -1330,7 +1333,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibrarySearchProgrammesConstMeta =>
       const TaskConstMeta(
         debugName: "Library_search_programmes",
-        argNames: ["that", "query", "limit"],
+        argNames: ["that", "query", "limit", "earlier"],
       );
 
   @override
@@ -4479,14 +4482,17 @@ class LibraryImpl extends RustOpaque implements Library {
     offset: offset,
   );
 
-  /// Programmes whose title, sub-title or description match, ongoing and upcoming first.
+  /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
+  /// the ended ones, most recent first.
   Future<List<ProgrammeHit>> searchProgrammes({
     required String query,
     required int limit,
+    required bool earlier,
   }) => RustLib.instance.api.crateApiLibraryLibrarySearchProgrammes(
     that: this,
     query: query,
     limit: limit,
+    earlier: earlier,
   );
 
   void setBitrate({required String key, required BigInt bps}) => RustLib

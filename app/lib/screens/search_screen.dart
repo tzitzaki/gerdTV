@@ -58,8 +58,16 @@ class _SearchScreenState extends State<SearchScreen> {
       });
       return;
     }
-    final hits = await lib.searchProgrammes(query: q, limit: _programmeLimit, earlier: false);
-    final earlier = await lib.searchProgrammes(query: q, limit: _programmeLimit, earlier: true);
+    final hits = await lib.searchProgrammes(
+      query: q,
+      limit: _programmeLimit,
+      earlier: false,
+    );
+    final earlier = await lib.searchProgrammes(
+      query: q,
+      limit: _programmeLimit,
+      earlier: true,
+    );
     if (mounted && q == _field.text) {
       setState(() {
         _programmes = hits;
@@ -138,7 +146,9 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ),
-            if (_model.counts.isNotEmpty || _programmes.isNotEmpty || _earlier.isNotEmpty)
+            if (_model.counts.isNotEmpty ||
+                _programmes.isNotEmpty ||
+                _earlier.isNotEmpty)
               SizedBox(
                 height: 48,
                 child: ListView(
