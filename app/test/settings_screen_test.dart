@@ -1,8 +1,10 @@
 // New, because nothing owns the shape of Settings: the search filter (every word must match an entry's title,
 // keywords or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
-// that opens a page on phones), with the search narrowing the visible entries as you type.
+// that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
+// app-wide.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
+import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/settings_model.dart';
 import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/session.dart';
@@ -62,11 +64,12 @@ void main() {
 
     // Without an open library only Account, Stream health and About exist; enough to see layout and search.
     // [beside]: a rail of that width left of Settings, as in the shell.
-    Future<void> pump(
+    Future<Session> pump(
       WidgetTester tester,
       Size size, {
       double beside = 0,
     }) async {
+      final session = Session(appDir: 'unused-by-the-fake');
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -82,12 +85,13 @@ void main() {
             body: Row(
               children: [
                 SizedBox(width: beside),
-                Expanded(child: SettingsScreen(session: Session())),
+                Expanded(child: SettingsScreen(session: session)),
               ],
             ),
           ),
         ),
       );
+      return session;
     }
 
     testWidgets('wide: categories beside the content, search narrows it', (
@@ -151,6 +155,19 @@ void main() {
       await tester.pump();
       expect(find.text('Licences'), findsOneWidget);
       expect(find.byKey(const Key('settings.cat.account')), findsNothing);
+    });
+
+    testWidgets('Appearance: picking a logo stores it app-wide', (
+      tester,
+    ) async {
+      final core = useFakeCore();
+      final session = await pump(tester, const Size(1280, 800));
+      await tester.tap(find.byKey(const Key('settings.cat.appearance')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('settings.logo.signal')));
+      await tester.pump();
+      expect(session.logo, AppLogo.signal);
+      expect(core.appSettings[Session.settingAppLogo], 'signal');
     });
   });
 }

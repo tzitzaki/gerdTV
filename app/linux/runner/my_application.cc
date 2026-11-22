@@ -4,9 +4,12 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+#include <cstring>
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  FlMethodChannel* channel;  // "gerdtv/platform" (lib/platform/platform_bridge.dart)
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -14,6 +17,32 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+}
+
+// The "gerdtv/platform" channel on Linux: setLogo(name, png) sets the window icon (taskbar, Alt-Tab) for this run;
+// Dart sends it again at every start. The .desktop file's icon stays whatever the package installed.
+// Debugging: a PNG GdkPixbuf can't read leaves the previous icon; nothing else happens.
+static void method_call_cb(FlMethodChannel* channel, FlMethodCall* call,
+                           gpointer user_data) {
+  GtkWindow* window = GTK_WINDOW(user_data);
+  g_autoptr(FlMethodResponse) response = nullptr;
+  if (strcmp(fl_method_call_get_name(call), "setLogo") == 0) {
+    FlValue* args = fl_method_call_get_args(call);
+    FlValue* png = fl_value_get_type(args) == FL_VALUE_TYPE_MAP
+                       ? fl_value_lookup_string(args, "png")
+                       : nullptr;
+    if (png != nullptr && fl_value_get_type(png) == FL_VALUE_TYPE_UINT8_LIST) {
+      g_autoptr(GdkPixbufLoader) loader = gdk_pixbuf_loader_new();
+      gboolean ok = gdk_pixbuf_loader_write(loader, fl_value_get_uint8_list(png),
+                                            fl_value_get_length(png), nullptr);
+      ok = gdk_pixbuf_loader_close(loader, nullptr) && ok;  // always close
+      if (ok) gtk_window_set_icon(window, gdk_pixbuf_loader_get_pixbuf(loader));
+    }
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  } else {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+  fl_method_call_respond(call, response, nullptr);
 }
 
 // Implements GApplication::activate.
@@ -55,6 +84,13 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  self->channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "gerdtv/platform", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(self->channel, method_call_cb,
+                                            window, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -102,6 +138,7 @@ static void my_application_shutdown(GApplication* application) {
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
+  g_clear_object(&self->channel);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 
