@@ -64,6 +64,14 @@ l10n:
 test-docs:
     cargo test -p gerdtv-testkit --test repo_rules --quiet
 
+# The libmpv harness: real libmpv driven by the watchdog against the fault server, one fault per test, serially.
+test-harness:
+    cargo test -q -p gerdtv-testkit --test libmpv_watchdog -- --ignored --nocapture --test-threads 1 --skip soak
+
+# The soak: GERDTV_SOAK_MINUTES (default 30) of playback with random faults; every fault must recover (nightly).
+soak:
+    cargo test -q -p gerdtv-testkit --release --test libmpv_watchdog soak -- --ignored --nocapture
+
 # The suites the changes since <base> can affect (the pre-push hook runs this).
 test-affected base="origin/main":
     scripts/test-affected.sh {{base}}
@@ -111,6 +119,7 @@ ready body="":
     step "clippy -D warnings" "cargo clippy --workspace --all-targets --quiet -- -D warnings"
     step "flutter analyze" "just l10n && (cd app && flutter analyze)"
     step "just test" "just test"
+    step "libmpv harness" "just test-harness"
     step "licences" "just licences"
     step "bench (budgets, ≤ 20 % regression)" "just bench"
     step "integration tests (Linux, Xvfb)" "just test-integration"
@@ -122,6 +131,7 @@ ci-linux:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --quiet -- -D warnings
     just test
+    just test-harness
     just l10n
     cd app && flutter analyze
     just licences

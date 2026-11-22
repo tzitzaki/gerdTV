@@ -17,6 +17,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile.
 - Secrets (provider credentials, TMDB key, PIN) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
+- Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
 - Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
