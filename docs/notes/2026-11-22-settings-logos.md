@@ -29,5 +29,5 @@ merge main into feat/app-logos, rerun `just test-integration`, `just build-linux
 - macOS switches only the Dock icon while running; a changed bundle icon would break the code signature.
 
 ## Open questions
-- Which of the four logos is the default (preview: app/build/logos/preview.png after `just logos`); "screen" until then.
+- Default logo: the gTV wordmark, as the owner asked for gerdTV-aware logos.
 - Bench gate vs parallel sessions' builds outside the heavy lock: owner decision.

@@ -16,7 +16,7 @@ Full Xcode (opened once), `brew install rustup just cocoapods`, rustup as above,
 
 ## Building
 - `just test-harness` (libmpv driven by the watchdog against the fault server, about 2 min), `just soak` (30 min), `just test-epg-budget` (full-scale guide import), `just bench` (the core's performance budgets, compared with the saved baseline), `just test` (Rust + Flutter unit/widget tests), `just licences` (every bundled library is GPL-3.0 compatible, and the Licences screen's crate list is current: after a dependency change run `scripts/licences.sh --write`), `just test-integration` (Linux build under Xvfb: the journeys and the screen check, which visits every screen on phone, desktop and TV sizes and saves a screenshot of each to `~/gerdTV-screens/<branch>/`), `just ready` (every gate before a PR is marked ready).
-- After changing a logo's drawing: `just logos` renders the Android, iOS and macOS icon files (commit them) and `app/build/logos/preview.png`.
+- After changing a logo's drawing: `just logos` renders the Android, iOS and macOS icon files (commit them) and a preview sheet, logos/preview.png in the app's build folder.
 - `just build-linux`, `just build-android` (debug APK, arm64). Release builds come only from `.github/workflows/release.yml`.
 - After changing `crates/gerdtv-api`: `just codegen` regenerates `app/lib/src/rust`. The native library is built by Cargokit (`app/rust_builder`) as part of every Flutter build.
 
