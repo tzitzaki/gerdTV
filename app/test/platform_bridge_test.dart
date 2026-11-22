@@ -1,8 +1,11 @@
-// Owns: the platform channel switches picture mode when the system's Picture-in-Picture starts and ends.
+// Owns: the platform channel: picture mode follows the system's Picture-in-Picture, and every start and stop of
+// playback reaches the native side (Android's foreground service and auto-PiP depend on it).
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/platform/platform_bridge.dart';
+import 'package:gerdtv/services/session.dart';
+import 'package:gerdtv/src/rust/api/library.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +28,34 @@ void main() {
     await send(false);
     expect(mode.value, isFalse);
   });
+
+  test(
+    'every start and stop of playback is announced to the platform',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final calls = <Object?>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+            if (call.method == 'setPlaying') calls.add(call.arguments);
+            return null;
+          });
+      final session = Session(appDir: '/nonexistent');
+      session.nowPlaying.value = ItemInfo(
+        key: 'live:1',
+        kind: ItemKind.live,
+        name: 'Channel One',
+        category: 'g',
+        logo: '',
+      );
+      session.nowPlaying.value = null;
+      await Future<void>.delayed(Duration.zero);
+      expect(calls, [
+        {'playing': true, 'title': 'Channel One'},
+        {'playing': false, 'title': ''},
+      ]);
+    },
+  );
 
   test(
     'iOS pipEnded reaches the resume callback with the failure flag',
