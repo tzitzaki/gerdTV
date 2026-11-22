@@ -789,6 +789,7 @@ name = "gerdtv-core"
 version = "0.261122.31"
 dependencies = [
  "criterion",
+ "ed25519-dalek",
  "flate2",
  "gerdtv-testkit",
  "quick-xml",
@@ -797,6 +798,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "tracing",
