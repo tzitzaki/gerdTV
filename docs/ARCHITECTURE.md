@@ -19,7 +19,7 @@
 ## The seam (Rust ↔ Flutter)
 - `app/flutter_rust_bridge.yaml` points the codegen at `crates/gerdtv-api`; `just codegen` writes the Dart side to `app/lib/src/rust`.
 - `app/rust_builder` is a Flutter FFI plugin using Cargokit: every Flutter build (Linux, macOS, Android, iOS) compiles `gerdtv_api` for its targets and bundles `libgerdtv_api`.
-- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/logos.rs` (the logo cache: `init_logo_cache` once at start, `logo_file` per URL), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs). Errors cross as credential-free messages.
+- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/logos.rs` (the logo cache: `init_logo_cache` once at start, `logo_file` per URL), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs, the guide: sources, refresh, now/next, grid window, programme search, manual mapping). Errors cross as credential-free messages.
 - `RustLib.init()` loads the library before the first frame. Widget tests replace it with `RustLib.initMock` and a fake (`app/test/support/fake_core.dart`), so they need no native build.
 - Debug: "Failed to load dynamic library" at start means Cargokit didn't build or bundle the library; build with `-v` and look for the Cargokit step.
 
