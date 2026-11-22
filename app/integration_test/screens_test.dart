@@ -110,7 +110,11 @@ Future<void> checkScreen(
   final seen = <FocusNode>{};
   for (var i = 0; i < 25; i++) {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump(const Duration(milliseconds: 50));
+    // Measured after the scroll settles: a text field animates itself into view (~100 ms), slow runners take longer.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pump();
     final node = FocusManager.instance.primaryFocus;
     if (node == null || node.context == null || !seen.add(node)) continue;
     final box = node.context!.findRenderObject();
