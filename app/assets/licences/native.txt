@@ -1,0 +1,12 @@
+## libmpv, FFmpeg (Android)
+gerdTV for Android bundles libmpv and FFmpeg as built by media_kit (media_kit_libs_android_video): mpv (2023, between 0.36 and 0.37) built with -Dgpl=false and FFmpeg 6.0, both under the GNU Lesser General Public License (FFmpeg: LGPL-3.0; mpv: LGPL-2.1 or later).
+
+The build and its sources: https://github.com/media-kit/libmpv-android-video-build (release v1.1.7). mpv: https://github.com/mpv-player/mpv. FFmpeg: https://ffmpeg.org.
+
+## libmpv, FFmpeg (macOS, iPhone, iPad)
+gerdTV for macOS, iPhone and iPad bundles libmpv 0.36.0 and FFmpeg 6.0 as built by media_kit (media_kit_libs_macos_video, media_kit_libs_ios_video) in an LGPL configuration, under the GNU Lesser General Public License.
+
+The build and its sources: https://github.com/media-kit/libmpv-darwin-build (release v0.6.0). mpv: https://github.com/mpv-player/mpv. FFmpeg: https://ffmpeg.org.
+
+## libmpv (Linux)
+gerdTV for Linux uses the libmpv installed by the system (media_kit_libs_linux); its licence is the one the distribution ships it under (see the libmpv package's copyright file).
