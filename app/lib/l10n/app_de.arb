@@ -67,6 +67,7 @@
   "playerNext": "Danach: {title}",
   "playerReconnecting": "Verbinde neu ({attempt})…",
   "playerZapHint": "↑ ↓ Sender · OK Senderliste",
+  "programmeFromStart": "Von Anfang an",
   "programmeNow": "Jetzt",
   "remove": "Entfernen",
   "restore": "Normale Größe",

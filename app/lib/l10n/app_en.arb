@@ -156,6 +156,7 @@
     }
   },
   "playerZapHint": "↑ ↓ channels · OK channel list",
+  "programmeFromStart": "From the start",
   "programmeNow": "Now",
   "remove": "Remove",
   "restore": "Full size",

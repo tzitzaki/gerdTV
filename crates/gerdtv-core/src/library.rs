@@ -276,6 +276,8 @@ impl Library {
             SourceKind::Xtream => {
                 let f = xtream::fetch(self.xc.as_ref().unwrap()).await?;
                 let stats = xtream::write(&mut self.conn.lock().unwrap(), &f)?;
+                // Catch-up URLs name the start in the server's local time.
+                self.set_setting(SETTING_XC_OFFSET, &f.account.time_offset.to_string())?;
                 Ok(SyncResult {
                     stats,
                     account: Some(f.account),
@@ -340,7 +342,7 @@ impl Library {
     ) -> Result<Vec<Hit>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
-            "SELECT key, kind, name, category, logo, number FROM items
+            "SELECT key, kind, name, category, logo, number, archive_days FROM items
              WHERE kind = ?1 AND category = ?2 ORDER BY position LIMIT ?3 OFFSET ?4",
         )?;
         let rows = stmt.query_map(
@@ -353,6 +355,7 @@ impl Library {
                     category: r.get(3)?,
                     logo: r.get(4)?,
                     number: r.get(5)?,
+                    archive_days: r.get(6)?,
                 })
             },
         )?;
@@ -390,7 +393,7 @@ impl Library {
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
-            "SELECT key, kind, name, category, logo, number FROM items
+            "SELECT key, kind, name, category, logo, number, archive_days FROM items
              WHERE kind = 2 AND category = ?1 ORDER BY season, episode, position",
         )?;
         let rows = stmt.query_map([series_key], |r| {
@@ -401,12 +404,84 @@ impl Library {
                 category: r.get(3)?,
                 logo: r.get(4)?,
                 number: r.get(5)?,
+                archive_days: r.get(6)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// The URL to play an item (live: `.ts` by default, `m3u8` when the watchdog asks; VOD: its container).
+    /// The catch-up URL for a programme of a live channel (from `start` to `stop`, UTC seconds), or None: no
+    /// archive on this channel, the programme lies beyond its reach or hasn't started, or the provider isn't Xtream
+    /// Codes (M3U catch-up templates are not supported yet). Holds credentials: straight to the player, never logged.
+    pub fn catchup_url(&self, key: &str, start: i64, stop: i64) -> Result<Option<String>> {
+        let Some(xc) = &self.xc else { return Ok(None) };
+        let Some(id) = key
+            .strip_prefix("live:")
+            .and_then(|i| i.parse::<u64>().ok())
+        else {
+            return Ok(None);
+        };
+        let days: u32 = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT archive_days FROM items WHERE key = ?1",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?
+            .unwrap_or(0);
+        let t = now();
+        if days == 0 || start >= t || start < t - days as i64 * 86_400 {
+            return Ok(None);
+        }
+        let offset = self
+            .setting(SETTING_XC_OFFSET)?
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        // Whole minutes, at least one; a programme still running is asked for up to now.
+        let minutes = ((stop.min(t) - start + 59) / 60).max(1) as u32;
+        Ok(Some(xc.catchup_url(id, start, minutes, offset)))
+    }
+
+    /// Reminders still to come (with the channel), soonest first; past ones are dropped on the way.
+    pub fn reminders(&self) -> Result<Vec<Reminder>> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM reminders WHERE start < ?1", [now() - 3600])?;
+        let mut st = conn.prepare_cached(
+            "SELECT item_key, start, stop, title FROM reminders WHERE start >= ?1 ORDER BY start",
+        )?;
+        let rows = st.query_map([now() - 3600], |r| {
+            Ok(Reminder {
+                item_key: r.get(0)?,
+                start: r.get(1)?,
+                stop: r.get(2)?,
+                title: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Sets (or with `on` false, clears) a reminder for a programme of a live channel.
+    pub fn set_reminder(&self, r: &Reminder, on: bool) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        if on {
+            conn.execute(
+                "INSERT INTO reminders (item_key, start, stop, title, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT (item_key, start) DO UPDATE SET stop = ?3, title = ?4, updated_at = ?5",
+                params![r.item_key, r.start, r.stop, r.title, now()],
+            )?;
+        } else {
+            conn.execute(
+                "DELETE FROM reminders WHERE item_key = ?1 AND start = ?2",
+                params![r.item_key, r.start],
+            )?;
+        }
+        Ok(())
+    }
+
     pub fn stream_url(&self, key: &str, live_ext: &str) -> Result<String> {
         if let Some(xc) = &self.xc {
             let (prefix, id) = key.split_once(':').unwrap_or(("", ""));
@@ -453,6 +528,8 @@ pub const SETTING_TIMESHIFT: &str = "timeshift_secs";
 pub const SETTING_GUIDE_OFFSET: &str = "guide_offset_hours";
 /// M3U profiles: the playlist header's guide URL (templated).
 pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
+/// Xtream Codes: the server's clock against UTC in seconds (from the last sync), for catch-up URLs.
+pub const SETTING_XC_OFFSET: &str = "xc_time_offset";
 
 /// One guide source as Settings → Guide shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -470,6 +547,15 @@ pub struct GuideSource {
 
 /// The built-in guide's row in epg_sources (its real URL holds the login and is built when needed).
 const BUILTIN: &str = "builtin";
+
+/// A reminder for a guide programme (user data): the channel, start and stop (UTC seconds) and the title.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reminder {
+    pub item_key: String,
+    pub start: i64,
+    pub stop: i64,
+    pub title: String,
+}
 
 /// One stream_health row.
 #[derive(Debug, Clone, PartialEq)]
@@ -1017,6 +1103,55 @@ mod tests {
             "a failing extra source records its error"
         );
         lib.remove_guide_source(sources[1].id).unwrap();
+
+        // Catch-up: the mock panel gives every 13th live channel a 3-day archive.
+        let t = now();
+        let all_live: Vec<Hit> = cats
+            .iter()
+            .flat_map(|c| lib.items(Kind::Live, &c.id, 500, 0).unwrap())
+            .collect();
+        let archive = all_live
+            .iter()
+            .find(|h| h.archive_days == 3)
+            .expect("an archive channel");
+        let plain = all_live.iter().find(|h| h.archive_days == 0).unwrap();
+        // (channel, start, stop, catch-up URL expected)
+        let cases = [
+            (&archive.key, t - 7200, t - 3600, true),
+            (&archive.key, t - 1800, t + 1800, true), // running: from its start up to now
+            (&archive.key, t - 4 * 86_400, t - 4 * 86_400 + 3600, false), // beyond the 3 days
+            (&archive.key, t + 600, t + 4200, false), // not started
+            (&plain.key, t - 7200, t - 3600, false),  // no archive
+        ];
+        for (key, start, stop, want) in cases {
+            let url = lib.catchup_url(key, start, stop).unwrap();
+            assert_eq!(url.is_some(), want, "{key} {start}");
+            if let Some(u) = url {
+                assert!(
+                    u.contains("/timeshift/") && u.ends_with(".ts"),
+                    "the timeshift form"
+                );
+            }
+        }
+        // Reminders: set, listed soonest first, cleared.
+        let r = |start: i64| Reminder {
+            item_key: archive.key.clone(),
+            start,
+            stop: start + 1800,
+            title: "Film".into(),
+        };
+        lib.set_reminder(&r(t + 7200), true).unwrap();
+        lib.set_reminder(&r(t + 3600), true).unwrap();
+        assert_eq!(
+            lib.reminders()
+                .unwrap()
+                .iter()
+                .map(|x| x.start)
+                .collect::<Vec<_>>(),
+            [t + 3600, t + 7200]
+        );
+        lib.set_reminder(&r(t + 3600), false).unwrap();
+        assert_eq!(lib.reminders().unwrap().len(), 1);
         assert_eq!(lib.guide_sources().unwrap().len(), 1);
 
         // Cache-first: reopening without network shows the catalogue at once.

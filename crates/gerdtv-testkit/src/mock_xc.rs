@@ -2,6 +2,7 @@
 //!   /player_api.php?username=&password=[&action=…]   account info, categories, stream lists, VOD/series info
 //!   /get.php?username=&password=&type=m3u_plus        the same library as M3U
 //!   /xmltv.php?username=&password=                    the guide (2 days by default, every live channel's id)
+//!   /timeshift/<user>/<pass>/<min>/<time>/<id>.ts       catch-up (every 13th live channel has a 3-day archive)
 //!   /live|movie|series/<user>/<pass>/<id>.<ext>       streams: the fault server's clip (live endless, VOD as file)
 //! Credentials are `testuser` / `testpass`; anything else gets `{"user_info":{"auth":0}}` like a real panel.
 //! Quirks copied from real panels: numbers often sent as strings, empty strings for missing values, `tmdb` ids on
@@ -157,6 +158,15 @@ async fn serve(
                 _ => format!("{stream_base}/vod/{id}.ts"),
             };
             redirect(stream, &target).await
+        }
+        // Catch-up: /timeshift/<user>/<pass>/<minutes>/<YYYY-MM-DD:HH-MM>/<id>.ts → the recording-like VOD stream.
+        p if p.starts_with("/timeshift/") => {
+            let parts: Vec<&str> = p.split('/').collect(); // ["", "timeshift", user, pass, min, time, file]
+            if parts.len() != 7 || parts[2] != USER || parts[3] != PASS {
+                return http::respond(stream, 403, "text/plain", b"").await;
+            }
+            let id = parts[6].trim_end_matches(".ts");
+            redirect(stream, &format!("{stream_base}/vod/{id}.ts")).await
         }
         _ => http::respond(stream, 404, "text/plain", b"").await,
     }

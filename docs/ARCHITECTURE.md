@@ -56,7 +56,7 @@
 | Android | `media_kit_libs_android_video` | mpv (2023, between 0.36 and 0.37) / FFmpeg 6.0; arm64-v8a, armeabi-v7a, x86_64; 16 KB page aligned | LGPL-3.0 (FFmpeg), mpv built with `-Dgpl=false` |
 | macOS, iOS | `media_kit_libs_macos_video`, `media_kit_libs_ios_video` | mpv 0.36.0 / FFmpeg 6.0 (xcframeworks via CocoaPods) | LGPL |
 
-All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with the GPL-3.0 app. The in-app Licences screen will list them with these flags.
+All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with the GPL-3.0 app. The in-app Licences screen lists them (`app/assets/licences/native.txt`, kept in step with this table by hand) and every bundled Rust crate (`app/assets/licences/rust.txt`, written and checked by `scripts/licences.sh`; `app/lib/licences.dart`).
 
 ## Desktop windows
 `app/lib/platform/mini_window.dart` switches the main window into mini-player mode (480 × 270, hidden title bar, always on top, on all Spaces) and restores its bounds. A second window would be a second Flutter engine that can't share the media_kit player, so the stream would reopen.

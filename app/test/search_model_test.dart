@@ -11,6 +11,7 @@ ItemInfo item(String name) => ItemInfo(
   name: name,
   category: 'g',
   logo: '',
+  archiveDays: 0,
 );
 
 void main() {

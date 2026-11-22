@@ -2,7 +2,7 @@ name: gerdtv
 description: "gerdTV: a multi-platform IPTV player (Flutter + Rust + libmpv)."
 publish_to: 'none'
 # Set by each wrap-up release: 0.YYMMDD.<PR#>+<PR#> (docs/RELEASING.md).
-version: 0.261122.21+21
+version: 0.261122.34+34
 
 environment:
   sdk: ^3.14.0
@@ -34,3 +34,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    # Shown on the Licences screen next to the Dart packages (lib/licences.dart; scripts/licences.sh keeps rust.txt).
+    - assets/licences/

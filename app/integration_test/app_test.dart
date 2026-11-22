@@ -1,6 +1,7 @@
 // The MVP journey on the Linux desktop build, against the testkit's mock Xtream Codes panel: first-run setup →
 // sync → browse a group → play a channel → global search (narrows per keystroke, Enter plays the top result) →
 // remove the account. Needs the mock panel: `just test-integration` starts it (GERDTV_MOCK_XC).
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import 'package:gerdtv/main.dart';
 import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
+import 'package:gerdtv/screens/programme_sheet.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -259,12 +261,81 @@ void main() {
             (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
       ),
     );
+    // The programme's sheet: the top hit is running, Watch plays its channel live.
+    await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
     await tapReady(tester, find.byKey(const Key('player.stop')));
-    await waitFor(tester, find.byKey(const Key('search.field')));
+    // Back in search for real (the field also exists underneath an open player).
+    await waitFor(tester, find.byKey(const Key('search.field')).hitTestable());
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: programme search played its channel');
+    // Catch-up: a programme that ended on a channel with an archive (every 13th mock channel) plays from the archive.
+    final lib = session.library!;
+    final groups = await tester.runAsync(
+      () => lib.categories(kind: ItemKind.live),
+    );
+    // (The first such channel may have no guide: the mock panel, like real ones, leaves some epg ids empty.)
+    final nowSecs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    ProgrammeInfo? found;
+    ItemInfo? onChannel;
+    for (final g in groups!) {
+      final items = await tester.runAsync(
+        () => lib.items(
+          kind: ItemKind.live,
+          category: g.id,
+          limit: 500,
+          offset: 0,
+        ),
+      );
+      final keys = [
+        for (final i in items!)
+          if (i.archiveDays > 0) i.key,
+      ];
+      if (keys.isEmpty) continue;
+      final rows = await tester.runAsync(
+        () => lib.guideWindow(
+          keys: keys,
+          from: nowSecs - 6 * 3600,
+          to: nowSecs - 3600,
+        ),
+      );
+      for (var r = 0; r < rows!.length && found == null; r++) {
+        found = rows[r].programmes
+            .where((p) => p.stop < nowSecs - 600)
+            .firstOrNull;
+        if (found != null) {
+          onChannel = items.firstWhere((i) => i.key == keys[r]);
+        }
+      }
+      if (found != null) break;
+    }
+    if (found == null) fail('no past programme on a channel with an archive');
+    final past = found;
+    // Its sheet (the guide grid and search open the same one; each is covered above): Watch plays the archive.
+    unawaited(
+      showProgrammeSheet(
+        session.navigatorKey.currentContext!,
+        session,
+        past,
+        onChannel!,
+      ),
+    );
+    await tapReady(tester, find.byKey(const Key('programme.catchup')));
+    await waitFor(tester, find.byKey(const Key('player.back')));
+    expect(session.nowPlaying.value!.key, startsWith('catchup:'));
+    final archiveEnd = DateTime.now().add(const Duration(seconds: 30));
+    while (session.player.state.position < const Duration(seconds: 1)) {
+      if (DateTime.now().isAfter(archiveEnd)) fail('no catch-up playback');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump();
+    }
+    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await waitFor(tester, find.byKey(const Key('search.field')));
+
+    debugPrint('JOURNEY: catch-up played a past programme');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.text('Guide'));
     await tapReady(tester, find.byKey(const Key('guide.now')));

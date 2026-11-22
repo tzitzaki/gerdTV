@@ -280,6 +280,40 @@ class Session extends ChangeNotifier {
     await _start(item, lib);
   }
 
+  /// Plays a programme from the channel's catch-up archive, from its start (false when there is none: no archive,
+  /// out of reach, or not Xtream Codes). It plays like a recording: seekable, no live timeshift; the channel's own
+  /// buffer applies. The now-playing item is the programme on its channel.
+  Future<bool> playCatchup(ItemInfo channel, ProgrammeInfo p) async {
+    final lib = library;
+    if (lib == null) return false;
+    final url = lib.catchupUrl(key: channel.key, start: p.start, stop: p.stop);
+    if (url == null) return false;
+    final item = ItemInfo(
+      key: 'catchup:${channel.key}:${p.start}',
+      kind: ItemKind.movie,
+      name: '${channel.name} · ${p.title}',
+      category: channel.category,
+      logo: channel.logo,
+      number: channel.number,
+      archiveDays: 0,
+    );
+    if (nowPlaying.value?.key == item.key) return true;
+    nowPlaying.value = item;
+    _playingKey = channel.key;
+    final choice = lib.bufferFor(key: channel.key);
+    bufferRaisedTo.value = null;
+    await adapter.play(
+      ({required hls}) => url,
+      live: false,
+      preset: choice.preset,
+      customSeconds: choice.seconds,
+      adaptive: false,
+      preferHls: false,
+      extraOptions: const [],
+    );
+    return true;
+  }
+
   /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
   /// ends, mpv resumes the same item. Live channels go as .m3u8 (AVPlayer can't play raw TS).
   Future<void> startApplePip() async {
