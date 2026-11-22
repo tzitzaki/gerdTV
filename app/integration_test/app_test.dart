@@ -236,6 +236,24 @@ void main() {
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: programme search played its channel');
+    // The guide grid: Now, a running programme's sheet, Watch plays its channel.
+    await tapReady(tester, find.text('Guide'));
+    await tapReady(tester, find.byKey(const Key('guide.now')));
+    final running = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('guide.cell.'),
+    );
+    await waitFor(tester, running.hitTestable());
+    await tapReady(tester, running);
+    await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
+    await waitFor(tester, find.byKey(const Key('player.back')));
+    expect(session.nowPlaying.value, isNotNull);
+    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await waitFor(tester, find.byKey(const Key('guide.now')).hitTestable());
+    expect(session.nowPlaying.value, isNull);
+
+    debugPrint('JOURNEY: guide played a channel');
     // Settings → Guide: the provider's guide imported; an extra XMLTV URL imports too and can be removed again.
     // (The stopped player is still closing: wait until the rail can take the tap.)
     await tapReady(tester, find.text('Settings'));
