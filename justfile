@@ -93,6 +93,10 @@ bench:
 bench-save:
     CRITERION_HOME="{{criterion_home}}" cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
 
+# The full-scale guide import budget (2,000 channels × 7 days in < 60 s); slow, also in the nightly.
+test-epg-budget:
+    cargo test -q -p gerdtv-core --release --test epg_budget -- --ignored --nocapture
+
 # Opt-in checks against the real account in the GERDTV_* environment (counts and timings only; docs/SETUP.md).
 test-live:
     cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1

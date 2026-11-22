@@ -131,6 +131,44 @@ async fn live_library_and_one_playback_probe() {
             u.rsplit('.').next().unwrap_or("?")
         );
     }
+    // The guide: the panel's xmltv.php imported; how many live channels show a programme now.
+    let t = std::time::Instant::now();
+    let sources = lib.refresh_guide(7).await.expect("guide");
+    println!(
+        "guide: {} channels, {} programmes in {:.1} s, status {:?}",
+        sources[0].channels,
+        sources[0].programmes,
+        t.elapsed().as_secs_f64(),
+        if sources[0].status.is_empty() {
+            "ok"
+        } else {
+            "error"
+        }
+    );
+    let mut live_keys = vec![];
+    for cat in lib.categories(Kind::Live).unwrap() {
+        live_keys.extend(
+            lib.items(Kind::Live, &cat.id, 10_000, 0)
+                .unwrap()
+                .into_iter()
+                .map(|h| h.key),
+        );
+    }
+    let unmatched = lib.unmatched_channels(100_000, 0).unwrap().len();
+    let on_now = lib
+        .now_next(&live_keys)
+        .unwrap()
+        .iter()
+        .filter(|(n, _)| n.is_some())
+        .count();
+    println!(
+        "guide match: {} of {} live channels matched ({} %), {} show a programme right now",
+        live_keys.len() - unmatched,
+        live_keys.len(),
+        100 * (live_keys.len() - unmatched) / live_keys.len().max(1),
+        on_now
+    );
+
     // One probe at a time, each at most 20 s (the provider allows few connections). The first channels of a list
     // are often separators or offline placeholders, so try a channel from each of the first groups, TS then HLS.
     let groups = lib.categories(Kind::Live).unwrap();

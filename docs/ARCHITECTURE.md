@@ -2,6 +2,7 @@
 
 ## Crates
 - `crates/gerdtv-core`: all logic, no Flutter dependency, tested headless on Linux.
+  - `epg.rs`: the guide: streaming XMLTV parser (quick-xml; gzip detected by its magic bytes), import per source in one transaction (a source replaces its own rows; a channel another source already covers is skipped; only the window is stored), matching (manual map → id → id ignoring case → normalised display name), and the queries for now/next, the grid window, programme details, programme search and the mapping screen. Budgets: full 300 MB import < 60 s (`just test-epg-budget`), window and now/next in `benches/budgets.rs`.
   - `library.rs`: profiles (non-secret settings in `profiles.json`) and the open profile's library (cache-first open, sync that downloads before locking the database, browse, search, play URLs); `m3u.rs`: the streaming M3U parser; `xtream.rs`: the Xtream Codes client and sync; `db.rs`: the profile database, sync and search (`docs/DATA_MODEL.md`); `playback.rs`: buffer presets and the watchdog.
   - Networking: reqwest with rustls on the ring provider (no C toolchain needed for Android/iOS builds), installed once per process.
   - Performance budgets: `crates/gerdtv-core/benches/budgets.rs` (`just bench`).
