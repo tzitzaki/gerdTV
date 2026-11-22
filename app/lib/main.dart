@@ -4,6 +4,8 @@
 // Debug hints: a crash before the first frame in RustLib.init() means the native library wasn't bundled or found
 // (Cargokit, app/rust_builder; see docs/ARCHITECTURE.md, "The seam"). Missing German strings: app/lib/l10n/*.arb.
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,8 +13,10 @@ import 'package:path_provider/path_provider.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'licences.dart';
 import 'screens/now_playing_bar.dart';
+import 'screens/player_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
+import 'services/reminders.dart';
 import 'services/session.dart';
 import 'src/rust/api/logos.dart';
 import 'src/rust/frb_generated.dart';
@@ -25,7 +29,21 @@ Future<void> main() async {
   // Logos and posters are kept on disk (the OS may clear this folder; they are fetched again then).
   initLogoCache(dir: '${(await getApplicationCacheDirectory()).path}/logos');
   MediaKit.ensureInitialized();
-  final session = Session()..start();
+  final session = Session();
+  // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
+  session.reminders = Reminders(
+    onOpen: (key) async {
+      final item = await session.library?.item(key: key);
+      if (item == null) return;
+      await session.navigatorKey.currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) => PlayerScreen(session: session, item: item),
+        ),
+      );
+    },
+  );
+  unawaited(session.reminders!.init());
+  unawaited(session.start());
   session.platform.attach();
   runApp(GerdTvApp(session: session));
 }

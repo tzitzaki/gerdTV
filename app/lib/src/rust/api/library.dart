@@ -73,6 +73,9 @@ abstract class Library implements RustOpaqueInterface {
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
 
+  /// One item by its key (a reminder's channel); None when it is gone from the catalogue.
+  Future<ItemInfo?> item({required String key});
+
   Future<List<ItemInfo>> items({
     required ItemKind kind,
     required String category,
