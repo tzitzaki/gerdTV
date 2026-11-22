@@ -3,8 +3,8 @@
 ## State
 - Version 0.261122.21: playback keeps going until Stop, in a now-playing bar, a desktop mini player, Android PiP and in the background.
 - Buffer settings are in the app: presets per profile and per channel, opt-in adaptive mode, bitrate-sized cache and the timeshift window.
-- The core imports TV guides (XMLTV, provider and extra URLs), matches channels and answers now/next, grid windows and programme search.
-- Session 3 so far: Block A #13–#16, guide core #17, release fix #20; the 0.261122.16 release failed (Maven Central 429), this one replaces it.
+- The TV guide: provider and extra XMLTV sources in Settings → Guide, mapping by hand, programmes in search, refresh every 12 h.
+- Session 3 so far: Block A #13–#16, guide #17 and #19, release fix #20; the 0.261122.16 release failed (Maven Central 429), this one replaces it.
 
 ## Owner decisions
 - All Phase 0 questions are answered; the standing decisions are in docs/DECISIONS.md.
@@ -20,7 +20,7 @@
 - Install this release on the Mac, the iPhone and the Shield and go through docs/DEVICE_CHECKS.md.
 
 ## Open work
-- Block B: Settings → Guide and programme search (#19), list modes with logos, then the grid, the mini-guide, catch-up and reminders.
+- Block B: list modes with logos (#22), then the guide grid, the mini-guide in the player, catch-up and reminders.
 - Block C: complete licences screen, in-app updater with macOS sandbox off, export/import, own libmpv with an engine switch.
 - Timeshift in the player screen (pause/rewind live, "behind live" label); the core and the harness test are done.
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
