@@ -18,6 +18,14 @@ if [[ ! -r "$denylist" ]]; then
   echo "denylist: $denylist not found, check skipped"
   exit 0
 fi
+# Fail closed: what can't be checked must not pass as "clean" (the git calls below swallow their own errors).
+if ! git rev-parse --verify -q "$base^{commit}" >/dev/null; then
+  echo "denylist: unknown base ref '$base' (usage: $0 [<base-ref>] [<extra-file>...])"
+  exit 2
+fi
+for f in "$@"; do
+  [[ -r "$f" ]] || { echo "denylist: cannot read $f"; exit 2; }
+done
 # Blank lines would match everything; drop them (and trailing CR from editors).
 patterns="$(mktemp)"
 trap 'rm -f "$patterns"' EXIT
