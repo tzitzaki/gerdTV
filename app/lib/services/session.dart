@@ -44,7 +44,17 @@ class Session extends ChangeNotifier {
 
   Player get player =>
       _player ??= Player(configuration: WatchdogAdapter.playerConfiguration);
-  VideoController get video => _video ??= VideoController(player);
+
+  /// Software video rendering, only for CI: GitHub's macOS runners are VMs without a usable GPU, and the hardware
+  /// texture stalled there (`just mac-check` sets GERDTV_SOFTWARE_VIDEO). Real devices use hardware rendering.
+  static const _softwareVideo = bool.fromEnvironment('GERDTV_SOFTWARE_VIDEO');
+
+  VideoController get video => _video ??= VideoController(
+    player,
+    configuration: const VideoControllerConfiguration(
+      enableHardwareAcceleration: !_softwareVideo,
+    ),
+  );
   WatchdogAdapter get adapter => _adapter ??= WatchdogAdapter(
     player,
     onHealth: (trigger, attempts, recovered, secs) {
