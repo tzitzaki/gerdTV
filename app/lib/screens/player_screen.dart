@@ -1,6 +1,9 @@
-// Full-screen player: media_kit's video with a small overlay (title, back, "Reconnecting (n)…", or the watchdog's
+// Full-screen player: media_kit's video with a small overlay (title, back, stop, "Reconnecting (n)…", or the watchdog's
 // failure message). The watchdog recovers by itself; the user never has to restart a channel.
-// Keys: Esc/Back leaves, Space pauses, F toggles full screen (desktop).
+// Leaving the screen keeps the stream playing (the now-playing bar takes over); only Stop or another stream end it.
+// Keys: Esc/Back leaves (keeps playing), S stops, Space pauses.
+
+import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -26,13 +29,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    widget.session.play(widget.item);
+    // Deferred: changing it here (during build) would rebuild the now-playing bar mid-build, which Flutter forbids.
+    final session = widget.session;
+    final item = widget.item;
+    scheduleMicrotask(() {
+      session.playerOpen.value = true;
+      session.play(item); // sets nowPlaying, which the bar also listens to
+    });
   }
 
   @override
   void dispose() {
-    widget.session.stopPlayback();
+    // Leaving the screen does not stop the stream: the now-playing bar takes over (deferred, as in initState).
+    final session = widget.session;
+    scheduleMicrotask(() => session.playerOpen.value = false);
     super.dispose();
+  }
+
+  Future<void> _stop() async {
+    await widget.session.stopPlayback();
+    if (mounted) Navigator.of(context).maybePop();
   }
 
   Future<void> _togglePause() async {
@@ -50,6 +66,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
             Navigator.of(context).maybePop(),
         const SingleActivator(LogicalKeyboardKey.space): _togglePause,
+        const SingleActivator(LogicalKeyboardKey.keyS): _stop,
       },
       child: Focus(
         autofocus: true,
@@ -83,6 +100,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(color: Colors.white),
                         ),
+                      ),
+                      IconButton.filledTonal(
+                        key: const Key('player.stop'),
+                        tooltip: l10n.stop,
+                        icon: const Icon(Icons.stop),
+                        onPressed: _stop,
                       ),
                     ],
                   ),

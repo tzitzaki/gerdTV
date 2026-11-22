@@ -93,10 +93,30 @@ void main() {
       );
       await tester.pump();
     }
+    // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
-    await tester.pumpAndSettle();
+    await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    final atLeave = session.player.state.position;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 2)),
+    );
+    await tester.pump();
+    expect(
+      session.player.state.position,
+      greaterThan(atLeave),
+      reason: 'keeps playing after leaving the player',
+    );
+    await tester.tap(find.byKey(const Key('nowPlaying.bar')));
+    await waitFor(tester, find.byKey(const Key('player.back')));
+    expect(
+      session.player.state.position,
+      greaterThanOrEqualTo(atLeave),
+      reason: 'reopening does not restart',
+    );
+    await tester.tap(find.byKey(const Key('player.back')));
+    await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     await tester.pageBack();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     debugPrint('JOURNEY: played, back in browse');
     // Search: each keystroke narrows, Enter plays the top result.
@@ -134,7 +154,12 @@ void main() {
     await tester.pump();
     await waitFor(tester, find.byKey(const Key('player.back')));
     await tester.tap(find.byKey(const Key('player.back')));
-    await tester.pumpAndSettle();
+    await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    // Stop is the way playback ends: the bar goes away.
+    await tester.tap(find.byKey(const Key('nowPlaying.stop')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('nowPlaying.bar')), findsNothing);
+    expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: search played top result');
     // Settings: remove the account → back to setup.

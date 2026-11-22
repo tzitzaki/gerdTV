@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'l10n/gen/app_localizations.dart';
+import 'screens/now_playing_bar.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
 import 'services/session.dart';
@@ -29,6 +30,14 @@ class GerdTvApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: session.navigatorKey,
+      // The now-playing bar below every screen (playback continues until Stop or another stream).
+      builder: (context, child) => Column(
+        children: [
+          Expanded(child: child!),
+          NowPlayingBar(session: session),
+        ],
+      ),
       // The window/task title; the visible name is "gerdTV" in every language.
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       // Not AppLocalizations.localizationsDelegates: gen-l10n still lists flutter_localizations' Material delegate,

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
@@ -77,6 +78,16 @@ class Session extends ChangeNotifier {
     },
   );
   String? _playingKey;
+
+  /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
+  /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
+  final ValueNotifier<ItemInfo?> nowPlaying = ValueNotifier(null);
+
+  /// True while the full player screen is open (the now-playing bar hides then).
+  final ValueNotifier<bool> playerOpen = ValueNotifier(false);
+
+  /// The app's navigator: the now-playing bar sits below all routes (MaterialApp.builder) and opens the player here.
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   Future<String> _dir() async =>
       appDir ??= (await getApplicationSupportDirectory()).path;
@@ -178,6 +189,10 @@ class Session extends ChangeNotifier {
   Future<void> play(ItemInfo item) async {
     final lib = library;
     if (lib == null) return;
+    if (nowPlaying.value?.key == item.key) {
+      return; // reopening the player for the running stream: keep it going
+    }
+    nowPlaying.value = item;
     _playingKey = item.key;
     final live = item.kind == ItemKind.live;
     final preferHls = live && lib.preferHls(key: item.key);
@@ -188,8 +203,10 @@ class Session extends ChangeNotifier {
     );
   }
 
+  /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
     _playingKey = null;
+    nowPlaying.value = null;
     await _adapter?.stop();
     await _player?.stop();
   }
