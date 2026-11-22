@@ -4,6 +4,7 @@
 //! Dart → Rust call path works end to end.
 
 pub mod db;
+pub mod epg;
 pub mod library;
 pub mod m3u;
 pub mod playback;

@@ -130,7 +130,14 @@ async fn serve(
                 .count()
                 .div_ceil(3);
             let mut out = Vec::new();
-            let _ = write_xmltv(&mut out, channels, 2, 1_763_683_200, data.seed);
+            // Around the current time (yesterday 00:00 UTC, 3 days), so clients see "now" in the guide.
+            let today = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64
+                / 86_400
+                * 86_400;
+            let _ = write_xmltv(&mut out, channels, 3, today - 86_400, data.seed);
             http::respond(stream, 200, "application/xml", &out).await
         }
         "/get.php" | "/xmltv.php" => http::respond(stream, 401, "text/plain", b"").await,
