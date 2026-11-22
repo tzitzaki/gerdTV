@@ -324,6 +324,7 @@ void main() {
     await tapReady(tester, guideChannel);
     await waitFor(tester, unmatched.hitTestable());
     expect(find.byKey(first), findsNothing);
+    await tester.pumpAndSettle(); // the picker is still sliding out (two Back buttons until then)
     await tester.pageBack();
     await tester.pumpAndSettle();
 
