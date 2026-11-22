@@ -36,12 +36,16 @@ class GerdTvApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: session.navigatorKey,
-      // The now-playing bar below every screen (playback continues until Stop or another stream).
-      builder: (context, child) => Column(
-        children: [
-          Expanded(child: child!),
-          NowPlayingBar(session: session),
-        ],
+      // The now-playing bar below every screen (playback continues until Stop or another stream), and one focus
+      // policy for every route, sheet and menu (see revealFocus).
+      builder: (context, child) => FocusTraversalGroup(
+        policy: ReadingOrderTraversalPolicy(requestFocusCallback: revealFocus),
+        child: Column(
+          children: [
+            Expanded(child: child!),
+            NowPlayingBar(session: session),
+          ],
+        ),
       ),
       // The window/task title; the visible name is "gerdTV" in every language.
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
@@ -65,6 +69,33 @@ class GerdTvApp extends StatelessWidget {
           SessionState.ready => Shell(session: session),
         },
       ),
+    );
+  }
+}
+
+/// Moves focus and scrolls the target into view from either side. Flutter's own Tab step only scrolls when the
+/// target lies past the end of the view, but in a scrolled list the next control in reading order can lie above it
+/// (built just off-screen): keyboard and remote users then lost sight of the focus (found by the screen check).
+/// Both steps do nothing for a target that is already visible, so visible moves never jump.
+void revealFocus(
+  FocusNode node, {
+  ScrollPositionAlignmentPolicy? alignmentPolicy,
+  double? alignment,
+  Duration? duration,
+  Curve? curve,
+}) {
+  node.requestFocus();
+  final context = node.context;
+  if (context == null) return;
+  for (final policy in const [
+    ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+    ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+  ]) {
+    Scrollable.ensureVisible(
+      context,
+      alignmentPolicy: policy,
+      duration: duration ?? Duration.zero,
+      curve: curve ?? Curves.ease,
     );
   }
 }
