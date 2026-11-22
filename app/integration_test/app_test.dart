@@ -150,6 +150,20 @@ void main() {
     );
     expect(mini.size.width, closeTo(fullWidth, 1));
 
+    // Zapping: Down plays the next channel of the group and shows what's on; OK opens the channel list, Esc closes
+    // it and stays in the player.
+    final before = session.nowPlaying.value!.key;
+    final i = session.zapList.indexWhere((c) => c.key == before);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await waitFor(tester, find.byKey(const Key('player.banner')));
+    expect(session.nowPlaying.value!.key, session.zapList[i + 1].key);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await waitFor(tester, find.byKey(const Key('player.panel')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.byKey(const Key('player.panel')), findsNothing);
+    expect(find.byKey(const Key('player.back')), findsOneWidget);
+
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));

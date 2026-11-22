@@ -14,8 +14,15 @@ import 'item_tile.dart';
 import 'list_modes.dart';
 import 'player_screen.dart';
 
-/// Plays an item, or opens a series' episodes.
-void openItem(BuildContext context, Session session, ItemInfo item) {
+/// Plays an item, or opens a series' episodes. [channels]: the live channels around it (Up/Down in the player).
+void openItem(
+  BuildContext context,
+  Session session,
+  ItemInfo item, {
+  List<ItemInfo>? channels,
+}) {
+  // Opened without its group (search): no zapping through an older list.
+  if (item.kind == ItemKind.live) session.zapList = channels ?? const [];
   if (item.kind == ItemKind.series) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -227,7 +234,12 @@ class _ItemsScreenState extends State<ItemsScreen> {
               now: DateTime.now(),
               loading: _loading,
               onNearEnd: _more,
-              onTap: (it) => openItem(context, widget.session, it),
+              onTap: (it) => openItem(
+                context,
+                widget.session,
+                it,
+                channels: widget.kind == ItemKind.live ? List.of(shown) : null,
+              ),
             ),
           ),
         ],
