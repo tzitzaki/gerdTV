@@ -6,7 +6,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Stack: Flutter stable (pinned in `app/FLUTTER_VERSION`) + media_kit (libmpv everywhere) + a Rust core through flutter_rust_bridge v2.
 - Standalone apps now, a home hub later: every device runs the full core; user data uses stable content keys and `updated_at` so a hub can sync it later.
 - Crates: `gerdtv-core` (all logic), `gerdtv-api` (bridge surface only; package `gerdtv_api` because Cargokit names the native library after it), `gerdtv-testkit`, `gerdtv-release`.
-- Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform; the pub.dev forks are abandoned and the newer mpv_kit is too young to adopt.
+- Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform, pinned to exact versions; the pub.dev forks are abandoned and the newer mpv_kit is too young to adopt.
 - Playback ends only by Stop or by starting another stream; leaving the player keeps it running (now-playing bar, floating mini player, background playback).
 - Floating/background playback: desktop floating always-on-top window, Android system Picture-in-Picture with a foreground service, iPhone/iPad hand-over to AVPlayer Picture-in-Picture (live as .m3u8; .mkv falls back to sound only).
 - Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).

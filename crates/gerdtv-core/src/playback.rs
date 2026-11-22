@@ -36,6 +36,45 @@ impl BufferPreset {
     }
 }
 
+impl BufferPreset {
+    /// The stored form: "fast_zap", "balanced", "smooth", "max_smooth", "custom:<seconds>". Unknown → Balanced.
+    pub fn parse(s: &str) -> BufferPreset {
+        match s {
+            "fast_zap" => BufferPreset::FastZap,
+            "smooth" => BufferPreset::Smooth,
+            "max_smooth" => BufferPreset::MaxSmooth,
+            c if c.starts_with("custom:") => c[7..]
+                .parse()
+                .map(BufferPreset::Custom)
+                .unwrap_or(BufferPreset::Balanced),
+            _ => BufferPreset::Balanced,
+        }
+    }
+
+    pub fn key(self) -> String {
+        match self {
+            BufferPreset::FastZap => "fast_zap".into(),
+            BufferPreset::Balanced => "balanced".into(),
+            BufferPreset::Smooth => "smooth".into(),
+            BufferPreset::MaxSmooth => "max_smooth".into(),
+            BufferPreset::Custom(s) => format!("custom:{}", s.clamp(1, 300)),
+        }
+    }
+
+    /// One step more buffer (adaptive mode): the next named preset above this one's seconds; Max smooth stays.
+    pub fn step_up(self) -> BufferPreset {
+        let secs = self.seconds();
+        [
+            BufferPreset::Balanced,
+            BufferPreset::Smooth,
+            BufferPreset::MaxSmooth,
+        ]
+        .into_iter()
+        .find(|p| p.seconds() > secs)
+        .unwrap_or(BufferPreset::MaxSmooth)
+    }
+}
+
 /// Assumed bitrate when nothing better is known (an HD IPTV channel is typically 4–8 Mbit/s).
 pub const DEFAULT_BITRATE_BPS: u64 = 8_000_000;
 /// The demuxer never gets less than this, so short presets still hold a few seconds of a high-bitrate stream.
@@ -175,6 +214,8 @@ pub enum Command {
     Fail(String),
     /// The other URL form worked after a switch: remember it for this channel.
     RememberHls(bool),
+    /// Adaptive mode: this channel rebuffered too often; raise its buffer one step (and tell the user).
+    RaiseBuffer,
     /// One recovery episode ended: log it (stream_health).
     Health {
         trigger: Trigger,
@@ -248,7 +289,15 @@ pub struct Watchdog {
     /// The current recovery episode: (first trigger, seconds so far).
     episode: Option<(Trigger, u64)>,
     last_position: Option<u64>,
+    /// Adaptive mode (opt-in): more than ADAPTIVE_REBUFFERS rebuffers within ADAPTIVE_WINDOW_SECS → RaiseBuffer.
+    adaptive: bool,
+    /// Seconds since the watchdog started (counted in ticks), and when recent rebuffers began.
+    clock: u64,
+    rebuffers: std::collections::VecDeque<u64>,
 }
+
+const ADAPTIVE_REBUFFERS: usize = 3;
+const ADAPTIVE_WINDOW_SECS: u64 = 600;
 
 impl Watchdog {
     /// `target_secs`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.
@@ -265,7 +314,16 @@ impl Watchdog {
             wait: 0,
             episode: None,
             last_position: None,
+            adaptive: false,
+            clock: 0,
+            rebuffers: Default::default(),
         }
+    }
+
+    /// Turns on adaptive mode (more than 3 rebuffers in 10 min → RaiseBuffer, at most once per 10 min).
+    pub fn with_adaptive(mut self, on: bool) -> Watchdog {
+        self.adaptive = on;
+        self
     }
 
     pub fn state(&self) -> State {
@@ -275,6 +333,9 @@ impl Watchdog {
     pub fn on_event(&mut self, event: PlayerEvent) -> Vec<Command> {
         if self.state == State::Failed {
             return vec![]; // stopped on a hard error; a new stream gets a new watchdog
+        }
+        if event == PlayerEvent::Tick {
+            self.clock += 1;
         }
         match (self.state, event) {
             (_, PlayerEvent::Position(ms)) => {
@@ -288,7 +349,7 @@ impl Watchdog {
             (State::Playing, PlayerEvent::Buffering(true)) => {
                 self.state = State::Buffering;
                 self.idle = 0;
-                vec![]
+                self.note_rebuffer()
             }
             (State::Buffering, PlayerEvent::Buffering(false)) => {
                 self.state = State::Playing;
@@ -341,6 +402,25 @@ impl Watchdog {
                 }
             }
             _ => vec![],
+        }
+    }
+
+    /// Counts a rebuffer during playback; in adaptive mode, too many in the window ask for a bigger buffer.
+    fn note_rebuffer(&mut self) -> Vec<Command> {
+        let now = self.clock;
+        self.rebuffers.push_back(now);
+        while self
+            .rebuffers
+            .front()
+            .is_some_and(|&t| now - t >= ADAPTIVE_WINDOW_SECS)
+        {
+            self.rebuffers.pop_front();
+        }
+        if self.adaptive && self.rebuffers.len() > ADAPTIVE_REBUFFERS {
+            self.rebuffers.clear(); // raise once; the count starts again with the bigger buffer
+            vec![Command::RaiseBuffer]
+        } else {
+            vec![]
         }
     }
 
@@ -779,6 +859,74 @@ mod tests {
             (Some("0"), Some("no"))
         );
         assert_eq!((behind_live(754.4, 0.0), behind_live(10.0, 12.0)), (754, 0));
+    }
+
+    #[test]
+    fn presets_parse_store_and_step_up() {
+        for (key, preset) in [
+            ("fast_zap", BufferPreset::FastZap),
+            ("balanced", BufferPreset::Balanced),
+            ("smooth", BufferPreset::Smooth),
+            ("max_smooth", BufferPreset::MaxSmooth),
+            ("custom:45", BufferPreset::Custom(45)),
+        ] {
+            assert_eq!(BufferPreset::parse(key), preset);
+            assert_eq!(preset.key(), key);
+        }
+        assert_eq!(BufferPreset::parse("nonsense"), BufferPreset::Balanced);
+        assert_eq!(BufferPreset::parse("custom:x"), BufferPreset::Balanced);
+        let steps: Vec<BufferPreset> = [
+            BufferPreset::FastZap,
+            BufferPreset::Balanced,
+            BufferPreset::Custom(20),
+            BufferPreset::MaxSmooth,
+            BufferPreset::Custom(200),
+        ]
+        .into_iter()
+        .map(BufferPreset::step_up)
+        .collect();
+        assert_eq!(
+            steps,
+            [
+                BufferPreset::Balanced,
+                BufferPreset::Smooth,
+                BufferPreset::Smooth,
+                BufferPreset::MaxSmooth,
+                BufferPreset::MaxSmooth
+            ]
+        );
+    }
+
+    /// Adaptive mode: the 4th rebuffer within 10 minutes asks for more buffer, once; outside the window it doesn't.
+    #[test]
+    fn adaptive_mode_raises_after_too_many_rebuffers() {
+        let rebuffer = |w: &mut Watchdog| {
+            w.on_event(Playing);
+            let out = w.on_event(Buffering(true));
+            w.on_event(Buffering(false));
+            out
+        };
+        let mut w = Watchdog::new(true, 8, false).with_adaptive(true);
+        assert!((0..3).all(|_| rebuffer(&mut w).is_empty()));
+        assert_eq!(rebuffer(&mut w), vec![Command::RaiseBuffer]);
+        assert!(
+            rebuffer(&mut w).is_empty(),
+            "the count starts again after raising"
+        );
+
+        let mut slow = Watchdog::new(true, 8, false).with_adaptive(true);
+        for _ in 0..6 {
+            assert!(rebuffer(&mut slow).is_empty());
+            for _ in 0..200 {
+                slow.on_event(Playing);
+                slow.on_event(Tick);
+            }
+        }
+        let mut off = Watchdog::new(true, 8, false);
+        assert!(
+            (0..6).all(|_| rebuffer(&mut off).is_empty()),
+            "only in adaptive mode"
+        );
     }
 
     #[test]

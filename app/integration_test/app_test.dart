@@ -45,6 +45,13 @@ Future<void> waitFor(
   }
 }
 
+/// Waits until [found] can take a tap at its centre, then taps the first such match. Routes and sheets slide in (macOS from the right,
+/// sheets from below): a widget that merely exists may still be outside the window, and the tap would miss.
+Future<void> tapReady(WidgetTester tester, Finder found) async {
+  await waitFor(tester, found.hitTestable());
+  await tester.tap(found.hitTestable().first);
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
@@ -79,11 +86,17 @@ void main() {
     expect(session.lastSync!.entries, greaterThan(1000));
 
     debugPrint('JOURNEY: synced, shell shown');
+    // Settings → Playback: Fast zap for the whole profile.
+    await tester.tap(find.text('Settings'));
+    await waitFor(tester, find.byKey(const Key('buffer.fastZap')));
+    await tester.tap(find.byKey(const Key('buffer.fastZap')));
+    await tester.pump();
+    await tester.tap(find.text('Live TV'));
+    await tester.pump(const Duration(milliseconds: 300));
     // Browse: the first live group, then its first channel plays.
     await waitFor(tester, find.byType(ListTile));
     await tester.tap(find.byType(ListTile).first);
-    await waitFor(tester, find.byType(ItemTile));
-    await tester.tap(find.byType(ItemTile).first);
+    await tapReady(tester, find.byType(ItemTile));
     await waitFor(tester, find.byKey(const Key('player.back')));
     debugPrint('JOURNEY: player opened');
     final end = DateTime.now().add(const Duration(seconds: 30));
@@ -94,6 +107,39 @@ void main() {
       );
       await tester.pump();
     }
+    // The profile's Fast zap reached mpv; the channel's own buffer applies at once and shows in the readout.
+    Future<double> pauseWait() async => double.parse(
+      await tester.runAsync(
+            () => (session.player.platform as NativePlayer).getProperty(
+              'cache-pause-wait',
+            ),
+          ) ??
+          '0',
+    );
+    expect(await pauseWait(), 2);
+    await tester.tap(find.byKey(const Key('player.buffer')));
+    await tapReady(tester, find.byKey(const Key('buffer.smooth')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump();
+    expect(await pauseWait(), 30);
+    await waitFor(
+      tester,
+      find.byKey(const Key('buffer.default'), skipOffstage: false),
+    );
+    await tester.ensureVisible(find.byKey(const Key('buffer.default')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('buffer.default')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump();
+    expect(await pauseWait(), 2);
+    await tester.tapAt(const Offset(10, 10)); // close the sheet
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('/ 2 s'), findsOneWidget);
+
     // Desktop mini player: the window shrinks to the floating player, playback continues, Restore brings it back.
     final mini = MiniWindow();
     final fullWidth = mini.size.width;

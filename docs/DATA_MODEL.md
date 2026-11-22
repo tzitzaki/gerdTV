@@ -12,7 +12,8 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `items` | the catalogue: live channels, movies, episodes, series; name, category (for Xtream Codes episodes: their series key), logo, EPG id, channel number, credential-free URL (M3U only), season/episode/year, container extension (Xtream Codes movies/episodes), provider position, sync generation | `key` |
 | `items_fts` | contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`; rowids match `items` | rowid |
 | `favourites`, `recents` | user data: item key + `updated_at` | `key` |
-| `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), `updated_at` | `key` |
+| `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
+| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs` (values as text), `updated_at` | `key` |
 | `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).
@@ -30,5 +31,5 @@ M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `
 - Rows not seen in a sync are removed, except: when a source list comes back empty while the catalogue has rows of that kind, those rows are kept (panels answer `[]` now and then under load).
 
 ## Migrations
-Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`.
+Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`.
 - Xtream Codes episodes are fetched when a series opens and kept until the next full sync.

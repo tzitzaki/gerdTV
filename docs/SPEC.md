@@ -21,7 +21,9 @@ What gerdTV does, per platform. Sections fill in as features are built; this is 
 - **Picture-in-Picture and background (Android phone and TV):** leaving the app while something plays shrinks it to the system's floating window; with the screen off or in another app the stream keeps playing (a "gerdTV" notification shows while it runs) until Stop.
 - **Background and Picture-in-Picture (iPhone/iPad):** sound keeps playing with the screen locked or in another app; the player's PiP button hands the stream to Apple's player in a floating window (live channels and most VOD; `.mkv` movies continue in gerdTV instead), and closing PiP continues in gerdTV.
 - **Mini player (desktop):** the player's mini-player button (or P) shrinks the window to a floating, always-on-top picture (on every Space on macOS) with Restore and Stop; drag it anywhere; playback continues.
-- **Settings:** update now, last sync, stream health (every recovery), remove the account, licences, version.
+- **Buffer:** Settings → Playback chooses the profile's preset (Fast zap ~2 s, Balanced ~8 s, Smooth ~30 s, Max smooth ~90 s, Custom 1–300 s); the player's buffer button sets a channel's own preset (applied at once, "Use the default" goes back). The player shows buffered seconds against the target. Adaptive mode (opt-in): a channel that rebuffers more than 3 times in 10 minutes gets one step more and a short notice; never lowered automatically. The cache size follows the channel's measured bitrate.
+- **Pause and rewind live:** live channels keep a back buffer (Settings → Playback: off, 30, 60 or 120 min; default 60 on desktop, 30 on phone/TV) on disk, so the player's seek bar can go back.
+- **Settings:** update now, last sync, playback (buffer, adaptive mode, timeshift), stream health (every recovery), remove the account, licences, version.
 - English and German, following the system language; dark theme.
 
 ## Planned for v1 (built phase by phase)

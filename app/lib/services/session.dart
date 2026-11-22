@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import '../platform/platform_bridge.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
+import '../src/rust/api/playback.dart';
 import 'secrets.dart';
 
 enum SessionState { loading, needsSetup, ready }
@@ -83,6 +84,9 @@ class Session extends ChangeNotifier {
   /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
   /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
   final ValueNotifier<ItemInfo?> nowPlaying = ValueNotifier(null);
+
+  /// Adaptive mode raised the current channel's buffer to this many seconds (the player shows a short notice).
+  final ValueNotifier<int?> bufferRaisedTo = ValueNotifier(null);
 
   /// True while the full player screen is open (the now-playing bar hides then).
   final ValueNotifier<bool> playerOpen = ValueNotifier(false);
@@ -201,13 +205,7 @@ class Session extends ChangeNotifier {
     }
     nowPlaying.value = item;
     _playingKey = item.key;
-    final live = item.kind == ItemKind.live;
-    final preferHls = live && lib.preferHls(key: item.key);
-    await adapter.play(
-      ({required hls}) => lib.streamUrl(key: item.key, preferHls: hls),
-      live: live,
-      preferHls: preferHls,
-    );
+    await _start(item, lib);
   }
 
   /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
@@ -232,12 +230,43 @@ class Session extends ChangeNotifier {
     if (lib == null || nowPlaying.value?.key != item.key) {
       return; // stopped or replaced meanwhile
     }
+    await _start(item, lib);
+  }
+
+  /// Opens [item] with its buffer (own override, else the profile's preset), measured bitrate, adaptive mode, and for
+  /// live channels the timeshift back buffer (pause/rewind) from settings.
+  Future<void> _start(ItemInfo item, Library lib) async {
     final live = item.kind == ItemKind.live;
+    final choice = lib.bufferFor(key: item.key);
+    final bitrate = lib.bitrate(key: item.key).toInt();
+    final shift =
+        int.tryParse(lib.setting(key: settingTimeshift) ?? '') ??
+        defaultTimeshiftSeconds(desktop: isDesktop);
+    bufferRaisedTo.value = null;
     await adapter.play(
       ({required hls}) => lib.streamUrl(key: item.key, preferHls: hls),
       live: live,
+      preset: choice.preset,
+      customSeconds: choice.seconds,
+      bitrate: bitrate > 0 ? bitrate : null,
+      adaptive: lib.setting(key: settingAdaptive) == '1',
       preferHls: live && lib.preferHls(key: item.key),
+      extraOptions: live && shift > 0
+          ? timeshiftOptions(
+              windowSeconds: shift,
+              bitrateBps: bitrate > 0 ? BigInt.from(bitrate) : null,
+              // The back buffer's disk budget: a quarter of this. A free-space query per platform is a follow-up.
+              freeDiskBytes: BigInt.from(isDesktop ? 16000000000 : 4000000000),
+              cacheDir: await _timeshiftDir(),
+            )
+          : const [],
     );
+  }
+
+  Future<String> _timeshiftDir() async {
+    final dir = Directory('${(await getTemporaryDirectory()).path}/timeshift');
+    await dir.create(recursive: true);
+    return dir.path;
   }
 
   /// The only way playback ends besides starting another stream.
@@ -255,6 +284,11 @@ class Session extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// Profile setting keys (the core's library.rs constants).
+const settingBuffer = 'buffer_preset';
+const settingAdaptive = 'adaptive_buffer';
+const settingTimeshift = 'timeshift_secs';
 
 /// True on iPhone/iPad (Apple Picture-in-Picture hand-over).
 bool get isApple => !kIsWeb && Platform.isIOS;
