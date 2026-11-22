@@ -54,6 +54,11 @@ impl From<m3u::Kind> for Kind {
 const MIGRATIONS: &[&str] = &[
     // 1 → 2: the container extension of Xtream Codes movies and episodes (play URLs need it: mp4, mkv …).
     "ALTER TABLE items ADD COLUMN ext TEXT NOT NULL DEFAULT ''",
+    // 2 → 3: profile settings (buffer preset, adaptive mode, timeshift window …) and, per channel, a buffer override
+    // and the last measured video bitrate (sizes the demuxer cache). User data: updated_at for a later hub sync.
+    "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
+     ALTER TABLE stream_prefs ADD COLUMN buffer TEXT NOT NULL DEFAULT '';
+     ALTER TABLE stream_prefs ADD COLUMN bitrate INTEGER NOT NULL DEFAULT 0;",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -640,6 +645,10 @@ http://other.example.invalid/stream?token=s3cret
             c.execute("INSERT INTO items (key, kind, name, category, position, seen) VALUES ('live:1', 0, 'Arte', 'g', 0, 1)", []).unwrap();
         }
         let c = open(&path).unwrap();
+        let settings: i64 = c
+            .query_row("SELECT count(*) FROM settings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(settings, 0, "version 3 adds the settings table");
         let (name, ext): (String, String) = c
             .query_row("SELECT name, ext FROM items", [], |r| {
                 Ok((r.get(0)?, r.get(1)?))

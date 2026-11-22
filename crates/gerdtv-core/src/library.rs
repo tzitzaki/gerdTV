@@ -405,6 +405,11 @@ impl Library {
     }
 }
 
+/// Profile settings keys (values are strings).
+pub const SETTING_BUFFER: &str = "buffer_preset";
+pub const SETTING_ADAPTIVE: &str = "adaptive_buffer";
+pub const SETTING_TIMESHIFT: &str = "timeshift_secs";
+
 /// One stream_health row.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HealthEntry {
@@ -461,6 +466,101 @@ impl Library {
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// A profile setting, or None when never set.
+    pub fn setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+                r.get(0)
+            })
+            .optional()?)
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET value = ?2, updated_at = ?3",
+            params![key, value, now()],
+        )?;
+        Ok(())
+    }
+
+    /// The buffer preset for an item: its own override, else the profile's preset, else Balanced.
+    pub fn buffer_for(&self, key: &str) -> Result<crate::playback::BufferPreset> {
+        let own: Option<String> = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT buffer FROM stream_prefs WHERE key = ?1 AND buffer != ''",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let preset = own.or(self.setting(SETTING_BUFFER)?).unwrap_or_default();
+        Ok(crate::playback::BufferPreset::parse(&preset))
+    }
+
+    /// The item's own buffer override, if it has one.
+    pub fn channel_buffer(&self, key: &str) -> Result<Option<crate::playback::BufferPreset>> {
+        let own: Option<String> = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT buffer FROM stream_prefs WHERE key = ?1 AND buffer != ''",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(own.map(|k| crate::playback::BufferPreset::parse(&k)))
+    }
+
+    /// Sets (Some) or clears (None: use the profile's preset) an item's buffer override.
+    pub fn set_channel_buffer(
+        &self,
+        key: &str,
+        preset: Option<crate::playback::BufferPreset>,
+    ) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO stream_prefs (key, prefer_hls, updated_at, buffer) VALUES (?1, 0, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET buffer = ?3, updated_at = ?2",
+            params![key, now(), preset.map(|p| p.key()).unwrap_or_default()],
+        )?;
+        Ok(())
+    }
+
+    /// Adaptive mode: raises this item's buffer one step (stored as its override) and returns the new preset.
+    pub fn raise_buffer(&self, key: &str) -> Result<crate::playback::BufferPreset> {
+        let next = self.buffer_for(key)?.step_up();
+        self.set_channel_buffer(key, Some(next))?;
+        Ok(next)
+    }
+
+    /// The channel's last measured video bitrate in bit/s (0 = unknown).
+    pub fn bitrate(&self, key: &str) -> Result<u64> {
+        let v: Option<i64> = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT bitrate FROM stream_prefs WHERE key = ?1",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(v.unwrap_or(0).max(0) as u64)
+    }
+
+    pub fn set_bitrate(&self, key: &str, bps: u64) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO stream_prefs (key, prefer_hls, updated_at, bitrate) VALUES (?1, 0, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET bitrate = ?3, updated_at = ?2",
+            params![key, now(), bps as i64],
+        )?;
+        Ok(())
     }
 
     /// Whether this channel last worked as HLS (false = TS, the default).
@@ -583,6 +683,34 @@ mod tests {
             ),
             (2, "live:gone", page[0].name.as_str(), true)
         );
+
+        // Buffer: profile preset, per-channel override (cleared again), measured bitrate.
+        use crate::playback::BufferPreset;
+        assert_eq!(lib.buffer_for(&key).unwrap(), BufferPreset::Balanced);
+        lib.set_setting(SETTING_BUFFER, "smooth").unwrap();
+        assert_eq!(lib.buffer_for(&key).unwrap(), BufferPreset::Smooth);
+        assert_eq!(lib.channel_buffer(&key).unwrap(), None);
+        lib.set_channel_buffer(&key, Some(BufferPreset::Custom(45)))
+            .unwrap();
+        assert_eq!(lib.buffer_for(&key).unwrap(), BufferPreset::Custom(45));
+        assert_eq!(
+            lib.channel_buffer(&key).unwrap(),
+            Some(BufferPreset::Custom(45))
+        );
+        assert_eq!(
+            lib.raise_buffer(&key).unwrap(),
+            BufferPreset::MaxSmooth,
+            "45 s steps up past Smooth (30 s)"
+        );
+        assert!(
+            lib.prefer_hls(&key).unwrap(),
+            "the override keeps the remembered URL form"
+        );
+        lib.set_channel_buffer(&key, None).unwrap();
+        assert_eq!(lib.buffer_for(&key).unwrap(), BufferPreset::Smooth);
+        assert_eq!(lib.bitrate(&key).unwrap(), 0);
+        lib.set_bitrate(&key, 6_500_000).unwrap();
+        assert_eq!(lib.bitrate(&key).unwrap(), 6_500_000);
 
         // Cache-first: reopening without network shows the catalogue at once.
         drop(lib);

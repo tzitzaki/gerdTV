@@ -5,8 +5,10 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
+import '../src/rust/api/playback.dart';
 import '../src/rust/api/simple.dart';
 import '../theme.dart';
+import 'buffer_picker.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.session});
@@ -77,6 +79,8 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => _confirmRemove(context),
             ),
             const Divider(),
+            if (session.library != null) _PlaybackSettings(session: session),
+            const Divider(),
             ListTile(
               title: Text(
                 l10n.settingsHealth,
@@ -134,6 +138,83 @@ class SettingsScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Settings → Playback: the profile's buffer preset, adaptive mode, and the timeshift window (pause/rewind live).
+/// Stored as profile settings (user data); a channel's own buffer (set in the player) wins over the preset.
+class _PlaybackSettings extends StatefulWidget {
+  const _PlaybackSettings({required this.session});
+  final Session session;
+
+  @override
+  State<_PlaybackSettings> createState() => _PlaybackSettingsState();
+}
+
+class _PlaybackSettingsState extends State<_PlaybackSettings> {
+  Library get _lib => widget.session.library!;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final preset = parseBuffer(
+      key: _lib.setting(key: settingBuffer) ?? 'balanced',
+    );
+    final adaptive = _lib.setting(key: settingAdaptive) == '1';
+    final shift =
+        int.tryParse(_lib.setting(key: settingTimeshift) ?? '') ??
+        defaultTimeshiftSeconds(desktop: isDesktop);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          title: Text(
+            l10n.settingsPlayback,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        ListTile(
+          title: Text(l10n.settingsBuffer),
+          subtitle: Text(l10n.bufferHint),
+        ),
+        BufferPicker(
+          value: preset,
+          onChanged: (c) => setState(() {
+            _lib.setSetting(
+              key: settingBuffer,
+              value: bufferKey(preset: c.preset, customSeconds: c.seconds),
+            );
+          }),
+        ),
+        SwitchListTile(
+          key: const Key('settings.adaptive'),
+          title: Text(l10n.adaptiveBuffer),
+          subtitle: Text(l10n.adaptiveHint),
+          value: adaptive,
+          onChanged: (on) => setState(
+            () => _lib.setSetting(key: settingAdaptive, value: on ? '1' : '0'),
+          ),
+        ),
+        ListTile(
+          title: Text(l10n.timeshift),
+          trailing: DropdownButton<int>(
+            key: const Key('settings.timeshift'),
+            value: [0, 1800, 3600, 7200].contains(shift) ? shift : 3600,
+            items: [
+              DropdownMenuItem(value: 0, child: Text(l10n.timeshiftOff)),
+              for (final m in [30, 60, 120])
+                DropdownMenuItem(
+                  value: m * 60,
+                  child: Text(l10n.timeshiftMinutes(m)),
+                ),
+            ],
+            onChanged: (v) => setState(
+              () => _lib.setSetting(key: settingTimeshift, value: '${v ?? 0}'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

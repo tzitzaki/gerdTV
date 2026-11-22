@@ -18,6 +18,7 @@ import '../platform/mini_window.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'buffer_picker.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key, required this.session, required this.item});
@@ -75,6 +76,71 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _stop() async {
     await widget.session.stopPlayback();
     if (mounted) Navigator.of(context).maybePop();
+  }
+
+  /// "Buffer for this channel": the channel's own preset (or back to the default), applied to the running stream.
+  Future<void> _bufferSheet() async {
+    final lib = widget.session.library;
+    if (lib == null) return;
+    final key = widget.item.key;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            final current = lib.bufferFor(key: key);
+            return SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      title: Text(
+                        l10n.bufferThisChannel,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    BufferPicker(
+                      value: current,
+                      onChanged: (c) {
+                        lib.setChannelBuffer(
+                          key: key,
+                          preset: c.preset,
+                          customSeconds: c.seconds,
+                        );
+                        widget.session.adapter.applyBuffer(c.preset, c.seconds);
+                        setSheet(() {});
+                      },
+                    ),
+                    if (lib.hasChannelBuffer(key: key))
+                      TextButton(
+                        key: const Key('buffer.default'),
+                        onPressed: () {
+                          lib.setChannelBuffer(
+                            key: key,
+                            preset: null,
+                            customSeconds: 0,
+                          );
+                          final d = lib.bufferFor(key: key);
+                          widget.session.adapter.applyBuffer(
+                            d.preset,
+                            d.seconds,
+                          );
+                          setSheet(() {});
+                        },
+                        child: Text(
+                          '${l10n.bufferUseDefault} (${presetLabel(l10n, lib.bufferFor(key: key))})',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _togglePause() async {
@@ -142,6 +208,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
+                              IconButton.filledTonal(
+                                key: const Key('player.buffer'),
+                                tooltip: l10n.bufferThisChannel,
+                                icon: const Icon(Icons.tune),
+                                onPressed: _bufferSheet,
+                              ),
+                              const SizedBox(width: Tokens.space),
                               if (isApple) ...[
                                 IconButton.filledTonal(
                                   key: const Key('player.applePip'),
@@ -163,35 +236,71 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ),
                         ),
                       ),
+                      // Buffered seconds vs. the target (bottom left): the stream's cushion right now.
+                      Positioned(
+                        left: Tokens.space * 2,
+                        bottom: Tokens.space * 2,
+                        child: StreamBuilder<Duration>(
+                          stream: widget.session.player.stream.buffer,
+                          builder: (context, snap) {
+                            final buffered =
+                                ((snap.data ?? Duration.zero) -
+                                        widget.session.player.state.position)
+                                    .inSeconds;
+                            return ValueListenableBuilder<int>(
+                              valueListenable: adapter.target,
+                              builder: (context, target, _) => Text(
+                                l10n.bufferReadout(
+                                  buffered < 0 ? 0 : buffered,
+                                  target,
+                                ),
+                                key: const Key('player.bufferReadout'),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(color: Colors.white70),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Padding(
                           padding: const EdgeInsets.all(Tokens.space * 4),
-                          child: ValueListenableBuilder<String?>(
-                            valueListenable: adapter.failure,
-                            builder: (context, failure, _) =>
-                                ValueListenableBuilder<int>(
-                                  valueListenable: adapter.reconnecting,
-                                  builder: (context, attempt, _) {
-                                    final text =
-                                        failure ??
-                                        (attempt > 0
-                                            ? l10n.playerReconnecting(attempt)
-                                            : null);
-                                    if (text == null) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return Card(
-                                      key: const Key('player.notice'),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(
-                                          Tokens.space * 2,
-                                        ),
-                                        child: Text(text),
+                          child: ListenableBuilder(
+                            listenable: Listenable.merge([
+                              adapter.failure,
+                              adapter.reconnecting,
+                              widget.session.bufferRaisedTo,
+                            ]),
+                            builder: (context, _) {
+                              final failure = adapter.failure.value;
+                              final attempt = adapter.reconnecting.value;
+                              final raised =
+                                  widget.session.bufferRaisedTo.value;
+                              return Builder(
+                                builder: (context) {
+                                  final text =
+                                      failure ??
+                                      (attempt > 0
+                                          ? l10n.playerReconnecting(attempt)
+                                          : raised != null
+                                          ? l10n.bufferRaised(raised)
+                                          : null);
+                                  if (text == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Card(
+                                    key: const Key('player.notice'),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(
+                                        Tokens.space * 2,
                                       ),
-                                    );
-                                  },
-                                ),
+                                      child: Text(text),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ),
                       ),

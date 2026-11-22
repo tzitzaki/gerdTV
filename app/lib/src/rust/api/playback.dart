@@ -7,7 +7,18 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `feed`, `of`, `preset`
+// These functions are ignored because they are not marked as `pub`: `choice`, `feed`, `from_choice`, `of`, `preset`
+
+/// The stored form of a preset ("smooth", "custom:45" …), for profile settings.
+String bufferKey({required BufferPreset preset, required int customSeconds}) =>
+    RustLib.instance.api.crateApiPlaybackBufferKey(
+      preset: preset,
+      customSeconds: customSeconds,
+    );
+
+/// Parses a stored preset (unknown → Balanced).
+BufferChoice parseBuffer({required String key}) =>
+    RustLib.instance.api.crateApiPlaybackParseBuffer(key: key);
 
 /// The mpv options to set before opening a stream (bitrate unknown → the core's default estimate).
 List<MpvOption> bufferOptions({
@@ -53,10 +64,12 @@ abstract class Watchdog implements RustOpaqueInterface {
     required bool live,
     required int targetSeconds,
     required bool preferHls,
+    required bool adaptive,
   }) => RustLib.instance.api.crateApiPlaybackWatchdogNew(
     live: live,
     targetSeconds: targetSeconds,
     preferHls: preferHls,
+    adaptive: adaptive,
   );
 
   List<WatchdogCommand> onBuffering({required bool active});
@@ -78,11 +91,31 @@ abstract class Watchdog implements RustOpaqueInterface {
   List<WatchdogCommand> onWake();
 }
 
+/// A preset as the UI shows it: the kind plus its seconds (for Custom, the chosen value).
+class BufferChoice {
+  final BufferPreset preset;
+  final int seconds;
+
+  const BufferChoice({required this.preset, required this.seconds});
+
+  @override
+  int get hashCode => preset.hashCode ^ seconds.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BufferChoice &&
+          runtimeType == other.runtimeType &&
+          preset == other.preset &&
+          seconds == other.seconds;
+}
+
 /// A buffer preset as the UI names it. Data-free enums only on this surface: flutter_rust_bridge needs the
 /// `freezed` package for enums with fields, which isn't worth a dependency (CLAUDE.md, "Dependencies").
 enum BufferPreset { fastZap, balanced, smooth, maxSmooth, custom }
 
 enum CommandKind {
+  raiseBuffer,
   reload,
   showReconnecting,
   hideReconnecting,

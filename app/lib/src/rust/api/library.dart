@@ -7,6 +7,8 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+import 'playback.dart';
+
 // These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `to_core`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
 
@@ -25,10 +27,19 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>>
 abstract class Library implements RustOpaqueInterface {
+  /// The item's last measured video bitrate (bit/s, 0 = unknown).
+  BigInt bitrate({required String key});
+
+  /// The buffer for an item: its override, else the profile's preset, else Balanced.
+  BufferChoice bufferFor({required String key});
+
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
+
+  /// Whether the item has its own buffer (else it follows the profile's preset).
+  bool hasChannelBuffer({required String key});
 
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
@@ -53,6 +64,9 @@ abstract class Library implements RustOpaqueInterface {
 
   bool preferHls({required String key});
 
+  /// Adaptive mode: one step more buffer for this item; returns the new choice.
+  BufferChoice raiseBuffer({required String key});
+
   /// Logs a recovery episode (the watchdog's Health command).
   Future<void> recordHealth({
     required String key,
@@ -71,7 +85,21 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
   });
 
+  void setBitrate({required String key, required BigInt bps});
+
+  /// Sets the item's own buffer; `preset` None clears it (back to the profile's preset).
+  void setChannelBuffer({
+    required String key,
+    BufferPreset? preset,
+    required int customSeconds,
+  });
+
   Future<void> setPreferHls({required String key, required bool hls});
+
+  void setSetting({required String key, required String value});
+
+  /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
+  String? setting({required String key});
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});

@@ -23,6 +23,42 @@ fn preset(p: BufferPreset, custom_seconds: u32) -> core::BufferPreset {
     }
 }
 
+/// A preset as the UI shows it: the kind plus its seconds (for Custom, the chosen value).
+pub struct BufferChoice {
+    pub preset: BufferPreset,
+    pub seconds: u32,
+}
+
+pub(crate) fn choice(p: core::BufferPreset) -> BufferChoice {
+    let preset = match p {
+        core::BufferPreset::FastZap => BufferPreset::FastZap,
+        core::BufferPreset::Balanced => BufferPreset::Balanced,
+        core::BufferPreset::Smooth => BufferPreset::Smooth,
+        core::BufferPreset::MaxSmooth => BufferPreset::MaxSmooth,
+        core::BufferPreset::Custom(_) => BufferPreset::Custom,
+    };
+    BufferChoice {
+        preset,
+        seconds: p.seconds(),
+    }
+}
+
+pub(crate) fn from_choice(preset: BufferPreset, seconds: u32) -> core::BufferPreset {
+    self::preset(preset, seconds)
+}
+
+/// The stored form of a preset ("smooth", "custom:45" …), for profile settings.
+#[flutter_rust_bridge::frb(sync)]
+pub fn buffer_key(preset: BufferPreset, custom_seconds: u32) -> String {
+    self::preset(preset, custom_seconds).key()
+}
+
+/// Parses a stored preset (unknown → Balanced).
+#[flutter_rust_bridge::frb(sync)]
+pub fn parse_buffer(key: String) -> BufferChoice {
+    choice(core::BufferPreset::parse(&key))
+}
+
 pub struct MpvOption {
     pub name: String,
     pub value: String,
@@ -80,6 +116,7 @@ pub fn behind_live(cache_end_seconds: f64, position_seconds: f64) -> u32 {
 }
 
 pub enum CommandKind {
+    RaiseBuffer,
     Reload,
     ShowReconnecting,
     HideReconnecting,
@@ -124,12 +161,10 @@ pub struct Watchdog(Mutex<core::Watchdog>);
 impl Watchdog {
     /// `target_seconds`: the buffer preset's target; `prefer_hls`: what worked last time for this channel.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn new(live: bool, target_seconds: u32, prefer_hls: bool) -> Watchdog {
-        Watchdog(Mutex::new(core::Watchdog::new(
-            live,
-            target_seconds,
-            prefer_hls,
-        )))
+    pub fn new(live: bool, target_seconds: u32, prefer_hls: bool, adaptive: bool) -> Watchdog {
+        Watchdog(Mutex::new(
+            core::Watchdog::new(live, target_seconds, prefer_hls).with_adaptive(adaptive),
+        ))
     }
 
     // One method per player event (see BufferPreset for why not one enum with fields).
@@ -191,6 +226,7 @@ impl Watchdog {
                     attempt,
                     ..WatchdogCommand::of(CommandKind::ShowReconnecting)
                 },
+                core::Command::RaiseBuffer => WatchdogCommand::of(CommandKind::RaiseBuffer),
                 core::Command::HideReconnecting => {
                     WatchdogCommand::of(CommandKind::HideReconnecting)
                 }

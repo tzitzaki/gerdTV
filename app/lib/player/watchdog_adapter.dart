@@ -26,7 +26,22 @@ typedef OnHealth = void Function(
 );
 
 class WatchdogAdapter {
-  WatchdogAdapter(this.player, {this.onHealth, this.onRememberHls});
+  WatchdogAdapter(
+    this.player, {
+    this.onHealth,
+    this.onRememberHls,
+    this.onRaiseBuffer,
+    this.onBitrate,
+  });
+
+  /// Adaptive mode asked for more buffer on this channel; returns the new target seconds (applied at once).
+  final int Function()? onRaiseBuffer;
+
+  /// mpv measured the stream's video bitrate (bit/s): stored per channel to size the cache next time.
+  final void Function(int bps)? onBitrate;
+
+  /// The current buffer target in seconds (the overlay shows buffered vs. this).
+  final ValueNotifier<int> target = ValueNotifier(8);
 
   /// Create every player with this: the watchdog needs mpv's warnings, because FFmpeg reports HTTP status
   /// errors ("HTTP error 403 Forbidden") at warn level, and media_kit only asks for errors by default.
@@ -47,6 +62,28 @@ class WatchdogAdapter {
   final ValueNotifier<String?> failure = ValueNotifier(null);
 
   Watchdog? _watchdog;
+  BufferPreset _preset = BufferPreset.balanced;
+  int _customSeconds = 0;
+  bool _bitrateReported = false;
+
+  /// Sets a preset's mpv options (sized for [bitrate] when known) and the target the overlay compares with.
+  Future<void> _applyBuffer(
+    NativePlayer native,
+    BufferPreset preset,
+    int customSeconds,
+    int? bitrate,
+  ) async {
+    final options = bufferOptions(
+      preset: preset,
+      customSeconds: customSeconds,
+      bitrateBps: bitrate == null || bitrate <= 0 ? null : BigInt.from(bitrate),
+    );
+    for (final o in options) {
+      await native.setProperty(o.name, o.value);
+      if (o.name == 'cache-pause-wait') target.value = int.parse(o.value);
+    }
+  }
+
   UrlFor? _urlFor;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _ticker;
@@ -58,21 +95,42 @@ class WatchdogAdapter {
     UrlFor urlFor, {
     required bool live,
     BufferPreset preset = BufferPreset.balanced,
+    int customSeconds = 0,
+    int? bitrate,
+    bool adaptive = false,
     bool preferHls = false,
+    List<MpvOption> extraOptions = const [],
   }) async {
     await stop();
     _urlFor = urlFor;
+    _preset = preset;
+    _customSeconds = customSeconds;
     final native = player.platform as NativePlayer;
-    var target = 8;
-    for (final o in bufferOptions(preset: preset, customSeconds: 0)) {
+    await _applyBuffer(native, preset, customSeconds, bitrate);
+    for (final o in extraOptions) {
       await native.setProperty(o.name, o.value);
-      if (o.name == 'cache-pause-wait') target = int.parse(o.value);
     }
     _watchdog = Watchdog(
       live: live,
-      targetSeconds: target,
+      targetSeconds: target.value,
       preferHls: preferHls,
+      adaptive: adaptive,
     );
+    _bitrateReported = false;
+    // mpv's measured video bitrate (bit/s): reported once per stream; the cache is resized for it right away.
+    await native.observeProperty('video-bitrate', (v) async {
+      final bps = double.tryParse(v)?.round() ?? 0;
+      if (bps > 0 && !_bitrateReported) {
+        _bitrateReported = true;
+        onBitrate?.call(bps);
+        await _applyBuffer(
+          native,
+          _preset,
+          _customSeconds,
+          bps,
+        ); // demuxer-max-bytes can change while playing
+      }
+    });
     _subs.addAll([
       // Position moving forward is the only reliable sign that playback really advances.
       player.stream.position.listen((p) {
@@ -107,6 +165,18 @@ class WatchdogAdapter {
     await player.open(Media(urlFor(hls: preferHls)));
   }
 
+  /// A new buffer for the running stream (the player's "Buffer for this channel"); mpv applies it at once.
+  Future<void> applyBuffer(BufferPreset preset, int customSeconds) async {
+    _preset = preset;
+    _customSeconds = customSeconds;
+    await _applyBuffer(
+      player.platform as NativePlayer,
+      preset,
+      customSeconds,
+      null,
+    );
+  }
+
   /// User pause/resume: a paused stream is never treated as stalled.
   Future<void> pause() async {
     _run(_watchdog?.onUserPause(paused: true));
@@ -124,6 +194,13 @@ class WatchdogAdapter {
 
   Future<void> stop() async {
     _ticker?.cancel();
+    try {
+      await (player.platform as NativePlayer).unobserveProperty(
+        'video-bitrate',
+      );
+    } catch (_) {
+      // Not observed yet.
+    }
     _lifecycle?.dispose();
     _lifecycle = null;
     for (final s in _subs) {
@@ -152,6 +229,20 @@ class WatchdogAdapter {
           );
         case CommandKind.showReconnecting:
           reconnecting.value = c.attempt;
+        case CommandKind.raiseBuffer:
+          final secs = onRaiseBuffer?.call();
+          if (secs != null) {
+            _preset = BufferPreset.custom;
+            _customSeconds = secs;
+            unawaited(
+              _applyBuffer(
+                player.platform as NativePlayer,
+                _preset,
+                secs,
+                null,
+              ),
+            );
+          }
         case CommandKind.hideReconnecting:
           reconnecting.value = 0;
         case CommandKind.fail:

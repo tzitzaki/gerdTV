@@ -8,9 +8,38 @@
       }
     }
   },
+  "adaptiveBuffer": "Raise the buffer automatically",
+  "adaptiveHint": "When a channel stutters more than 3 times in 10 minutes, its buffer goes up one step.",
   "appTitle": "gerdTV",
   "back": "Back",
   "browseEmpty": "Nothing here yet. The first update may still be running; check Settings.",
+  "bufferBalanced": "Balanced (about 8 s)",
+  "bufferCustom": "Custom",
+  "bufferFastZap": "Fast zap (about 2 s)",
+  "bufferHint": "More buffer: a later but smoother start and fewer stutters on a slow line.",
+  "bufferMaxSmooth": "Max smooth (about 90 s)",
+  "bufferRaised": "Buffer raised to {seconds} s for this channel",
+  "@bufferRaised": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "bufferReadout": "Buffer {buffered} / {target} s",
+  "@bufferReadout": {
+    "placeholders": {
+      "buffered": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+  "bufferSmooth": "Smooth (about 30 s)",
+  "bufferThisChannel": "Buffer for this channel",
+  "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
   "chipAll": "All",
   "clear": "Clear",
@@ -64,8 +93,17 @@
       }
     }
   },
+  "secondsShort": "{seconds} s",
+  "@secondsShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "settingsAbout": "About",
   "settingsAccount": "Account",
+  "settingsBuffer": "Buffer",
   "settingsHealth": "Stream health",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
@@ -79,6 +117,7 @@
     }
   },
   "settingsLicences": "Licences",
+  "settingsPlayback": "Playback",
   "settingsRemove": "Remove this account",
   "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",
   "settingsSyncNow": "Update now",
@@ -111,5 +150,15 @@
       }
     }
   },
-  "syncing": "Updating the catalogue…"
+  "syncing": "Updating the catalogue…",
+  "timeshift": "Pause and rewind live TV",
+  "timeshiftMinutes": "{minutes} min",
+  "@timeshiftMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "timeshiftOff": "Off"
 }

@@ -74,6 +74,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  BufferPreset dco_decode_box_autoadd_buffer_preset(dynamic raw);
+
+  @protected
   ItemKind dco_decode_box_autoadd_item_kind(dynamic raw);
 
   @protected
@@ -84,6 +87,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  BufferChoice dco_decode_buffer_choice(dynamic raw);
 
   @protected
   BufferPreset dco_decode_buffer_preset(dynamic raw);
@@ -144,6 +150,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MpvOption dco_decode_mpv_option(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  BufferPreset? dco_decode_opt_box_autoadd_buffer_preset(dynamic raw);
 
   @protected
   ItemKind? dco_decode_opt_box_autoadd_item_kind(dynamic raw);
@@ -227,6 +239,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  BufferPreset sse_decode_box_autoadd_buffer_preset(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ItemKind sse_decode_box_autoadd_item_kind(SseDeserializer deserializer);
 
   @protected
@@ -237,6 +254,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  BufferChoice sse_decode_buffer_choice(SseDeserializer deserializer);
 
   @protected
   BufferPreset sse_decode_buffer_preset(SseDeserializer deserializer);
@@ -301,6 +321,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MpvOption sse_decode_mpv_option(SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  BufferPreset? sse_decode_opt_box_autoadd_buffer_preset(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ItemKind? sse_decode_opt_box_autoadd_item_kind(SseDeserializer deserializer);
@@ -390,6 +418,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_buffer_preset(
+    BufferPreset self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_item_kind(
     ItemKind self,
     SseSerializer serializer,
@@ -406,6 +440,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_buffer_choice(BufferChoice self, SseSerializer serializer);
 
   @protected
   void sse_encode_buffer_preset(BufferPreset self, SseSerializer serializer);
@@ -487,6 +524,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_mpv_option(MpvOption self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_buffer_preset(
+    BufferPreset? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_item_kind(

@@ -290,6 +290,68 @@ impl Library {
             .collect())
     }
 
+    /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn setting(&self, key: String) -> Result<Option<String>, String> {
+        self.0.setting(&key).map_err(err)
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
+        self.0.set_setting(&key, &value).map_err(err)
+    }
+
+    /// The buffer for an item: its override, else the profile's preset, else Balanced.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn buffer_for(&self, key: String) -> Result<super::playback::BufferChoice, String> {
+        self.0
+            .buffer_for(&key)
+            .map(super::playback::choice)
+            .map_err(err)
+    }
+
+    /// Whether the item has its own buffer (else it follows the profile's preset).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn has_channel_buffer(&self, key: String) -> Result<bool, String> {
+        Ok(self.0.channel_buffer(&key).map_err(err)?.is_some())
+    }
+
+    /// Sets the item's own buffer; `preset` None clears it (back to the profile's preset).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_channel_buffer(
+        &self,
+        key: String,
+        preset: Option<super::playback::BufferPreset>,
+        custom_seconds: u32,
+    ) -> Result<(), String> {
+        self.0
+            .set_channel_buffer(
+                &key,
+                preset.map(|p| super::playback::from_choice(p, custom_seconds)),
+            )
+            .map_err(err)
+    }
+
+    /// Adaptive mode: one step more buffer for this item; returns the new choice.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn raise_buffer(&self, key: String) -> Result<super::playback::BufferChoice, String> {
+        self.0
+            .raise_buffer(&key)
+            .map(super::playback::choice)
+            .map_err(err)
+    }
+
+    /// The item's last measured video bitrate (bit/s, 0 = unknown).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn bitrate(&self, key: String) -> Result<u64, String> {
+        self.0.bitrate(&key).map_err(err)
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_bitrate(&self, key: String, bps: u64) -> Result<(), String> {
+        self.0.set_bitrate(&key, bps).map_err(err)
+    }
+
     #[flutter_rust_bridge::frb(sync)]
     pub fn prefer_hls(&self, key: String) -> Result<bool, String> {
         self.0.prefer_hls(&key).map_err(err)
