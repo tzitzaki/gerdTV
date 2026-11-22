@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
 import 'package:gerdtv/platform/mini_window.dart';
+import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/programme_sheet.dart';
 import 'package:gerdtv/screens/list_modes.dart';
@@ -64,7 +65,19 @@ void main() {
     await waitFor(tester, find.byKey(const Key('buffer.fastZap')));
     await tester.tap(find.byKey(const Key('buffer.fastZap')));
     await tester.pump();
-    await tester.tap(find.text('Live TV'));
+    // Settings → Appearance: another logo, stored app-wide and sent to the Linux window as its icon.
+    await tapReady(tester, find.byKey(const Key('settings.cat.appearance')));
+    await tapReady(tester, find.byKey(const Key('settings.logo.signal')));
+    await tester.pump();
+    expect(session.logo, AppLogo.signal);
+    expect(appSetting(dir: dir.path, key: Session.settingAppLogo), 'signal');
+    // The rail's Live TV (Appearance lists the sections by name too).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Live TV'),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 300));
     // Browse: the first live group, then its first channel plays.
     await waitFor(tester, find.byType(ListTile));

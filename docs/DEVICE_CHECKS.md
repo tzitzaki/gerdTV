@@ -20,6 +20,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
+- Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
 ## iPhone
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
@@ -27,6 +28,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
 - Background: locking the phone while a channel plays keeps the sound going; the lock screen shows it.
 - PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
+- Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 
 ## iPad
 - PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
@@ -35,6 +37,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
+- Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
 
 ## Shield
 - Install: the APK installs and gerdTV appears in the TV launcher row with its banner.
@@ -45,3 +48,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
+- Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
