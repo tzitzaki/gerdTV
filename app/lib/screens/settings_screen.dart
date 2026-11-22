@@ -1,4 +1,4 @@
-// Settings: the account (update now, last sync, remove), playback, the TV guide, stream health, about.
+// Settings: the account (update now, last sync, remove), playback, the TV guide, list modes, stream health, about.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -10,6 +10,7 @@ import '../src/rust/api/simple.dart';
 import '../theme.dart';
 import 'buffer_picker.dart';
 import 'guide_settings.dart';
+import 'list_modes.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.session});
@@ -83,6 +84,8 @@ class SettingsScreen extends StatelessWidget {
             if (session.library != null) _PlaybackSettings(session: session),
             const Divider(),
             if (session.library != null) GuideSettings(session: session),
+            const Divider(),
+            if (session.library != null) _ListSettings(session: session),
             const Divider(),
             ListTile(
               title: Text(
@@ -217,6 +220,62 @@ class _PlaybackSettingsState extends State<_PlaybackSettings> {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Settings → Lists: each section's list mode (the list bar's toggle changes the same setting).
+class _ListSettings extends StatefulWidget {
+  const _ListSettings({required this.session});
+  final Session session;
+
+  @override
+  State<_ListSettings> createState() => _ListSettingsState();
+}
+
+class _ListSettingsState extends State<_ListSettings> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final lib = widget.session.library!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          title: Text(
+            l10n.settingsLists,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        for (final (kind, name) in [
+          (ItemKind.live, l10n.navLive),
+          (ItemKind.movie, l10n.navMovies),
+          (ItemKind.series, l10n.navSeries),
+        ])
+          ListTile(
+            title: Text(name),
+            trailing: DropdownButton<ListMode>(
+              key: Key('settings.listMode.${kind.name}'),
+              value: parseListMode(
+                lib.setting(key: listModeSetting(kind)),
+                kind,
+              ),
+              items: [
+                for (final m in ListMode.values)
+                  DropdownMenuItem(
+                    value: m,
+                    child: Text(listModeLabel(l10n, m)),
+                  ),
+              ],
+              onChanged: (m) => setState(
+                () => lib.setSetting(
+                  key: listModeSetting(kind),
+                  value: (m ?? defaultListMode(kind)).name,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

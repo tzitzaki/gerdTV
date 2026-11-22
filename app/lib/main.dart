@@ -6,18 +6,22 @@
 
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'l10n/gen/app_localizations.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
 import 'services/session.dart';
+import 'src/rust/api/logos.dart';
 import 'src/rust/frb_generated.dart';
 import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
+  // Logos and posters are kept on disk (the OS may clear this folder; they are fetched again then).
+  initLogoCache(dir: '${(await getApplicationCacheDirectory()).path}/logos');
   MediaKit.ensureInitialized();
   final session = Session()..start();
   session.platform.attach();

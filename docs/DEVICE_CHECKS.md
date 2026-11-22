@@ -13,6 +13,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
+- Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
+- Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
 
 ## iPhone
@@ -35,3 +37,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
 - PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.
+- Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.

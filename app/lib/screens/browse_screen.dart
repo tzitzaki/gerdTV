@@ -1,5 +1,8 @@
 // Browse one kind (Live TV, Movies, Series): the provider's groups in provider order, then a group's items
-// (paged, 100 at a time, more on scroll). Series open their episodes; everything else plays.
+// (paged, 100 at a time, more on scroll) in the section's list mode, live channels with what's on now and next.
+// Series open their episodes; everything else plays.
+
+import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -8,6 +11,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'item_tile.dart';
+import 'list_modes.dart';
 import 'player_screen.dart';
 
 /// Plays an item, or opens a series' episodes.
@@ -101,17 +105,57 @@ class _ItemsScreenState extends State<ItemsScreen> {
   bool _done = false;
   final _filter = TextEditingController();
 
+  /// What is on for the loaded live items; refreshed every minute (progress, the next programme) and after each
+  /// guide import.
+  final Map<String, NowNext> _nowNext = {};
+  Timer? _tick;
+  int _guideSeen = 0;
+
+  late ListMode _mode = parseListMode(
+    widget.session.library!.setting(key: listModeSetting(widget.kind)),
+    widget.kind,
+  );
+
   @override
   void initState() {
     super.initState();
+    _guideSeen = widget.session.guideGeneration;
+    widget.session.addListener(_onSession);
+    _tick = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshNowNext(),
+    );
     _more();
   }
 
   @override
   void dispose() {
+    widget.session.removeListener(_onSession);
+    _tick?.cancel();
     _filter.dispose();
     super.dispose();
   }
+
+  void _onSession() {
+    if (widget.session.guideGeneration != _guideSeen) {
+      _guideSeen = widget.session.guideGeneration;
+      _refreshNowNext();
+    }
+  }
+
+  Future<void> _nowNextFor(List<ItemInfo> items) async {
+    if (widget.kind != ItemKind.live || items.isEmpty) return;
+    final keys = [for (final i in items) i.key];
+    final rows = await widget.session.library!.nowNext(keys: keys);
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < keys.length; i++) {
+        _nowNext[keys[i]] = rows[i];
+      }
+    });
+  }
+
+  Future<void> _refreshNowNext() => _nowNextFor(List.of(_items));
 
   Future<void> _more() async {
     if (_loading || _done) return;
@@ -128,6 +172,17 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _done = next.length < page;
       _loading = false;
     });
+    await _nowNextFor(next);
+  }
+
+  /// The list bar's toggle: the next mode, remembered for this section (the same setting as Settings → Lists).
+  void _nextMode() {
+    final m = ListMode.values[(_mode.index + 1) % ListMode.values.length];
+    widget.session.library!.setSetting(
+      key: listModeSetting(widget.kind),
+      value: m.name,
+    );
+    setState(() => _mode = m);
   }
 
   @override
@@ -138,8 +193,19 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final shown = f.isEmpty
         ? _items
         : _items.where((i) => i.name.toLowerCase().contains(f)).toList();
+    final next = ListMode.values[(_mode.index + 1) % ListMode.values.length];
     return Scaffold(
-      appBar: AppBar(title: Text(widget.group.name)),
+      appBar: AppBar(
+        title: Text(widget.group.name),
+        actions: [
+          IconButton(
+            key: const Key('list.mode'),
+            tooltip: listModeLabel(l10n, next),
+            icon: Icon(listModeIcon(next)),
+            onPressed: _nextMode,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -154,24 +220,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
             ),
           ),
           Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (n) {
-                if (n.metrics.extentAfter < 600) _more();
-                return false;
-              },
-              child: ListView.builder(
-                itemCount: shown.length + (_loading ? 1 : 0),
-                itemBuilder: (context, i) => i == shown.length
-                    ? const Padding(
-                        padding: EdgeInsets.all(Tokens.space * 2),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    : ItemTile(
-                        item: shown[i],
-                        onTap: () =>
-                            openItem(context, widget.session, shown[i]),
-                      ),
-              ),
+            child: ItemsView(
+              mode: _mode,
+              items: shown,
+              nowNext: _nowNext,
+              now: DateTime.now(),
+              loading: _loading,
+              onNearEnd: _more,
+              onTap: (it) => openItem(context, widget.session, it),
             ),
           ),
         ],
