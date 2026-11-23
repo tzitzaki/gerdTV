@@ -394,6 +394,30 @@ impl Library {
         self.0.record_search(&section, &query).map_err(err)
     }
 
+    /// Marks or unmarks a favourite (the star, a long press, a long OK).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_favourite(&self, key: String, favourite: bool) -> Result<(), String> {
+        self.0.set_favourite(&key, favourite).map_err(err)
+    }
+
+    /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+    pub fn favourites(&self, kinds: Vec<ItemKind>) -> Result<Vec<ItemInfo>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .favourites(&kinds)
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// Every favourite's key, for the stars in the lists.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn favourite_keys(&self) -> Result<Vec<String>, String> {
+        self.0.favourite_keys().map_err(err)
+    }
+
     /// The section's newest searches, newest first (the field's suggestions while empty).
     #[flutter_rust_bridge::frb(sync)]
     pub fn recent_searches(&self, section: String, limit: u32) -> Result<Vec<String>, String> {

@@ -49,6 +49,33 @@ class Session extends ChangeNotifier {
   /// Bumped after each sync so lists reload.
   int generation = 0;
 
+  /// Bumped when a favourite is added or removed: the stars and the Favourites group rebuild.
+  final favouritesChanged = ValueNotifier<int>(0);
+  Set<String> _favourites = const {};
+  Library? _favouritesOf;
+
+  /// The open profile's favourites (read once per profile, then kept here).
+  Set<String> get favourites {
+    final lib = library;
+    if (lib != null && !identical(lib, _favouritesOf)) {
+      _favouritesOf = lib;
+      _favourites = lib.favouriteKeys().toSet();
+    }
+    return _favourites;
+  }
+
+  /// The star, a long press or a long OK: in or out of the favourites.
+  void toggleFavourite(ItemInfo item) {
+    final lib = library;
+    if (lib == null) return;
+    final on = !favourites.contains(item.key);
+    lib.setFavourite(key: item.key, favourite: on);
+    _favourites = on
+        ? {...favourites, item.key}
+        : ({...favourites}..remove(item.key));
+    favouritesChanged.value++;
+  }
+
   /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
   bool guideRefreshing = false;
 

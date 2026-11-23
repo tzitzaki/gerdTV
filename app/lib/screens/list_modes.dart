@@ -1,7 +1,11 @@
 // How a section's items are shown (owner decision): compact list, list (logo, number, name, what's on now with its
 // progress, what's next), tiles, large tiles. Chosen per section in Settings → Lists, switched with the list bar's
 // toggle; stored as the profile setting `list_mode_<kind>`. These widgets take plain data, so tests need no core.
+// Favourites: a star on every row and tile, a long press, or a long OK on the remote (LongOk) toggles one.
 
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -68,6 +72,8 @@ class ItemsView extends StatelessWidget {
     this.leading = const [],
     this.trailing = const [],
     this.highlight,
+    this.favourites = const {},
+    this.onFavourite,
   });
   final ListMode mode;
   final List<ItemInfo> items;
@@ -79,6 +85,10 @@ class ItemsView extends StatelessWidget {
   final List<Widget> leading;
   final List<Widget> trailing;
   final String? highlight;
+
+  /// The favourites' keys (filled stars); [onFavourite] toggles one (null: no stars).
+  final Set<String> favourites;
+  final void Function(ItemInfo)? onFavourite;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +102,8 @@ class ItemsView extends StatelessWidget {
       }
       final it = items[i];
       final nn = nowNext[it.key];
-      return switch (mode) {
+      final fav = onFavourite == null ? null : () => onFavourite!(it);
+      final cellWidget = switch (mode) {
         ListMode.compact || ListMode.list => ItemRow(
           item: it,
           nowNext: nn,
@@ -100,6 +111,8 @@ class ItemsView extends StatelessWidget {
           now: now,
           onTap: () => onTap(it),
           highlight: highlight,
+          favourite: favourites.contains(it.key),
+          onFavourite: fav,
         ),
         _ => ItemCard(
           item: it,
@@ -107,8 +120,13 @@ class ItemsView extends StatelessWidget {
           large: mode == ListMode.largeTiles,
           onTap: () => onTap(it),
           highlight: highlight,
+          favourite: favourites.contains(it.key),
+          onFavourite: fav,
         ),
       };
+      return fav == null
+          ? cellWidget
+          : LongOk(onTap: () => onTap(it), onLong: fav, child: cellWidget);
     }
 
     final body = switch (mode) {
@@ -155,10 +173,14 @@ class ItemRow extends StatelessWidget {
     required this.now,
     required this.onTap,
     this.highlight,
+    this.favourite = false,
+    this.onFavourite,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool compact;
+  final bool favourite;
+  final VoidCallback? onFavourite;
   final DateTime now;
   final VoidCallback onTap;
 
@@ -227,9 +249,101 @@ class ItemRow extends StatelessWidget {
                   ),
               ],
             ),
+      trailing: onFavourite == null
+          ? null
+          : FavouriteStar(item: item, on: favourite, onPressed: onFavourite!),
       onTap: onTap,
+      onLongPress: onFavourite,
     );
   }
+}
+
+/// The star on a row or tile: filled for a favourite.
+class FavouriteStar extends StatelessWidget {
+  const FavouriteStar({
+    super.key,
+    required this.item,
+    required this.on,
+    required this.onPressed,
+  });
+  final ItemInfo item;
+  final bool on;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return IconButton(
+      key: Key('item.star.${item.key}'),
+      tooltip: on ? l10n.favouriteRemove : l10n.favouriteAdd,
+      icon: Icon(on ? Icons.star : Icons.star_border),
+      color: on ? Theme.of(context).colorScheme.primary : null,
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// OK on a remote (Enter, Select): a short press opens, holding it half a second toggles the favourite. Ahead of the
+/// list's own activation, which would open the item on the key going down.
+class LongOk extends StatefulWidget {
+  const LongOk({
+    super.key,
+    required this.onTap,
+    required this.onLong,
+    required this.child,
+  });
+  final VoidCallback onTap;
+  final VoidCallback onLong;
+  final Widget child;
+
+  @override
+  State<LongOk> createState() => _LongOkState();
+}
+
+class _LongOkState extends State<LongOk> {
+  static const _holdFor = Duration(milliseconds: 500);
+  static final _ok = {
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.gameButtonA,
+  };
+  Timer? _hold;
+  bool _down = false;
+  bool _long = false;
+
+  KeyEventResult _key(FocusNode _, KeyEvent e) {
+    if (!_ok.contains(e.logicalKey)) return KeyEventResult.ignored;
+    if (e is KeyDownEvent) {
+      _down = true;
+      _long = false;
+      _hold?.cancel();
+      _hold = Timer(_holdFor, () {
+        _long = true;
+        widget.onLong();
+      });
+    } else if (e is KeyUpEvent) {
+      _hold?.cancel();
+      if (_down && !_long) widget.onTap();
+      _down = false;
+    }
+    return KeyEventResult
+        .handled; // repeats too: held OK must not open the item over and over
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: _key,
+    child: widget.child,
+  );
 }
 
 /// A tile: the logo or poster, the name, and for live channels what is on now.
@@ -241,10 +355,14 @@ class ItemCard extends StatelessWidget {
     required this.large,
     required this.onTap,
     this.highlight,
+    this.favourite = false,
+    this.onFavourite,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool large;
+  final bool favourite;
+  final VoidCallback? onFavourite;
   final VoidCallback onTap;
 
   /// A search result: the query to bold; the group's name shows too.
@@ -259,17 +377,34 @@ class ItemCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onFavourite,
         child: Padding(
           padding: const EdgeInsets.all(Tokens.space),
           child: Column(
             children: [
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, c) => Logo(
-                    url: item.logo,
-                    size: c.biggest.shortestSide,
-                    icon: kindIcon(item.kind),
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: LayoutBuilder(
+                        builder: (context, c) => Logo(
+                          url: item.logo,
+                          size: c.biggest.shortestSide,
+                          icon: kindIcon(item.kind),
+                        ),
+                      ),
+                    ),
+                    if (onFavourite != null)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: FavouriteStar(
+                          item: item,
+                          on: favourite,
+                          onPressed: onFavourite!,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: Tokens.space),

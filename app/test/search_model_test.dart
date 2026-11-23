@@ -23,13 +23,12 @@ void main() {
       final c = Completer<SearchPage>();
       pending[q] = c;
       return c.future.then(
-        (p) =>
-            SearchPage(
-              seq: BigInt.from(seq),
-              hits: p.hits,
-              counts: p.counts,
-              groups: const [],
-            ),
+        (p) => SearchPage(
+          seq: BigInt.from(seq),
+          hits: p.hits,
+          counts: p.counts,
+          groups: const [],
+        ),
       );
     });
     final first = model.set('ar');

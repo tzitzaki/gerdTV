@@ -366,6 +366,11 @@ class _SectionSearchState extends State<SectionSearch> {
       now: DateTime.now(),
       onNearEnd: _model.loadMore,
       highlight: q,
+      favourites: widget.session.favourites,
+      onFavourite: (it) {
+        widget.session.toggleFavourite(it);
+        setState(() {}); // the star changes at once
+      },
       onTap: _openItem,
       leading: [
         if (widget.group != null)

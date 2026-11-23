@@ -425,6 +425,18 @@ impl Library {
         )?)
     }
 
+    pub fn set_favourite(&self, key: &str, on: bool) -> Result<()> {
+        Ok(db::set_favourite(&self.conn.lock().unwrap(), key, on)?)
+    }
+
+    pub fn favourites(&self, kinds: &[Kind]) -> Result<Vec<Hit>> {
+        Ok(db::favourites(&self.conn.lock().unwrap(), kinds)?)
+    }
+
+    pub fn favourite_keys(&self) -> Result<Vec<String>> {
+        Ok(db::favourite_keys(&self.conn.lock().unwrap())?)
+    }
+
     pub fn recent_searches(&self, section: &str, limit: usize) -> Result<Vec<String>> {
         Ok(db::recent_searches(
             &self.conn.lock().unwrap(),

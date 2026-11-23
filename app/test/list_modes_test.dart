@@ -1,6 +1,9 @@
 // New, because nothing owns how the list modes render: every mode at phone and desktop width lays out without
-// overflow, shows the name, and shows what's on now where the mode has room for it (list and tiles, not compact).
+// overflow (stars included), shows the name, and shows what's on now where the mode has room for it (list and tiles,
+// not compact). Favourites: the star, a long press and a long OK toggle one; a short OK opens.
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:material_ui/material_ui.dart';
@@ -61,6 +64,7 @@ void main() {
         addTearDown(tester.view.reset);
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             home: Scaffold(
               body: ItemsView(
                 mode: mode,
@@ -68,6 +72,8 @@ void main() {
                 nowNext: nowNext,
                 now: now,
                 onTap: (_) {},
+                favourites: const {'live:1'},
+                onFavourite: (_) {},
               ),
             ),
           ),
@@ -88,4 +94,42 @@ void main() {
       });
     }
   }
+
+  testWidgets(
+    'star, long press and long OK toggle a favourite; short OK opens',
+    (tester) async {
+      final opened = <String>[], starred = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Scaffold(
+            body: ItemsView(
+              mode: ListMode.list,
+              items: [channel(1), channel(2)],
+              nowNext: const {},
+              now: now,
+              onTap: (it) => opened.add(it.key),
+              onFavourite: (it) => starred.add(it.key),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('item.star.live:1')));
+      await tester.longPress(find.byKey(const Key('item.live:2')));
+      expect(starred, ['live:1', 'live:2']);
+      expect(opened, isEmpty);
+      // The remote: Tab focuses the first row, then OK briefly (opens) and held (toggles).
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      expect(opened, ['live:1']);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      expect(opened, ['live:1'], reason: 'held OK does not open');
+      expect(starred.last, 'live:1');
+    },
+  );
 }

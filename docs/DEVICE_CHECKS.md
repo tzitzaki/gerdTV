@@ -9,6 +9,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
 - Search: typing in Live TV (without clicking the field) finds channels of every group, also by their group's name; Enter plays the top one.
 - Movies and series: a movie plays; a series opens its episodes and one plays.
+- Favourites: the star on a channel adds it to the Favourites group on top of Live TV; the star again removes it.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
@@ -47,6 +48,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.
 - Plain HTTP: with a provider on http://, sync, logos, the guide and playback all still work (the cleartext config is gone).
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
+- Favourites: holding OK on a channel adds it to Favourites (top of Live TV); a short OK still plays it.
 - Search: Up from a list reaches the section's search field; the on-screen keyboard's text finds channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.

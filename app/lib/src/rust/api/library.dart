@@ -62,6 +62,12 @@ abstract class Library implements RustOpaqueInterface {
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
+  /// Every favourite's key, for the stars in the lists.
+  List<String> favouriteKeys();
+
+  /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+  Future<List<ItemInfo>> favourites({required List<ItemKind> kinds});
+
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
     required String query,
@@ -170,6 +176,9 @@ abstract class Library implements RustOpaqueInterface {
     BufferPreset? preset,
     required int customSeconds,
   });
+
+  /// Marks or unmarks a favourite (the star, a long press, a long OK).
+  void setFavourite({required String key, required bool favourite});
 
   Future<void> setPreferHls({required String key, required bool hls});
 

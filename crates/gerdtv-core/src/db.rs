@@ -910,6 +910,52 @@ pub fn record_search(conn: &Connection, section: &str, query: &str) -> Result<()
     Ok(())
 }
 
+/// Marks (`on`) or unmarks an item as a favourite. User data by stable key with `updated_at`: a favourite the provider
+/// drops for a while comes back with the item.
+pub fn set_favourite(conn: &Connection, key: &str, on: bool) -> Result<()> {
+    if on {
+        conn.execute(
+            "INSERT INTO favourites (key, updated_at) VALUES (?1, ?2)
+             ON CONFLICT (key) DO UPDATE SET updated_at = ?2",
+            params![key, unix_now()],
+        )?;
+    } else {
+        conn.execute("DELETE FROM favourites WHERE key = ?1", [key])?;
+    }
+    Ok(())
+}
+
+/// The favourites of `kinds` (empty = all) in provider order (channel numbers stay in order, zapping follows the
+/// list), with their group's name; ones the catalogue doesn't have right now are left out.
+pub fn favourites(conn: &Connection, kinds: &[Kind]) -> Result<Vec<Hit>> {
+    let mut st = conn.prepare_cached(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, '')
+         FROM favourites f JOIN items i ON i.key = f.key
+         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
+         WHERE (?1 >> i.kind) & 1 ORDER BY i.kind, i.position",
+    )?;
+    let rows = st.query_map([kind_mask(kinds)], |r| {
+        Ok(Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: r.get(7)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Every favourite's key (the lists' stars).
+pub fn favourite_keys(conn: &Connection) -> Result<Vec<String>> {
+    let mut st = conn.prepare_cached("SELECT key FROM favourites")?;
+    let rows = st.query_map([], |r| r.get(0))?;
+    rows.collect()
+}
+
 /// The newest searches of a section, newest first.
 pub fn recent_searches(conn: &Connection, section: &str, limit: usize) -> Result<Vec<String>> {
     let mut st = conn.prepare_cached(
@@ -1121,6 +1167,32 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             ["Kino Welt", "Kino Plus"],
             "paging"
         );
+    }
+
+    #[test]
+    fn favourites_survive_a_resync_and_list_in_provider_order() {
+        let mut c = db();
+        set_favourite(&c, "live:102", true).unwrap();
+        set_favourite(&c, "live:101", true).unwrap();
+        set_favourite(&c, "movie:201", true).unwrap();
+        assert_eq!(
+            names(&favourites(&c, &[Kind::Live]).unwrap()),
+            ["DE | ARD Sportschau HD", "BR München FHD"]
+        );
+        assert_eq!(
+            favourites(&c, &[Kind::Live]).unwrap()[0].group,
+            "DE | Vollprogramm"
+        );
+        // The provider drops a channel for one sync: it is not listed, but comes back with it.
+        let without = PLAYLIST.replace("#EXTINF:-1 tvg-chno=\"7\" group-title=\"DE | Regional\",BR München FHD\nhttp://h.example.invalid/live/alice/s3cret/102.ts\n", "");
+        import_m3u(&mut c, without.as_bytes(), &["alice", "s3cret"]).unwrap();
+        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 1);
+        import_m3u(&mut c, PLAYLIST.as_bytes(), &["alice", "s3cret"]).unwrap();
+        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 2);
+        set_favourite(&c, "live:101", false).unwrap();
+        let mut keys = favourite_keys(&c).unwrap();
+        keys.sort();
+        assert_eq!(keys, ["live:102", "movie:201"]);
     }
 
     #[test]
