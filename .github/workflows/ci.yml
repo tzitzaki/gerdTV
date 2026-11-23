@@ -82,6 +82,9 @@ jobs:
         # The main target on every PR: macOS build + integration tests in the runner's GUI session.
         run: just mac-check
       - if: steps.scope.outputs.code == 'true'
+        # The release's first-install DMG, from this build: the packaging script is checked on every PR.
+        run: scripts/macos-dmg.sh app/build/macos/Build/Products/Debug/gerdTV.app "$RUNNER_TEMP/check.dmg"
+      - if: steps.scope.outputs.code == 'true'
         # iPhone/iPad: compile the app (Swift platform code included) without signing; no simulator run.
         run: cd app && flutter build ios --debug --no-codesign
 

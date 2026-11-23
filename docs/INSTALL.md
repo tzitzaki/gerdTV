@@ -3,7 +3,7 @@
 Releases: https://github.com/tzitzaki/gerdTV/releases. Install the first copy by hand; after that the app offers updates (desktop and Android install after you confirm; iOS notifies only).
 
 ## macOS
-Download `gerdTV-macos-<version>.zip`, unzip, move `gerdTV.app` to Applications. The first open is blocked (self-signed, not notarized): System Settings > Privacy & Security > "Open Anyway", once. Allow Keychain access ("Always Allow") and Local Network (for Cast discovery).
+Download `gerdTV-macos-<version>.dmg`, open it and drag gerdTV onto Applications (the zip next to it is for the in-app updater). The first open is blocked (self-signed, not notarized): System Settings > Privacy & Security > "Open Anyway", once. Allow Keychain access ("Always Allow") and Local Network (for Cast discovery).
 
 ## Android TV (e.g. Nvidia Shield)
 Allow unknown sources for a file manager or downloader app (Settings > Device Preferences > Security & restrictions), download `gerdTV-android-<version>.apk` there and install it. The arm64-v8a build runs on 64-bit Android TV devices, including ones with a 32+64-bit userspace. The first in-app update asks once to allow "Install unknown apps" for gerdTV.
