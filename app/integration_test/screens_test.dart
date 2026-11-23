@@ -302,6 +302,8 @@ void main() {
             (w.key! as ValueKey<String>).value.startsWith('guide.cell.'),
       );
       await waitFor(tester, cell.hitTestable());
+      // Before anything is focused the header shows the first row's running programme, never nothing.
+      await waitFor(tester, find.textContaining('Now ·'));
       await checkScreen(tester, form, 'guide', size);
       await tapReady(tester, cell);
       await waitFor(tester, find.byKey(const Key('guide.sheet.watch')));
