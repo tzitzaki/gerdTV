@@ -61,10 +61,6 @@ class WatchdogAdapter {
   /// Set when the watchdog gave up (a message for the user); null while playing or retrying.
   final ValueNotifier<String?> failure = ValueNotifier(null);
 
-  /// How far mpv's cache reaches, in stream seconds (`demuxer-cache-time`): the live edge while at live, for the
-  /// player's timeshift controls (player/live_edge.dart). Null until mpv reports it.
-  final ValueNotifier<double?> cacheEnd = ValueNotifier(null);
-
   Watchdog? _watchdog;
   BufferPreset _preset = BufferPreset.balanced;
   int _customSeconds = 0;
@@ -136,9 +132,6 @@ class WatchdogAdapter {
         ); // demuxer-max-bytes can change while playing
       }
     });
-    await native.observeProperty('demuxer-cache-time', (v) async {
-      cacheEnd.value = double.tryParse(v);
-    });
     _subs.addAll([
       // Position moving forward is the only reliable sign that playback really advances.
       player.stream.position.listen((p) {
@@ -205,13 +198,12 @@ class WatchdogAdapter {
   Future<void> stop() async {
     _ticker?.cancel();
     try {
-      final native = player.platform as NativePlayer;
-      await native.unobserveProperty('video-bitrate');
-      await native.unobserveProperty('demuxer-cache-time');
+      await (player.platform as NativePlayer).unobserveProperty(
+        'video-bitrate',
+      );
     } catch (_) {
       // Not observed yet.
     }
-    cacheEnd.value = null;
     _lifecycle?.dispose();
     _lifecycle = null;
     for (final s in _subs) {

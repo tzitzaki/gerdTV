@@ -52,6 +52,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _edgeKey;
   Timer? _shiftTick;
   StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration>? _bufferSub;
   StreamSubscription<bool>? _playingSub;
 
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
@@ -69,7 +70,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       session.play(item); // sets nowPlaying, which the bar also listens to
       _showBanner();
     });
-    session.adapter.cacheEnd.addListener(_onCacheEnd);
+    // How far mpv's cache reaches (`demuxer-cache-time`, which media_kit observes itself): live while attached.
+    _bufferSub = session.player.stream.buffer.listen(
+      (b) => _liveEdge.cache(b.inMilliseconds / 1000, DateTime.now()),
+    );
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
@@ -94,11 +98,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return _edge;
   }
 
-  void _onCacheEnd() {
-    final v = widget.session.adapter.cacheEnd.value;
-    if (v != null) _liveEdge.cache(v, DateTime.now());
-  }
-
   double get _position =>
       widget.session.player.state.position.inMilliseconds / 1000;
 
@@ -121,12 +120,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (mounted) setState(() {});
   }
 
-  /// Back to live: just short of the edge, playing. Exactly at the cache's end mpv has nothing left to play and
-  /// waits for new data (macOS CI: the position stood still); half the live slack still counts as live.
+  /// Back to live: just short of the cache's end, playing (exactly at it, mpv has nothing left to play and waits for
+  /// new data; half the live slack still counts as live).
   Future<void> _goLive() async {
     final live = _liveEdge.live(DateTime.now());
     if (live == null) return;
-    await _seekTo(live - liveSlack / 2);
+    // Never past what is cached: on a slow connection the projected live edge runs ahead of the data (macOS CI).
+    final cached = widget.session.player.state.buffer.inMilliseconds / 1000;
+    await _seekTo((cached < live ? cached : live) - liveSlack / 2);
     if (_paused) await _togglePause();
   }
 
@@ -203,7 +204,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _shiftTick?.cancel();
     _positionSub?.cancel();
     _playingSub?.cancel();
-    widget.session.adapter.cacheEnd.removeListener(_onCacheEnd);
+    _bufferSub?.cancel();
     if (_miniWindow.isMini) {
       _miniWindow.exit();
       widget.session.pictureMode.value = false;
