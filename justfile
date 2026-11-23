@@ -80,25 +80,25 @@ soak:
 test-affected base="origin/main":
     scripts/test-affected.sh {{base}}
 
-# The core's performance budgets. A regression of more than 20 % against main fails. Main and this tree are
-# measured back to back in one run, under the heavy lock (owner decision: a stored baseline gave false alarms on a
-# shared machine, whose load changes between runs). Main is a temporary detached worktree of origin/main (HEAD where
-# there is none, e.g. a CI checkout of main); both build into this tree's target folder, so the worktree stays clean.
-# Lenient: a benchmark that main doesn't have yet is measured, not compared (strict mode aborts on it).
+# The core's performance budgets. A regression of more than 20 % against the saved `main` baseline fails.
+# The baseline lives outside the worktrees (CRITERION_HOME), so every worktree compares against the same one;
+# `just bench-save` records it (the wrap-up does, on main). No baseline yet: this run becomes it.
+# Lenient: a benchmark added since the baseline is measured, not compared (strict mode aborts on it).
+criterion_home := env_var('HOME') + "/.cache/gerdtv-criterion"
+
 bench:
     #!/usr/bin/env bash
     set -euo pipefail
-    export CRITERION_HOME="$(mktemp -d)" CARGO_TARGET_DIR="$PWD/target"
-    base="$(mktemp -d)/main"
-    ref="$(git rev-parse --verify -q origin/main || git rev-parse HEAD)"
-    git worktree add -q --detach "$base" "$ref"
-    trap 'git worktree remove "$base"; rm -rf "$CRITERION_HOME"' EXIT
-    out="$({{heavy}} bash -c "
-        (cd '$base' && cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main >/dev/null) &&
-        cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20" 2>&1)" ||
+    export CRITERION_HOME="{{criterion_home}}"
+    if [[ ! -d "$CRITERION_HOME/budgets" ]]; then just bench-save; exit 0; fi
+    # Under the heavy lock: a build or test run beside it skews the timings (seen: false regressions of +25–39 %).
+    out="$({{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20 2>&1)" ||
         { echo "$out"; exit 1; }
     grep -E 'time:|change:|regressed|improved' <<<"$out" || true
     ! grep -q "Performance has regressed" <<<"$out"
+
+bench-save:
+    CRITERION_HOME="{{criterion_home}}" {{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
 
 # The full-scale guide import budget (2,000 channels × 7 days in < 60 s); slow, also in the nightly.
 test-epg-budget:

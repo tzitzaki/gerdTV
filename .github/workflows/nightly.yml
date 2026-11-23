@@ -1,6 +1,6 @@
 # Nightly (02:30 UTC) and on demand: the long checks: everything ci.yml's linux job runs, the 30-minute soak and
-# the benchmarks (docs/SETUP.md, "CI"). On main, `just bench` compares main with itself, so here it only proves the
-# benchmarks run; the 20 % regression gate is `just ready` on a branch.
+# the benchmarks (docs/SETUP.md, "CI"). Runners keep no criterion baseline, so `just bench` here only proves the
+# benchmarks run; the 20 % regression gate is `just ready` on the dev machine.
 name: nightly
 
 on:
