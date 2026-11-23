@@ -125,6 +125,8 @@ pub struct ItemInfo {
     pub number: Option<u32>,
     /// Live channels: catch-up days (0 = none).
     pub archive_days: u32,
+    /// The group's name; filled by search only.
+    pub group: String,
 }
 
 impl From<gerdtv_core::db::Hit> for ItemInfo {
@@ -137,6 +139,7 @@ impl From<gerdtv_core::db::Hit> for ItemInfo {
             logo: h.logo,
             number: h.number,
             archive_days: h.archive_days,
+            group: h.group,
         }
     }
 }
@@ -151,8 +154,18 @@ pub struct KindCount {
 pub struct SearchPage {
     pub seq: u64,
     pub hits: Vec<ItemInfo>,
-    /// Per-kind totals; only on the first page (offset 0).
+    /// Per-kind totals over every section; only on the first page (offset 0).
     pub counts: Vec<KindCount>,
+    /// Groups whose name matches; only on the first page of a whole-section search.
+    pub groups: Vec<GroupHit>,
+}
+
+/// A group whose name matches a search (opens like a group in the browse list).
+pub struct GroupHit {
+    pub kind: ItemKind,
+    pub id: String,
+    pub name: String,
+    pub count: u32,
 }
 
 pub struct SyncSummary {
@@ -332,18 +345,26 @@ impl Library {
             .collect())
     }
 
-    /// Search as the user types; `kind` None = all kinds.
+    /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
     pub fn search(
         &self,
         seq: u64,
         query: String,
-        kind: Option<ItemKind>,
+        kinds: Vec<ItemKind>,
+        category: Option<String>,
         limit: u32,
         offset: u32,
     ) -> Result<SearchPage, String> {
-        let (hits, counts) = self
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        let (hits, counts, groups) = self
             .0
-            .search(&query, kind.map(to_core), limit as usize, offset as usize)
+            .search(
+                &query,
+                &kinds,
+                category.as_deref(),
+                limit as usize,
+                offset as usize,
+            )
             .map_err(err)?;
         Ok(SearchPage {
             seq,
@@ -355,7 +376,28 @@ impl Library {
                     count: n as u32,
                 })
                 .collect(),
+            groups: groups
+                .into_iter()
+                .map(|g| GroupHit {
+                    kind: from_core(g.kind),
+                    id: g.id,
+                    name: g.name,
+                    count: g.count as u32,
+                })
+                .collect(),
         })
+    }
+
+    /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
+    pub fn record_search(&self, section: String, query: String) -> Result<(), String> {
+        self.0.record_search(&section, &query).map_err(err)
+    }
+
+    /// The section's newest searches, newest first (the field's suggestions while empty).
+    pub fn recent_searches(&self, section: String, limit: u32) -> Result<Vec<String>, String> {
+        self.0
+            .recent_searches(&section, limit as usize)
+            .map_err(err)
     }
 
     /// Logs a recovery episode (the watchdog's Health command).

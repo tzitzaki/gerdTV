@@ -32,13 +32,27 @@ fn budgets(c: &mut Criterion) {
     let mut conn = db::open(Path::new(":memory:")).unwrap();
     db::import_m3u(&mut conn, pl.as_slice(), &["testuser", "testpass"]).unwrap();
     let mut g = c.benchmark_group("search");
-    for q in ["s", "sport", "sport mu", "munchen kino", "de | reise", "12"] {
+    // "port": mid-word (trigram) hits; "spotr", "munchne": typo lookups in the vocabulary.
+    for q in [
+        "s",
+        "sport",
+        "sport mu",
+        "munchen kino",
+        "de | reise",
+        "12",
+        "port",
+        "spotr",
+        "munchne",
+    ] {
         g.bench_function(format!("search_{q}"), |b| {
-            b.iter(|| db::search(&conn, q, None, 50, 0).unwrap())
+            b.iter(|| db::search(&conn, q, &[], None, 50, 0).unwrap())
         });
     }
     g.bench_function("counts_sport", |b| {
         b.iter(|| db::search_counts(&conn, "sport").unwrap())
+    });
+    g.bench_function("groups_sport", |b| {
+        b.iter(|| db::search_groups(&conn, "sport", &[db::Kind::Live], 5).unwrap())
     });
     g.finish();
 }

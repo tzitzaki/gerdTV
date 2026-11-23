@@ -121,6 +121,12 @@ abstract class Library implements RustOpaqueInterface {
   /// Adaptive mode: one step more buffer for this item; returns the new choice.
   BufferChoice raiseBuffer({required String key});
 
+  /// The section's newest searches, newest first (the field's suggestions while empty).
+  Future<List<String>> recentSearches({
+    required String section,
+    required int limit,
+  });
+
   /// Logs a recovery episode (the watchdog's Health command).
   Future<void> recordHealth({
     required String key,
@@ -130,6 +136,9 @@ abstract class Library implements RustOpaqueInterface {
     required int secs,
   });
 
+  /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
+  Future<void> recordSearch({required String section, required String query});
+
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});
 
@@ -138,11 +147,12 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
-  /// Search as the user types; `kind` None = all kinds.
+  /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
   Future<SearchPage> search({
     required BigInt seq,
     required String query,
-    ItemKind? kind,
+    required List<ItemKind> kinds,
+    String? category,
     required int limit,
     required int offset,
   });
@@ -227,6 +237,35 @@ class ChannelRef {
           runtimeType == other.runtimeType &&
           id == other.id &&
           name == other.name;
+}
+
+/// A group whose name matches a search (opens like a group in the browse list).
+class GroupHit {
+  final ItemKind kind;
+  final String id;
+  final String name;
+  final int count;
+
+  const GroupHit({
+    required this.kind,
+    required this.id,
+    required this.name,
+    required this.count,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^ id.hashCode ^ name.hashCode ^ count.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GroupHit &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          id == other.id &&
+          name == other.name &&
+          count == other.count;
 }
 
 /// One channel's programmes in a time window (the guide grid's row).
@@ -349,6 +388,9 @@ class ItemInfo {
   /// Live channels: catch-up days (0 = none).
   final int archiveDays;
 
+  /// The group's name; filled by search only.
+  final String group;
+
   const ItemInfo({
     required this.key,
     required this.kind,
@@ -357,6 +399,7 @@ class ItemInfo {
     required this.logo,
     this.number,
     required this.archiveDays,
+    required this.group,
   });
 
   @override
@@ -367,7 +410,8 @@ class ItemInfo {
       category.hashCode ^
       logo.hashCode ^
       number.hashCode ^
-      archiveDays.hashCode;
+      archiveDays.hashCode ^
+      group.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -380,7 +424,8 @@ class ItemInfo {
           category == other.category &&
           logo == other.logo &&
           number == other.number &&
-          archiveDays == other.archiveDays;
+          archiveDays == other.archiveDays &&
+          group == other.group;
 }
 
 enum ItemKind { live, movie, episode, series }
@@ -568,17 +613,22 @@ class SearchPage {
   final BigInt seq;
   final List<ItemInfo> hits;
 
-  /// Per-kind totals; only on the first page (offset 0).
+  /// Per-kind totals over every section; only on the first page (offset 0).
   final List<KindCount> counts;
+
+  /// Groups whose name matches; only on the first page of a whole-section search.
+  final List<GroupHit> groups;
 
   const SearchPage({
     required this.seq,
     required this.hits,
     required this.counts,
+    required this.groups,
   });
 
   @override
-  int get hashCode => seq.hashCode ^ hits.hashCode ^ counts.hashCode;
+  int get hashCode =>
+      seq.hashCode ^ hits.hashCode ^ counts.hashCode ^ groups.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -587,7 +637,8 @@ class SearchPage {
           runtimeType == other.runtimeType &&
           seq == other.seq &&
           hits == other.hits &&
-          counts == other.counts;
+          counts == other.counts &&
+          groups == other.groups;
 }
 
 enum SourceKind { xtream, m3UUrl, m3UFile }

@@ -169,8 +169,12 @@ pub struct SyncResult {
     pub account: Option<Account>,
 }
 
-/// One page of hits plus per-kind totals (totals only on the first page).
-pub type SearchResult = (Vec<Hit>, Vec<(Kind, usize)>);
+/// One page of hits plus per-kind totals and matching groups (both only on the first page).
+pub type SearchResult = (Vec<Hit>, Vec<(Kind, usize)>, Vec<db::GroupHit>);
+
+/// Groups shown above a section's search results: enough for "DE | DAZN", "UK | DAZN" …, few enough not to push the
+/// channels out of view.
+pub const GROUP_HITS: usize = 5;
 
 /// One open profile: its database and, for Xtream Codes, its client.
 pub struct Library {
@@ -350,6 +354,7 @@ impl Library {
                         logo: r.get(4)?,
                         number: r.get(5)?,
                         archive_days: r.get(6)?,
+                        group: String::new(),
                     })
                 },
             )
@@ -380,27 +385,52 @@ impl Library {
                     logo: r.get(4)?,
                     number: r.get(5)?,
                     archive_days: r.get(6)?,
+                    group: String::new(),
                 })
             },
         )?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// One page of a section's search (`kinds`), or of one group's (`category`). The first page also carries the
+    /// per-kind totals and, for a whole section, the matching groups (at most [`GROUP_HITS`]).
     pub fn search(
         &self,
         query: &str,
-        kind: Option<Kind>,
+        kinds: &[Kind],
+        category: Option<&str>,
         limit: usize,
         offset: usize,
     ) -> Result<SearchResult> {
         let conn = self.conn.lock().unwrap();
-        let hits = db::search(&conn, query, kind, limit, offset)?;
-        let counts = if offset == 0 {
-            db::search_counts(&conn, query)?
+        let hits = db::search(&conn, query, kinds, category, limit, offset)?;
+        if offset > 0 {
+            return Ok((hits, vec![], vec![]));
+        }
+        let counts = db::search_counts(&conn, query)?;
+        let groups = if category.is_none() {
+            db::search_groups(&conn, query, kinds, GROUP_HITS)?
         } else {
             vec![]
         };
-        Ok((hits, counts))
+        Ok((hits, counts, groups))
+    }
+
+    /// Remembers a search the user opened a result of (the field's recent searches).
+    pub fn record_search(&self, section: &str, query: &str) -> Result<()> {
+        Ok(db::record_search(
+            &self.conn.lock().unwrap(),
+            section,
+            query,
+        )?)
+    }
+
+    pub fn recent_searches(&self, section: &str, limit: usize) -> Result<Vec<String>> {
+        Ok(db::recent_searches(
+            &self.conn.lock().unwrap(),
+            section,
+            limit,
+        )?)
     }
 
     /// A series' episodes in season/episode order. Xtream Codes fetches them now (and caches them until the next
@@ -429,6 +459,7 @@ impl Library {
                 logo: r.get(4)?,
                 number: r.get(5)?,
                 archive_days: r.get(6)?,
+                group: String::new(),
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -1027,7 +1058,7 @@ mod tests {
         assert!(!cats.is_empty() && cats.iter().all(|c| c.count > 0));
         let page = lib.items(Kind::Live, &cats[0].id, 5, 0).unwrap();
         assert_eq!(page.len(), 5.min(cats[0].count));
-        let (hits, counts) = lib.search("munchen", None, 10, 0).unwrap();
+        let (hits, counts, _) = lib.search("munchen", &[], None, 10, 0).unwrap();
         assert!(!hits.is_empty() && !counts.is_empty());
         assert!(
             lib.stream_url(&page[0].key, "m3u8")
@@ -1202,7 +1233,7 @@ mod tests {
         let lib = Library::open(&dir, &p.id, vec![url]).unwrap();
         let r = lib.sync().await.unwrap();
         assert_eq!(r.stats.entries, 500);
-        let (hits, _) = lib.search("s", Some(Kind::Movie), 1, 0).unwrap();
+        let (hits, _, _) = lib.search("s", &[Kind::Movie], None, 1, 0).unwrap();
         // The generated playlist uses the testkit's fixed example credentials, which equal the mock's.
         assert!(
             lib.stream_url(&hits[0].key, "ts")

@@ -533,6 +533,7 @@ pub fn search(
                 logo: r.get(13)?,
                 number: r.get(14)?,
                 archive_days: r.get(15)?,
+                group: String::new(),
             },
         ))
     })?
