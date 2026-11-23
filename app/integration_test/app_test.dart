@@ -271,7 +271,7 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      programmeHit,
+      programmeHit.first,
       400,
       scrollable: results,
       maxScrolls: 60,
