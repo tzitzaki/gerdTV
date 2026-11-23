@@ -29,6 +29,17 @@ dependencies:
   timezone: 0.11.2 # flutter_local_notifications schedules with TZDateTime (reminders use UTC)
   window_manager: ^0.7.0
 
+# The media_kit packages whose native side gerdTV patches, vendored (owner decision; third_party/README.md): the
+# video plugin looks up libmpv at run time on macOS and iOS, and the Apple libs packages embed gerdTV's own libmpv
+# next to media_kit's. Same versions as above.
+dependency_overrides:
+  media_kit_video:
+    path: ../third_party/media_kit_video
+  media_kit_libs_macos_video:
+    path: ../third_party/media_kit_libs_macos_video
+  media_kit_libs_ios_video:
+    path: ../third_party/media_kit_libs_ios_video
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

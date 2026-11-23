@@ -11,3 +11,8 @@ signing.env
 /.claude/worktrees/
 # gerdTV's own libmpv and its sources (just libmpv)
 /build/
+# media_kit's and gerdTV's Apple frameworks, fetched or copied into the vendored packages at build time.
+/third_party/media_kit_libs_*_video/*/Frameworks/
+/third_party/media_kit_libs_*_video/*/.cache/
+/third_party/media_kit_video/*/Headers/
+/third_party/media_kit_video/common/darwin/.cache/
