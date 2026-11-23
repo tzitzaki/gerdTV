@@ -5,7 +5,8 @@
 # Usage: scripts/build-libmpv.sh <out-dir>     (Linux x64; other platforms follow in their own PRs)
 # Output: <out-dir>/libgerdmpv.so and <out-dir>/libgerdmpv.txt (versions, sources and configure flags, shown on the
 # Licences screen). Needs: meson ≥ 1.3, ninja, nasm, pkg-config, a C compiler, python3-jinja2, and the -dev packages
-# of the system libraries it links dynamically (libass, libva, libdrm, EGL/GL, PulseAudio, ALSA, GnuTLS, zlib).
+# of the system libraries it links dynamically (libass, libva, libdrm, EGL/GL, X11, Wayland, PulseAudio, ALSA, GnuTLS,
+# zlib).
 # Debugging: every stage logs to <out-dir>/work/<stage>.log; a failed stage prints that log's tail. Sources are
 # pinned by SHA-256 (tarballs) or commit (libplacebo, which needs its git submodules).
 set -euo pipefail
@@ -79,12 +80,15 @@ mkdir -p "$work/mpv/subprojects"
 ln -sfn "$work/libplacebo" "$work/mpv/subprojects/libplacebo"
 
 # mpv: only libmpv (no CLI), LGPL, every optional feature off unless listed (what media_kit's video output and an
-# IPTV player use: OpenGL/EGL rendering, VA-API decoding, PulseAudio/ALSA, subtitles via libass).
+# IPTV player use: OpenGL/EGL rendering, VA-API decoding on X11, Wayland and DRM, PulseAudio/ALSA, subtitles via
+# libass). VA-API needs at least one of those display backends, or meson refuses it.
 mpv_flags=(
   --buildtype=release --default-library=shared --auto-features=disabled --force-fallback-for=libplacebo
   -Dlibmpv=true -Dcplayer=false -Dgpl=false -Dtests=false
   -Dlibplacebo:demos=false -Dlibplacebo:vulkan=disabled -Dlibplacebo:opengl=enabled
   -Dgl=enabled -Degl=enabled -Dplain-gl=enabled -Dvaapi=enabled -Ddrm=enabled
+  -Dx11=enabled -Dwayland=enabled -Degl-x11=enabled -Degl-wayland=enabled -Degl-drm=enabled
+  -Dvaapi-x11=enabled -Dvaapi-wayland=enabled -Dvaapi-drm=enabled
   -Dpulse=enabled -Dalsa=enabled -Diconv=enabled -Dzlib=enabled
 )
 stage mpv-configure env PKG_CONFIG_PATH="$prefix/lib/pkgconfig" meson setup "$work/mpv-build" "$work/mpv" "${mpv_flags[@]}"
