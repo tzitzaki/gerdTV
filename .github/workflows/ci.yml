@@ -1,13 +1,14 @@
 # CI on every pull request push (docs/SETUP.md, "CI"). The job names linux, macos and android are the required
 # checks of the main ruleset: renaming one blocks every merge until the ruleset changes too.
-# Each job's first step ends it green at once when only *.md files changed (scripts/ci-scope.sh).
+# Each job runs only the steps of the areas the change touches (scripts/ci-scope.sh); a job without work ends green
+# in seconds. Debug: the scope step prints the changed files and the areas it picked.
 name: ci
 
 on:
   pull_request:
   workflow_dispatch:
-  # Pushes to main run only the android job: it saves the Gradle/pub/cargo cache in main's scope, the only scope a
-  # release tag can restore from (caches saved by pull requests are invisible to tag runs).
+  # Pushes to main run only the android and warm-caches jobs: they save caches in main's scope, the only scope a
+  # release tag or a new branch can restore from (a pull request's caches are visible only to that pull request).
   push:
     branches: [main]
 
@@ -32,7 +33,14 @@ jobs:
           fetch-depth: 0
       - id: scope
         run: scripts/ci-scope.sh "${{ github.event.pull_request.base.sha }}"
-      - if: steps.scope.outputs.code == 'true'
+      # What this job needs: anything (any area but macos/android), Flutter (all but the repo rules alone), gerdTV's
+      # own libmpv (the harness on it, the integration tests).
+      - id: need
+        run: |
+          echo "any=${{ steps.scope.outputs.rust == 'true' || steps.scope.outputs.flutter == 'true' || steps.scope.outputs.linux == 'true' || steps.scope.outputs.rules == 'true' }}" >> "$GITHUB_OUTPUT"
+          echo "flutter=${{ steps.scope.outputs.rust == 'true' || steps.scope.outputs.flutter == 'true' || steps.scope.outputs.linux == 'true' }}" >> "$GITHUB_OUTPUT"
+          echo "libmpv=${{ steps.scope.outputs.rust == 'true' || steps.scope.outputs.linux == 'true' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.need.outputs.any == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -43,14 +51,14 @@ jobs:
             target
           key: linux-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
           restore-keys: linux-
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.need.outputs.any == 'true'
         name: System packages
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
             libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq gdb
       # gerdTV's own libmpv (scripts/build-libmpv.sh), rebuilt only when the script changes.
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.need.outputs.libmpv == 'true'
         id: libmpv
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -58,19 +66,21 @@ jobs:
             build/libmpv/libgerdmpv.so
             build/libmpv/libgerdmpv.txt
           key: libmpv-linux-${{ hashFiles('scripts/build-libmpv.sh', 'scripts/build-libmpv-container.sh') }}
-      - if: steps.scope.outputs.code == 'true' && steps.libmpv.outputs.cache-hit != 'true'
+      - if: steps.need.outputs.libmpv == 'true' && steps.libmpv.outputs.cache-hit != 'true'
         run: scripts/build-libmpv-container.sh build/libmpv
       # For debugging on a dev machine: `gh run download <run> -n libgerdmpv-linux`, then LIBMPV_LIBRARY_PATH.
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.need.outputs.libmpv == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: libgerdmpv-linux
           path: build/libmpv/libgerdmpv.*
           retention-days: 7
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.need.outputs.flutter == 'true'
         run: scripts/ci-install-flutter.sh
-      - if: steps.scope.outputs.code == 'true'
-        run: just ci-linux
+      - if: steps.need.outputs.any == 'true'
+        run: >-
+          just ci-linux ${{ steps.scope.outputs.rust }} ${{ steps.scope.outputs.flutter }}
+          ${{ steps.scope.outputs.linux }} ${{ steps.scope.outputs.rules }}
 
   macos:
     if: github.event_name != 'push'
@@ -82,7 +92,7 @@ jobs:
           fetch-depth: 0
       - id: scope
         run: scripts/ci-scope.sh "${{ github.event.pull_request.base.sha }}"
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -92,17 +102,17 @@ jobs:
             ~/.cargo/git
           key: macos-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
           restore-keys: macos-
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         run: brew install just
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         run: scripts/ci-install-flutter.sh
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         # The main target on every PR: macOS build + integration tests in the runner's GUI session.
         run: just mac-check
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         # The release's first-install DMG, from this build: the packaging script is checked on every PR.
         run: scripts/macos-dmg.sh app/build/macos/Build/Products/Debug/gerdTV.app "$RUNNER_TEMP/check.dmg"
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.macos == 'true'
         # iPhone/iPad: compile the app (Swift platform code included) without signing; no simulator run.
         run: cd app && flutter build ios --debug --no-codesign
 
@@ -115,12 +125,12 @@ jobs:
           fetch-depth: 0
       - id: scope
         run: scripts/ci-scope.sh "${{ github.event.pull_request.base.sha }}"
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.android == 'true'
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: "21"
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.android == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -131,9 +141,77 @@ jobs:
             ~/.gradle/caches
           key: android-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
           restore-keys: android-
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.android == 'true'
         run: sudo apt-get install -y -q just
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.android == 'true'
         run: scripts/ci-install-flutter.sh
-      - if: steps.scope.outputs.code == 'true'
+      - if: steps.scope.outputs.android == 'true'
         run: just build-android
+
+  # Main's caches for new branches: a branch restores main's libmpv and linux caches instead of rebuilding libmpv
+  # (about 6 min) and the Rust/Flutter dependencies on its first run. Real work only when a cache key changed
+  # (lookup-only: a hit downloads nothing).
+  warm-caches:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Same paths and key as the linux job's, or the linux job can't restore it.
+      - id: libmpv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv/libgerdmpv.so
+            build/libmpv/libgerdmpv.txt
+          key: libmpv-linux-${{ hashFiles('scripts/build-libmpv.sh', 'scripts/build-libmpv-container.sh') }}
+          lookup-only: true
+      - if: steps.libmpv.outputs.cache-hit != 'true'
+        run: scripts/build-libmpv-container.sh build/libmpv
+      - id: linux
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/flutter
+            ~/.pub-cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
+          lookup-only: true
+      # A miss: start from main's previous linux cache, build what the linux job builds first, save under the new key.
+      - if: steps.linux.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/flutter
+            ~/.pub-cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
+          restore-keys: linux-
+      - if: steps.linux.outputs.cache-hit != 'true'
+        name: System packages and Flutter
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
+            libayatana-appindicator3-dev libsecret-1-dev
+          scripts/ci-install-flutter.sh
+      # A step of its own: Flutter's PATH entry (GITHUB_PATH) takes effect from the next step on.
+      - if: steps.linux.outputs.cache-hit != 'true'
+        name: Build the dependencies
+        run: |
+          cargo clippy --workspace --all-targets --quiet
+          cargo test --workspace --no-run --quiet
+          (cd app && flutter pub get)
+      - if: steps.linux.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/flutter
+            ~/.pub-cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
