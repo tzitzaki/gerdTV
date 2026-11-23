@@ -20,6 +20,7 @@ import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'settings_model.dart';
 import 'update_settings.dart';
+import 'user_data_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session});
@@ -173,6 +174,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: l10n.settingsLists,
               keywords: l10n.settingsKeywordsLists,
               build: (_) => _ListSettings(session: session),
+            ),
+        ],
+      ),
+      SettingsCategory(
+        id: 'data',
+        icon: Icons.import_export,
+        title: l10n.settingsData,
+        entries: [
+          if (lib != null)
+            SettingsEntry(
+              id: 'userData',
+              title: l10n.userDataExport,
+              keywords: l10n.settingsKeywordsData,
+              build: (_) => UserDataSettings(session: session),
             ),
         ],
       ),

@@ -21,6 +21,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
+- Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
 
 ## iPhone
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
@@ -29,6 +30,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Background: locking the phone while a channel plays keeps the sound going; the lock screen shows it.
 - PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
+- Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 
 ## iPad
 - PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
@@ -50,3 +52,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
+- Your data: Export says Downloads/gerdtv-….json; Import opens a file picker that reaches that file (if none opens, note the error shown).

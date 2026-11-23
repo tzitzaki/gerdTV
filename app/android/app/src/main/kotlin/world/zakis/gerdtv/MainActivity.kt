@@ -6,7 +6,10 @@ package world.zakis.gerdtv
 // - Background playback: PlaybackService (a foreground service with a notification, wake and Wi-Fi locks) keeps the
 //   process and the stream alive with the screen off, until Dart says playback stopped.
 // - The launcher icon: one <activity-alias> per logo in the manifest, exactly one enabled (setLogo).
-// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name); native →
+// - Settings → Your data: saveToDownloads writes the export into the public Downloads folder (MediaStore, Android
+//   10+, no permission needed); older Android gets the app's own Downloads folder and the path is returned.
+// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name),
+// saveToDownloads(String name, String text) → String; native →
 // pictureMode(Boolean).
 // Debug hints: `adb shell dumpsys activity services world.zakis.gerdtv` shows the service; PiP needs
 // android:supportsPictureInPicture in the manifest and Android 8+.
@@ -15,7 +18,10 @@ import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.ContentValues
 import android.content.res.Configuration
+import android.os.Environment
+import android.provider.MediaStore
 import android.os.Build
 import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
@@ -43,10 +49,37 @@ class MainActivity : FlutterActivity() {
                         setLogo(call.argument<String>("name") ?: "gtv")
                         result.success(null)
                     }
+                    "saveToDownloads" -> {
+                        val name = call.argument<String>("name") ?: "gerdtv.json"
+                        val text = call.argument<String>("text") ?: ""
+                        try {
+                            result.success(saveToDownloads(name, text.toByteArray()))
+                        } catch (e: Exception) {
+                            result.error("save", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
         }
+    }
+
+    /// Writes [bytes] as [name] into Downloads; returns where it went (shown to the user).
+    private fun saveToDownloads(name: String, bytes: ByteArray): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+            val file = java.io.File(dir, name)
+            file.writeBytes(bytes)
+            return file.path
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, name)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+        }
+        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw java.io.IOException("Downloads refused the file")
+        contentResolver.openOutputStream(uri).use { it!!.write(bytes) }
+        return "Downloads/$name"
     }
 
     /// Enables the chosen logo's launcher alias and disables the others. DONT_KILL_APP keeps this process running;

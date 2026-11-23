@@ -101,7 +101,10 @@ void main() {
       for (final id in ['account', 'health', 'about']) {
         expect(find.byKey(Key('settings.cat.$id')), findsOneWidget);
       }
-      expect(find.byKey(const Key('settings.cat.playback')), findsNothing);
+      // Profile categories need an open library (none here).
+      for (final id in ['playback', 'data']) {
+        expect(find.byKey(Key('settings.cat.$id')), findsNothing);
+      }
       // The first category shows; another one replaces it.
       expect(find.byKey(const Key('settings.remove')), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings.cat.about')));

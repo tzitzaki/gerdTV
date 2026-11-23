@@ -67,6 +67,13 @@ class PlatformBridge {
     }
   }
 
+  /// Android: writes [text] as [name] into Downloads; returns where it went.
+  static Future<String> saveToDownloads(String name, String text) async =>
+      (await channel.invokeMethod<String>('saveToDownloads', {
+        'name': name,
+        'text': text,
+      }))!;
+
   /// iOS: hands the stream to AVPlayer and starts Picture-in-Picture. False when PiP isn't available.
   Future<bool> startApplePip(String url) async {
     try {
