@@ -86,10 +86,10 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     }
 
     MPVHelpers.checkError(
-      mpv_render_context_create(&renderContext, handle, &params)
+      MPV.renderContextCreate(&renderContext, handle, &params)
     )
 
-    mpv_render_context_set_update_callback(
+    MPV.renderContextSetUpdateCallback(
       renderContext,
       { (ctx) in
         let that = unsafeBitCast(ctx, to: TextureHW.self)
@@ -108,8 +108,8 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       CGLSetCurrentContext(nil)
     }
 
-    mpv_render_context_set_update_callback(renderContext, nil, nil)
-    mpv_render_context_free(renderContext)
+    MPV.renderContextSetUpdateCallback(renderContext, nil, nil)
+    MPV.renderContextFree(renderContext)
   }
 
   public func resize(_ size: CGSize) {
@@ -179,7 +179,7 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       mpv_render_param(type: MPV_RENDER_PARAM_OPENGL_FBO, data: fboPtr),
       mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil),
     ]
-    mpv_render_context_render(renderContext, &params)
+    MPV.renderContextRender(renderContext, &params)
 
     glFlush()
 

@@ -39,7 +39,7 @@ Pod::Spec.new do |s|
       'GCC_PREPROCESSOR_DEFINITIONS'                 => '"$(inherited)" GL_SILENCE_DEPRECATION COREVIDEO_SILENCE_GL_DEPRECATION',
       'FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]'        => sprintf('"$(inherited)" "%s"', framework_search_paths_iphoneos),
       'FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]' => sprintf('"$(inherited)" "%s"', framework_search_paths_iphonesimulator),
-      'OTHER_LDFLAGS'                                => '"$(inherited)" -framework Mpv',
+      # gerdTV patch: no -framework Mpv; MPV.swift looks libmpv up at run time (third_party/README.md).
       # Flutter.framework does not contain a i386 slice.
       'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
     }

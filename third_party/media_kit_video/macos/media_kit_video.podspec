@@ -37,7 +37,7 @@ Pod::Spec.new do |s|
       'GCC_WARN_INHIBIT_ALL_WARNINGS'       => 'YES',
       'GCC_PREPROCESSOR_DEFINITIONS'        => '"$(inherited)" GL_SILENCE_DEPRECATION COREVIDEO_SILENCE_GL_DEPRECATION',
       'FRAMEWORK_SEARCH_PATHS[sdk=macosx*]' => sprintf('"$(inherited)" "%s"', framework_search_paths_macosx),
-      'OTHER_LDFLAGS'                       => '"$(inherited)" -framework Mpv',
+      # gerdTV patch: no -framework Mpv; MPV.swift looks libmpv up at run time (third_party/README.md).
     }
   else
     s.source_files        = 'Classes/stub/**/*.swift'
