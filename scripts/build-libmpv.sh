@@ -95,7 +95,7 @@ stage mpv-configure env PKG_CONFIG_PATH="$prefix/lib/pkgconfig" meson setup "$wo
 stage mpv-build ninja -C "$work/mpv-build"
 
 # The library under its own name (file and soname), so nothing can mistake it for the system's libmpv.so.2.
-lib="$(find "$work/mpv-build" -maxdepth 1 -name 'libmpv.so.*.*' | head -n 1)"
+lib="$(find "$work/mpv-build" -maxdepth 1 -type f -name 'libmpv.so.*.*' | head -n 1)"
 [[ -n "$lib" ]] || { echo "build-libmpv: no libmpv.so in $work/mpv-build"; exit 1; }
 cp "$lib" "$out/libgerdmpv.so"
 stage soname patchelf --set-soname libgerdmpv.so "$out/libgerdmpv.so"
