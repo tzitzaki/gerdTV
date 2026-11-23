@@ -32,7 +32,11 @@ impl Harness {
         let mpv = Mpv::with_initializer(|init| {
             init.set_property("vo", "null")?;
             init.set_property("ao", "null")?;
-            init.set_property("ytdl", "no")?;
+            // gerdTV's own libmpv has no Lua, so no youtube-dl hook and no such property (error -8).
+            match init.set_property("ytdl", "no") {
+                Err(libmpv2::Error::Raw(libmpv2::mpv_error::PropertyNotFound)) | Ok(()) => {}
+                Err(e) => return Err(e),
+            }
             Ok(())
         })
         .expect("libmpv");
