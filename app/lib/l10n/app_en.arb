@@ -139,6 +139,10 @@
   "navSeries": "Series",
   "navSettings": "Settings",
   "playerChannels": "Channels",
+  "playerEngine": "Player engine",
+  "playerEngineGerdtv": "gerdTV build (newer mpv and FFmpeg)",
+  "playerEngineHint": "Takes effect after restarting gerdTV",
+  "playerEngineStandard": "Standard",
   "playerNext": "Next: {title}",
   "@playerNext": {
     "placeholders": {
@@ -192,6 +196,7 @@
   "settingsKeywordsAccount": "profile login sync",
   "settingsKeywordsAdaptive": "buffer automatic",
   "settingsKeywordsBuffer": "cache delay zapping",
+  "settingsKeywordsEngine": "engine mpv ffmpeg libmpv decoder player",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
   "settingsKeywordsLicences": "licenses open source",

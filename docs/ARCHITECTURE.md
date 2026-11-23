@@ -56,6 +56,9 @@
 | Linux | `media_kit_libs_linux` | the system libmpv (Debian/Ubuntu package) | as packaged by the distribution |
 | Android | `media_kit_libs_android_video` | mpv (2023, between 0.36 and 0.37) / FFmpeg 6.0; arm64-v8a, armeabi-v7a, x86_64; 16 KB page aligned | LGPL-3.0 (FFmpeg), mpv built with `-Dgpl=false` |
 | macOS, iOS | `media_kit_libs_macos_video`, `media_kit_libs_ios_video` | mpv 0.36.0 / FFmpeg 6.0 (xcframeworks via CocoaPods) | LGPL |
+| Linux (gerdTV build) | `scripts/build-libmpv.sh` → `lib/libgerdmpv.so` | mpv 0.42.0 / FFmpeg 9.1 / libplacebo v7.387.0, linked into one library (soname `libgerdmpv.so`), only the listed features | LGPL-2.1+ (`-Dgpl=false`, FFmpeg without gpl/nonfree) |
+
+Player engine (Settings → Playback, app-wide in `app.json`, `app/lib/platform/engine.dart`): media_kit's default library or gerdTV's own build, passed to `MediaKit.ensureInitialized(libmpv:)` at start (libmpv loads once per process, so a change applies after a restart). CI builds the own library when the script changes (cached) and runs the libmpv harness and the integration tests on both engines (`just test-harness-gerdmpv`, `just test-integration-gerdmpv`).
 
 All are pulled in through `media_kit_libs_video`; LGPL builds combine fine with the GPL-3.0 app. The in-app Licences screen lists them (`app/assets/licences/native.txt`, kept in step with this table by hand) and every bundled Rust crate (`app/assets/licences/rust.txt`, written and checked by `scripts/licences.sh`; `app/lib/licences.dart`).
 

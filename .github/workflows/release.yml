@@ -117,7 +117,11 @@ jobs:
       - name: System packages
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libayatana-appindicator3-dev libsecret-1-dev
+          sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libayatana-appindicator3-dev libsecret-1-dev \
+            meson nasm patchelf python3-jinja2 libass-dev libva-dev libdrm-dev libegl-dev libgl-dev libpulse-dev \
+            libasound2-dev libgnutls28-dev zlib1g-dev
+      # gerdTV's own libmpv, bundled into lib/ by app/linux/CMakeLists.txt (Settings → Player engine).
+      - run: scripts/build-libmpv.sh build/libmpv
       - run: scripts/ci-install-flutter.sh
       - name: Linux bundle (tar.gz)
         run: |

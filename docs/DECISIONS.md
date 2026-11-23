@@ -20,6 +20,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
 - Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n) and material_ui (Material moved out of the SDK).
+- Own libmpv: one self-contained library per platform (mpv + FFmpeg + libplacebo, LGPL), built by our scripts in CI, named libgerdmpv; media_kit's engine stays the default until ours passes the harness, the journeys and the owner's device checks.
 - State management with `ChangeNotifier`/`ValueListenable`, navigation with `Navigator`/`Router`; images fetched and disk-cached by the core, shown with `Image.file`.
 - Native code only as small, commented Swift/Kotlin platform channels; no third-party native libraries.
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.

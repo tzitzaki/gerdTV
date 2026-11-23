@@ -72,6 +72,21 @@ test-docs:
 test-harness:
     cargo test -q -p gerdtv-testkit --test libmpv_watchdog -- --ignored --nocapture --test-threads 1 --skip soak
 
+# gerdTV's own libmpv into build/libmpv (scripts/build-libmpv.sh): about 15 min the first time; the downloaded
+# sources stay in build/libmpv/work. The Linux build bundles it when it is there (app/linux/CMakeLists.txt).
+libmpv:
+    {{heavy}} scripts/build-libmpv.sh build/libmpv
+
+# The harness on the own build: the test binary links libmpv.so.2, and a symlink of that name in front of the
+# system's points it at libgerdmpv.so.
+test-harness-gerdmpv:
+    mkdir -p build/libmpv/as-system && ln -sfn ../libgerdmpv.so build/libmpv/as-system/libmpv.so.2
+    LD_LIBRARY_PATH="$PWD/build/libmpv/as-system" just test-harness
+
+# The integration tests with the own build (media_kit loads LIBMPV_LIBRARY_PATH when the default engine is chosen).
+test-integration-gerdmpv:
+    LIBMPV_LIBRARY_PATH="$PWD/build/libmpv/libgerdmpv.so" just test-integration
+
 # The soak: GERDTV_SOAK_MINUTES (default 30) of playback with random faults; every fault must recover (nightly).
 soak:
     cargo test -q -p gerdtv-testkit --release --test libmpv_watchdog soak -- --ignored --nocapture
@@ -146,10 +161,12 @@ ci-linux:
     cargo clippy --workspace --all-targets --quiet -- -D warnings
     just test
     just test-harness
+    just test-harness-gerdmpv
     just l10n
     cd app && flutter analyze
     just licences
     just test-integration
+    just test-integration-gerdmpv
     just build-linux
 
 build-linux:

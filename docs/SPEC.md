@@ -40,3 +40,4 @@ Live TV, movies and series from Xtream Codes or M3U with provider groups; TMDB e
 - iOS/iPadOS: no recording (the platform suspends background apps) and no Picture-in-Picture (Apple's PiP needs AVPlayer, not mpv).
 - iOS/iPadOS: updates are notified only; the IPA is re-signed and installed by hand.
 - Linux: updates are downloaded and verified, then replaced by hand.
+- Player engine: Settings → Playback offers gerdTV's own libmpv build (newer mpv and FFmpeg) besides the standard one where it is bundled (Linux so far); the choice applies after a restart.

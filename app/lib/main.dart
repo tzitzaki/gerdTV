@@ -12,12 +12,14 @@ import 'package:path_provider/path_provider.dart';
 
 import 'l10n/gen/app_localizations.dart';
 import 'licences.dart';
+import 'platform/engine.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
 import 'services/reminders.dart';
 import 'services/session.dart';
+import 'src/rust/api/library.dart';
 import 'src/rust/api/logos.dart';
 import 'src/rust/frb_generated.dart';
 import 'theme.dart';
@@ -28,7 +30,18 @@ Future<void> main() async {
   registerBundledLicences();
   // Logos and posters are kept on disk (the OS may clear this folder; they are fetched again then).
   initLogoCache(dir: '${(await getApplicationCacheDirectory()).path}/logos');
-  MediaKit.ensureInitialized();
+  // The player engine (Settings → Playback) is chosen before libmpv loads; a change applies at the next start.
+  final engine = parsePlayerEngine(
+    appSetting(
+      dir: (await getApplicationSupportDirectory()).path,
+      key: settingPlayerEngine,
+    ),
+  );
+  final libmpv = libmpvFor(engine, ownLibmpv());
+  debugPrint(
+    'player engine: ${engine.name} (${libmpv ?? 'media_kit default'})',
+  );
+  MediaKit.ensureInitialized(libmpv: libmpv);
   final session = Session();
   // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
   session.reminders = Reminders(
