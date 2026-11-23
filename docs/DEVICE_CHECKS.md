@@ -25,6 +25,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - User data: Settings → Account → Export writes a file to Downloads; on a second Mac (or after removing favourites) Import brings them back.
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
+- Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
+- Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
 - Programme search: a show's title in Live TV search lists it under Programmes with the right local time; a tap opens its sheet.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
@@ -60,4 +62,5 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
 - Timeshift: Left on a live channel skips 10 s back and shows "−0:10" with Live; Right skips forward, at most to now (the label goes).
+- Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).

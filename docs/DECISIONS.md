@@ -23,7 +23,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
 - Search ranking: favourites and recents first, then name matches, the group's name, mid-word, typos (from 4 letters); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
-- The macOS sandbox goes off with the first feature that needs it (the updater).
+- macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
