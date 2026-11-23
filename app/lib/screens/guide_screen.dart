@@ -172,6 +172,18 @@ class _GuideScreenState extends State<GuideScreen> {
     return null;
   }
 
+  /// What runs now on the first channel with a guide in the loaded first page (null until it has loaded).
+  (ProgrammeInfo, ItemInfo)? _firstRunning(int now) {
+    final rows = _pages[0];
+    if (rows == null) return null;
+    for (var i = 0; i < rows.length && i < _channels.length; i++) {
+      for (final p in rows[i].programmes) {
+        if (p.start <= now && now < p.stop) return (p, _channels[i]);
+      }
+    }
+    return null;
+  }
+
   Future<void> _openProgramme(ProgrammeInfo p, ItemInfo channel) =>
       showProgrammeSheet(
         context,
@@ -250,8 +262,10 @@ class _GuideScreenState extends State<GuideScreen> {
     // The focused programme, above the grid (what the cell can't show: the full title, time and description).
     final header = ValueListenableBuilder<(ProgrammeInfo, ItemInfo)?>(
       valueListenable: _focused,
-      builder: (context, f, _) {
+      builder: (context, focused, _) {
         final text = Theme.of(context).textTheme;
+        // Nothing focused yet: the first row's running programme, so the header never sits empty (owner decision).
+        final f = focused ?? _firstRunning(now);
         return SizedBox(
           height: narrow ? 48 : 64,
           child: f == null
