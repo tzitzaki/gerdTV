@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version VERSION: updates install in place (macOS swap with the sandbox off, Android installer), and a DMG for the first Mac install.
+- Version 0.261123.52: updates install in place (macOS swap with the sandbox off, Android installer), and a DMG for the first Mac install.
 - Also new: Settings → Your data exports and imports favourites, history, hidden groups, reminders and settings as one JSON file.
 - Also new: search in every section, favourites, continue watching, hidden groups, profiles, the timeshift UI and Android voice search.
 - Also new: gerdTV's own libmpv on Linux (mpv 0.42.0, FFmpeg 9.1) in Settings → Playback → Player engine; the standard engine stays default.
