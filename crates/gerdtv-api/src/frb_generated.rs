@@ -326,6 +326,7 @@ fn wire__crate__api__library__Library_categories_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>,
             >>::sse_decode(&mut deserializer);
             let api_kind = <crate::api::library::ItemKind>::sse_decode(&mut deserializer);
+            let api_sort = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -343,8 +344,11 @@ fn wire__crate__api__library__Library_categories_impl(
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let output_ok =
-                        crate::api::library::Library::categories(&*api_that_guard, api_kind)?;
+                    let output_ok = crate::api::library::Library::categories(
+                        &*api_that_guard,
+                        api_kind,
+                        api_sort,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -588,6 +592,7 @@ fn wire__crate__api__library__Library_favourites_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>,
             >>::sse_decode(&mut deserializer);
             let api_kinds = <Vec<crate::api::library::ItemKind>>::sse_decode(&mut deserializer);
+            let api_sort = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -605,8 +610,11 @@ fn wire__crate__api__library__Library_favourites_impl(
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let output_ok =
-                        crate::api::library::Library::favourites(&*api_that_guard, api_kinds)?;
+                    let output_ok = crate::api::library::Library::favourites(
+                        &*api_that_guard,
+                        api_kinds,
+                        api_sort,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1050,6 +1058,7 @@ fn wire__crate__api__library__Library_items_impl(
             >>::sse_decode(&mut deserializer);
             let api_kind = <crate::api::library::ItemKind>::sse_decode(&mut deserializer);
             let api_category = <String>::sse_decode(&mut deserializer);
+            let api_sort = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
             let api_offset = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -1073,6 +1082,7 @@ fn wire__crate__api__library__Library_items_impl(
                         &*api_that_guard,
                         api_kind,
                         api_category,
+                        api_sort,
                         api_limit,
                         api_offset,
                     )?;

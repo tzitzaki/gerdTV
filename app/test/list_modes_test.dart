@@ -132,4 +132,76 @@ void main() {
       expect(starred.last, 'live:1');
     },
   );
+
+  // Sort: each list offers only the orders that make sense for it, and the menu reports the pick.
+  test('sort options per list', () {
+    const p = ListSort.provider, a = ListSort.nameAsc, z = ListSort.nameDesc;
+    for (final (kind, groups, xtream, want) in [
+      (ItemKind.live, true, true, [p, a, z]),
+      (ItemKind.live, false, true, [p, a, z, ListSort.number]),
+      (ItemKind.movie, true, true, [p, a, z]),
+      (
+        ItemKind.movie,
+        false,
+        true,
+        [
+          p,
+          a,
+          z,
+          ListSort.yearDesc,
+          ListSort.yearAsc,
+          ListSort.added,
+          ListSort.rating,
+        ],
+      ),
+      (
+        ItemKind.series,
+        false,
+        false,
+        [p, a, z, ListSort.yearDesc, ListSort.yearAsc],
+      ),
+    ]) {
+      expect(
+        sortOptions(kind, groups: groups, xtream: xtream),
+        want,
+        reason: '$kind groups=$groups xtream=$xtream',
+      );
+    }
+    expect(parseSort('rating'), ListSort.rating);
+    expect(parseSort(null), ListSort.provider);
+    expect(parseSort('gone'), ListSort.provider);
+  });
+
+  testWidgets('the sort menu checks the current order and reports the pick', (
+    tester,
+  ) async {
+    final picked = <ListSort>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          appBar: AppBar(
+            actions: [
+              SortButton(
+                value: ListSort.provider,
+                options: sortOptions(
+                  ItemKind.live,
+                  groups: false,
+                  xtream: false,
+                ),
+                onSelected: picked.add,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('list.sort')));
+    await tester.pumpAndSettle();
+    expect(find.text('Channel number'), findsOneWidget);
+    expect(find.text('Rating'), findsNothing);
+    await tester.tap(find.byKey(const Key('sort.number')));
+    await tester.pumpAndSettle();
+    expect(picked, [ListSort.number]);
+  });
 }

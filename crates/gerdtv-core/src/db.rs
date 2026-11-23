@@ -49,6 +49,63 @@ impl From<m3u::Kind> for Kind {
     }
 }
 
+/// The order of a list (groups, a group's items, favourites), chosen per section in the list's top bar and stored as
+/// a profile setting. Each maps to a fixed ORDER BY (never built from input); provider order breaks every tie, so
+/// paging stays stable. NULLs (no number, year, date or rating) go last in every order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Sort {
+    #[default]
+    Provider,
+    NameAsc,
+    NameDesc,
+    Number,
+    YearDesc,
+    YearAsc,
+    Added,
+    Rating,
+}
+
+impl Sort {
+    /// The setting's value; anything unknown (an older or newer app wrote it) is provider order.
+    pub fn parse(s: &str) -> Sort {
+        match s {
+            "name_asc" => Sort::NameAsc,
+            "name_desc" => Sort::NameDesc,
+            "number" => Sort::Number,
+            "year_desc" => Sort::YearDesc,
+            "year_asc" => Sort::YearAsc,
+            "added" => Sort::Added,
+            "rating" => Sort::Rating,
+            _ => Sort::Provider,
+        }
+    }
+
+    /// ORDER BY terms for items under the table alias `a` (`folded` starts with the cleaned, accent-free name, so
+    /// "DE | ARD HD" sorts under A).
+    pub fn items_sql(self, a: &str) -> String {
+        let terms = match self {
+            Sort::Provider => "",
+            Sort::NameAsc => "{a}folded, ",
+            Sort::NameDesc => "{a}folded DESC, ",
+            Sort::Number => "{a}number IS NULL, {a}number, ",
+            Sort::YearDesc => "{a}year IS NULL, {a}year DESC, ",
+            Sort::YearAsc => "{a}year IS NULL, {a}year, ",
+            Sort::Added => "{a}added IS NULL, {a}added DESC, ",
+            Sort::Rating => "{a}rating IS NULL, {a}rating DESC, ",
+        };
+        format!("{terms}{{a}}position").replace("{a}", a)
+    }
+
+    /// ORDER BY for groups (categories, alias `c`): only provider order and by name; the others keep provider order.
+    pub fn groups_sql(self) -> &'static str {
+        match self {
+            Sort::NameAsc => "c.name COLLATE NOCASE, c.position",
+            Sort::NameDesc => "c.name COLLATE NOCASE DESC, c.position",
+            _ => "c.position",
+        }
+    }
+}
+
 /// Forward-only migrations: entry i takes the schema from version i + 1 to i + 2. The base SCHEMA is version 1.
 /// Never edit a released entry; append a new one (docs/DATA_MODEL.md, "Migrations").
 const MIGRATIONS: &[&str] = &[
@@ -100,6 +157,10 @@ const MIGRATIONS: &[&str] = &[
     // 7 → 8: groups the user hid (user data): left out of the lists, search, the guide and every row.
     "CREATE TABLE hidden_groups (kind INTEGER NOT NULL, category TEXT NOT NULL, updated_at INTEGER NOT NULL,
         PRIMARY KEY (kind, category));",
+    // 8 → 9: sort by "recently added" and "rating" (Xtream Codes `added` / `last_modified` and `rating`; M3U has
+    // neither, so both stay NULL there). Catalogue data: the next sync fills them.
+    "ALTER TABLE items ADD COLUMN added INTEGER;
+     ALTER TABLE items ADD COLUMN rating REAL;",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -317,6 +378,10 @@ pub struct NewItem {
     pub ext: String,
     /// Live channels: days the provider keeps for catch-up (0 = none).
     pub archive_days: u32,
+    /// Xtream Codes movies and series: when the provider added it (unix seconds), for "recently added".
+    pub added: Option<i64>,
+    /// Xtream Codes movies and series: the provider's rating (0–10; a 0 counts as "no rating").
+    pub rating: Option<f64>,
 }
 
 /// One sync of a profile's catalogue: everything inside one transaction (diff + upsert by key), so readers see the
@@ -360,15 +425,16 @@ impl<'c> Sync<'c> {
         let alt = format!("{} {}", clean_name(&it.name), clean_name(&it.alt));
         let rowid: i64 = self.tx.prepare_cached(
             "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext,
-               archive_days, folded)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+               archive_days, folded, added, rating)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
              ON CONFLICT (key) DO UPDATE SET kind = ?2, name = ?3, category = ?4, logo = ?5, epg_id = ?6,
                number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13, ext = ?14,
-               archive_days = ?15, folded = ?16
+               archive_days = ?15, folded = ?16, added = ?17, rating = ?18
              RETURNING rowid",
         )?.query_row(
             params![it.key, kind as i64, it.name, it.category, it.logo, it.epg_id, it.number, it.url, it.season,
-                    it.episode, it.year, self.position, self.generation, it.ext, it.archive_days, fold(&alt)],
+                    it.episode, it.year, self.position, self.generation, it.ext, it.archive_days, fold(&alt),
+                    it.added, it.rating],
             |r| r.get(0),
         )?;
         let fresh = self.tx.last_insert_rowid() != before && self.tx.last_insert_rowid() == rowid;
@@ -452,6 +518,8 @@ pub fn import_m3u(
             url,
             year: None,
             ext: String::new(),
+            added: None, // M3U has no date added and no rating
+            rating: None,
             // A catchup attribute without catchup-days says nothing about the reach: no catch-up then.
             archive_days: if e.catchup.is_empty() {
                 0
@@ -989,15 +1057,17 @@ pub fn set_favourite(conn: &Connection, key: &str, on: bool) -> Result<()> {
     Ok(())
 }
 
-/// The favourites of `kinds` (empty = all) in provider order (channel numbers stay in order, zapping follows the
-/// list), with their group's name; ones the catalogue doesn't have right now are left out.
-pub fn favourites(conn: &Connection, kinds: &[Kind]) -> Result<Vec<Hit>> {
+/// The favourites of `kinds` (empty = all) in the section's item order (provider order by default, so channel numbers
+/// stay in order; zapping follows the list), with their group's name; ones the catalogue doesn't have right now are
+/// left out.
+pub fn favourites(conn: &Connection, kinds: &[Kind], sort: Sort) -> Result<Vec<Hit>> {
     let mut st = conn.prepare_cached(&format!(
         "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, '')
          FROM favourites f JOIN items i ON i.key = f.key
          LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
-         WHERE (?1 >> i.kind) & 1 {} ORDER BY i.kind, i.position",
-        visible_and(conn, "i")?
+         WHERE (?1 >> i.kind) & 1 {} ORDER BY i.kind, {}",
+        visible_and(conn, "i")?,
+        sort.items_sql("i.")
     ))?;
     let rows = st.query_map([kind_mask(kinds)], |r| {
         Ok(Hit {
@@ -1354,25 +1424,133 @@ http://h.example.invalid/live/alice/s3cret/403.ts
     }
 
     #[test]
+    fn every_sort_orders_with_missing_values_last_and_provider_order_on_ties() {
+        let mut c = open(Path::new(":memory:")).unwrap();
+        let mut s = Sync::begin(&mut c).unwrap();
+        s.category(Kind::Movie, "b", "beta");
+        s.category(Kind::Movie, "a", "Alpha");
+        // (name, year, added, rating) in provider order.
+        let rows = [
+            ("Zorro (1998)", Some(1998), Some(300), Some(6.0)),
+            ("Ärger (2020)", Some(2020), None, Some(8.5)),
+            ("DE | Bambi", None, Some(500), None),
+            ("Casablanca (1942)", Some(1942), Some(100), Some(8.5)),
+        ];
+        for (i, (name, year, added, rating)) in rows.into_iter().enumerate() {
+            let it = NewItem {
+                key: format!("movie:{i}"),
+                name: name.into(),
+                category: "a".into(),
+                year,
+                added,
+                rating,
+                ..NewItem::default()
+            };
+            s.item(Kind::Movie, &it).unwrap();
+        }
+        let b = NewItem {
+            key: "movie:9".into(),
+            name: "Other".into(),
+            category: "b".into(),
+            ..NewItem::default()
+        };
+        s.item(Kind::Movie, &b).unwrap();
+        s.finish().unwrap();
+        let order = |sort: Sort| -> Vec<String> {
+            c.prepare(&format!(
+                "SELECT name FROM items WHERE category = 'a' ORDER BY {}",
+                sort.items_sql("")
+            ))
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect()
+        };
+        let (z, a, b, cb) = (
+            "Zorro (1998)",
+            "Ärger (2020)",
+            "DE | Bambi",
+            "Casablanca (1942)",
+        );
+        for (sort, want) in [
+            (Sort::Provider, [z, a, b, cb]),
+            (Sort::NameAsc, [a, b, cb, z]), // accents folded, "DE |" prefix ignored
+            (Sort::NameDesc, [z, cb, b, a]),
+            (Sort::YearDesc, [a, z, cb, b]), // no year last
+            (Sort::YearAsc, [cb, z, a, b]),
+            (Sort::Added, [b, z, cb, a]),
+            (Sort::Rating, [a, cb, z, b]), // the tie at 8.5 keeps provider order
+            (Sort::Number, [z, a, b, cb]), // no numbers at all: provider order
+        ] {
+            assert_eq!(order(sort), want, "{sort:?}");
+        }
+        // Groups sort by name or keep provider order; favourites follow the items' sort.
+        let groups = |sort: Sort| -> Vec<String> {
+            c.prepare(&format!(
+                "SELECT c.name FROM categories c WHERE kind = 1 ORDER BY {}",
+                sort.groups_sql()
+            ))
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect()
+        };
+        assert_eq!(groups(Sort::Provider), ["beta", "Alpha"]);
+        assert_eq!(groups(Sort::NameAsc), ["Alpha", "beta"]);
+        assert_eq!(groups(Sort::NameDesc), ["beta", "Alpha"]);
+        assert_eq!(
+            groups(Sort::Rating),
+            ["beta", "Alpha"],
+            "items-only orders keep provider order"
+        );
+        set_favourite(&c, "movie:0", true).unwrap();
+        set_favourite(&c, "movie:3", true).unwrap();
+        assert_eq!(
+            names(&favourites(&c, &[Kind::Movie], Sort::NameAsc).unwrap()),
+            [cb, z]
+        );
+        assert_eq!(
+            names(&favourites(&c, &[Kind::Movie], Sort::Provider).unwrap()),
+            [z, cb]
+        );
+        for (raw, sort) in [
+            ("name_desc", Sort::NameDesc),
+            ("rating", Sort::Rating),
+            ("", Sort::Provider),
+            ("bogus", Sort::Provider),
+        ] {
+            assert_eq!(Sort::parse(raw), sort, "{raw}");
+        }
+    }
+
+    #[test]
     fn favourites_survive_a_resync_and_list_in_provider_order() {
         let mut c = db();
         set_favourite(&c, "live:102", true).unwrap();
         set_favourite(&c, "live:101", true).unwrap();
         set_favourite(&c, "movie:201", true).unwrap();
         assert_eq!(
-            names(&favourites(&c, &[Kind::Live]).unwrap()),
+            names(&favourites(&c, &[Kind::Live], Sort::Provider).unwrap()),
             ["DE | ARD Sportschau HD", "BR München FHD"]
         );
         assert_eq!(
-            favourites(&c, &[Kind::Live]).unwrap()[0].group,
+            favourites(&c, &[Kind::Live], Sort::Provider).unwrap()[0].group,
             "DE | Vollprogramm"
         );
         // The provider drops a channel for one sync: it is not listed, but comes back with it.
         let without = PLAYLIST.replace("#EXTINF:-1 tvg-chno=\"7\" group-title=\"DE | Regional\",BR München FHD\nhttp://h.example.invalid/live/alice/s3cret/102.ts\n", "");
         import_m3u(&mut c, without.as_bytes(), &["alice", "s3cret"]).unwrap();
-        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 1);
+        assert_eq!(
+            favourites(&c, &[Kind::Live], Sort::Provider).unwrap().len(),
+            1
+        );
         import_m3u(&mut c, PLAYLIST.as_bytes(), &["alice", "s3cret"]).unwrap();
-        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 2);
+        assert_eq!(
+            favourites(&c, &[Kind::Live], Sort::Provider).unwrap().len(),
+            2
+        );
         set_favourite(&c, "live:101", false).unwrap();
         let mut keys = favourite_keys(&c).unwrap();
         keys.sort();
@@ -1439,7 +1617,7 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             "the series and its episode"
         );
         assert!(search_counts(&c, "maus").unwrap().is_empty());
-        assert!(favourites(&c, &[]).unwrap().is_empty());
+        assert!(favourites(&c, &[], Sort::Provider).unwrap().is_empty());
         assert!(search_groups(&c, "regional", &[], 5).unwrap().is_empty());
         set_group_hidden(&c, Kind::Live, "DE | Regional", false).unwrap();
         assert_eq!(

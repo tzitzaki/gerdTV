@@ -310,7 +310,7 @@ void main() {
     // Catch-up: a programme that ended on a channel with an archive (every 13th mock channel) plays from the archive.
     final lib = session.library!;
     final groups = await tester.runAsync(
-      () => lib.categories(kind: ItemKind.live),
+      () => lib.categories(kind: ItemKind.live, sort: 'provider'),
     );
     // (The first such channel may have no guide: the mock panel, like real ones, leaves some epg ids empty.)
     final nowSecs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -321,6 +321,7 @@ void main() {
         () => lib.items(
           kind: ItemKind.live,
           category: g.id,
+          sort: 'provider',
           limit: 500,
           offset: 0,
         ),

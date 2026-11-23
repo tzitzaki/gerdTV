@@ -132,14 +132,16 @@ class _SectionSearchState extends State<SectionSearch> {
     _model.addListener(_onResults);
     _search(); // a query kept from before (the section was shown earlier)
     for (final kind in sectionKinds(widget.section)) {
-      widget.session.library?.categories(kind: kind).then((groups) {
-        if (!mounted) return;
-        setState(() {
-          for (final g in groups) {
-            _groupNames[(kind, g.id)] = g.name;
-          }
-        });
-      });
+      widget.session.library
+          ?.categories(kind: kind, sort: ListSort.provider.value) // names only
+          .then((groups) {
+            if (!mounted) return;
+            setState(() {
+              for (final g in groups) {
+                _groupNames[(kind, g.id)] = g.name;
+              }
+            });
+          });
     }
     widget.session.platform.voiceAvailable.then((v) {
       if (mounted && v) setState(() => _voice = true);

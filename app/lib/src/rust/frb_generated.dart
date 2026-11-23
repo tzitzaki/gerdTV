@@ -115,6 +115,7 @@ abstract class RustLibApi extends BaseApi {
   Future<List<CategoryInfo>> crateApiLibraryLibraryCategories({
     required Library that,
     required ItemKind kind,
+    required String sort,
   });
 
   Future<List<ResumeItem>> crateApiLibraryLibraryContinueWatching({
@@ -135,6 +136,7 @@ abstract class RustLibApi extends BaseApi {
   Future<List<ItemInfo>> crateApiLibraryLibraryFavourites({
     required Library that,
     required List<ItemKind> kinds,
+    required String sort,
   });
 
   Future<List<ChannelRef>> crateApiLibraryLibraryFindGuideChannels({
@@ -182,6 +184,7 @@ abstract class RustLibApi extends BaseApi {
     required Library that,
     required ItemKind kind,
     required String category,
+    required String sort,
     required int limit,
     required int offset,
   });
@@ -663,6 +666,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<List<CategoryInfo>> crateApiLibraryLibraryCategories({
     required Library that,
     required ItemKind kind,
+    required String sort,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -673,6 +677,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_item_kind(kind, serializer);
+          sse_encode_String(sort, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -685,7 +690,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibraryCategoriesConstMeta,
-        argValues: [that, kind],
+        argValues: [that, kind, sort],
         apiImpl: this,
       ),
     );
@@ -694,7 +699,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibraryCategoriesConstMeta =>
       const TaskConstMeta(
         debugName: "Library_categories",
-        argNames: ["that", "kind"],
+        argNames: ["that", "kind", "sort"],
       );
 
   @override
@@ -842,6 +847,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<List<ItemInfo>> crateApiLibraryLibraryFavourites({
     required Library that,
     required List<ItemKind> kinds,
+    required String sort,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -852,6 +858,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_list_item_kind(kinds, serializer);
+          sse_encode_String(sort, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -864,7 +871,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibraryFavouritesConstMeta,
-        argValues: [that, kinds],
+        argValues: [that, kinds, sort],
         apiImpl: this,
       ),
     );
@@ -873,7 +880,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibraryFavouritesConstMeta =>
       const TaskConstMeta(
         debugName: "Library_favourites",
-        argNames: ["that", "kinds"],
+        argNames: ["that", "kinds", "sort"],
       );
 
   @override
@@ -1176,6 +1183,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required Library that,
     required ItemKind kind,
     required String category,
+    required String sort,
     required int limit,
     required int offset,
   }) {
@@ -1189,6 +1197,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_item_kind(kind, serializer);
           sse_encode_String(category, serializer);
+          sse_encode_String(sort, serializer);
           sse_encode_u_32(limit, serializer);
           sse_encode_u_32(offset, serializer);
           pdeCallFfi(
@@ -1203,7 +1212,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibraryItemsConstMeta,
-        argValues: [that, kind, category, limit, offset],
+        argValues: [that, kind, category, sort, limit, offset],
         apiImpl: this,
       ),
     );
@@ -1212,7 +1221,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibraryItemsConstMeta =>
       const TaskConstMeta(
         debugName: "Library_items",
-        argNames: ["that", "kind", "category", "limit", "offset"],
+        argNames: ["that", "kind", "category", "sort", "limit", "offset"],
       );
 
   @override
@@ -5411,10 +5420,15 @@ class LibraryImpl extends RustOpaque implements Library {
     stop: stop,
   );
 
-  Future<List<CategoryInfo>> categories({required ItemKind kind}) => RustLib
-      .instance
-      .api
-      .crateApiLibraryLibraryCategories(that: this, kind: kind);
+  /// `sort`: the list's sort setting ("name_asc", "name_desc"; anything else is provider order).
+  Future<List<CategoryInfo>> categories({
+    required ItemKind kind,
+    required String sort,
+  }) => RustLib.instance.api.crateApiLibraryLibraryCategories(
+    that: this,
+    kind: kind,
+    sort: sort,
+  );
 
   /// The continue-watching row of a section: started, unfinished items, last watched first.
   Future<List<ResumeItem>> continueWatching({
@@ -5441,11 +5455,15 @@ class LibraryImpl extends RustOpaque implements Library {
   List<String> favouriteKeys() =>
       RustLib.instance.api.crateApiLibraryLibraryFavouriteKeys(that: this);
 
-  /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
-  Future<List<ItemInfo>> favourites({required List<ItemKind> kinds}) => RustLib
-      .instance
-      .api
-      .crateApiLibraryLibraryFavourites(that: this, kinds: kinds);
+  /// A section's favourites (`kinds`; empty = all) in the section's item `sort`: the Favourites group.
+  Future<List<ItemInfo>> favourites({
+    required List<ItemKind> kinds,
+    required String sort,
+  }) => RustLib.instance.api.crateApiLibraryLibraryFavourites(
+    that: this,
+    kinds: kinds,
+    sort: sort,
+  );
 
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
@@ -5496,12 +5514,14 @@ class LibraryImpl extends RustOpaque implements Library {
   Future<List<ItemInfo>> items({
     required ItemKind kind,
     required String category,
+    required String sort,
     required int limit,
     required int offset,
   }) => RustLib.instance.api.crateApiLibraryLibraryItems(
     that: this,
     kind: kind,
     category: category,
+    sort: sort,
     limit: limit,
     offset: offset,
   );

@@ -42,6 +42,98 @@ IconData listModeIcon(ListMode m) => switch (m) {
   ListMode.largeTiles => Icons.view_module,
 };
 
+/// The order of a list (owner decision): provider order (the default), by name both ways, channel number (live),
+/// year, recently added and rating (movies and series; added and rating only Xtream Codes sends). Chosen with the
+/// list's sort button, remembered per section for its groups and its items (profile settings
+/// `sort_<kind>_groups` / `sort_<kind>_items`; the core maps the value to a fixed ORDER BY, `db::Sort`).
+/// Favourites, zapping and the guide's channels follow the items' order.
+enum ListSort {
+  provider('provider'),
+  nameAsc('name_asc'),
+  nameDesc('name_desc'),
+  number('number'),
+  yearDesc('year_desc'),
+  yearAsc('year_asc'),
+  added('added'),
+  rating('rating');
+
+  const ListSort(this.value);
+
+  /// The setting's value, as the core parses it.
+  final String value;
+}
+
+String sortSetting(ItemKind kind, {required bool groups}) =>
+    'sort_${kind.name}_${groups ? 'groups' : 'items'}';
+
+ListSort parseSort(String? v) => ListSort.values.firstWhere(
+  (s) => s.value == v,
+  orElse: () => ListSort.provider,
+);
+
+/// The orders that make sense for a list: groups only by name; numbers only for channels; years, dates and ratings
+/// only for movies and series, dates and ratings only where the source sends them (Xtream Codes).
+List<ListSort> sortOptions(
+  ItemKind kind, {
+  required bool groups,
+  required bool xtream,
+}) => [
+  ListSort.provider,
+  ListSort.nameAsc,
+  ListSort.nameDesc,
+  if (!groups && kind == ItemKind.live) ListSort.number,
+  if (!groups && kind != ItemKind.live) ...[
+    ListSort.yearDesc,
+    ListSort.yearAsc,
+    if (xtream) ...[ListSort.added, ListSort.rating],
+  ],
+];
+
+String sortLabel(AppLocalizations l10n, ListSort s) => switch (s) {
+  ListSort.provider => l10n.sortProvider,
+  ListSort.nameAsc => l10n.sortNameAsc,
+  ListSort.nameDesc => l10n.sortNameDesc,
+  ListSort.number => l10n.sortNumber,
+  ListSort.yearDesc => l10n.sortYearDesc,
+  ListSort.yearAsc => l10n.sortYearAsc,
+  ListSort.added => l10n.sortAdded,
+  ListSort.rating => l10n.sortRating,
+};
+
+/// The sort button of a list's top bar: a menu of [options] with the current one checked.
+class SortButton extends StatelessWidget {
+  const SortButton({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+  });
+  final ListSort value;
+  final List<ListSort> options;
+  final ValueChanged<ListSort> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return PopupMenuButton<ListSort>(
+      key: const Key('list.sort'),
+      tooltip: l10n.sortTooltip,
+      icon: const Icon(Icons.sort),
+      initialValue: value,
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        for (final s in options)
+          CheckedPopupMenuItem(
+            key: Key('sort.${s.value}'),
+            value: s,
+            checked: s == value,
+            child: Text(sortLabel(l10n, s)),
+          ),
+      ],
+    );
+  }
+}
+
 IconData kindIcon(ItemKind k) => switch (k) {
   ItemKind.live => Icons.live_tv,
   ItemKind.movie => Icons.movie_outlined,

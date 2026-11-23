@@ -106,7 +106,13 @@ class _GuideScreenState extends State<GuideScreen> {
   }
 
   Future<void> _loadGroups() async {
-    final groups = await _lib.categories(kind: ItemKind.live);
+    // The guide follows the Live section's orders (groups and channels).
+    final groups = await _lib.categories(
+      kind: ItemKind.live,
+      sort:
+          _lib.setting(key: sortSetting(ItemKind.live, groups: true)) ??
+          ListSort.provider.value,
+    );
     if (!mounted || groups.isEmpty) return;
     setState(() => _groups = groups);
     await _selectGroup(groups.first);
@@ -116,6 +122,9 @@ class _GuideScreenState extends State<GuideScreen> {
     final items = await _lib.items(
       kind: ItemKind.live,
       category: g.id,
+      sort:
+          _lib.setting(key: sortSetting(ItemKind.live, groups: false)) ??
+          ListSort.provider.value,
       limit: _maxChannels,
       offset: 0,
     );
