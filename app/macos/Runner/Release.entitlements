@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<!-- Outgoing connections: streams, the provider's API, TMDB, update checks. Without it the sandbox blocks
-	     every stream mpv opens. -->
+	<!-- No app sandbox (owner decision): the in-app updater replaces the app bundle in place, which a sandboxed app
+	     can't. The container's data is copied out once (lib/platform/sandbox_migration.dart). -->
+	<!-- Outgoing connections: streams, the provider's API, TMDB, update checks. Only read inside the sandbox; kept
+	     so turning it back on doesn't silently block every stream mpv opens. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
 </dict>

@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Reminders: re-scheduled after a reboot (flutter_local_notifications). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Updates: hand the downloaded APK to the system's installer (MainActivity.installApk). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android TV (e.g. Nvidia Shield): no touchscreen needed; leanback optional, so phones install it too. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -37,6 +39,16 @@
               android:resource="@style/NormalTheme"
               />
         </activity>
+        <!-- Shares the downloaded update (cache folder) with the system's installer; see res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <!-- The launcher entries: one alias of MainActivity per logo (app/lib/screens/app_logo.dart), exactly one enabled.
              MainActivity.setLogo switches them; `just logos` renders the icons. Their names are stored nowhere, but
              MainActivity maps logo names to them, so rename both together. -->
