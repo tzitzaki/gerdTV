@@ -69,6 +69,14 @@ class GerdTvApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The look the user picked (Settings → Appearance → Theme) applies at once.
+    return ValueListenableBuilder<ThemePrefs>(
+      valueListenable: session.theme,
+      builder: (context, prefs, _) => _app(prefs),
+    );
+  }
+
+  Widget _app(ThemePrefs prefs) {
     return MaterialApp(
       navigatorKey: session.navigatorKey,
       // The now-playing bar below every screen (playback continues until Stop or another stream), and one focus
@@ -91,9 +99,9 @@ class GerdTvApp extends StatelessWidget {
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: gerdTheme(Brightness.light),
-      darkTheme: gerdTheme(Brightness.dark),
-      themeMode: ThemeMode.dark,
+      theme: gerdTheme(Brightness.light, prefs),
+      darkTheme: gerdTheme(Brightness.dark, prefs),
+      themeMode: prefs.mode,
       home: ListenableBuilder(
         listenable: session,
         builder: (context, _) => switch (session.state) {

@@ -1,5 +1,6 @@
-// Design tokens (docs/DESIGN.md): one accent colour, dark by default, high contrast, one font (the platform's),
-// a small type scale, generous spacing, visible focus. Widgets read these, never raw values.
+// Design tokens (docs/DESIGN.md): one accent colour (orange unless the user picks another), dark by default, high
+// contrast, one font (the platform's), a small type scale, generous spacing, visible focus. Widgets read these, never
+// raw values. The look the user chose (Settings → Appearance → Theme) is a [ThemePrefs], applied by gerdTheme.
 
 import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoPageTransitionsBuilder;
@@ -9,7 +10,20 @@ import 'package:material_ui/material_ui.dart';
 class Tokens {
   static const accent = Color(
     0xFFFF7A1A,
-  ); // orange: the logo's and the app's one accent
+  ); // orange: the logo's and the app's default accent
+
+  /// The accent presets (owner decision), orange first; every one keeps AA contrast in both brightnesses
+  /// (test/theme_test.dart). The logo stays orange whatever the pick.
+  static const accents = [
+    accent, // orange
+    Color(0xFFE5484D), // red
+    Color(0xFFE93D82), // pink
+    Color(0xFF8E4EC6), // violet
+    Color(0xFF3E63DD), // blue
+    Color(0xFF12A594), // teal
+    Color(0xFF30A46C), // green
+    Color(0xFFFFB224), // gold
+  ];
 
   /// The logo's tile and the Android TV banner's background.
   static const ink = Color(0xFF12121A);
@@ -21,11 +35,106 @@ class Tokens {
   static const wideLayout = 720.0;
 }
 
-ThemeData gerdTheme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: Tokens.accent,
-    brightness: brightness,
+/// The look the user picked (app-wide, Settings → Appearance → Theme; stored by the session in app.json).
+/// Defaults (owner decision): dark, orange, neutral surfaces, no pure black.
+class ThemePrefs {
+  const ThemePrefs({
+    this.mode = ThemeMode.dark,
+    this.accent = 0,
+    this.tinted = false,
+    this.black = false,
+  });
+
+  final ThemeMode mode;
+
+  /// Index into [Tokens.accents].
+  final int accent;
+
+  /// Surfaces tinted by the accent (warm brown-black with orange) instead of neutral grey-black.
+  final bool tinted;
+
+  /// Pure black backgrounds in the dark theme (OLED screens).
+  final bool black;
+
+  /// From the stored strings; anything unknown keeps the default.
+  factory ThemePrefs.parse({
+    String? mode,
+    String? accent,
+    String? tinted,
+    String? black,
+  }) => ThemePrefs(
+    mode: ThemeMode.values.firstWhere(
+      (m) => m.name == mode,
+      orElse: () => ThemeMode.dark,
+    ),
+    accent: (int.tryParse(accent ?? '') ?? 0).clamp(
+      0,
+      Tokens.accents.length - 1,
+    ),
+    tinted: tinted == 'true',
+    black: black == 'true',
   );
+
+  ThemePrefs copyWith({
+    ThemeMode? mode,
+    int? accent,
+    bool? tinted,
+    bool? black,
+  }) => ThemePrefs(
+    mode: mode ?? this.mode,
+    accent: accent ?? this.accent,
+    tinted: tinted ?? this.tinted,
+    black: black ?? this.black,
+  );
+}
+
+/// The colour scheme for [prefs]: Material's scheme from the accent (fidelity: the accent stays close to the pick
+/// instead of a pastel), with the surfaces of a grey scheme unless tinted, and black backgrounds on request (dark).
+ColorScheme gerdScheme(Brightness brightness, ThemePrefs prefs) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: Tokens.accents[prefs.accent],
+    brightness: brightness,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+  );
+  final grey = ColorScheme.fromSeed(
+    seedColor: const Color(0xFF808080),
+    brightness: brightness,
+    dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
+  );
+  var s = prefs.tinted
+      ? scheme
+      : scheme.copyWith(
+          surface: grey.surface,
+          onSurface: grey.onSurface,
+          onSurfaceVariant: grey.onSurfaceVariant,
+          surfaceDim: grey.surfaceDim,
+          surfaceBright: grey.surfaceBright,
+          surfaceContainerLowest: grey.surfaceContainerLowest,
+          surfaceContainerLow: grey.surfaceContainerLow,
+          surfaceContainer: grey.surfaceContainer,
+          surfaceContainerHigh: grey.surfaceContainerHigh,
+          surfaceContainerHighest: grey.surfaceContainerHighest,
+          outline: grey.outline,
+          outlineVariant: grey.outlineVariant,
+          inverseSurface: grey.inverseSurface,
+          onInverseSurface: grey.onInverseSurface,
+          surfaceTint: Colors.transparent, // no accent haze on raised surfaces
+        );
+  if (prefs.black && brightness == Brightness.dark) {
+    s = s.copyWith(
+      surface: Colors.black,
+      surfaceDim: Colors.black,
+      surfaceContainerLowest: Colors.black,
+    );
+  }
+  return s;
+}
+
+ThemeData gerdTheme(
+  Brightness brightness, [
+  ThemePrefs prefs = const ThemePrefs(),
+]) {
+  final scheme = gerdScheme(brightness, prefs);
   return ThemeData(
     colorScheme: scheme,
     brightness: brightness,

@@ -16,6 +16,7 @@ import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
+import '../theme.dart';
 import 'reminders.dart';
 import 'secrets.dart';
 
@@ -192,10 +193,35 @@ class Session extends ChangeNotifier {
     await platform.setLogo(l);
   }
 
+  /// The look (app-wide, Settings → Appearance → Theme): the app rebuilds its theme whenever it changes.
+  final theme = ValueNotifier(const ThemePrefs());
+
+  /// The app-wide settings that store [theme].
+  static const settingThemeMode = 'theme_mode',
+      settingThemeAccent = 'theme_accent',
+      settingThemeTinted = 'theme_tinted',
+      settingThemeBlack = 'theme_black';
+
+  /// Stores and applies a new look at once.
+  Future<void> setTheme(ThemePrefs t) async {
+    final dir = await _dir();
+    setAppSetting(dir: dir, key: settingThemeMode, value: t.mode.name);
+    setAppSetting(dir: dir, key: settingThemeAccent, value: '${t.accent}');
+    setAppSetting(dir: dir, key: settingThemeTinted, value: '${t.tinted}');
+    setAppSetting(dir: dir, key: settingThemeBlack, value: '${t.black}');
+    theme.value = t;
+  }
+
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
     logo = parseAppLogo(appSetting(dir: dir, key: settingAppLogo));
+    theme.value = ThemePrefs.parse(
+      mode: appSetting(dir: dir, key: settingThemeMode),
+      accent: appSetting(dir: dir, key: settingThemeAccent),
+      tinted: appSetting(dir: dir, key: settingThemeTinted),
+      black: appSetting(dir: dir, key: settingThemeBlack),
+    );
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
     profiles = await listProfiles(dir: dir);

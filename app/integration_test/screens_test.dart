@@ -364,6 +364,30 @@ void main() {
       );
       await waitFor(tester, find.byType(PickGuideChannelScreen));
       await checkScreen(tester, form, 'guide-pick', size);
+
+      // The light theme (Settings → Appearance → Theme), once at phone size: the same rules on a few screens.
+      if (form == 'phone') {
+        await tester.runAsync(
+          () => session.setTheme(const ThemePrefs(mode: ThemeMode.light)),
+        );
+        session.navigatorKey.currentState!.popUntil((r) => r.isFirst);
+        await settle(tester);
+        await section('Live TV');
+        await checkScreen(tester, form, 'light-live', size);
+        await tapReady(tester, find.byType(ListTile));
+        await waitFor(tester, find.byType(ItemRow).hitTestable());
+        await checkScreen(tester, form, 'light-group', size);
+        await tester.pageBack();
+        await settle(tester);
+        await section('Settings');
+        await tapReady(
+          tester,
+          find.byKey(const Key('settings.cat.appearance')),
+        );
+        await settle(tester);
+        await checkScreen(tester, form, 'light-settings-appearance', size);
+        await tester.runAsync(() => session.setTheme(const ThemePrefs()));
+      }
     });
   }
 }

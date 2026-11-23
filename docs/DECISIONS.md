@@ -17,6 +17,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
 - Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
 - Swipe on phones: from the left edge back, sideways between sections (not on the Guide), and in the player media_kit's seek and volume swipes (the player's volume; switchable).
+- Theme: dark by default, or light or the system's; orange by default among eight accent presets; neutral surfaces by default (tinted on request); pure black on request; app-wide.
 - Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
