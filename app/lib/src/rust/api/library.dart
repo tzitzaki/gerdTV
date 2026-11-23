@@ -71,10 +71,6 @@ abstract class Library implements RustOpaqueInterface {
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
-  /// The profile's user data (favourites, progress, hidden groups, settings, mapping, reminders …) as JSON; no
-  /// secrets. Settings → Account → Export.
-  Future<String> exportUserData();
-
   /// Every favourite's key, for the stars in the lists.
   List<String> favouriteKeys();
 
@@ -105,9 +101,6 @@ abstract class Library implements RustOpaqueInterface {
 
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
-
-  /// Merges an exported file; newer rows win. Returns how many rows changed.
-  Future<int> importUserData({required String text});
 
   /// One item by its key (a reminder's channel); None when it is gone from the catalogue.
   Future<ItemInfo?> item({required String key});

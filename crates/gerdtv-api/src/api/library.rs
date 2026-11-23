@@ -494,20 +494,6 @@ impl Library {
             .map_err(err)
     }
 
-    /// The profile's user data (favourites, progress, hidden groups, settings, mapping, reminders …) as JSON; no
-    /// secrets. Settings → Account → Export.
-    pub fn export_user_data(&self) -> Result<String, String> {
-        self.0.export_user_data().map_err(|e| e.to_string())
-    }
-
-    /// Merges an exported file; newer rows win. Returns how many rows changed.
-    pub fn import_user_data(&self, text: String) -> Result<u32, String> {
-        self.0
-            .import_user_data(&text)
-            .map(|n| n as u32)
-            .map_err(|e| e.to_string())
-    }
-
     /// Every favourite's key, for the stars in the lists.
     #[flutter_rust_bridge::frb(sync)]
     pub fn favourite_keys(&self) -> Result<Vec<String>, String> {

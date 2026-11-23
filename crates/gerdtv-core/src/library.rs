@@ -351,19 +351,6 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The profile's user data as JSON (crate::userdata).
-    pub fn export_user_data(&self) -> std::result::Result<String, crate::userdata::UserDataError> {
-        crate::userdata::export(&self.conn.lock().unwrap())
-    }
-
-    /// Merges an exported file (newer rows win); the number of rows added or replaced.
-    pub fn import_user_data(
-        &self,
-        text: &str,
-    ) -> std::result::Result<usize, crate::userdata::UserDataError> {
-        crate::userdata::import(&mut self.conn.lock().unwrap(), text)
-    }
-
     pub fn set_group_hidden(&self, kind: Kind, category: &str, hidden: bool) -> Result<()> {
         Ok(db::set_group_hidden(
             &self.conn.lock().unwrap(),

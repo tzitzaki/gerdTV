@@ -249,7 +249,6 @@
   "settingsKeywordsTimeshift": "pause rewind live",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
-  "settingsKeywordsUserData": "backup export import file transfer",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -344,32 +343,5 @@
   "updateInstallRestart": "Install and restart",
   "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
   "updateNone": "gerdTV is up to date.",
-  "updateShowFolder": "Show in folder",
-  "userDataExport": "Export user data",
-  "userDataExported": "Saved to {path}",
-  "@userDataExported": {
-    "placeholders": {
-      "path": {
-        "type": "String"
-      }
-    }
-  },
-  "userDataHint": "Favourites, progress, hidden groups, settings and reminders as a file; no passwords",
-  "userDataImport": "Import user data",
-  "userDataImported": "{count} changes imported",
-  "@userDataImported": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "userDataNone": "No gerdTV files in {path}",
-  "@userDataNone": {
-    "placeholders": {
-      "path": {
-        "type": "String"
-      }
-    }
-  }
+  "updateShowFolder": "Show in folder"
 }

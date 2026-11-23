@@ -20,7 +20,6 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
-- User data: Settings → Account → Export writes a file to Downloads; on a second Mac (or after removing favourites) Import brings them back.
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
 - Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.

@@ -6,10 +6,7 @@
 // Debugging: entries are rebuilt from scratch on every session notification (_categories), so a setting that shows a
 // stale value usually means its widget read the value once in initState instead of in build.
 
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
@@ -144,13 +141,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          if (lib != null)
-            SettingsEntry(
-              id: 'userdata',
-              title: l10n.userDataExport,
-              keywords: l10n.settingsKeywordsUserData,
-              build: (context) => UserDataTiles(session: session),
-            ),
           SettingsEntry(
             id: 'sync',
             title: l10n.settingsSyncNow,
@@ -790,106 +780,6 @@ class _HiddenGroupsScreenState extends State<HiddenGroupsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Settings → Account: export the profile's user data to a JSON file and import one (newer rows win; core
-/// userdata.rs). No file picker (no extra dependency): files go to the Downloads folder on desktop and to the app's
-/// own folder on phones and TV, and Import lists the gerdTV files found there, newest first.
-class UserDataTiles extends StatelessWidget {
-  const UserDataTiles({super.key, required this.session});
-  final Session session;
-
-  static Future<Directory> folder() async =>
-      (isDesktop ? await getDownloadsDirectory() : null) ??
-      (Platform.isAndroid ? await getExternalStorageDirectory() : null) ??
-      await getApplicationDocumentsDirectory();
-
-  Future<void> _export(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final json = await session.library!.exportUserData();
-    final now = DateTime.now();
-    String two(int v) => v.toString().padLeft(2, '0');
-    final name =
-        'gerdtv-${session.profile?.name.replaceAll(RegExp(r'[^\w.-]+'), '_') ?? 'profile'}-'
-        '${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}.json';
-    final file = File('${(await folder()).path}/$name');
-    await file.writeAsString(json);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.userDataExported(file.path))),
-    );
-  }
-
-  Future<void> _import(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final dir = await folder();
-    final files =
-        dir
-            .listSync()
-            .whereType<File>()
-            .where(
-              (f) =>
-                  f.uri.pathSegments.last.startsWith('gerdtv-') &&
-                  f.path.endsWith('.json'),
-            )
-            .toList()
-          ..sort(
-            (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
-          );
-    if (!context.mounted) return;
-    final pick = await showDialog<File>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(l10n.userDataImport),
-        children: [
-          if (files.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(Tokens.space * 2),
-              child: Text(l10n.userDataNone(dir.path)),
-            ),
-          for (final f in files)
-            SimpleDialogOption(
-              key: Key('userdata.file.${f.uri.pathSegments.last}'),
-              onPressed: () => Navigator.of(context).pop(f),
-              child: Text(f.uri.pathSegments.last),
-            ),
-        ],
-      ),
-    );
-    if (pick == null) return;
-    try {
-      final n = await session.library!.importUserData(
-        text: await pick.readAsString(),
-      );
-      session.groupsChanged(); // favourites, hidden groups, progress: every list reloads
-      messenger.showSnackBar(SnackBar(content: Text(l10n.userDataImported(n))));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      children: [
-        ListTile(
-          key: const Key('settings.export'),
-          leading: const Icon(Icons.upload_file),
-          title: Text(l10n.userDataExport),
-          subtitle: Text(l10n.userDataHint),
-          onTap: () => _export(context),
-        ),
-        ListTile(
-          key: const Key('settings.import'),
-          leading: const Icon(Icons.download),
-          title: Text(l10n.userDataImport),
-          onTap: () => _import(context),
-        ),
-      ],
     );
   }
 }

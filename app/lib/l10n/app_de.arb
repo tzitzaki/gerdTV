@@ -118,7 +118,6 @@
   "settingsKeywordsTimeshift": "Pause zurückspulen live",
   "settingsKeywordsUnmatched": "Zuordnung epg",
   "settingsKeywordsUpdates": "Version Release herunterladen neu",
-  "settingsKeywordsUserData": "sicherung backup export import datei übertragen",
   "settingsLastSync": "{entries} Einträge in {categories} Gruppen",
   "settingsLicences": "Lizenzen",
   "settingsLists": "Listen",
@@ -161,11 +160,5 @@
   "updateInstallRestart": "Installieren und neu starten",
   "updateIosHint": "Die neue IPA mit dem Re-Signing-Dienst signieren und installieren.",
   "updateNone": "gerdTV ist aktuell.",
-  "updateShowFolder": "Im Ordner zeigen",
-  "userDataExport": "Nutzerdaten exportieren",
-  "userDataExported": "Gespeichert unter {path}",
-  "userDataHint": "Favoriten, Fortschritt, ausgeblendete Gruppen, Einstellungen und Erinnerungen als Datei; ohne Passwörter",
-  "userDataImport": "Nutzerdaten importieren",
-  "userDataImported": "{count} Änderungen importiert",
-  "userDataNone": "Keine gerdTV-Dateien in {path}"
+  "updateShowFolder": "Im Ordner zeigen"
 }
