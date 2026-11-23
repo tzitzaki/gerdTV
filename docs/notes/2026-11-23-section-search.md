@@ -17,3 +17,10 @@ Plan: the owner's answers from 10:08 to 10:26. Each topic is its own PR. The run
 - 10:35 start step 1 (core: migration 6, index, tiers, typos, groups, history).
 - 10:58 step 1 green (core + bridge): budgets hold (s 40 ms, sport 19 ms); "sport mu" was 1 s until the trigram arm used INTERSECT.
 - 11:15 step 3 built; first integration run: screen check green on all sizes, journey's type-to-search step fixed (test-only).
+- 11:21 step 6 (`just ready`, #47): bench green against the re-saved baseline; the journey failed on a finder that matched 5 programme rows (fixed).
+- 11:20 to 11:56 built in their own worktrees: voice search, timeshift UI, the group-count fix, favourites, continue watching (schema 7), hidden groups (schema 8), profiles, user data export/import, the logo tile tint, and the bench measuring main and the branch in one run.
+- 12:06 the `just ready` rerun went red on the bench: +22 to 28 % on unchanged code while my pushes ran the pre-push tests beside it. Rerunning with nothing else of mine running.
+
+## Open questions
+- Own libmpv: on macOS and iOS the video plugin links Mpv.framework directly, so a Settings switch there needs a media_kit_video fork. Alternative: Android and Linux switchable, Apple chosen at build time.
+- Export/import has no file picker: files go to Downloads on desktop and the app folder on phones/TV. file_selector (flutter.dev) would allow free choice, but needs owner approval as a dependency.
