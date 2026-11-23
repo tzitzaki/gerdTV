@@ -169,7 +169,7 @@
   "updateNone": "gerdTV ist aktuell.",
   "updateShowFolder": "Im Ordner zeigen",
   "userDataExport": "Deine Daten exportieren",
-  "userDataExportHint": "Favoriten, Zuletzt gesehen, Erinnerungen, Programmzuordnung und Einstellungen dieses Profils, ohne Anmeldedaten",
+  "userDataExportHint": "Favoriten, Verlauf, ausgeblendete Gruppen, Erinnerungen und Einstellungen dieses Profils, ohne Anmeldedaten",
   "userDataExportedTo": "Gespeichert unter {path}",
   "userDataFailed": "Hat nicht geklappt: {reason}",
   "userDataImport": "Daten importieren",

@@ -784,7 +784,10 @@ impl Library {
             + n.reminders
             + n.settings
             + n.channel_buffers
-            + n.guide_urls)
+            + n.guide_urls
+            + n.resume
+            + n.hidden_groups
+            + n.search_history)
     }
 
     pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {

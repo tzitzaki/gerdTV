@@ -352,7 +352,7 @@
   "updateNone": "gerdTV is up to date.",
   "updateShowFolder": "Show in folder",
   "userDataExport": "Export your data",
-  "userDataExportHint": "Favourites, recents, reminders, guide mapping and settings of this profile, without the login",
+  "userDataExportHint": "Favourites, history, hidden groups, reminders and settings of this profile, without the login",
   "userDataExportedTo": "Saved to {path}",
   "@userDataExportedTo": {
     "placeholders": {
