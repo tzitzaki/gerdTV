@@ -14,11 +14,11 @@ set -euo pipefail
 worktree=0
 [[ "${1:-}" == "--worktree" ]] && { worktree=1; shift; }
 base="${1:-}"
-areas=(rust flutter linux macos android rules)
-declare -A on
-for a in "${areas[@]}"; do on[$a]=false; done
-all() { for a in "${areas[@]}"; do on[$a]=true; done; }
-set_on() { for a in "$@"; do on[$a]=true; done; }
+areas="rust flutter linux macos android rules"
+# The areas switched on, space-separated (macOS runners have bash 3.2: no associative arrays).
+on=" "
+set_on() { for a in "$@"; do [[ "$on" == *" $a "* ]] || on="$on$a "; done; }
+all() { set_on $areas; }
 
 if [[ -z "$base" ]]; then
   all
@@ -53,4 +53,6 @@ else
     case "$f" in app/lib/l10n/*|app/*/Info.plist|*AndroidManifest.xml) set_on rules ;; esac
   done <<<"$changed"
 fi
-for a in "${areas[@]}"; do echo "$a=${on[$a]}"; done | tee -a "${GITHUB_OUTPUT:-/dev/null}"
+for a in $areas; do
+  if [[ "$on" == *" $a "* ]]; then echo "$a=true"; else echo "$a=false"; fi
+done | tee -a "${GITHUB_OUTPUT:-/dev/null}"
