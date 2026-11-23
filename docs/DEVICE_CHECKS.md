@@ -5,6 +5,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## Mac
 - Install: the zip unpacks to gerdTV.app, "Open Anyway" once, then the setup screen appears.
 - Setup: the Xtream Codes login connects, the catalogue appears, and after a restart it opens without asking again.
+- Profiles: a second provider added in Settings → Account; after a restart the picker asks, "Always open this one" stops it asking.
 - Keychain: no repeated password prompts after the first "Always Allow"; still none after updating to the next release.
 - Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
 - Search: typing in Live TV (without clicking the field) finds channels of every group, also by their group's name; Enter plays the top one.

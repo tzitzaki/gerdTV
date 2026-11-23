@@ -67,6 +67,11 @@ class _SetupScreenState extends State<SetupScreen> {
         : [_m3u.text.trim()];
     final error = await widget.session.addProfile(info, secrets);
     if (!mounted) return;
+    // Added from Settings (a pushed page): back to the app, now on the new profile.
+    if (error == null && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
     setState(() {
       _busy = false;
       _error = error;

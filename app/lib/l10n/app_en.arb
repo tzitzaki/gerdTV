@@ -157,6 +157,19 @@
     }
   },
   "playerZapHint": "↑ ↓ channels · OK channel list",
+  "profileAdd": "Add a provider",
+  "profileAlways": "Always open this one",
+  "profileChoose": "Which provider?",
+  "profileFailed": "Could not open (sign in again by adding it anew)",
+  "profileSwitch": "Switch to {name}",
+  "@profileSwitch": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profiles": "Profiles",
   "programmeFromStart": "From the start",
   "programmeNow": "Now",
   "programmeRemind": "Remind me",
@@ -229,6 +242,7 @@
   "settingsKeywordsLists": "layout tiles compact view",
   "settingsKeywordsLogo": "icon app launcher",
   "settingsKeywordsOffset": "time zone hours",
+  "settingsKeywordsProfiles": "profile account provider switch add another",
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsTimeshift": "pause rewind live",
   "settingsKeywordsUnmatched": "mapping epg",

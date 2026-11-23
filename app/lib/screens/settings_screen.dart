@@ -19,6 +19,7 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'settings_model.dart';
+import 'setup_screen.dart';
 import 'update_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -93,6 +94,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : last == null
                     ? ''
                     : l10n.settingsLastSync(last.entries, last.categories),
+              ),
+            ),
+          ),
+          // Profiles: switch to another provider account, add one, and whether this one opens without asking.
+          SettingsEntry(
+            id: 'profiles',
+            title: l10n.profiles,
+            keywords: l10n.settingsKeywordsProfiles,
+            build: (context) => StatefulBuilder(
+              builder: (context, setState) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final p in session.profiles)
+                    if (p.id != session.profile?.id)
+                      ListTile(
+                        key: Key('settings.profile.${p.id}'),
+                        leading: const Icon(Icons.swap_horiz),
+                        title: Text(l10n.profileSwitch(p.name)),
+                        onTap: () => session.openProfile(p),
+                      ),
+                  if (session.profiles.length > 1 && session.profile != null)
+                    SwitchListTile(
+                      key: const Key('settings.profileAlways'),
+                      title: Text(l10n.profileAlways),
+                      value: session.opensAlways(session.profile!),
+                      onChanged: (on) => setState(() {
+                        setAppSetting(
+                          dir: session.appDir!,
+                          key: Session.settingAlwaysProfile,
+                          value: on ? session.profile!.id : '',
+                        );
+                      }),
+                    ),
+                  ListTile(
+                    key: const Key('settings.profileAdd'),
+                    leading: const Icon(Icons.add),
+                    title: Text(l10n.profileAdd),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SetupScreen(session: session),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

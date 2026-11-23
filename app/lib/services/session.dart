@@ -19,7 +19,8 @@ import '../src/rust/api/playback.dart';
 import 'reminders.dart';
 import 'secrets.dart';
 
-enum SessionState { loading, needsSetup, ready }
+/// `choosing`: more than one profile and none set to open by itself: the start picker shows.
+enum SessionState { loading, needsSetup, choosing, ready }
 
 class Session extends ChangeNotifier {
   Session({Secrets? secrets, this.appDir}) : secrets = secrets ?? Secrets() {
@@ -37,6 +38,14 @@ class Session extends ChangeNotifier {
 
   SessionState state = SessionState.loading;
   ProfileInfo? profile;
+
+  /// Every saved profile (one provider account each), for the start picker and Settings → Account.
+  List<ProfileInfo> profiles = const [];
+
+  /// App-wide settings (app.json): the profile opened last (the picker lists it first) and the one that opens without
+  /// asking ("Always open this one"; empty: ask whenever there are several).
+  static const settingLastProfile = 'last_profile';
+  static const settingAlwaysProfile = 'always_profile';
   Library? library;
 
   /// True while a sync runs; the UI keeps showing the cached catalogue meanwhile.
@@ -186,18 +195,61 @@ class Session extends ChangeNotifier {
     logo = parseAppLogo(appSetting(dir: dir, key: settingAppLogo));
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
-    final profiles = await listProfiles(dir: dir);
+    profiles = await listProfiles(dir: dir);
+    await _openOrChoose();
+  }
+
+  /// One profile, or the one set to open always: open it. Several: the picker. None that opens: setup.
+  Future<void> _openOrChoose() async {
+    final dir = await _dir();
+    final always = appSetting(dir: dir, key: settingAlwaysProfile);
+    final pinned = profiles.where((p) => p.id == always).firstOrNull;
+    if (pinned != null && await openProfile(pinned)) return;
+    if (profiles.length > 1) {
+      final last = appSetting(dir: dir, key: settingLastProfile);
+      // The last one first: usually the one wanted.
+      profiles = [
+        ...profiles.where((p) => p.id == last),
+        ...profiles.where((p) => p.id != last),
+      ];
+      state = SessionState.choosing;
+      notifyListeners();
+      return;
+    }
     for (final p in profiles) {
-      final s = await secrets.read(p.id);
-      if (s == null && p.source != SourceKind.m3UFile) continue;
-      if (await _open(p, s ?? const [])) {
-        unawaited(sync()); // cache first, then refresh in the background
-        return;
-      }
+      if (await openProfile(p)) return;
     }
     state = SessionState.needsSetup;
     notifyListeners();
   }
+
+  /// Opens [p] (at start, from the picker, or switching in Settings): its cached catalogue at once, then a sync in
+  /// the background. [always]: open it without asking from now on (true) or ask again (false). False when its
+  /// secrets are missing (e.g. a new device with the profile list restored) or its database can't open.
+  Future<bool> openProfile(ProfileInfo p, {bool? always}) async {
+    final s = await secrets.read(p.id);
+    if (s == null && p.source != SourceKind.m3UFile) return false;
+    if (library != null) await stopPlayback();
+    zapList = const [];
+    if (!await _open(p, s ?? const [])) return false;
+    final dir = await _dir();
+    setAppSetting(dir: dir, key: settingLastProfile, value: p.id);
+    if (always != null) {
+      setAppSetting(
+        dir: dir,
+        key: settingAlwaysProfile,
+        value: always ? p.id : '',
+      );
+    }
+    generation++;
+    unawaited(sync()); // cache first, then refresh in the background
+    return true;
+  }
+
+  /// Whether [p] opens without asking.
+  bool opensAlways(ProfileInfo p) =>
+      appDir != null &&
+      appSetting(dir: appDir!, key: settingAlwaysProfile) == p.id;
 
   Future<bool> _open(ProfileInfo p, List<String> s) async {
     try {
@@ -240,8 +292,11 @@ class Session extends ChangeNotifier {
       await secrets.delete(saved.id);
       return '$e';
     }
+    if (library != null) await stopPlayback(); // added from Settings: the old profile's stream ends
     library = lib;
     profile = saved;
+    profiles = [...profiles, saved];
+    setAppSetting(dir: dir, key: settingLastProfile, value: saved.id);
     syncError = null;
     generation++;
     state = SessionState.ready;
@@ -305,8 +360,8 @@ class Session extends ChangeNotifier {
     await secrets.delete(p.id);
     library = null;
     profile = null;
-    state = SessionState.needsSetup;
-    notifyListeners();
+    profiles = [...profiles.where((o) => o.id != p.id)];
+    await _openOrChoose(); // another profile, the picker, or setup when it was the last
   }
 
   /// Plays an item through the watchdog. Live channels use the URL form that worked last time; movies and episodes

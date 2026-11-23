@@ -1,6 +1,7 @@
 // A fake Rust core for widget tests: flutter_rust_bridge's RustLib.initMock swaps the native library for this
 // class, so widget tests run without building or loading libgerdtv_api. Add an override per API call a test needs;
 // calls that aren't overridden throw (noSuchMethod), which points straight at the missing fake.
+import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 
 class FakeCore implements RustLibApi {
@@ -29,6 +30,14 @@ class FakeCore implements RustLibApi {
     required String key,
     required String value,
   }) => appSettings[key] = value;
+
+  /// Saved profiles (profiles.json in the real core).
+  var profiles = <ProfileInfo>[];
+
+  @override
+  Future<List<ProfileInfo>> crateApiLibraryListProfiles({
+    required String dir,
+  }) async => profiles;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
