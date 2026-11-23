@@ -292,6 +292,8 @@
       }
     }
   },
+  "updateInstall": "Install",
+  "updateInstallRestart": "Install and restart",
   "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
   "updateNone": "gerdTV is up to date.",
   "updateShowFolder": "Show in folder"

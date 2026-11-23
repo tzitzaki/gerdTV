@@ -1,7 +1,8 @@
 // Settings → Updates: checks the latest release (signed manifest, newer version, a build for this platform; the
 // checks are the core's, gerdtv_core::update), shows its notes and downloads the file, kept only when its SHA-256
-// matches. Installing: desktop opens the download folder (the macOS swap and Android's installer come next); on
-// iPhone/iPad the IPA has to be re-signed first, so there is only a hint.
+// matches. Installing: macOS swaps the bundle in place and restarts (platform/mac_install.dart), Android hands the APK
+// to the system's installer, Linux opens the download folder; on iPhone/iPad the IPA has to be re-signed first, so
+// there is only a hint.
 // Debugging: a failure shows the core's reason (signature, size/SHA-256, network).
 
 import 'dart:io';
@@ -10,6 +11,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../platform/mac_install.dart';
+import '../platform/platform_bridge.dart';
 import '../services/session.dart';
 import '../src/rust/api/update.dart';
 
@@ -60,6 +63,16 @@ class _UpdateSettingsState extends State<UpdateSettings> {
         (isDesktop ? await getDownloadsDirectory() : null) ??
         await getTemporaryDirectory();
     _file = await downloadUpdate(update: _update!, dir: dir.path);
+  });
+
+  /// macOS: swap and restart (returns only on a refusal). Android: the system's installer asks to confirm.
+  Future<void> _install() => _run(() async {
+    if (Platform.isMacOS) {
+      final refused = await installMacUpdate(_file!);
+      if (refused != null) throw refused;
+    } else {
+      await PlatformBridge.installApk(_file!);
+    }
   });
 
   /// Desktop: the folder with the download, in the system's file manager.
@@ -114,6 +127,18 @@ class _UpdateSettingsState extends State<UpdateSettings> {
             )
           else ...[
             ListTile(title: Text(l10n.updateDownloaded(_file!))),
+            if (Platform.isMacOS || Platform.isAndroid)
+              ListTile(
+                key: const Key('update.install'),
+                leading: const Icon(Icons.install_desktop),
+                title: Text(
+                  Platform.isMacOS
+                      ? l10n.updateInstallRestart
+                      : l10n.updateInstall,
+                ),
+                enabled: !_busy,
+                onTap: _install,
+              ),
             if (isDesktop)
               ListTile(
                 leading: const Icon(Icons.folder_open),

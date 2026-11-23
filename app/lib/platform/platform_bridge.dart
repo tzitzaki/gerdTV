@@ -67,6 +67,10 @@ class PlatformBridge {
     }
   }
 
+  /// Android: opens the system's package installer for the downloaded [apk] (the user confirms there).
+  static Future<void> installApk(String apk) =>
+      channel.invokeMethod('installApk', {'path': apk});
+
   /// iOS: hands the stream to AVPlayer and starts Picture-in-Picture. False when PiP isn't available.
   Future<bool> startApplePip(String url) async {
     try {
