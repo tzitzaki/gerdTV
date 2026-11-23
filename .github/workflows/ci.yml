@@ -48,7 +48,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
-            libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq
+            libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq gdb
       - if: steps.scope.outputs.code == 'true'
         run: scripts/ci-install-flutter.sh
       - if: steps.scope.outputs.code == 'true'

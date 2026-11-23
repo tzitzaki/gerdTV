@@ -8,6 +8,7 @@ import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'app_logo.dart';
 import 'browse_screen.dart';
 import 'guide_screen.dart';
 import 'search_screen.dart';
@@ -104,6 +105,15 @@ class _ShellState extends State<Shell> {
                       NavigationRail(
                         selectedIndex: _index,
                         labelType: NavigationRailLabelType.all,
+                        leading: ListenableBuilder(
+                          listenable: s,
+                          builder: (context, _) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: Tokens.space,
+                            ),
+                            child: AppLogoMark(logo: s.logo, size: 40),
+                          ),
+                        ),
                         onDestinationSelected: (i) =>
                             setState(() => _index = i),
                         destinations: [

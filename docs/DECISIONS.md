@@ -31,4 +31,6 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
 - Releases: one per wrap-up from `release.yml`; macOS signed with a stable self-signed certificate; Android with the release keystore; an unsigned iOS IPA; a signed `latest.json` for the in-app updater.
 - No automated installs on the owner's devices; the owner installs every first copy.
+- The logo is drawn in code, the user picks it in Settings, and the pick switches the launcher icon on Android and iOS and the Dock or window icon on macOS and Linux.
+- Screen changes fade in 150 ms on every platform instead of the platforms' 300–500 ms slides.
 - UI strings in English and German via gen-l10n; the UI follows the system language; the name is spelled "gerdTV" everywhere visible.

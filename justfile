@@ -55,6 +55,10 @@ test-rust:
 test-flutter: l10n
     cd app && flutter test
 
+# Render the logo mockups (app/lib/screens/app_logo.dart) into the launcher icon files and app/build/logos/preview.png.
+logos:
+    cd app && flutter test tool/render_logos_test.dart
+
 # Generate the localisation code (app/lib/l10n/gen, not committed). `flutter test` and `analyze` don't do it on a
 # fresh clone; builds do.
 l10n:
@@ -106,8 +110,10 @@ test-live:
 
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 # Expanded reporter: every test's output (the JOURNEY steps) prints as it happens, so a hang shows where it stopped.
+# A hang that blocks the app (no Dart timeout can fire) is ended after 10 min without output, with the app's native
+# stacks in the log (scripts/with-hang-watch.sh).
 test-integration:
-    {{heavy}} scripts/with-fault-server.sh bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --reporter expanded --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC" --dart-define=GERDTV_SCREENS_DIR="$HOME/gerdTV-screens/$(git branch --show-current)"'
+    {{heavy}} scripts/with-fault-server.sh scripts/with-hang-watch.sh 600 bash -c 'cd app && xvfb-run -a flutter test integration_test -d linux --reporter expanded --dart-define=GERDTV_FAULT_SERVER="$GERDTV_FAULT_SERVER" --dart-define=GERDTV_MOCK_XC="$GERDTV_MOCK_XC" --dart-define=GERDTV_SCREENS_DIR="$HOME/gerdTV-screens/$(git branch --show-current)"'
 
 # Fails on a private detail in the changes since <base> or in the given files (e.g. a PR body draft).
 denylist base="origin/main" *files="":

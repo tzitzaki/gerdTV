@@ -25,6 +25,8 @@ void main() {
         await tester.pumpWidget(GerdTvApp(session: setupSession()));
         await tester.pumpAndSettle();
         expect(find.text(title), findsOneWidget);
+        // The form scrolls (logo on top): bring Connect into the 800×600 test window first.
+        await tester.ensureVisible(find.byKey(const Key('setup.connect')));
         await tester.tap(find.byKey(const Key('setup.connect')));
         await tester.pumpAndSettle();
         expect(
