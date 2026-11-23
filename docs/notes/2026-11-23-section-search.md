@@ -16,3 +16,4 @@ Plan: the owner's answers from 10:08 to 10:26. Each topic is its own PR. The run
 - 10:33 #45 merged: CLAUDE.md rule "unknowns first, one extensive question round".
 - 10:35 start step 1 (core: migration 6, index, tiers, typos, groups, history).
 - 10:58 step 1 green (core + bridge): budgets hold (s 40 ms, sport 19 ms); "sport mu" was 1 s until the trigram arm used INTERSECT.
+- 11:15 step 3 built; first integration run: screen check green on all sizes, journey's type-to-search step fixed (test-only).
