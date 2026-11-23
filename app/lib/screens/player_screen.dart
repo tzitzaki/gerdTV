@@ -53,7 +53,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _shiftTick;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _bufferSub;
-  StreamSubscription<bool>? _playingSub;
 
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
   List<ItemInfo> get _channels => widget.session.zapList;
@@ -77,10 +76,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
-    // Paused by any control (ours, media_kit's, the system's): live moves on without us.
-    _playingSub = session.player.stream.playing.listen((playing) {
-      if (!playing) _liveEdge.detach();
-    });
     // The "behind live" label counts up while paused or rewound.
     _shiftTick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _shiftable) setState(() {});
@@ -203,7 +198,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
     _positionSub?.cancel();
-    _playingSub?.cancel();
     _bufferSub?.cancel();
     if (_miniWindow.isMini) {
       _miniWindow.exit();
@@ -296,15 +290,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
       displaySeekBar: !_shiftable,
       bottomButtonBar: _shiftable
           ? [
-              const MaterialDesktopPlayOrPauseButton(),
+              _pauseButton(desktop: true),
               Expanded(child: _timeshiftBar()),
               const MaterialDesktopVolumeButton(),
               const MaterialDesktopFullscreenButton(),
             ]
           : kDefaultMaterialDesktopVideoControlsThemeData.bottomButtonBar,
       keyboardShortcuts: {
-        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): p.playOrPause,
-        const SingleActivator(LogicalKeyboardKey.space): p.playOrPause,
+        // Ours, not media_kit's playOrPause: only a pause by the user moves timeshift off live (media_kit reports
+        // "not playing" at every stream start too), and the watchdog must know a pause isn't a stall.
+        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): _togglePause,
+        const SingleActivator(LogicalKeyboardKey.space): _togglePause,
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () => seek(-2),
         const SingleActivator(LogicalKeyboardKey.arrowRight): () => seek(2),
         const SingleActivator(LogicalKeyboardKey.keyJ): () => seek(-10),
@@ -317,6 +313,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   MaterialVideoControlsThemeData get _mobileControls => _shiftable
       ? MaterialVideoControlsThemeData(
           displaySeekBar: false,
+          primaryButtonBar: [
+            const Spacer(),
+            _pauseButton(desktop: false),
+            const Spacer(),
+          ],
           bottomButtonBar: [
             Expanded(child: _timeshiftBar()),
             const MaterialFullscreenButton(),
@@ -341,8 +342,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _togglePause() async {
     final a = widget.session.adapter;
+    if (!_paused && _shiftable) {
+      _liveEdge.detach(); // paused: live moves on without us
+    }
     _paused ? await a.resume() : await a.pause();
     setState(() => _paused = !_paused);
+  }
+
+  /// Play/pause in the controls while timeshift is on: ours (see the keyboard shortcuts above).
+  Widget _pauseButton({required bool desktop}) {
+    final icon = Icon(_paused ? Icons.play_arrow : Icons.pause);
+    return desktop
+        ? MaterialDesktopCustomButton(
+            key: const Key('player.pause'),
+            icon: icon,
+            onPressed: _togglePause,
+          )
+        : MaterialCustomButton(
+            key: const Key('player.pause'),
+            icon: icon,
+            iconSize: 48,
+            onPressed: _togglePause,
+          );
   }
 
   @override
