@@ -88,7 +88,7 @@ mpv_flags=(
   -Dlibmpv=true -Dcplayer=false -Dgpl=false -Dtests=false
   -Dlibplacebo:demos=false -Dlibplacebo:vulkan=disabled -Dlibplacebo:opengl=enabled
   -Dgl=enabled -Degl=enabled -Dplain-gl=enabled -Dvaapi=enabled -Ddrm=enabled
-  -Dwayland=enabled -Degl-wayland=enabled -Degl-drm=enabled -Dvaapi-wayland=enabled -Dvaapi-drm=enabled
+  -Dwayland=enabled -Degl-wayland=enabled -Dvaapi-wayland=enabled -Dvaapi-drm=enabled
   -Dpulse=enabled -Dalsa=enabled -Diconv=enabled -Dzlib=enabled
 )
 stage mpv-configure env PKG_CONFIG_PATH="$prefix/lib/pkgconfig" meson setup "$work/mpv-build" "$work/mpv" "${mpv_flags[@]}"

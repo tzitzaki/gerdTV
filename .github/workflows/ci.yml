@@ -51,7 +51,7 @@ jobs:
             libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq gdb \
             meson nasm patchelf python3-jinja2 libass-dev libva-dev libdrm-dev libegl-dev libgl-dev libpulse-dev \
             libasound2-dev libgnutls28-dev zlib1g-dev \
-            libwayland-dev wayland-protocols libxkbcommon-dev
+            libwayland-dev libwayland-bin wayland-protocols libxkbcommon-dev libdisplay-info-dev
       # gerdTV's own libmpv (scripts/build-libmpv.sh), rebuilt only when the script changes.
       - if: steps.scope.outputs.code == 'true'
         id: libmpv
