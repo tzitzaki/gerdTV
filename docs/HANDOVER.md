@@ -1,19 +1,19 @@
 # Handover
 
 ## State
-- Version 0.261122.40: Settings in categories with a search over every setting, four gTV logos that switch the app icon, an orange accent.
-- Also new since 0.261122.34: reminders on future programmes (#36) and the in-app updater part 1 in Settings → Updates (#35).
+- Version 0.261123.43: Earlier in programme search, 150 ms fades, a never-empty guide header, no Android cleartext config, a CI hang watchdog.
+- Before (0.261122.40): Settings in categories with a search over every setting, four gTV logos that switch the app icon, an orange accent.
+- Also in 0.261122.40: reminders on future programmes (#36) and the in-app updater part 1 in Settings → Updates (#35).
 - Before: catch-up, the Licences screen, the TV guide everywhere (grid, now/next in lists, zapping with a banner and channel list).
 - Channel lists in four modes with logos from a disk cache; Settings → TV guide with extra XMLTV URLs, offset and mapping; programmes in search.
 - A screen check visits every screen on phone, desktop and TV sizes with screenshots in ~/gerdTV-screens/<branch>/.
-- Session 3: Block A (0.261122.21), Block B (0.261122.31), catch-up and licences (0.261122.34), this release; fades, guide header, cleartext are open PRs.
+- Session 3: Block A (0.261122.21), Block B (0.261122.31), catch-up and licences (0.261122.34), settings and logos (0.261122.40), this release.
 
 ## Owner decisions
 - All Phase 0 questions are answered; the standing decisions are in docs/DECISIONS.md.
 - Open: which gTV logo is the default? The wordmark is, until you pick one in Settings → Appearance (the pick also changes the icon).
 - Open: orange seeds the whole theme, so dark surfaces turned warm brown-black. Keep that, or keep neutral surfaces with orange highlights only?
 - Open: the logo tile is blue-black (#12121A) and shows as a faint square on the warm surfaces. Recommended: tint the tile to the surface.
-- Open: programme search lists running and upcoming first, so a missed show can drop past 100 hits. Recommended: an "Earlier" group.
 - Open: `just bench` against a stored baseline gives false alarms on a shared machine. Recommended: measure main and the branch in one run.
 - Open: Linux builds of parallel sessions don't take the heavy lock, which skews the bench gate. Recommended: build-linux and test-integration take it.
 
@@ -37,7 +37,8 @@
 - The iOS alternate icons and the macOS Dock icon could not be checked against Apple's docs here; CI only compiles them.
 - media_kit has had no release since 12/2025 and ships mpv 0.36 / FFmpeg 6.0 on Apple platforms and Android.
 - One media_kit Player per process: a second one misbehaved, and one per screen-check size hung CI's Linux job (#26).
-- A Linux CI hang in #18 is unexplained; tests now time out after 5 min with their name, a blocked event loop shows as a job cancel.
+- Linux CI hung four times (#18, #26, #37, #41) with the app blocked; the next hang leaves the app's native stacks in the log (#42).
+- In the journey, typing into search after the catch-up step doesn't arrive (cause open; a real keyboard is not involved).
 - Integration tests take about 7–14 min (the screen check plays video at every size); watch it as screens are added.
 - Another session on the same machine skews `just bench`: compare against main under the same load before believing a regression.
 - Release builds restore CI's Android cache from main; a release tagged before main's android run finished builds cold.
