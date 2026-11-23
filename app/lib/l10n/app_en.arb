@@ -186,12 +186,14 @@
   "settingsAccount": "Account",
   "settingsAppearance": "Appearance",
   "settingsBuffer": "Buffer",
+  "settingsData": "Your data",
   "settingsGuide": "TV guide",
   "settingsGuideSources": "Guide sources",
   "settingsHealth": "Stream health",
   "settingsKeywordsAccount": "profile login sync",
   "settingsKeywordsAdaptive": "buffer automatic",
   "settingsKeywordsBuffer": "cache delay zapping",
+  "settingsKeywordsData": "export import backup favourites file transfer",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
   "settingsKeywordsLicences": "licenses open source",
@@ -296,5 +298,33 @@
   "updateInstallRestart": "Install and restart",
   "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
   "updateNone": "gerdTV is up to date.",
-  "updateShowFolder": "Show in folder"
+  "updateShowFolder": "Show in folder",
+  "userDataExport": "Export your data",
+  "userDataExportHint": "Favourites, recents, reminders, guide mapping and settings of this profile, without the login",
+  "userDataExportedTo": "Saved to {path}",
+  "@userDataExportedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "userDataFailed": "Didn't work: {reason}",
+  "@userDataFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "userDataImport": "Import data",
+  "userDataImportHint": "Merges a gerdTV export into this profile; newer entries win, nothing is deleted",
+  "userDataImported": "Imported: {count} new or newer entries",
+  "@userDataImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

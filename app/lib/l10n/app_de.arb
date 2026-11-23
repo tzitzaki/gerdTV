@@ -83,12 +83,14 @@
   "settingsAccount": "Konto",
   "settingsAppearance": "Darstellung",
   "settingsBuffer": "Puffer",
+  "settingsData": "Deine Daten",
   "settingsGuide": "TV-Programm",
   "settingsGuideSources": "Programmquellen",
   "settingsHealth": "Stream-Zustand",
   "settingsKeywordsAccount": "Profil Anmeldung Sync",
   "settingsKeywordsAdaptive": "Puffer automatisch",
   "settingsKeywordsBuffer": "Cache Verzögerung Umschalten",
+  "settingsKeywordsData": "Export Import Sicherung Favoriten Datei übertragen",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "Wiederherstellung Fehler",
   "settingsKeywordsLicences": "Open Source",
@@ -141,5 +143,12 @@
   "updateInstallRestart": "Installieren und neu starten",
   "updateIosHint": "Die neue IPA mit dem Re-Signing-Dienst signieren und installieren.",
   "updateNone": "gerdTV ist aktuell.",
-  "updateShowFolder": "Im Ordner zeigen"
+  "updateShowFolder": "Im Ordner zeigen",
+  "userDataExport": "Deine Daten exportieren",
+  "userDataExportHint": "Favoriten, Zuletzt gesehen, Erinnerungen, Programmzuordnung und Einstellungen dieses Profils, ohne Anmeldedaten",
+  "userDataExportedTo": "Gespeichert unter {path}",
+  "userDataFailed": "Hat nicht geklappt: {reason}",
+  "userDataImport": "Daten importieren",
+  "userDataImportHint": "Führt einen gerdTV-Export mit diesem Profil zusammen; neuere Einträge gewinnen, nichts wird gelöscht",
+  "userDataImported": "Importiert: {count} neue oder neuere Einträge"
 }
