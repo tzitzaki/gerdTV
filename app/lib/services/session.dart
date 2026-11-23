@@ -160,6 +160,9 @@ class Session extends ChangeNotifier {
   /// Adaptive mode raised the current channel's buffer to this many seconds (the player shows a short notice).
   final ValueNotifier<int?> bufferRaisedTo = ValueNotifier(null);
 
+  /// The running stream's timeshift window in seconds (pause/rewind live); 0 for VOD, catch-up or timeshift off.
+  final ValueNotifier<int> timeshiftWindow = ValueNotifier(0);
+
   /// True while the full player screen is open (the now-playing bar hides then).
   final ValueNotifier<bool> playerOpen = ValueNotifier(false);
 
@@ -406,6 +409,8 @@ class Session extends ChangeNotifier {
     _playingKey = channel.key;
     final choice = lib.bufferFor(key: channel.key);
     bufferRaisedTo.value = null;
+    timeshiftWindow.value =
+        0; // an archive plays like a recording: its own seek bar
     await adapter.play(
       ({required hls}) => url,
       live: false,
@@ -453,6 +458,7 @@ class Session extends ChangeNotifier {
         int.tryParse(lib.setting(key: settingTimeshift) ?? '') ??
         defaultTimeshiftSeconds(desktop: isDesktop);
     bufferRaisedTo.value = null;
+    timeshiftWindow.value = live && shift > 0 ? shift : 0;
     await adapter.play(
       ({required hls}) => lib.streamUrl(key: item.key, preferHls: hls),
       live: live,
@@ -510,6 +516,7 @@ class Session extends ChangeNotifier {
     _saveProgress();
     _playingKey = null;
     nowPlaying.value = null;
+    timeshiftWindow.value = 0;
     await _adapter?.stop();
     await _player?.stop();
   }

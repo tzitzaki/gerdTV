@@ -51,6 +51,7 @@
   "favouriteAdd": "Add to favourites",
   "favouriteRemove": "Remove from favourites",
   "favourites": "Favourites",
+  "goLive": "Live",
   "guideAddUrl": "Extra XMLTV URL",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",

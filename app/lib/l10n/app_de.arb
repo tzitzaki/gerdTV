@@ -27,6 +27,7 @@
   "favouriteAdd": "Zu Favoriten hinzufügen",
   "favouriteRemove": "Aus Favoriten entfernen",
   "favourites": "Favoriten",
+  "goLive": "Live",
   "guideAddUrl": "Weitere XMLTV-URL",
   "guideEmpty": "Keine Sender in dieser Gruppe.",
   "guideFailed": "Fehlgeschlagen: {error}",
