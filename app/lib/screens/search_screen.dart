@@ -36,8 +36,10 @@ class _SearchScreenState extends State<SearchScreen> {
   );
   final _field = TextEditingController();
 
-  /// Guide programmes for the current query (at most [_programmeLimit]); shown under the Programmes chip.
+  /// Guide programmes for the current query, shown under the Programmes chip: running and upcoming (soonest first),
+  /// then under "Earlier" the ended ones (most recent first); each group at most [_programmeLimit].
   List<ProgrammeHit> _programmes = const [];
+  List<ProgrammeHit> _earlier = const [];
   bool _showProgrammes = false;
   static const _programmeLimit = 100;
 
@@ -50,11 +52,28 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _findProgrammes(String q) async {
     final lib = widget.session.library;
     if (lib == null || q.trim().isEmpty) {
-      setState(() => _programmes = const []);
+      setState(() {
+        _programmes = const [];
+        _earlier = const [];
+      });
       return;
     }
-    final hits = await lib.searchProgrammes(query: q, limit: _programmeLimit);
-    if (mounted && q == _field.text) setState(() => _programmes = hits);
+    final hits = await lib.searchProgrammes(
+      query: q,
+      limit: _programmeLimit,
+      earlier: false,
+    );
+    final earlier = await lib.searchProgrammes(
+      query: q,
+      limit: _programmeLimit,
+      earlier: true,
+    );
+    if (mounted && q == _field.text) {
+      setState(() {
+        _programmes = hits;
+        _earlier = earlier;
+      });
+    }
   }
 
   void _setKind(ItemKind? kind) {
@@ -127,7 +146,9 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ),
-            if (_model.counts.isNotEmpty || _programmes.isNotEmpty)
+            if (_model.counts.isNotEmpty ||
+                _programmes.isNotEmpty ||
+                _earlier.isNotEmpty)
               SizedBox(
                 height: 48,
                 child: ListView(
@@ -154,11 +175,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           onSelected: (_) => _setKind(c.kind),
                         ),
                       ),
-                    if (_programmes.isNotEmpty)
+                    if (_programmes.isNotEmpty || _earlier.isNotEmpty)
                       ChoiceChip(
                         key: const Key('search.chip.programmes'),
                         label: Text(
-                          '${l10n.chipProgrammes} ${_programmes.length}${_programmes.length == _programmeLimit ? '+' : ''}',
+                          '${l10n.chipProgrammes} ${_programmes.length + _earlier.length}'
+                          '${_programmes.length == _programmeLimit || _earlier.length == _programmeLimit ? '+' : ''}',
                         ),
                         selected: _showProgrammes,
                         onSelected: (_) =>
@@ -198,13 +220,26 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Programme hits: title, channel and when; a tap plays the channel (the programme sheet comes with the grid).
+  /// Programme hits: title, channel and when; a tap opens the programme's sheet. The ended ones follow under
+  /// "Earlier".
   Widget _programmeList(AppLocalizations l10n) {
     final locale = Localizations.localeOf(context).toLanguageTag();
+    final header = _earlier.isEmpty ? 0 : 1;
     return ListView.builder(
-      itemCount: _programmes.length,
+      itemCount: _programmes.length + header + _earlier.length,
       itemBuilder: (context, i) {
-        final h = _programmes[i];
+        if (header == 1 && i == _programmes.length) {
+          return ListTile(
+            key: const Key('search.earlier'),
+            title: Text(
+              l10n.searchEarlier,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          );
+        }
+        final h = i < _programmes.length
+            ? _programmes[i]
+            : _earlier[i - _programmes.length - header];
         return ItemTile(
           key: Key('search.programme.${h.programme.id}'),
           item: h.item,

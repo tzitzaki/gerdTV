@@ -500,13 +500,15 @@ pub fn programme(conn: &Connection, id: i64) -> Result<Option<Programme>> {
     .optional()
 }
 
-/// Programme search for the global search: (programme, the live item that shows it, ready to play), ongoing and
-/// upcoming first.
+/// Programme search for the global search: (programme, the live item that shows it, ready to play). Running and
+/// upcoming programmes soonest first, or with `earlier` the ones that have ended, most recent first: two groups
+/// with their own limit, so a missed show isn't pushed out by everything still to come (owner decision).
 pub fn search(
     conn: &Connection,
     input: &str,
     now: i64,
     limit: usize,
+    earlier: bool,
 ) -> Result<Vec<(Programme, crate::db::Hit)>> {
     let Some(q) = crate::db::fts_query(input) else {
         return Ok(vec![]);
@@ -515,8 +517,10 @@ pub fn search(
         "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
          FROM programmes p
          JOIN items i ON i.key = (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1)
-         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1)
-         ORDER BY p.stop < ?2, p.start LIMIT ?3"
+         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) AND (p.stop < ?2) = {}
+         ORDER BY p.start {} LIMIT ?3",
+        earlier as i32,
+        if earlier { "DESC" } else { "ASC" }
     ))?;
     st.query_map(params![q, now, limit as i64], |r| {
         Ok((
@@ -709,12 +713,16 @@ mod tests {
             "Sport <live>"
         );
         // Programme search, umlaut-insensitive, with the item that shows it.
-        let hits = search(&c, "munchen", now, 10).unwrap();
+        let hits = search(&c, "munchen", now, 10, false).unwrap();
         assert_eq!(
             (hits.len(), hits[0].0.title.as_str()),
             (1, "Tagesschau & Wetter")
         );
         assert!(hits[0].1.key == "live:1" || hits[0].1.key == "live:3");
+        // Three hours later it has ended: it is in the "earlier" group, not among the running and upcoming.
+        let later = now + 3 * 3600;
+        assert!(search(&c, "munchen", later, 10, false).unwrap().is_empty());
+        assert_eq!(search(&c, "munchen", later, 10, true).unwrap().len(), 1);
         // Manual mapping wins and survives a rebuild; unmatched lists the rest.
         assert_eq!(
             unmatched(&c, 10, 0).unwrap(),

@@ -11,6 +11,7 @@ import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/programme_sheet.dart';
+import 'package:gerdtv/screens/item_tile.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -333,9 +334,36 @@ void main() {
       await tester.pump();
     }
     await tapReady(tester, find.byKey(const Key('player.stop')));
-    await waitFor(tester, find.byKey(const Key('search.field')));
+    // Back in search for real (the field also exists underneath the closing player).
+    await waitFor(tester, find.byKey(const Key('search.field')).hitTestable());
 
     debugPrint('JOURNEY: catch-up played a past programme');
+    // Search lists ended programmes under "Earlier", after the running and upcoming ones (missed shows aren't pushed
+    // out by what's still to come). The field still holds "sport", whose ended programmes exist in the mock guide;
+    // the group is built only once scrolled to.
+    await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
+    final programmeList = find.ancestor(
+      of: find.byType(ItemTile).first,
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('search.earlier')),
+      400,
+      scrollable: programmeList.first,
+      maxScrolls: 60,
+    );
+    expect(
+      find.descendant(
+        of: programmeList.first,
+        matching: find.textContaining(
+          RegExp(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) |\d\d:\d\d–'),
+        ),
+      ),
+      findsWidgets,
+    );
+
+    debugPrint('JOURNEY: search lists ended programmes under Earlier');
+
     // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.
     final soon = await tester.runAsync(
       () => lib.guideWindow(

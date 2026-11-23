@@ -14,6 +14,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
+- Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - The macOS sandbox goes off with the first feature that needs it (the updater).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
