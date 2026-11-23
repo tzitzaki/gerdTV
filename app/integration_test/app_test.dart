@@ -510,6 +510,23 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search in sections, groups and the guide');
+    // Favourites: the star on a channel puts it into a Favourites group on top of Live TV.
+    await tapReady(
+      tester,
+      find.byWidgetPredicate(
+        (w) => w is ListTile && w.trailing is Text && w.onTap != null,
+      ),
+    );
+    final star = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('item.star.'),
+    );
+    await tapReady(tester, star);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await waitFor(tester, find.byKey(const Key('browse.favourites')));
+    debugPrint('JOURNEY: a favourite shows in its group');
 
     // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.
     final soon = await tester.runAsync(

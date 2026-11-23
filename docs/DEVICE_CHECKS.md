@@ -8,18 +8,15 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Profiles: a second provider added in Settings → Account; after a restart the picker asks, "Always open this one" stops it asking.
 - Keychain: no repeated password prompts after the first "Always Allow"; still none after updating to the next release.
 - Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
-- Search: typing in Live TV (without clicking the field) finds channels of every group, also by their group's name; Enter plays the top one.
-- Movies and series: a movie plays; a series opens its episodes and one plays.
-- Continue watching: stop a movie after 5 min; it shows on top of Movies with its progress, and opening it continues there.
-- Favourites: the star on a channel adds it to the Favourites group on top of Live TV; the star again removes it.
-- Hidden groups: ticking a group in Settings → Appearance → Hidden groups removes it from Live TV, the guide and search.
+- Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
+- Movies and series: a movie plays, a series opens its episodes; a movie stopped after 5 min shows under Continue watching and continues there.
+- Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
-- Zapping: Up/Down in the player switch channels within the group; Left/Right still seek in timeshift.
-- Timeshift: Space on a live channel, wait a minute: the top shows about −1:00 and Live; the seek bar drags back; Live returns to now.
+- Zapping and timeshift: Up/Down switch channels; Space on live, then a minute later the top shows −1:00 and Live; the seek bar drags back.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
@@ -27,7 +24,6 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
 - Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
-- Programme search: a show's title in Live TV search lists it under Programmes with the right local time; a tap opens its sheet.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
 ## iPhone
@@ -57,10 +53,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Plain HTTP: with a provider on http://, sync, logos, the guide and playback all still work (the cleartext config is gone).
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Favourites: holding OK on a channel adds it to Favourites (top of Live TV); a short OK still plays it.
-- Search: Up from a list reaches the section's search field; the on-screen keyboard's text finds channels of every group.
-- Voice search: the field's mic (OK on it) opens the speech prompt; the spoken words become the search.
+- Search: Up reaches the section's search field; typed or spoken (its mic) words find channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
-- Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
-- Timeshift: Left on a live channel skips 10 s back and shows "−0:10" with Live; Right skips forward, at most to now (the label goes).
+- Zapping and timeshift: Up/Down switch with the banner, OK opens the channel list; Left skips 10 s back ("−0:10", Live), Right forward to now.
 - Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
