@@ -29,6 +29,7 @@
 - Own libmpv on Android: build it like Linux (one library, own name) and load it for the whole process (the plugin links libmpv itself).
 - Own libmpv on macOS and iOS, after the fork question above.
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
+- Flaky journey: playback sometimes stalls after leaving the player (app_test.dart "keeps playing", 4 CI runs); fix by cause, failing test first.
 - A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
 - Phase 3 rest: PIN-locked groups and the TV-layout focus polish.
