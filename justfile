@@ -80,25 +80,38 @@ soak:
 test-affected base="origin/main":
     scripts/test-affected.sh {{base}}
 
-# The core's performance budgets. A regression of more than 20 % against the saved `main` baseline fails.
-# The baseline lives outside the worktrees (CRITERION_HOME), so every worktree compares against the same one;
-# `just bench-save` records it (the wrap-up does, on main). No baseline yet: this run becomes it.
-# Lenient: a benchmark added since the baseline is measured, not compared (strict mode aborts on it).
-criterion_home := env_var('HOME') + "/.cache/gerdtv-criterion"
-
+# The core's performance budgets, A/B: origin/main's core and this tree's are measured back to back under the heavy
+# lock, and more than 20 % slower than main fails (owner decision: a stored baseline drifted with the machine's load,
+# e.g. +110 % on unchanged code). Main's side runs in a temporary detached worktree with its own criterion folder.
+# With the core and Cargo.lock unchanged against main there is nothing to compare: the benchmarks run once (they
+# still have to work; the nightly on main takes this path).
+# Lenient: a benchmark that main doesn't have yet is measured, not compared.
 bench:
     #!/usr/bin/env bash
     set -euo pipefail
-    export CRITERION_HOME="{{criterion_home}}"
-    if [[ ! -d "$CRITERION_HOME/budgets" ]]; then just bench-save; exit 0; fi
-    # Under the heavy lock: a build or test run beside it skews the timings (seen: false regressions of +25–39 %).
-    out="$({{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20 2>&1)" ||
+    git fetch -q origin main || true
+    # A shallow CI checkout may have no origin/main: then HEAD stands in (nothing to compare).
+    base="$(git rev-parse -q --verify origin/main || git rev-parse HEAD)"
+    if git diff --quiet "$base" -- crates/gerdtv-core Cargo.lock; then
+      echo "bench: core unchanged against main; measuring without a comparison"
+      out="$(CRITERION_HOME="$(mktemp -d)" {{heavy}} cargo bench -q -p gerdtv-core --bench budgets 2>&1)" ||
+          { echo "$out"; exit 1; }
+      grep -E 'time:' <<<"$out" || true
+      exit 0
+    fi
+    main="$(mktemp -d)"
+    export CRITERION_HOME="$main/criterion"
+    # Main's side builds into its own lasting target folder (dependencies stay built between runs). Never share
+    # this tree's: cargo names a workspace crate's output the same whatever folder its source is in, so one side
+    # would silently reuse the other's binary (seen: a deliberate 3 ms slowdown measured as 18 % faster).
+    main_target="$HOME/.cache/gerdtv-bench-main-target"
+    trap 'rm -rf "$main"; git worktree prune' EXIT
+    git worktree add -q --detach "$main/tree" "$base"
+    out="$({{heavy}} bash -c "cd '$main/tree' && CARGO_TARGET_DIR='$main_target' cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main >/dev/null \
+      && cd '$PWD' && cargo bench -q -p gerdtv-core --bench budgets -- --baseline-lenient main --noise-threshold 0.20" 2>&1)" ||
         { echo "$out"; exit 1; }
     grep -E 'time:|change:|regressed|improved' <<<"$out" || true
     ! grep -q "Performance has regressed" <<<"$out"
-
-bench-save:
-    CRITERION_HOME="{{criterion_home}}" {{heavy}} cargo bench -q -p gerdtv-core --bench budgets -- --save-baseline main
 
 # The full-scale guide import budget (2,000 channels × 7 days in < 60 s); slow, also in the nightly.
 test-epg-budget:
