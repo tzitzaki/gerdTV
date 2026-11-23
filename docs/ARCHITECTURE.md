@@ -27,7 +27,7 @@
 ## The app (Flutter)
 - `app/lib/services/session.dart`: the app's state (`ChangeNotifier`): the open profile's `Library`, sync status, and the one media_kit player and `WatchdogAdapter` the whole app uses. `app/lib/services/secrets.dart`: profile secrets in `flutter_secure_storage` (macOS: the legacy keychain, which needs no provisioning profile). `app/lib/services/search_model.dart`: numbered search queries, stale answers dropped.
 - Screens in `app/lib/screens`: setup (first run), shell (rail/bottom bar), browse/items/episodes, search, player, settings.
-- Cleartext HTTP is allowed app-wide on Android (`network_security_config.xml`) and in ATS on iOS/macOS: providers use plain HTTP on a user-entered host; it matters for the platform's own players (AVPlayer for the iOS Picture-in-Picture hand-over); the core (sync, guide, the logo cache) and libmpv use their own networking, and Flutter itself fetches nothing.
+- Cleartext HTTP (providers use plain HTTP on a user-entered host): allowed in ATS on iOS/macOS for the platform's own players (AVPlayer for the iOS Picture-in-Picture hand-over). Android needs no setting: the core (sync, guide, logo cache, updater) and libmpv use their own networking, and Flutter itself fetches nothing.
 
 ## Playback pipeline
 - One media_kit `Player`. The Rust core owns the policy (`crates/gerdtv-core/src/playback.rs`): `mpv_options` turns a buffer preset into mpv options, and `Watchdog` turns player events into commands. The Dart adapter (`app/lib/player/watchdog_adapter.dart`) sets the options through media_kit's `NativePlayer.setProperty` before `open()`, feeds position/buffering/completed/error events in, ticks it once a second, and runs its commands (reload, show/hide "Reconnecting (n)").

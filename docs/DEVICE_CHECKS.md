@@ -45,6 +45,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
 - PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.
+- Plain HTTP: with a provider on http://, sync, logos, the guide and playback all still work (the cleartext config is gone).
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
