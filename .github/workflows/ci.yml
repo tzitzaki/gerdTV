@@ -63,6 +63,13 @@ jobs:
           key: libmpv-linux-${{ hashFiles('scripts/build-libmpv.sh') }}
       - if: steps.scope.outputs.code == 'true' && steps.libmpv.outputs.cache-hit != 'true'
         run: scripts/build-libmpv.sh build/libmpv
+      # For debugging on a dev machine: `gh run download <run> -n libgerdmpv-linux`, then LIBMPV_LIBRARY_PATH.
+      - if: steps.scope.outputs.code == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: libgerdmpv-linux
+          path: build/libmpv/libgerdmpv.*
+          retention-days: 7
       - if: steps.scope.outputs.code == 'true'
         run: scripts/ci-install-flutter.sh
       - if: steps.scope.outputs.code == 'true'
