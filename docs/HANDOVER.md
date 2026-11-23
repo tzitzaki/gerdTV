@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version VERSION_PLACEHOLDER: reminders, the in-app update check, Earlier in programme search, 150 ms fades, a never-empty guide header.
+- Version 0.261123.43: reminders, the in-app update check, Earlier in programme search, 150 ms fades, a never-empty guide header.
 - Before: catch-up and a complete Licences screen (0.261122.34); the guide grid, list modes, zapping (0.261122.31).
 - Android needs no cleartext config any more; background playback and auto-PiP work again since 0.261122.31.
 - A screen check visits every screen on phone, desktop and TV with screenshots; a watchdog stops a hung integration run with native stacks.
