@@ -1,5 +1,6 @@
-//! Export and import of a profile's user data (Settings → Your data): favourites, recents, manual guide mapping,
-//! reminders, profile settings, per-channel buffer choices and extra guide URLs, as one JSON file. No secrets (guide
+//! Export and import of a profile's user data (Settings → Your data): favourites, recents, where movies and
+//! episodes were left (resume), hidden groups, search history, manual guide mapping, reminders, profile settings,
+//! per-channel buffer choices and extra guide URLs, as one JSON file. No secrets (guide
 //! URLs keep their `{secret0}` placeholders) and no catalogue or guide: a sync brings those back.
 //! Import merges row by row: a row is taken when it is new or its `updated_at` is newer than ours, nothing is
 //! deleted. That is the rule a later home hub would sync by (docs/DATA_MODEL.md).
@@ -34,6 +35,37 @@ struct File {
     channel_buffers: Vec<ChannelBuffer>,
     #[serde(default)]
     guide_urls: Vec<GuideUrl>,
+    #[serde(default)]
+    resume: Vec<Resume>,
+    #[serde(default)]
+    hidden_groups: Vec<HiddenGroup>,
+    #[serde(default)]
+    search_history: Vec<Search>,
+}
+
+/// Where a movie or episode was left (seconds).
+#[derive(Debug, Serialize, Deserialize)]
+struct Resume {
+    key: String,
+    position: i64,
+    duration: i64,
+    updated_at: i64,
+}
+
+/// A provider group hidden from the lists (kind as stored: 0 live, 1 movie, 2 episode, 3 series).
+#[derive(Debug, Serialize, Deserialize)]
+struct HiddenGroup {
+    kind: i64,
+    category: String,
+    updated_at: i64,
+}
+
+/// A recent search, per section.
+#[derive(Debug, Serialize, Deserialize)]
+struct Search {
+    section: String,
+    query: String,
+    updated_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,6 +120,9 @@ pub struct ImportCounts {
     pub settings: usize,
     pub channel_buffers: usize,
     pub guide_urls: usize,
+    pub resume: usize,
+    pub hidden_groups: usize,
+    pub search_history: usize,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -188,6 +223,40 @@ pub fn export(conn: &Connection) -> rusqlite::Result<String> {
                 })
             },
         )?,
+        resume: rows(
+            conn,
+            "SELECT key, position, duration, updated_at FROM resume ORDER BY key",
+            |r| {
+                Ok(Resume {
+                    key: r.get(0)?,
+                    position: r.get(1)?,
+                    duration: r.get(2)?,
+                    updated_at: r.get(3)?,
+                })
+            },
+        )?,
+        hidden_groups: rows(
+            conn,
+            "SELECT kind, category, updated_at FROM hidden_groups ORDER BY kind, category",
+            |r| {
+                Ok(HiddenGroup {
+                    kind: r.get(0)?,
+                    category: r.get(1)?,
+                    updated_at: r.get(2)?,
+                })
+            },
+        )?,
+        search_history: rows(
+            conn,
+            "SELECT section, query, updated_at FROM search_history ORDER BY section, query",
+            |r| {
+                Ok(Search {
+                    section: r.get(0)?,
+                    query: r.get(1)?,
+                    updated_at: r.get(2)?,
+                })
+            },
+        )?,
     };
     Ok(serde_json::to_string_pretty(&file).expect("plain data serialises"))
 }
@@ -259,6 +328,33 @@ pub fn import(conn: &mut Connection, json: &str) -> Result<ImportCounts, UserDat
             params![g.url, g.updated_at],
         )?;
     }
+    for r in &file.resume {
+        n.resume += tx.execute(
+            "INSERT INTO resume (key, position, duration, updated_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (key) DO UPDATE SET position = ?2, duration = ?3, updated_at = ?4 WHERE ?4 > updated_at",
+            params![r.key, r.position, r.duration, r.updated_at],
+        )?;
+    }
+    for g in &file.hidden_groups {
+        n.hidden_groups += tx.execute(
+            "INSERT INTO hidden_groups (kind, category, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (kind, category) DO UPDATE SET updated_at = ?3 WHERE ?3 > updated_at",
+            params![g.kind, g.category, g.updated_at],
+        )?;
+    }
+    for h in &file.search_history {
+        n.search_history += tx.execute(
+            "INSERT INTO search_history (section, query, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (section, query) DO UPDATE SET updated_at = ?3 WHERE ?3 > updated_at",
+            params![h.section, h.query, h.updated_at],
+        )?;
+    }
+    // The app keeps the newest 20 searches per section (db::record_search); an import must not grow past that.
+    tx.execute(
+        "DELETE FROM search_history WHERE rowid NOT IN (SELECT rowid FROM (SELECT rowid, row_number() OVER
+           (PARTITION BY section ORDER BY updated_at DESC, rowid DESC) AS n FROM search_history) WHERE n <= 20)",
+        [],
+    )?;
     tx.commit()?;
     Ok(n)
 }
@@ -281,7 +377,10 @@ mod tests {
              INSERT INTO stream_prefs (key, prefer_hls, buffer, updated_at) VALUES ('live:1', 1, 'max', 160),
                 ('live:3', 1, '', 160);
              INSERT INTO epg_sources (url, builtin, updated_at) VALUES ('http://example.invalid/a.xml', 0, 110),
-                ('builtin', 1, 110);",
+                ('builtin', 1, 110);
+             INSERT INTO resume VALUES ('movie:7', 1200, 5400, 170);
+             INSERT INTO hidden_groups VALUES (0, '12', 180);
+             INSERT INTO search_history VALUES ('live', 'sport', 190);",
         )
         .unwrap();
     }
@@ -307,6 +406,9 @@ mod tests {
             settings: 1,
             channel_buffers: 1,
             guide_urls: 1,
+            resume: 1,
+            hidden_groups: 1,
+            search_history: 1,
         };
         assert_eq!(n, want);
         assert_eq!(export(&b).unwrap(), json, "a round trip is lossless");
@@ -345,6 +447,38 @@ mod tests {
             .query_row("SELECT count(*) FROM favourites", [], |r| r.get(0))
             .unwrap();
         assert_eq!(favs, 3, "ours stays, theirs added");
+    }
+
+    /// Search history stays at the newest 20 per section, as the app keeps it, however many a file brings.
+    #[test]
+    fn imported_search_history_keeps_the_newest_20_per_section() {
+        let theirs = db();
+        for i in 0..25 {
+            theirs
+                .execute(
+                    "INSERT INTO search_history VALUES ('live', ?1, ?2)",
+                    params![format!("q{i}"), 100 + i],
+                )
+                .unwrap();
+        }
+        theirs
+            .execute("INSERT INTO search_history VALUES ('movie', 'old', 1)", [])
+            .unwrap();
+        let mut ours = db();
+        import(&mut ours, &export(&theirs).unwrap()).unwrap();
+        let count = |section: &str| -> i64 {
+            ours.query_row(
+                "SELECT count(*) FROM search_history WHERE section = ?1",
+                [section],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!((count("live"), count("movie")), (20, 1));
+        let oldest: String = ours
+            .query_row("SELECT query FROM search_history WHERE section = 'live' ORDER BY updated_at LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(oldest, "q5", "q0..q4 were the oldest");
     }
 
     /// Foreign or future files are refused before anything is written.
