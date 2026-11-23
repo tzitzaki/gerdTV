@@ -7,7 +7,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Setup: the Xtream Codes login connects, the catalogue appears, and after a restart it opens without asking again.
 - Keychain: no repeated password prompts after the first "Always Allow"; still none after updating to the next release.
 - Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
-- Search: typing narrows the list at once, umlauts don't matter, Enter plays the top result.
+- Search: typing in Live TV (without clicking the field) finds channels of every group, also by their group's name; Enter plays the top one.
 - Movies and series: a movie plays; a series opens its episodes and one plays.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
@@ -19,7 +19,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
-- Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
+- Programme search: a show's title in Live TV search lists it under Programmes with the right local time; a tap opens its sheet.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
 ## iPhone
@@ -47,6 +47,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.
 - Plain HTTP: with a provider on http://, sync, logos, the guide and playback all still work (the cleartext config is gone).
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
+- Search: Up from a list reaches the section's search field; the on-screen keyboard's text finds channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).

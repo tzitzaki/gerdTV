@@ -1,6 +1,7 @@
 // Browse one kind (Live TV, Movies, Series): the provider's groups in provider order, then a group's items
 // (paged, 100 at a time, more on scroll) in the section's list mode, live channels with what's on now and next.
-// Series open their episodes; everything else plays.
+// Series open their episodes; everything else plays. A group's own search field searches the whole group in the
+// core (section_search.dart), not just the rows loaded so far.
 
 import 'dart:async';
 
@@ -13,6 +14,7 @@ import '../theme.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'player_screen.dart';
+import 'section_search.dart';
 
 /// Plays an item, or opens a series' episodes. [channels]: the live channels around it (Up/Down in the player).
 void openItem(
@@ -21,7 +23,7 @@ void openItem(
   ItemInfo item, {
   List<ItemInfo>? channels,
 }) {
-  // Opened without its group (search): no zapping through an older list.
+  // Opened without a list (a programme, an episode): no zapping through an older list.
   if (item.kind == ItemKind.live) session.zapList = channels ?? const [];
   if (item.kind == ItemKind.series) {
     Navigator.of(context).push(
@@ -110,7 +112,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   final List<ItemInfo> _items = [];
   bool _loading = false;
   bool _done = false;
-  final _filter = TextEditingController();
+  final _search = TextEditingController();
+  final _searchFocus = FocusNode();
 
   /// What is on for the loaded live items; refreshed every minute (progress, the next programme) and after each
   /// guide import.
@@ -139,7 +142,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   void dispose() {
     widget.session.removeListener(_onSession);
     _tick?.cancel();
-    _filter.dispose();
+    _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -195,11 +199,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final f = _filter.text.toLowerCase();
-    // The instant filter narrows what is loaded; groups beyond a few pages are rare and load on scroll.
-    final shown = f.isEmpty
-        ? _items
-        : _items.where((i) => i.name.toLowerCase().contains(f)).toList();
     final next = ListMode.values[(_mode.index + 1) % ListMode.values.length];
     return Scaffold(
       appBar: AppBar(
@@ -213,36 +212,30 @@ class _ItemsScreenState extends State<ItemsScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(Tokens.space),
-            child: TextField(
-              controller: _filter,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.filter_list),
-                hintText: l10n.filterHint,
-              ),
-              onChanged: (_) => setState(() {}),
+      body: TypeToSearch(
+        focus: _searchFocus,
+        field: _search,
+        child: SectionSearch(
+          session: widget.session,
+          section: sectionOf(widget.kind),
+          controller: _search,
+          focus: _searchFocus,
+          group: widget.group,
+          child: ItemsView(
+            mode: _mode,
+            items: _items,
+            nowNext: _nowNext,
+            now: DateTime.now(),
+            loading: _loading,
+            onNearEnd: _more,
+            onTap: (it) => openItem(
+              context,
+              widget.session,
+              it,
+              channels: widget.kind == ItemKind.live ? List.of(_items) : null,
             ),
           ),
-          Expanded(
-            child: ItemsView(
-              mode: _mode,
-              items: shown,
-              nowNext: _nowNext,
-              now: DateTime.now(),
-              loading: _loading,
-              onNearEnd: _more,
-              onTap: (it) => openItem(
-                context,
-                widget.session,
-                it,
-                channels: widget.kind == ItemKind.live ? List.of(shown) : null,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

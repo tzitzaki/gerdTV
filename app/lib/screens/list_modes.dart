@@ -8,6 +8,7 @@ import '../l10n/gen/app_localizations.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'logo.dart';
+import 'search_text.dart';
 
 enum ListMode { compact, list, tiles, largeTiles }
 
@@ -50,8 +51,10 @@ double progressOf(ProgrammeInfo p, DateTime now) {
   return ((t - p.start) / (p.stop - p.start)).clamp(0.0, 1.0);
 }
 
-/// The items of one group in [mode]: a list for the list modes, a grid for the tile modes.
+/// The items of one group, or search results, in [mode]: a list for the list modes, a grid for the tile modes.
 /// [nowNext] holds what is on for live items (missing: no guide); [onNearEnd] loads the next page.
+/// Search results add [leading] and [trailing] slivers (matching groups, programmes, the "Also in" line), bold the
+/// [highlight] query in names and show each item's group.
 class ItemsView extends StatelessWidget {
   const ItemsView({
     super.key,
@@ -62,6 +65,9 @@ class ItemsView extends StatelessWidget {
     required this.now,
     this.loading = false,
     this.onNearEnd,
+    this.leading = const [],
+    this.trailing = const [],
+    this.highlight,
   });
   final ListMode mode;
   final List<ItemInfo> items;
@@ -70,6 +76,9 @@ class ItemsView extends StatelessWidget {
   final DateTime now;
   final bool loading;
   final VoidCallback? onNearEnd;
+  final List<Widget> leading;
+  final List<Widget> trailing;
+  final String? highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -90,35 +99,42 @@ class ItemsView extends StatelessWidget {
           compact: mode == ListMode.compact,
           now: now,
           onTap: () => onTap(it),
+          highlight: highlight,
         ),
         _ => ItemCard(
           item: it,
           nowNext: nn,
           large: mode == ListMode.largeTiles,
           onTap: () => onTap(it),
+          highlight: highlight,
         ),
       };
     }
 
-    final view = switch (mode) {
+    final body = switch (mode) {
       ListMode.compact ||
-      ListMode.list => ListView.builder(itemCount: count, itemBuilder: cell),
-      _ => GridView.builder(
+      ListMode.list => SliverList.builder(itemCount: count, itemBuilder: cell),
+      _ => SliverPadding(
         padding: const EdgeInsets.all(Tokens.space),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: mode == ListMode.largeTiles ? 240 : 160,
-          // Posters are portrait (2:3); channel logos sit in a squarer tile with the name below.
-          childAspectRatio:
-              items.isNotEmpty && items.first.kind != ItemKind.live
-              ? 2 / 3.6
-              : 1 / 1.15,
-          crossAxisSpacing: Tokens.space,
-          mainAxisSpacing: Tokens.space,
+        sliver: SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: mode == ListMode.largeTiles ? 240 : 160,
+            // Posters are portrait (2:3); channel logos sit in a squarer tile with the name below. Search results
+            // add a line for the group.
+            childAspectRatio:
+                (items.isNotEmpty && items.first.kind != ItemKind.live
+                    ? 2 / 3.6
+                    : 1 / 1.15) *
+                (highlight == null ? 1 : 0.9),
+            crossAxisSpacing: Tokens.space,
+            mainAxisSpacing: Tokens.space,
+          ),
+          itemCount: count,
+          itemBuilder: cell,
         ),
-        itemCount: count,
-        itemBuilder: cell,
       ),
     };
+    final view = CustomScrollView(slivers: [...leading, body, ...trailing]);
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         if (n.metrics.extentAfter < 600) onNearEnd?.call();
@@ -138,6 +154,7 @@ class ItemRow extends StatelessWidget {
     required this.compact,
     required this.now,
     required this.onTap,
+    this.highlight,
   });
   final ItemInfo item;
   final NowNext? nowNext;
@@ -145,11 +162,25 @@ class ItemRow extends StatelessWidget {
   final DateTime now;
   final VoidCallback onTap;
 
+  /// A search result: the query to bold; the group's name shows too.
+  final String? highlight;
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final current = nowNext?.now;
     final next = nowNext?.next;
+    final name = item.number == null
+        ? item.name
+        : '${item.number}  ${item.name}';
+    final group = highlight != null && item.group.isNotEmpty
+        ? Text(
+            item.group,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: text.bodySmall,
+          )
+        : null;
     return ListTile(
       key: Key('item.${item.key}'),
       dense: compact,
@@ -158,17 +189,20 @@ class ItemRow extends StatelessWidget {
         size: compact ? 32 : 48,
         icon: kindIcon(item.kind),
       ),
-      title: Text(
-        item.number == null ? item.name : '${item.number}  ${item.name}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: highlight == null
+          ? Text(name, maxLines: 1, overflow: TextOverflow.ellipsis)
+          : Text.rich(
+              highlightSpan(name, highlight!, null),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
       subtitle: compact || (current == null && next == null)
-          ? null
+          ? group
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                ?group,
                 if (current != null) ...[
                   Text(
                     current.title,
@@ -206,11 +240,15 @@ class ItemCard extends StatelessWidget {
     required this.nowNext,
     required this.large,
     required this.onTap,
+    this.highlight,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool large;
   final VoidCallback onTap;
+
+  /// A search result: the query to bold; the group's name shows too.
+  final String? highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -235,13 +273,21 @@ class ItemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: Tokens.space),
-              Text(
-                item.name,
+              Text.rich(
+                highlightSpan(item.name, highlight ?? '', null),
                 maxLines: large ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: large ? text.titleSmall : text.bodyMedium,
               ),
+              if (highlight != null && item.group.isNotEmpty)
+                Text(
+                  item.group,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: text.bodySmall,
+                ),
               if (current != null)
                 Text(
                   current.title,

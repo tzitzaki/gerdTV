@@ -122,10 +122,7 @@ abstract class Library implements RustOpaqueInterface {
   BufferChoice raiseBuffer({required String key});
 
   /// The section's newest searches, newest first (the field's suggestions while empty).
-  Future<List<String>> recentSearches({
-    required String section,
-    required int limit,
-  });
+  List<String> recentSearches({required String section, required int limit});
 
   /// Logs a recovery episode (the watchdog's Health command).
   Future<void> recordHealth({
@@ -137,7 +134,7 @@ abstract class Library implements RustOpaqueInterface {
   });
 
   /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
-  Future<void> recordSearch({required String section, required String query});
+  void recordSearch({required String section, required String query});
 
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});

@@ -13,6 +13,7 @@ ItemInfo channel(int i) => ItemInfo(
   logo: '', // no URL: the icon shows, no core call
   number: i,
   archiveDays: 0,
+  group: '',
 );
 
 ProgrammeInfo prog(String title, DateTime start, Duration length) =>

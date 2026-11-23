@@ -389,11 +389,13 @@ impl Library {
     }
 
     /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
+    #[flutter_rust_bridge::frb(sync)]
     pub fn record_search(&self, section: String, query: String) -> Result<(), String> {
         self.0.record_search(&section, &query).map_err(err)
     }
 
     /// The section's newest searches, newest first (the field's suggestions while empty).
+    #[flutter_rust_bridge::frb(sync)]
     pub fn recent_searches(&self, section: String, limit: u32) -> Result<Vec<String>, String> {
         self.0
             .recent_searches(&section, limit as usize)

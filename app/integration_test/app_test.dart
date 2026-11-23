@@ -1,6 +1,6 @@
 // The MVP journey on the Linux desktop build, against the testkit's mock Xtream Codes panel: first-run setup →
-// sync → browse a group → play a channel → global search (narrows per keystroke, Enter plays the top result) →
-// remove the account. Needs the mock panel: `just test-integration` starts it (GERDTV_MOCK_XC).
+// sync → browse a group → play a channel → search in the sections (typing starts it, across groups, Enter plays the
+// top result, programmes, Also in, typos, recent searches, a group with All groups, the guide) → remove the account. Needs the mock panel: `just test-integration` starts it (GERDTV_MOCK_XC).
 import 'dart:async';
 import 'dart:io';
 
@@ -11,7 +11,7 @@ import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/programme_sheet.dart';
-import 'package:gerdtv/screens/item_tile.dart';
+import 'package:gerdtv/screens/section_search.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -208,38 +208,45 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     debugPrint('JOURNEY: played, back in browse');
-    // Search: each keystroke narrows, Enter plays the top result.
-    await tester.tap(find.text('Search'));
+    // Search in Live TV: typing a letter anywhere starts it (no tap on the field), and the field takes the focus;
+    // each further keystroke narrows (a test's key events don't reach a text field's input, so enterText types on).
+    // The hits come from every group (not just one); Enter plays the top result.
     await tester.pumpAndSettle();
-    final field = find.byKey(const Key('search.field'));
+    final liveField = find.byKey(const Key('search.live'));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyS, character: 's');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyS);
+    await tester.pump();
+    expect(tester.widget<TextField>(liveField).controller!.text, 's');
+    expect(tester.widget<TextField>(liveField).focusNode!.hasFocus, isTrue);
     var previous = 1 << 30;
     for (final q in ['s', 'sp', 'spo', 'sport']) {
-      await tester.enterText(field, q);
-      await waitFor(tester, find.byType(ListTile));
+      if (q != 's') await tester.enterText(liveField, q);
+      await waitFor(tester, find.byType(ItemRow));
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 200)),
       );
       await tester.pump();
-      final n = find.byType(ListTile).evaluate().length;
-      expect(
-        n,
-        lessThanOrEqualTo(previous),
-        reason: '"$q" must not widen the list',
-      );
+      final n = find.byType(ItemRow).evaluate().length;
+      expect(n, lessThanOrEqualTo(previous), reason: '"$q" must not widen');
       previous = n;
     }
-    // The Live TV chip narrows to channels; Enter then plays the top one (for a series it would open its episodes).
-    await tester.tap(find.byKey(const Key('search.chip.live')));
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    final liveGroups = {
+      for (final r in tester.widgetList<ItemRow>(find.byType(ItemRow)))
+        r.item.group,
+    };
+    expect(liveGroups.length, greaterThan(1), reason: 'hits from every group');
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('search.group.'),
+      ),
+      findsWidgets,
+      reason: 'groups named "… Sport …" are results too',
     );
-    await tester.pump();
-    await tester.tap(
-      field,
-    ); // keyboard focus in the field (enterText only feeds the text input)
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(
+      LogicalKeyboardKey.enter,
+    ); // the field has the focus since typing started
     await tester.pump();
     await waitFor(tester, find.byKey(const Key('player.back')));
     await tester.tap(find.byKey(const Key('player.back')));
@@ -251,23 +258,31 @@ void main() {
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: search played top result');
-    // Programmes: the guide loaded in the background after setup; its hits play their channel.
-    await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
-    await tester.pump();
-    await tapReady(
-      tester,
-      find.byWidgetPredicate(
-        (w) =>
-            w.key is ValueKey<String> &&
-            (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
-      ),
+    // Programmes under the channels (the guide loaded in the background after setup); a hit plays its channel.
+    final programmeHit = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
     );
+    final results = find
+        .ancestor(
+          of: find.byType(ItemRow).first,
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      programmeHit,
+      400,
+      scrollable: results,
+      maxScrolls: 60,
+    );
+    await tapReady(tester, programmeHit);
     // The programme's sheet: the top hit is running, Watch plays its channel live.
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
     await tapReady(tester, find.byKey(const Key('player.stop')));
     // Back in search for real (the field also exists underneath an open player).
-    await waitFor(tester, find.byKey(const Key('search.field')).hitTestable());
+    await waitFor(tester, liveField.hitTestable());
     expect(session.nowPlaying.value, isNull);
 
     debugPrint('JOURNEY: programme search played its channel');
@@ -335,34 +350,150 @@ void main() {
     }
     await tapReady(tester, find.byKey(const Key('player.stop')));
     // Back in search for real (the field also exists underneath the closing player).
-    await waitFor(tester, find.byKey(const Key('search.field')).hitTestable());
+    await waitFor(tester, liveField.hitTestable());
 
     debugPrint('JOURNEY: catch-up played a past programme');
-    // Search lists ended programmes under "Earlier", after the running and upcoming ones (missed shows aren't pushed
-    // out by what's still to come). The field still holds "sport", whose ended programmes exist in the mock guide;
-    // the group is built only once scrolled to.
-    await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
-    final programmeList = find.ancestor(
-      of: find.byType(ItemTile).first,
-      matching: find.byType(Scrollable),
+    // "Show all" lists every programme hit: ended ones under "Earlier", after the running and upcoming ones (missed
+    // shows aren't pushed out by what's still to come). The field still holds "sport", whose ended programmes exist
+    // in the mock guide; the group is built only once scrolled to.
+    final showAll = find.byKey(const Key('search.programmes.all'));
+    await tester.scrollUntilVisible(
+      showAll,
+      400,
+      scrollable: find
+          .ancestor(
+            of: find.byType(ItemRow).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      maxScrolls: 60,
     );
+    await tapReady(tester, showAll);
+    await waitFor(tester, find.byType(ProgrammeResultsScreen));
+    final programmeList = find
+        .descendant(
+          of: find.byType(ProgrammeResultsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
     await tester.scrollUntilVisible(
       find.byKey(const Key('search.earlier')),
       400,
-      scrollable: programmeList.first,
+      scrollable: programmeList,
       maxScrolls: 60,
     );
     expect(
       find.descendant(
-        of: programmeList.first,
+        of: programmeList,
         matching: find.textContaining(
           RegExp(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) |\d\d:\d\d–'),
         ),
       ),
       findsWidgets,
     );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search lists ended programmes under Earlier');
+    // "Also in": Movies with the same query; a typo still finds movies; each section keeps its own query.
+    final also = find.byKey(const Key('search.also.movies'));
+    await tester.scrollUntilVisible(
+      also,
+      400,
+      scrollable: find
+          .ancestor(
+            of: find.byType(ItemRow).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      maxScrolls: 60,
+    );
+    await tapReady(tester, also);
+    final moviesField = find.byKey(const Key('search.movies'));
+    await waitFor(tester, moviesField);
+    expect(tester.widget<TextField>(moviesField).controller!.text, 'sport');
+    await waitFor(tester, find.byType(ItemCard)); // movies show as tiles
+    await tester.enterText(moviesField, 'sprot'); // two letters swapped
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump();
+    expect(find.byType(ItemCard), findsWidgets, reason: 'typo matches');
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Live TV'),
+      ),
+    );
+    await waitFor(tester, liveField);
+    expect(tester.widget<TextField>(liveField).controller!.text, 'sport');
+    // Cleared and focused, the field lists the recent searches (opened results above recorded "sport").
+    await tester.tap(find.byKey(const Key('search.clear')));
+    await tester.pump();
+    await tester.tap(liveField);
+    await waitFor(tester, find.byKey(const Key('search.recent.0')));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('search.recent.0')),
+        matching: find.text('sport'),
+      ),
+      findsOneWidget,
+    );
+    // Inside a group: the search covers that group only, "All groups" widens it to the whole section.
+    await tester.tap(find.byKey(const Key('search.recent.0')));
+    await waitFor(tester, find.byType(ItemRow));
+    await tester.tap(find.byKey(const Key('search.clear')));
+    await tester.pump();
+    final groupTile = find.byWidgetPredicate(
+      (w) => w is ListTile && w.trailing is Text && w.onTap != null,
+    );
+    await tapReady(tester, groupTile);
+    await waitFor(tester, find.byType(ItemRow));
+    final groupId = tester
+        .widget<ItemRow>(find.byType(ItemRow).first)
+        .item
+        .category;
+    final inGroup = liveField.hitTestable();
+    await tester.enterText(inGroup, 'sport');
+    await waitFor(tester, find.byKey(const Key('search.allGroups')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump();
+    final groupHits = tester.widgetList<ItemRow>(find.byType(ItemRow));
+    expect(groupHits.map((r) => r.item.category).toSet(), {groupId});
+    await tester.tap(find.byKey(const Key('search.allGroups')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widgetList<ItemRow>(find.byType(ItemRow))
+          .map((r) => r.item.category)
+          .toSet()
+          .length,
+      greaterThan(1),
+      reason: 'All groups widens to the section',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    // The guide's field lists programmes instead of the grid.
+    await tapReady(tester, find.text('Guide'));
+    final guideField = find.byKey(const Key('search.guide'));
+    await tester.enterText(guideField, 'sport');
+    await waitFor(tester, programmeHit);
+    await tester.tap(find.byKey(const Key('search.clear')));
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Live TV'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    debugPrint('JOURNEY: search in sections, groups and the guide');
 
     // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.
     final soon = await tester.runAsync(

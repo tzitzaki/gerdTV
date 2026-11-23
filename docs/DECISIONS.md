@@ -14,6 +14,8 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
+- Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
+- Search ranking: favourites and recents first, then name matches, the group's name, mid-word, typos (from 4 letters); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - The macOS sandbox goes off with the first feature that needs it (the updater).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.

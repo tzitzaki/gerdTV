@@ -303,6 +303,7 @@ class Session extends ChangeNotifier {
       logo: channel.logo,
       number: channel.number,
       archiveDays: 0,
+      group: '',
     );
     if (nowPlaying.value?.key == item.key) return true;
     nowPlaying.value = item;

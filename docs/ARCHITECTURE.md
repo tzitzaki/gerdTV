@@ -20,13 +20,13 @@
 ## The seam (Rust ↔ Flutter)
 - `app/flutter_rust_bridge.yaml` points the codegen at `crates/gerdtv-api`; `just codegen` writes the Dart side to `app/lib/src/rust`.
 - `app/rust_builder` is a Flutter FFI plugin using Cargokit: every Flutter build (Linux, macOS, Android, iOS) compiles `gerdtv_api` for its targets and bundles `libgerdtv_api`.
-- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/update.rs` (`check_update`, `download_update`), `api/logos.rs` (the logo cache: `init_logo_cache` once at start, `logo_file` per URL), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages carrying the caller's sequence number, play URLs, the guide: sources, refresh, now/next, grid window, programme search, manual mapping). Errors cross as credential-free messages.
+- Bridge modules: `api/simple.rs` (start-up), `api/playback.rs` (presets, watchdog), `api/update.rs` (`check_update`, `download_update`), `api/logos.rs` (the logo cache: `init_logo_cache` once at start, `logo_file` per URL), `api/library.rs` (profiles; an opaque `Library` per open profile with sync, categories, items, search pages (a section's kinds or one group, with the matching groups) carrying the caller's sequence number, recent searches, play URLs, the guide: sources, refresh, now/next, grid window, programme search, manual mapping). Errors cross as credential-free messages.
 - `RustLib.init()` loads the library before the first frame. Widget tests replace it with `RustLib.initMock` and a fake (`app/test/support/fake_core.dart`), so they need no native build.
 - Debug: "Failed to load dynamic library" at start means Cargokit didn't build or bundle the library; build with `-v` and look for the Cargokit step.
 
 ## The app (Flutter)
-- `app/lib/services/session.dart`: the app's state (`ChangeNotifier`): the open profile's `Library`, sync status, and the one media_kit player and `WatchdogAdapter` the whole app uses. `app/lib/services/secrets.dart`: profile secrets in `flutter_secure_storage` (macOS: the legacy keychain, which needs no provisioning profile). `app/lib/services/search_model.dart`: numbered search queries, stale answers dropped.
-- Screens in `app/lib/screens`: setup (first run), shell (rail/bottom bar), browse/items/episodes, search, player, settings.
+- `app/lib/services/session.dart`: the app's state (`ChangeNotifier`): the open profile's `Library`, sync status, and the one media_kit player and `WatchdogAdapter` the whole app uses. `app/lib/services/secrets.dart`: profile secrets in `flutter_secure_storage` (macOS: the legacy keychain, which needs no provisioning profile). `app/lib/services/search_model.dart`: numbered search queries per search field (a section or a group), stale answers dropped.
+- Screens in `app/lib/screens`: setup (first run), shell (rail/bottom bar), browse/items/episodes, the section search, player, settings.
 - Cleartext HTTP (providers use plain HTTP on a user-entered host): allowed in ATS on iOS/macOS for the platform's own players (AVPlayer for the iOS Picture-in-Picture hand-over). Android needs no setting: the core (sync, guide, logo cache, updater) and libmpv use their own networking, and Flutter itself fetches nothing.
 
 ## Playback pipeline

@@ -1068,16 +1068,15 @@ fn wire__crate__api__library__Library_raise_buffer_impl(
     )
 }
 fn wire__crate__api__library__Library_recent_searches_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
             debug_name: "Library_recent_searches",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
         },
         move || {
             let message = unsafe {
@@ -1095,30 +1094,28 @@ fn wire__crate__api__library__Library_recent_searches_impl(
             let api_section = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
+            transform_result_sse::<_, String>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
                     }
-                    let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::library::Library::recent_searches(
-                        &*api_that_guard,
-                        api_section,
-                        api_limit,
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = crate::api::library::Library::recent_searches(
+                    &*api_that_guard,
+                    api_section,
+                    api_limit,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
         },
     )
 }
@@ -1184,16 +1181,15 @@ fn wire__crate__api__library__Library_record_health_impl(
     )
 }
 fn wire__crate__api__library__Library_record_search_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
             debug_name: "Library_record_search",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
         },
         move || {
             let message = unsafe {
@@ -1211,30 +1207,28 @@ fn wire__crate__api__library__Library_record_search_impl(
             let api_section = <String>::sse_decode(&mut deserializer);
             let api_query = <String>::sse_decode(&mut deserializer);
             deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
+            transform_result_sse::<_, String>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
                     }
-                    let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = crate::api::library::Library::record_search(
-                        &*api_that_guard,
-                        api_section,
-                        api_query,
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = crate::api::library::Library::record_search(
+                    &*api_that_guard,
+                    api_section,
+                    api_query,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
         },
     )
 }
@@ -3883,17 +3877,8 @@ fn pde_ffi_dispatcher_primary_impl(
         16 => wire__crate__api__library__Library_now_next_impl(port, ptr, rust_vec_len, data_len),
         17 => wire__crate__api__library__Library_open_impl(port, ptr, rust_vec_len, data_len),
         19 => wire__crate__api__library__Library_programme_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__library__Library_recent_searches_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
         22 => {
             wire__crate__api__library__Library_record_health_impl(port, ptr, rust_vec_len, data_len)
-        }
-        23 => {
-            wire__crate__api__library__Library_record_search_impl(port, ptr, rust_vec_len, data_len)
         }
         24 => {
             wire__crate__api__library__Library_refresh_guide_impl(port, ptr, rust_vec_len, data_len)
@@ -3955,6 +3940,8 @@ fn pde_ffi_dispatcher_sync_impl(
         }
         18 => wire__crate__api__library__Library_prefer_hls_impl(ptr, rust_vec_len, data_len),
         20 => wire__crate__api__library__Library_raise_buffer_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__library__Library_recent_searches_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__library__Library_record_search_impl(ptr, rust_vec_len, data_len),
         29 => wire__crate__api__library__Library_set_bitrate_impl(ptr, rust_vec_len, data_len),
         30 => {
             wire__crate__api__library__Library_set_channel_buffer_impl(ptr, rust_vec_len, data_len)

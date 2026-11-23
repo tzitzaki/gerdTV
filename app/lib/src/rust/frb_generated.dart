@@ -193,7 +193,7 @@ abstract class RustLibApi extends BaseApi {
     required String key,
   });
 
-  Future<List<String>> crateApiLibraryLibraryRecentSearches({
+  List<String> crateApiLibraryLibraryRecentSearches({
     required Library that,
     required String section,
     required int limit,
@@ -208,7 +208,7 @@ abstract class RustLibApi extends BaseApi {
     required int secs,
   });
 
-  Future<void> crateApiLibraryLibraryRecordSearch({
+  void crateApiLibraryLibraryRecordSearch({
     required Library that,
     required String section,
     required String query,
@@ -1163,14 +1163,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<List<String>> crateApiLibraryLibraryRecentSearches({
+  List<String> crateApiLibraryLibraryRecentSearches({
     required Library that,
     required String section,
     required int limit,
   }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
             that,
@@ -1178,12 +1178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(section, serializer);
           sse_encode_u_32(limit, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 21,
-            port: port_,
-          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -1249,14 +1244,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<void> crateApiLibraryLibraryRecordSearch({
+  void crateApiLibraryLibraryRecordSearch({
     required Library that,
     required String section,
     required String query,
   }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
             that,
@@ -1264,12 +1259,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(section, serializer);
           sse_encode_String(query, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 23,
-            port: port_,
-          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -4933,14 +4923,12 @@ class LibraryImpl extends RustOpaque implements Library {
       .crateApiLibraryLibraryRaiseBuffer(that: this, key: key);
 
   /// The section's newest searches, newest first (the field's suggestions while empty).
-  Future<List<String>> recentSearches({
-    required String section,
-    required int limit,
-  }) => RustLib.instance.api.crateApiLibraryLibraryRecentSearches(
-    that: this,
-    section: section,
-    limit: limit,
-  );
+  List<String> recentSearches({required String section, required int limit}) =>
+      RustLib.instance.api.crateApiLibraryLibraryRecentSearches(
+        that: this,
+        section: section,
+        limit: limit,
+      );
 
   /// Logs a recovery episode (the watchdog's Health command).
   Future<void> recordHealth({
@@ -4959,7 +4947,7 @@ class LibraryImpl extends RustOpaque implements Library {
   );
 
   /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
-  Future<void> recordSearch({required String section, required String query}) =>
+  void recordSearch({required String section, required String query}) =>
       RustLib.instance.api.crateApiLibraryLibraryRecordSearch(
         that: this,
         section: section,

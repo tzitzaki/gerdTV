@@ -50,6 +50,7 @@ void main() {
         category: 'g',
         logo: '',
         archiveDays: 0,
+        group: '',
       );
       session.nowPlaying.value = null;
       await Future<void>.delayed(Duration.zero);

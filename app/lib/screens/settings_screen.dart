@@ -22,8 +22,11 @@ import 'settings_model.dart';
 import 'update_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.session});
+  const SettingsScreen({super.key, required this.session, this.focus});
   final Session session;
+
+  /// The settings search field's focus (the shell's Ctrl/Cmd+F and `/`).
+  final FocusNode? focus;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -331,6 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: TextField(
         key: const Key('settings.search'),
         controller: _query,
+        focusNode: widget.focus,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.search),
           hintText: l10n.settingsSearchHint,

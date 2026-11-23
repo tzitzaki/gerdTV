@@ -42,14 +42,11 @@
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
-  "chipAll": "All",
-  "chipProgrammes": "Programmes",
   "clear": "Clear",
   "dayToday": "Today",
   "dayTomorrow": "Tomorrow",
   "dayYesterday": "Yesterday",
   "episodesEmpty": "This series has no episodes.",
-  "filterHint": "Filter this list",
   "guideAddUrl": "Extra XMLTV URL",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
@@ -122,7 +119,6 @@
       }
     }
   },
-  "kindEpisodes": "Episodes",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
@@ -135,7 +131,6 @@
   "navGuide": "Guide",
   "navLive": "Live TV",
   "navMovies": "Movies",
-  "navSearch": "Search",
   "navSeries": "Series",
   "navSettings": "Settings",
   "playerChannels": "Channels",
@@ -163,14 +158,43 @@
   "remove": "Remove",
   "restore": "Full size",
   "retry": "Retry",
+  "searchAllGroups": "All groups {count}",
+  "@searchAllGroups": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchAlsoIn": "Also in",
   "searchEarlier": "Earlier",
-  "searchEmpty": "Type to search all channels, movies and series.",
-  "searchHint": "Search channels, movies, series",
+  "searchHintGroup": "Search {group}",
+  "@searchHintGroup": {
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "searchHintGuide": "Search programmes",
+  "searchHintLive": "Search channels and programmes",
+  "searchHintMovies": "Search movies",
+  "searchHintSeries": "Search series and episodes",
   "searchNoResults": "Nothing found for “{query}”.",
   "@searchNoResults": {
     "placeholders": {
       "query": {
         "type": "String"
+      }
+    }
+  },
+  "searchProgrammes": "Programmes",
+  "searchRecent": "Recent searches",
+  "searchShowAll": "Show all {count}",
+  "@searchShowAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
       }
     }
   },
