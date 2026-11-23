@@ -68,6 +68,18 @@ void main() {
     await tester.pump();
     // Settings → Appearance: another logo, stored app-wide and sent to the Linux window as its icon.
     await tapReady(tester, find.byKey(const Key('settings.cat.appearance')));
+    // The theme comes first in Appearance: the logos may be below the window (built only when scrolled to).
+    await waitFor(tester, find.byKey(const Key('settings.themeMode')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('settings.logo.signal')),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('settings.content')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tapReady(tester, find.byKey(const Key('settings.logo.signal')));
     await tester.pump();
     expect(session.logo, AppLogo.signal);
