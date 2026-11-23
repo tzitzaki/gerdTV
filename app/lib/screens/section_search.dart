@@ -7,7 +7,7 @@
 // - A line "Also in Movies 3 · Series 2" jumps to another section with the same query ([SectionSearch.onJump]).
 // The core does the matching and ranking (gerdtv-core db.rs `search`); answers to older keystrokes are dropped
 // (SearchModel). Enter opens the top result. An empty, focused field lists the section's recent searches (those
-// whose result was opened).
+// whose result was opened). On Android the empty field has a mic: the system's speech recognizer types for you.
 //
 // Debugging "my search finds nothing": try the query in a sqlite3 shell on the profile db (docs/DATA_MODEL.md);
 // no hits at all after an update means the search index is still empty, which the first sync after migration 6 fills.
@@ -101,6 +101,9 @@ class _SectionSearchState extends State<SectionSearch> {
   List<ProgrammeHit> _programmes = const [];
   List<ProgrammeHit> _earlier = const [];
   List<String> _recent = const [];
+
+  /// Android with a speech recognizer installed: the mic shows in the empty field.
+  bool _voice = false;
   final Map<String, NowNext> _nowNext = {};
 
   bool get _items => widget.section != SearchSection.guide;
@@ -124,6 +127,9 @@ class _SectionSearchState extends State<SectionSearch> {
     _focus.addListener(_onFocus);
     _model.addListener(_onResults);
     _search(); // a query kept from before (the section was shown earlier)
+    widget.session.platform.voiceAvailable.then((v) {
+      if (mounted && v) setState(() => _voice = true);
+    });
   }
 
   @override
@@ -243,6 +249,16 @@ class _SectionSearchState extends State<SectionSearch> {
     }
   }
 
+  /// The mic: what the recognizer heard becomes the query.
+  Future<void> _listen(String prompt) async {
+    final heard = await widget.session.platform.listen(prompt);
+    if (heard == null || !mounted) return;
+    widget.controller.value = TextEditingValue(
+      text: heard,
+      selection: TextSelection.collapsed(offset: heard.length),
+    );
+  }
+
   String _hint(AppLocalizations l10n) => widget.group != null
       ? l10n.searchHintGroup(widget.group!.name)
       : switch (widget.section) {
@@ -280,7 +296,14 @@ class _SectionSearchState extends State<SectionSearch> {
             prefixIcon: const Icon(Icons.search),
             hintText: _hint(l10n),
             suffixIcon: q.isEmpty
-                ? null
+                ? (_voice
+                      ? IconButton(
+                          key: const Key('search.voice'),
+                          icon: const Icon(Icons.mic_none),
+                          tooltip: l10n.searchVoice,
+                          onPressed: () => _listen(_hint(l10n)),
+                        )
+                      : null)
                 : IconButton(
                     key: const Key('search.clear'),
                     icon: const Icon(Icons.clear),

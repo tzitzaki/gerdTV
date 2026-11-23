@@ -1,7 +1,8 @@
 // The Dart end of the "gerdtv/platform" channel (Android: MainActivity.kt, iOS: AppDelegate.swift). Tells the platform
 // whether something plays (background playback, Android Picture-in-Picture) and hears back when PiP starts or ends.
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
-// the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc).
+// the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc). Android only: voice search through the
+// system's speech recognizer (voiceAvailable, listen); iOS and macOS have dictation on their keyboards.
 // Platforms without a native side ignore the calls.
 
 import 'package:flutter/foundation.dart';
@@ -74,6 +75,30 @@ class PlatformBridge {
           false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Android: whether a speech recognizer is installed (the search field shows its mic only then). Asked once.
+  late final Future<bool> voiceAvailable = _voiceAvailable();
+
+  Future<bool> _voiceAvailable() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await channel.invokeMethod<bool>('voiceAvailable') ?? false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Android: the system's speech recognizer with [prompt]; the words heard, or null (cancelled, nothing heard).
+  Future<String?> listen(String prompt) async {
+    try {
+      final text = await channel.invokeMethod<String>('listen', {
+        'prompt': prompt,
+      });
+      return text == null || text.trim().isEmpty ? null : text.trim();
+    } on MissingPluginException {
+      return null;
     }
   }
 }

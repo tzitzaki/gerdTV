@@ -6,8 +6,10 @@ package world.zakis.gerdtv
 // - Background playback: PlaybackService (a foreground service with a notification, wake and Wi-Fi locks) keeps the
 //   process and the stream alive with the screen off, until Dart says playback stopped.
 // - The launcher icon: one <activity-alias> per logo in the manifest, exactly one enabled (setLogo).
-// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name); native →
-// pictureMode(Boolean).
+// - Voice search: the search field's mic starts the system's speech recognizer (RecognizerIntent); it records, so
+//   gerdTV needs no microphone permission. voiceAvailable says whether one is installed (<queries> in the manifest).
+// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name), voiceAvailable(),
+// listen(String prompt) → String? (null: cancelled or nothing heard); native → pictureMode(Boolean).
 // Debug hints: `adb shell dumpsys activity services world.zakis.gerdtv` shows the service; PiP needs
 // android:supportsPictureInPicture in the manifest and Android 8+.
 
@@ -17,6 +19,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
+import android.speech.RecognizerIntent
 import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,6 +28,9 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var playing = false
+
+    /// The Dart call waiting for the speech recognizer's answer (one at a time).
+    private var listening: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -43,6 +49,8 @@ class MainActivity : FlutterActivity() {
                         setLogo(call.argument<String>("name") ?: "gtv")
                         result.success(null)
                     }
+                    "voiceAvailable" -> result.success(speechIntent("").resolveActivity(packageManager) != null)
+                    "listen" -> listen(call.argument<String>("prompt") ?: "", result)
                     else -> result.notImplemented()
                 }
             }
@@ -63,6 +71,36 @@ class MainActivity : FlutterActivity() {
                 PackageManager.DONT_KILL_APP,
             )
         }
+    }
+
+    private fun speechIntent(prompt: String) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+        .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        .putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
+
+    /// Starts the recognizer; its answer arrives in onActivityResult. A recognizer that vanished since voiceAvailable
+    /// (uninstalled) answers null instead of crashing.
+    @Suppress("DEPRECATION") // FlutterActivity is no ComponentActivity: no Activity Result API here
+    private fun listen(prompt: String, result: MethodChannel.Result) {
+        listening?.success(null)
+        listening = result
+        try {
+            startActivityForResult(speechIntent(prompt), VOICE_REQUEST)
+        } catch (e: android.content.ActivityNotFoundException) {
+            listening = null
+            result.success(null)
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != VOICE_REQUEST) return
+        val text = if (resultCode == RESULT_OK) {
+            data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        } else null
+        listening?.success(text)
+        listening = null
     }
 
     private fun startForegroundServiceCompat(intent: Intent) {
@@ -88,5 +126,9 @@ class MainActivity : FlutterActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         channel?.invokeMethod("pictureMode", isInPictureInPictureMode)
+    }
+
+    private companion object {
+        const val VOICE_REQUEST = 7301
     }
 }

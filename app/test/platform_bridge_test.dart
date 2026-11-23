@@ -1,6 +1,6 @@
 // Owns: the platform channel: picture mode follows the system's Picture-in-Picture, every start and stop of
-// playback reaches the native side (Android's foreground service and auto-PiP depend on it), and setLogo hands it the
-// logo's name plus, on desktop, its PNG.
+// playback reaches the native side (Android's foreground service and auto-PiP depend on it), setLogo hands it the
+// logo's name plus, on desktop, its PNG, and voice search exists only on Android and returns what was heard.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,5 +96,29 @@ void main() {
     expect(args['name'], 'signal');
     // Linux: the window icon arrives as PNG bytes (the PNG signature starts with 0x89 'P' 'N' 'G').
     expect((args['png'] as Uint8List).sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+  });
+
+  test('voice search: Android only, the words heard or null', () async {
+    final asked = <String>[];
+    String? answer = '  ARD Sport ';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+          asked.add(call.method);
+          return call.method == 'voiceAvailable' ? true : answer;
+        });
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    expect(
+      await PlatformBridge(pictureMode: ValueNotifier(false)).voiceAvailable,
+      isFalse,
+      reason: 'no mic on desktop (dictation elsewhere)',
+    );
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final bridge = PlatformBridge(pictureMode: ValueNotifier(false));
+    expect(await bridge.voiceAvailable, isTrue);
+    expect(await bridge.listen('Search'), 'ARD Sport');
+    answer = null; // cancelled
+    expect(await bridge.listen('Search'), isNull);
+    expect(asked, ['voiceAvailable', 'listen', 'listen']);
   });
 }
