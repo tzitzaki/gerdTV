@@ -84,6 +84,102 @@ fn ci_keeps_the_required_job_names() {
     }
 }
 
+/// The CI area map (scripts/ci-scope.sh): a change runs the areas it can break, a wrap-up's version bump and docs run
+/// only the repo rules, and anything the map doesn't know runs everything. One commit per case on a fresh branch
+/// of a throwaway repo; the expected areas are the ones printed `=true`.
+#[test]
+fn ci_scope_maps_changes_to_areas() {
+    let repo = std::env::temp_dir().join(format!("gerdtv-scope-{}", std::process::id()));
+    fs::create_dir_all(&repo).unwrap();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args(args)
+            .current_dir(&repo)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    let write = |rel: &str, text: &str| {
+        let p = repo.join(rel);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, text).unwrap();
+    };
+    let manifest = |version: &str, dep: &str| {
+        format!("[workspace.package]\nversion = \"{version}\"\n\n[dependencies]\nserde = \"{dep}\"\n")
+    };
+    git(&["init", "-q", "-b", "main"]);
+    write("Cargo.toml", &manifest("0.261123.52", "1.0.1"));
+    write(
+        "Cargo.lock",
+        "[[package]]\nname = \"gerdtv-core\"\nversion = \"0.261123.52\"\n",
+    );
+    write("app/pubspec.yaml", "name: gerdtv\nversion: 0.261123.52+52\n");
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "base"]);
+    let all = "rust flutter linux macos android rules";
+    let app = "flutter linux macos android";
+    // (files written on the branch, areas expected on)
+    let bump = manifest("0.261124.60", "1.0.1");
+    let lock = "[[package]]\nname = \"gerdtv-core\"\nversion = \"0.261124.60\"\n";
+    let dep = manifest("0.261123.52", "1.0.2");
+    let cases: Vec<(Vec<(&str, &str)>, &str)> = vec![
+        (vec![("docs/SPEC.md", "x")], "rules"),
+        (
+            vec![
+                ("Cargo.toml", &bump),
+                ("Cargo.lock", lock),
+                ("app/pubspec.yaml", "name: gerdtv\nversion: 0.261124.60+60\n"),
+                ("docs/HANDOVER.md", "x"),
+            ],
+            "rules",
+        ),
+        (vec![("Cargo.toml", &dep)], all),
+        (vec![("crates/gerdtv-core/src/lib.rs", "x")], all),
+        (vec![("app/lib/main.dart", "x")], app),
+        (
+            vec![("app/lib/l10n/app_en.arb", "x")],
+            "flutter linux macos android rules",
+        ),
+        (vec![("app/linux/CMakeLists.txt", "x")], "flutter linux"),
+        (vec![("app/macos/Runner/x.swift", "x")], "macos"),
+        (vec![("app/ios/Runner/x.swift", "x")], "macos"),
+        (vec![("app/android/app/build.gradle.kts", "x")], "android"),
+        (vec![("app/rust_builder/x", "x")], all),
+        (vec![("scripts/build-libmpv.sh", "x")], "rust linux"),
+        (vec![(".github/workflows/ci.yml", "x")], all),
+        (vec![("justfile", "x")], all),
+    ];
+    for (n, (files, want)) in cases.iter().enumerate() {
+        git(&["checkout", "-q", "-b", &format!("case{n}"), "main"]);
+        for (rel, text) in files {
+            write(rel, text);
+        }
+        git(&["add", "-A"]);
+        git(&["commit", "-q", "-m", "change"]);
+        let out = std::process::Command::new(repo_root().join("scripts/ci-scope.sh"))
+            .arg("main")
+            .current_dir(&repo)
+            .env_remove("GITHUB_OUTPUT")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let got: Vec<&str> = std::str::from_utf8(&out.stdout)
+            .unwrap()
+            .lines()
+            .filter_map(|l| l.strip_suffix("=true"))
+            .collect();
+        let files: Vec<&str> = files.iter().map(|f| f.0).collect();
+        assert_eq!(got.join(" "), *want, "ci-scope.sh for {files:?}");
+    }
+    fs::remove_dir_all(&repo).unwrap();
+}
+
 /// Every repo path and `just` recipe a doc names exists (docs stay current; CLAUDE.md "Docs").
 /// A backticked token counts as a path when its first segment exists at the repo root (so `origin/main` or
 /// `~/…` aren't checked); tokens with placeholders (`<`, `*`, `{`, spaces) are skipped.
