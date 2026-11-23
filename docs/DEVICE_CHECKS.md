@@ -51,5 +51,5 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
-- Updates: on an older release Settings → Updates → Download, then Install opens the system's installer (once asking to allow installs from gerdTV) and the new version starts.
+- Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
