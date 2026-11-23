@@ -20,7 +20,7 @@ done
 cat <<'HINTS'
 
 ## Install
-- macOS: unzip, move gerdTV.app to Applications; first open via System Settings > Privacy & Security > Open Anyway.
+- macOS: open the DMG, drag gerdTV to Applications; first open via System Settings > Privacy & Security > Open Anyway.
 - Android / Android TV: install the APK (allow unknown sources once); later updates come through the app.
 - iPhone/iPad: re-sign the unsigned IPA with your re-signing service; the app notifies about updates.
 - Linux: unpack the tarball and run gerdTV/gerdtv.

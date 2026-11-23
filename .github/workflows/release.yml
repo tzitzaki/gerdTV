@@ -38,7 +38,7 @@ jobs:
           # A self-signed certificate is "not trusted" for policy checks, but codesign can still sign with it.
           security find-identity -v "$kc" || true
           echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
-      - name: macOS app (signed, zipped)
+      - name: macOS app (signed; zip for the updater, DMG for the first install)
         run: |
           version="${GITHUB_REF_NAME#v}"
           cd app && flutter build macos --release
@@ -49,6 +49,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -d -r- "$app"
           mkdir -p ../dist && ditto -c -k --keepParent "$app" "../dist/gerdTV-macos-$version.zip"
+          ../scripts/macos-dmg.sh "$app" "../dist/gerdTV-macos-$version.dmg"
       - name: iOS IPA (unsigned, for a re-signing service)
         run: |
           version="${GITHUB_REF_NAME#v}"
