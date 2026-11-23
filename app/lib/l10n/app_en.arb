@@ -50,6 +50,7 @@
   "dayYesterday": "Yesterday",
   "episodesEmpty": "This series has no episodes.",
   "filterHint": "Filter this list",
+  "goLive": "Live",
   "guideAddUrl": "Extra XMLTV URL",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",

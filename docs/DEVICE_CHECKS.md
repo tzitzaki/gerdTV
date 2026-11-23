@@ -15,6 +15,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
 - Zapping: Up/Down in the player switch channels within the group; Left/Right still seek in timeshift.
+- Timeshift: Space on a live channel, wait a minute: the top shows about −1:00 and Live; the seek bar drags back; Live returns to now.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a Live TV group shows logos, what's on now with a progress bar and what's next; the toggle cycles all four modes.
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
@@ -49,4 +50,5 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
+- Timeshift: Left on a live channel skips 10 s back and shows "−0:10" with Live; Right skips forward, at most to now (the label goes).
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).

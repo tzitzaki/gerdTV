@@ -8,6 +8,9 @@
 // picture. media_kit's own controls keep Space, Left/Right (seek), J/I and F; their Up/Down (volume) and Esc are ours.
 // Keys: Esc/Back leaves (keeps playing; it closes the channel list or restores picture mode first), S stops,
 // Space pauses, P mini player, Up/Down channels, OK (Enter/Select) the channel list.
+// Pause and rewind live (timeshift window > 0): the controls' seek bar spans the back buffer up to live; "−5:12" and
+// Go live show at the top while behind live (live_edge.dart says where live is); Left/Right skip 10 s on phone and
+// TV (the D-pad), 2 s on desktop as before.
 
 import 'dart:async';
 
@@ -22,6 +25,7 @@ import '../platform/mini_window.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import '../player/live_edge.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
 
@@ -43,6 +47,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _panel = false;
   final Map<String, NowNext> _nowNext = {};
 
+  /// Timeshift: where live is, for the running channel ([_edgeKey]); a new channel starts a new edge.
+  LiveEdge _edge = LiveEdge();
+  String? _edgeKey;
+  Timer? _shiftTick;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<bool>? _playingSub;
+
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
   List<ItemInfo> get _channels => widget.session.zapList;
   static final _miniWindow = MiniWindow();
@@ -58,6 +69,64 @@ class _PlayerScreenState extends State<PlayerScreen> {
       session.play(item); // sets nowPlaying, which the bar also listens to
       _showBanner();
     });
+    session.adapter.cacheEnd.addListener(_onCacheEnd);
+    _positionSub = session.player.stream.position.listen(
+      (p) => _liveEdge.position(p.inMilliseconds / 1000),
+    );
+    // Paused by any control (ours, media_kit's, the system's): live moves on without us.
+    _playingSub = session.player.stream.playing.listen((playing) {
+      if (!playing) _liveEdge.detach();
+    });
+    // The "behind live" label counts up while paused or rewound.
+    _shiftTick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _shiftable) setState(() {});
+    });
+  }
+
+  bool get _shiftable => widget.session.timeshiftWindow.value > 0;
+
+  /// The edge of the running channel (reset when the channel changed: zapping keeps this screen).
+  LiveEdge get _liveEdge {
+    if (_edgeKey != _current.key) {
+      _edgeKey = _current.key;
+      _edge = LiveEdge();
+    }
+    return _edge;
+  }
+
+  void _onCacheEnd() {
+    final v = widget.session.adapter.cacheEnd.value;
+    if (v != null) _liveEdge.cache(v, DateTime.now());
+  }
+
+  double get _position =>
+      widget.session.player.state.position.inMilliseconds / 1000;
+
+  /// Seeks by [secs] inside the back buffer (never past live, never before its start); back means off live.
+  Future<void> _shift(double secs) => _seekTo(_position + secs);
+
+  Future<void> _seekTo(double target) async {
+    final now = DateTime.now();
+    final e = _liveEdge;
+    final live = e.live(now);
+    if (live == null) return;
+    final to = target.clamp(
+      e.earliest(widget.session.timeshiftWindow.value, now),
+      live,
+    );
+    live - to < liveSlack ? e.attach() : e.detach();
+    await widget.session.player.seek(
+      Duration(milliseconds: (to * 1000).round()),
+    );
+    if (mounted) setState(() {});
+  }
+
+  /// Back to live: to the edge, playing.
+  Future<void> _goLive() async {
+    final live = _liveEdge.live(DateTime.now());
+    if (live == null) return;
+    await _seekTo(live);
+    if (_paused) await _togglePause();
   }
 
   /// Shows the banner for 5 s with what's on now on the playing channel (live only).
@@ -130,6 +199,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _bannerTimer?.cancel();
+    _shiftTick?.cancel();
+    _positionSub?.cancel();
+    _playingSub?.cancel();
+    widget.session.adapter.cacheEnd.removeListener(_onCacheEnd);
     if (_miniWindow.isMini) {
       _miniWindow.exit();
       widget.session.pictureMode.value = false;
@@ -211,10 +284,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// media_kit's desktop controls without their Up/Down (volume) and Esc, which switch channels and leave here.
+  /// With timeshift, our seek bar over the back buffer replaces theirs (a live stream has no duration to show).
   MaterialDesktopVideoControlsThemeData get _desktopControls {
     final p = widget.session.player;
-    void seek(int secs) => p.seek(p.state.position + Duration(seconds: secs));
+    void seek(int secs) => _shiftable
+        ? _shift(secs.toDouble())
+        : p.seek(p.state.position + Duration(seconds: secs));
     return MaterialDesktopVideoControlsThemeData(
+      displaySeekBar: !_shiftable,
+      bottomButtonBar: _shiftable
+          ? [
+              const MaterialDesktopPlayOrPauseButton(),
+              Expanded(child: _timeshiftBar()),
+              const MaterialDesktopVolumeButton(),
+              const MaterialDesktopFullscreenButton(),
+            ]
+          : kDefaultMaterialDesktopVideoControlsThemeData.bottomButtonBar,
       keyboardShortcuts: {
         const SingleActivator(LogicalKeyboardKey.mediaPlayPause): p.playOrPause,
         const SingleActivator(LogicalKeyboardKey.space): p.playOrPause,
@@ -223,6 +308,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SingleActivator(LogicalKeyboardKey.keyJ): () => seek(-10),
         const SingleActivator(LogicalKeyboardKey.keyI): () => seek(10),
       },
+    );
+  }
+
+  /// Phone and TV controls, the same change.
+  MaterialVideoControlsThemeData get _mobileControls => _shiftable
+      ? MaterialVideoControlsThemeData(
+          displaySeekBar: false,
+          bottomButtonBar: [
+            Expanded(child: _timeshiftBar()),
+            const MaterialFullscreenButton(),
+          ],
+        )
+      : kDefaultMaterialVideoControlsThemeData;
+
+  /// The seek bar over the back buffer: from the window's start (or the stream's) to live.
+  Widget _timeshiftBar() {
+    final now = DateTime.now();
+    final e = _liveEdge;
+    final live = e.live(now) ?? _position;
+    final from = e.earliest(widget.session.timeshiftWindow.value, now);
+    return Slider(
+      key: const Key('player.timeshift'),
+      min: from,
+      max: live > from ? live : from + 1,
+      value: _position.clamp(from, live > from ? live : from + 1),
+      onChanged: (v) => _seekTo(v),
     );
   }
 
@@ -248,6 +359,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _zap(1),
           const SingleActivator(LogicalKeyboardKey.enter): _togglePanel,
           const SingleActivator(LogicalKeyboardKey.select): _togglePanel,
+          // The D-pad on TV (and arrow keys on phones): 10 s per press; desktop keeps media_kit's 2 s.
+          if (_shiftable && !isDesktop) ...{
+            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+                _shift(-10),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                _shift(10),
+          },
         },
       },
       child: Focus(
@@ -261,12 +379,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   body: Stack(
                     children: [
                       Positioned.fill(
-                        child: MaterialDesktopVideoControlsTheme(
-                          normal: _desktopControls,
-                          fullscreen: _desktopControls,
-                          child: Video(
-                            controller: widget.session.video,
-                            controls: AdaptiveVideoControls,
+                        child: MaterialVideoControlsTheme(
+                          normal: _mobileControls,
+                          fullscreen: _mobileControls,
+                          child: MaterialDesktopVideoControlsTheme(
+                            normal: _desktopControls,
+                            fullscreen: _desktopControls,
+                            child: Video(
+                              controller: widget.session.video,
+                              controls: AdaptiveVideoControls,
+                            ),
                           ),
                         ),
                       ),
@@ -291,6 +413,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                       ?.copyWith(color: Colors.white),
                                 ),
                               ),
+                              ..._behindLive(l10n),
                               if (isDesktop) ...[
                                 IconButton.filledTonal(
                                   key: const Key('player.mini'),
@@ -431,6 +554,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
     );
+  }
+
+  /// While behind live: how far ("−5:12") and Go live (reachable with the D-pad).
+  List<Widget> _behindLive(AppLocalizations l10n) {
+    final behind = _shiftable ? _liveEdge.behind(_position, DateTime.now()) : 0;
+    if (behind == 0) return const [];
+    return [
+      Text(
+        behindLabel(behind),
+        key: const Key('player.behind'),
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(color: Colors.white),
+      ),
+      const SizedBox(width: Tokens.space),
+      FilledButton.tonalIcon(
+        key: const Key('player.live'),
+        onPressed: _goLive,
+        icon: const Icon(Icons.skip_next),
+        label: Text(l10n.goLive),
+      ),
+      const SizedBox(width: Tokens.space),
+    ];
   }
 
   /// Picture mode: only the video, with Restore and Stop; the whole picture drags the floating window (desktop).

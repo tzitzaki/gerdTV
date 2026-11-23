@@ -26,6 +26,7 @@
   "dayYesterday": "Gestern",
   "episodesEmpty": "Diese Serie hat keine Folgen.",
   "filterHint": "Diese Liste filtern",
+  "goLive": "Live",
   "guideAddUrl": "Weitere XMLTV-URL",
   "guideEmpty": "Keine Sender in dieser Gruppe.",
   "guideFailed": "Fehlgeschlagen: {error}",

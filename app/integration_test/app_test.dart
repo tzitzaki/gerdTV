@@ -182,6 +182,22 @@ void main() {
     expect(find.byKey(const Key('player.panel')), findsNothing);
     expect(find.byKey(const Key('player.back')), findsOneWidget);
 
+    // Pause live TV (timeshift: 60 min on desktop by default): after a few seconds the player says how far behind live
+    // it is and offers Live, which plays from the live edge again.
+    expect(session.timeshiftWindow.value, greaterThan(0));
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await waitFor(tester, find.byKey(const Key('player.behind')));
+    await tapReady(tester, find.byKey(const Key('player.live')));
+    final liveBy = DateTime.now().add(const Duration(seconds: 10));
+    while (find.byKey(const Key('player.behind')).evaluate().isNotEmpty) {
+      if (DateTime.now().isAfter(liveBy)) fail('still behind live after Live');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump();
+    }
+    expect(session.player.state.playing, isTrue);
+
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
