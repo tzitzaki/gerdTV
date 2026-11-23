@@ -9,6 +9,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../platform/engine.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
@@ -171,7 +172,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         id: 'playback',
         icon: Icons.play_circle_outline,
         title: l10n.settingsPlayback,
-        entries: [if (lib != null) ..._playbackEntries(l10n, lib)],
+        entries: [
+          if (lib != null) ..._playbackEntries(l10n, lib),
+          if (ownLibmpv() != null) _engineEntry(l10n),
+        ],
       ),
       SettingsCategory(
         id: 'guide',
@@ -402,6 +406,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ),
   ];
+
+  /// Settings → Playback → Player engine (app-wide, platform/engine.dart): shown where gerdTV's own libmpv is
+  /// installed; the choice applies at the next start.
+  SettingsEntry _engineEntry(AppLocalizations l10n) => SettingsEntry(
+    id: 'engine',
+    title: l10n.playerEngine,
+    keywords: l10n.settingsKeywordsEngine,
+    build: (_) => StatefulBuilder(
+      builder: (context, setState) {
+        final dir = session.appDir!;
+        final engine = readEngine(dir);
+        return ListTile(
+          title: Text(l10n.playerEngine),
+          subtitle: Text(l10n.playerEngineHint),
+          trailing: DropdownButton<PlayerEngine>(
+            key: const Key('settings.engine'),
+            value: engine,
+            items: [
+              DropdownMenuItem(
+                value: PlayerEngine.standard,
+                child: Text(l10n.playerEngineStandard),
+              ),
+              DropdownMenuItem(
+                value: PlayerEngine.gerdtv,
+                child: Text(l10n.playerEngineGerdtv),
+              ),
+            ],
+            onChanged: (v) =>
+                setState(() => writeEngine(dir, v ?? PlayerEngine.standard)),
+          ),
+        );
+      },
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {

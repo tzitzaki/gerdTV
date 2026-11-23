@@ -9,3 +9,5 @@ signing.env
 
 # Session worktrees live inside the main folder.
 /.claude/worktrees/
+# gerdTV's own libmpv and its sources (just libmpv)
+/build/

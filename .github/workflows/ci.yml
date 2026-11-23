@@ -49,6 +49,24 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
             libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq gdb
+      # gerdTV's own libmpv (scripts/build-libmpv.sh), rebuilt only when the script changes.
+      - if: steps.scope.outputs.code == 'true'
+        id: libmpv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv/libgerdmpv.so
+            build/libmpv/libgerdmpv.txt
+          key: libmpv-linux-${{ hashFiles('scripts/build-libmpv.sh', 'scripts/build-libmpv-container.sh') }}
+      - if: steps.scope.outputs.code == 'true' && steps.libmpv.outputs.cache-hit != 'true'
+        run: scripts/build-libmpv-container.sh build/libmpv
+      # For debugging on a dev machine: `gh run download <run> -n libgerdmpv-linux`, then LIBMPV_LIBRARY_PATH.
+      - if: steps.scope.outputs.code == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: libgerdmpv-linux
+          path: build/libmpv/libgerdmpv.*
+          retention-days: 7
       - if: steps.scope.outputs.code == 'true'
         run: scripts/ci-install-flutter.sh
       - if: steps.scope.outputs.code == 'true'

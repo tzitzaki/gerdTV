@@ -31,7 +31,6 @@ Future<void> main() async {
   registerBundledLicences();
   // Logos and posters are kept on disk (the OS may clear this folder; they are fetched again then).
   initLogoCache(dir: '${(await getApplicationCacheDirectory()).path}/logos');
-  MediaKit.ensureInitialized();
   if (Platform.isMacOS) {
     // First start without the sandbox: copy the old container's data over (see sandbox_migration.dart).
     final copied = migrateSandboxData(
@@ -43,6 +42,8 @@ Future<void> main() async {
     );
     if (copied > 0) debugPrint('sandbox-migration: copied $copied files');
   }
+  // The player engine (Settings → Playback) was applied before this process loaded anything: linux/runner/main.cc.
+  MediaKit.ensureInitialized();
   final session = Session();
   // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
   session.reminders = Reminders(
