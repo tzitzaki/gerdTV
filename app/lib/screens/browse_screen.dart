@@ -13,6 +13,7 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
+import 'logo.dart';
 import 'player_screen.dart';
 import 'section_search.dart';
 
@@ -69,10 +70,14 @@ class BrowseScreen extends StatelessWidget {
                 session.syncing ? l10n.syncing : l10n.browseEmpty,
               );
             }
-            // The favourites of this section come first, as a group of their own (when there are any).
-            return ValueListenableBuilder<int>(
-              valueListenable: session.favouritesChanged,
-              builder: (context, _, _) => FutureBuilder<List<ItemInfo>>(
+            // The favourites of this section come first, as a group of their own (when there are any); movies and
+            // series show what was left part-way above them (refreshed whenever playback starts or stops).
+            return ListenableBuilder(
+              listenable: Listenable.merge([
+                session.favouritesChanged,
+                session.nowPlaying,
+              ]),
+              builder: (context, _) => FutureBuilder<List<ItemInfo>>(
                 future: lib.favourites(kinds: sectionKinds(sectionOf(kind))),
                 builder: (context, favs) {
                   final n = favs.data?.length ?? 0;
@@ -81,31 +86,129 @@ class BrowseScreen extends StatelessWidget {
                       CategoryInfo(id: '', name: l10n.favourites, count: n),
                     ...list,
                   ];
+                  final resume = kind == ItemKind.live
+                      ? null
+                      : ContinueRow(session: session, kind: kind);
                   return ListView.builder(
-                    itemCount: all.length,
-                    itemBuilder: (context, i) => ListTile(
-                      key: n > 0 && i == 0
-                          ? const Key('browse.favourites')
-                          : null,
-                      leading: n > 0 && i == 0 ? const Icon(Icons.star) : null,
-                      title: Text(all[i].name),
-                      trailing: Text('${all[i].count}'),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ItemsScreen(
-                            session: session,
-                            kind: kind,
-                            group: all[i],
-                            favourites: n > 0 && i == 0,
+                    itemCount: all.length + (resume == null ? 0 : 1),
+                    itemBuilder: (context, row) {
+                      if (resume != null && row == 0) return resume;
+                      final i = resume == null ? row : row - 1;
+                      return ListTile(
+                        key: n > 0 && i == 0
+                            ? const Key('browse.favourites')
+                            : null,
+                        leading: n > 0 && i == 0
+                            ? const Icon(Icons.star)
+                            : null,
+                        title: Text(all[i].name),
+                        trailing: Text('${all[i].count}'),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ItemsScreen(
+                              session: session,
+                              kind: kind,
+                              group: all[i],
+                              favourites: n > 0 && i == 0,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// Continue watching (movies, series): started, unfinished movies or episodes as a row of tiles with how far they
+/// got, last watched first; a tile continues where it was left. Shows nothing until something was started.
+class ContinueRow extends StatelessWidget {
+  const ContinueRow({super.key, required this.session, required this.kind});
+  final Session session;
+  final ItemKind kind;
+
+  static const _limit = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+    return FutureBuilder<List<ResumeItem>>(
+      future: session.library!.continueWatching(
+        kinds: sectionKinds(sectionOf(kind)),
+        limit: _limit,
+      ),
+      builder: (context, snap) {
+        final rows = snap.data ?? const [];
+        if (rows.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Tokens.space * 2,
+                Tokens.space,
+                Tokens.space * 2,
+                0,
+              ),
+              child: Text(l10n.continueWatching, style: text.titleSmall),
+            ),
+            SizedBox(
+              height: 200,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(Tokens.space),
+                children: [
+                  for (final r in rows)
+                    SizedBox(
+                      width: 130,
+                      child: Card(
+                        key: Key('continue.${r.item.key}'),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => openItem(context, session, r.item),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, c) => Logo(
+                                    url: r.item.logo,
+                                    size: c.biggest.shortestSide,
+                                    icon: kindIcon(r.item.kind),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(Tokens.space / 2),
+                                child: Text(
+                                  r.item.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: text.bodySmall,
+                                ),
+                              ),
+                              LinearProgressIndicator(
+                                value: r.duration > 0
+                                    ? r.position / r.duration
+                                    : null,
+                                minHeight: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );

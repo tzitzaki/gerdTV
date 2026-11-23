@@ -160,6 +160,13 @@ pub struct SearchPage {
     pub groups: Vec<GroupHit>,
 }
 
+/// A started movie or episode with where it was left (seconds).
+pub struct ResumeItem {
+    pub item: ItemInfo,
+    pub position: u32,
+    pub duration: u32,
+}
+
 /// A group whose name matches a search (opens like a group in the browse list).
 pub struct GroupHit {
     pub kind: ItemKind,
@@ -410,6 +417,44 @@ impl Library {
             .into_iter()
             .map(Into::into)
             .collect())
+    }
+
+    /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn save_progress(&self, key: String, position: u32, duration: u32) -> Result<(), String> {
+        self.0.save_progress(&key, position, duration).map_err(err)
+    }
+
+    /// Where to resume an item (seconds), if it was left part-way.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn resume_position(&self, key: String) -> Result<Option<u32>, String> {
+        self.0.resume_position(&key).map_err(err)
+    }
+
+    /// The continue-watching row of a section: started, unfinished items, last watched first.
+    pub fn continue_watching(
+        &self,
+        kinds: Vec<ItemKind>,
+        limit: u32,
+    ) -> Result<Vec<ResumeItem>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .continue_watching(&kinds, limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(|(h, position, duration)| ResumeItem {
+                item: h.into(),
+                position,
+                duration,
+            })
+            .collect())
+    }
+
+    /// Something started playing: search ranks recently watched items first.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn touch_recent(&self, key: String) -> Result<(), String> {
+        self.0.touch_recent(&key).map_err(err)
     }
 
     /// Every favourite's key, for the stars in the lists.

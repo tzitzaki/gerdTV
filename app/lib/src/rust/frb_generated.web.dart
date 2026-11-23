@@ -201,6 +201,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
 
   @protected
+  List<ResumeItem> dco_decode_list_resume_item(dynamic raw);
+
+  @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
 
   @protected
@@ -244,6 +247,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
+
+  @protected
+  ResumeItem dco_decode_resume_item(dynamic raw);
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
@@ -457,6 +463,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ResumeItem> sse_decode_list_resume_item(SseDeserializer deserializer);
+
+  @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
     SseDeserializer deserializer,
   );
@@ -508,6 +517,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
+
+  @protected
+  ResumeItem sse_decode_resume_item(SseDeserializer deserializer);
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
@@ -768,6 +780,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_resume_item(
+    List<ResumeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -829,6 +847,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resume_item(ResumeItem self, SseSerializer serializer);
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);

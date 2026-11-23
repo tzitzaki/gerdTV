@@ -302,13 +302,20 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Plays an item through the watchdog. Live channels use the URL form that worked last time.
+  /// Plays an item through the watchdog. Live channels use the URL form that worked last time; movies and episodes
+  /// continue where they were left.
   Future<void> play(ItemInfo item) async {
     final lib = library;
     if (lib == null) return;
     if (nowPlaying.value?.key == item.key) {
       return; // reopening the player for the running stream: keep it going
     }
+    _saveProgress(); // the one playing until now
+    _progressTimer ??= Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _saveProgress(),
+    );
+    lib.touchRecent(key: item.key);
     nowPlaying.value = item;
     _playingKey = item.key;
     await _start(item, lib);
@@ -392,6 +399,10 @@ class Session extends ChangeNotifier {
       bitrate: bitrate > 0 ? bitrate : null,
       adaptive: lib.setting(key: settingAdaptive) == '1',
       preferHls: live && lib.preferHls(key: item.key),
+      start: switch (live ? null : lib.resumePosition(key: item.key)) {
+        final secs? => Duration(seconds: secs),
+        null => null,
+      },
       extraOptions: live && shift > 0
           ? timeshiftOptions(
               windowSeconds: shift,
@@ -410,8 +421,31 @@ class Session extends ChangeNotifier {
     return dir.path;
   }
 
+  Timer? _progressTimer;
+
+  /// Continue watching: how far the playing movie or episode got (the core keeps it from 2 min, drops it at 95 %).
+  /// Catch-up archives play as movies but aren't kept.
+  void _saveProgress() {
+    final it = nowPlaying.value;
+    final lib = library;
+    if (it == null ||
+        lib == null ||
+        !(it.kind == ItemKind.movie || it.kind == ItemKind.episode) ||
+        it.key.startsWith('catchup:')) {
+      return;
+    }
+    final pos = player.state.position.inSeconds;
+    if (pos <= 0) return;
+    lib.saveProgress(
+      key: it.key,
+      position: pos,
+      duration: player.state.duration.inSeconds,
+    );
+  }
+
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
+    _saveProgress();
     _playingKey = null;
     nowPlaying.value = null;
     await _adapter?.stop();
@@ -420,6 +454,7 @@ class Session extends ChangeNotifier {
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
     unawaited(_player?.dispose());
     super.dispose();
   }

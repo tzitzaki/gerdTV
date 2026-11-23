@@ -433,6 +433,31 @@ impl Library {
         Ok(db::favourites(&self.conn.lock().unwrap(), kinds)?)
     }
 
+    pub fn save_progress(&self, key: &str, position: u32, duration: u32) -> Result<()> {
+        Ok(db::save_progress(
+            &self.conn.lock().unwrap(),
+            key,
+            position,
+            duration,
+        )?)
+    }
+
+    pub fn resume_position(&self, key: &str) -> Result<Option<u32>> {
+        Ok(db::resume_position(&self.conn.lock().unwrap(), key)?)
+    }
+
+    pub fn continue_watching(&self, kinds: &[Kind], limit: usize) -> Result<Vec<(Hit, u32, u32)>> {
+        Ok(db::continue_watching(
+            &self.conn.lock().unwrap(),
+            kinds,
+            limit,
+        )?)
+    }
+
+    pub fn touch_recent(&self, key: &str) -> Result<()> {
+        Ok(db::touch_recent(&self.conn.lock().unwrap(), key)?)
+    }
+
     pub fn favourite_keys(&self) -> Result<Vec<String>> {
         Ok(db::favourite_keys(&self.conn.lock().unwrap())?)
     }

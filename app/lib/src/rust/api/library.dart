@@ -59,6 +59,12 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
+  /// The continue-watching row of a section: started, unfinished items, last watched first.
+  Future<List<ResumeItem>> continueWatching({
+    required List<ItemKind> kinds,
+    required int limit,
+  });
+
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
@@ -150,6 +156,16 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
+  /// Where to resume an item (seconds), if it was left part-way.
+  int? resumePosition({required String key});
+
+  /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+  void saveProgress({
+    required String key,
+    required int position,
+    required int duration,
+  });
+
   /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
   Future<SearchPage> search({
     required BigInt seq,
@@ -194,6 +210,9 @@ abstract class Library implements RustOpaqueInterface {
   String streamUrl({required String key, required bool preferHls});
 
   Future<SyncSummary> sync_();
+
+  /// Something started playing: search ranks recently watched items first.
+  void touchRecent({required String key});
 
   /// Live channels without a guide match, in provider order (the mapping screen).
   Future<List<ChannelRef>> unmatchedChannels({
@@ -611,6 +630,31 @@ class ReminderInfo {
           start == other.start &&
           stop == other.stop &&
           title == other.title;
+}
+
+/// A started movie or episode with where it was left (seconds).
+class ResumeItem {
+  final ItemInfo item;
+  final int position;
+  final int duration;
+
+  const ResumeItem({
+    required this.item,
+    required this.position,
+    required this.duration,
+  });
+
+  @override
+  int get hashCode => item.hashCode ^ position.hashCode ^ duration.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResumeItem &&
+          runtimeType == other.runtimeType &&
+          item == other.item &&
+          position == other.position &&
+          duration == other.duration;
 }
 
 /// One page of search results. `seq` echoes the caller's sequence number, so the UI drops answers to keystrokes

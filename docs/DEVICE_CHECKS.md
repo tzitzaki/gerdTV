@@ -9,6 +9,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
 - Search: typing in Live TV (without clicking the field) finds channels of every group, also by their group's name; Enter plays the top one.
 - Movies and series: a movie plays; a series opens its episodes and one plays.
+- Continue watching: stop a movie after 5 min; it shows on top of Movies with its progress, and opening it continues there.
 - Favourites: the star on a channel adds it to the Favourites group on top of Live TV; the star again removes it.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".

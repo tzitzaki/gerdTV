@@ -97,6 +97,9 @@ const MIGRATIONS: &[&str] = &[
      CREATE VIRTUAL TABLE items_vocab USING fts5vocab(items_fts, 'row');
      CREATE TABLE search_history (section TEXT NOT NULL, query TEXT NOT NULL, updated_at INTEGER NOT NULL,
         PRIMARY KEY (section, query));",
+    // 6 → 7: continue watching: where a movie or episode was left (user data, seconds).
+    "CREATE TABLE resume (key TEXT PRIMARY KEY, position INTEGER NOT NULL, duration INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -949,6 +952,74 @@ pub fn favourites(conn: &Connection, kinds: &[Kind]) -> Result<Vec<Hit>> {
     rows.collect()
 }
 
+/// Counts as started after this many seconds (owner decision: 2 min), as finished from this share of the duration.
+pub const RESUME_FROM_SECS: u32 = 120;
+pub const FINISHED_AT: f64 = 0.95;
+
+/// Remembers how far a movie or episode played. Under 2 min nothing is kept (zapping through isn't "started"), from
+/// 95 % it counts as finished and leaves continue watching.
+pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32) -> Result<()> {
+    if duration > 0 && position as f64 >= duration as f64 * FINISHED_AT {
+        conn.execute("DELETE FROM resume WHERE key = ?1", [key])?;
+    } else if position >= RESUME_FROM_SECS {
+        conn.execute(
+            "INSERT INTO resume (key, position, duration, updated_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (key) DO UPDATE SET position = ?2, duration = ?3, updated_at = ?4",
+            params![key, position, duration, unix_now()],
+        )?;
+    }
+    Ok(())
+}
+
+/// Where to resume an item (seconds), if it was left part-way.
+pub fn resume_position(conn: &Connection, key: &str) -> Result<Option<u32>> {
+    conn.query_row("SELECT position FROM resume WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
+}
+
+/// Started, unfinished items of `kinds`, last watched first, with (position, duration) in seconds; at most `limit`.
+pub fn continue_watching(
+    conn: &Connection,
+    kinds: &[Kind],
+    limit: usize,
+) -> Result<Vec<(Hit, u32, u32)>> {
+    let mut st = conn.prepare_cached(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, ''),
+                p.position, p.duration
+         FROM resume p JOIN items i ON i.key = p.key
+         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
+         WHERE (?1 >> i.kind) & 1 ORDER BY p.updated_at DESC, p.rowid DESC LIMIT ?2",
+    )?;
+    let rows = st.query_map(params![kind_mask(kinds), limit as i64], |r| {
+        Ok((
+            Hit {
+                key: r.get(0)?,
+                kind: Kind::from_i64(r.get(1)?),
+                name: r.get(2)?,
+                category: r.get(3)?,
+                logo: r.get(4)?,
+                number: r.get(5)?,
+                archive_days: r.get(6)?,
+                group: r.get(7)?,
+            },
+            r.get(8)?,
+            r.get(9)?,
+        ))
+    })?;
+    rows.collect()
+}
+
+/// Marks an item as watched just now (search ranks recently watched items first).
+pub fn touch_recent(conn: &Connection, key: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO recents (key, updated_at) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET updated_at = ?2",
+        params![key, unix_now()],
+    )?;
+    Ok(())
+}
+
 /// Every favourite's key (the lists' stars).
 pub fn favourite_keys(conn: &Connection) -> Result<Vec<String>> {
     let mut st = conn.prepare_cached("SELECT key FROM favourites")?;
@@ -1193,6 +1264,34 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         let mut keys = favourite_keys(&c).unwrap();
         keys.sort();
         assert_eq!(keys, ["live:102", "movie:201"]);
+    }
+
+    #[test]
+    fn progress_counts_from_two_minutes_until_95_percent() {
+        let c = db();
+        // (position, duration, kept afterwards)
+        for (pos, dur, kept) in [
+            (60, 6000, None),         // under 2 min: not started
+            (600, 6000, Some(600)),   // started
+            (1200, 6000, Some(1200)), // moved on
+            (5800, 6000, None),       // 96 %: finished, leaves the row
+            (300, 0, Some(300)),      // unknown duration (a stream without one): kept
+        ] {
+            save_progress(&c, "movie:201", pos, dur).unwrap();
+            assert_eq!(
+                resume_position(&c, "movie:201").unwrap(),
+                kept,
+                "{pos}/{dur}"
+            );
+        }
+        save_progress(&c, "episode:301", 900, 2700).unwrap();
+        let row = continue_watching(&c, &[Kind::Movie, Kind::Episode], 10).unwrap();
+        assert_eq!(
+            names(&row.iter().map(|r| r.0.clone()).collect::<Vec<_>>()),
+            ["Planet Wissen S01E02", "Die Reise (2019)"]
+        );
+        assert_eq!((row[0].1, row[0].2), (900, 2700));
+        assert!(continue_watching(&c, &[Kind::Live], 10).unwrap().is_empty());
     }
 
     #[test]
