@@ -20,7 +20,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logos: after a restart the logos appear at once (from disk), also with the network off.
 - Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
-- Install and restart: after the download, gerdTV quits, starts again on the new version within a few seconds, with no `gerdTV.previous.app` left in Applications.
+- Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
 - Programme search: searching a show's title lists it under the Programmes chip with the right local time; a tap plays its channel.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 
