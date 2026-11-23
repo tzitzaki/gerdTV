@@ -19,6 +19,7 @@ import 'app_logo.dart';
 import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
+import 'player_screen.dart' show playerGesturesSetting;
 import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
@@ -183,6 +184,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           if (lib != null) ..._playbackEntries(l10n, lib),
           if (ownLibmpv() != null) _engineEntry(l10n),
+          // Touch screens only: desktop and TV have no swipes.
+          if (lib != null && !isDesktop)
+            SettingsEntry(
+              id: 'gestures',
+              title: l10n.playerGestures,
+              keywords: l10n.settingsKeywordsGestures,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.gestures'),
+                  title: Text(l10n.playerGestures),
+                  subtitle: Text(l10n.playerGesturesHint),
+                  value: lib.setting(key: playerGesturesSetting) != 'off',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: playerGesturesSetting,
+                      value: on ? 'on' : 'off',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
           SettingsEntry(
             id: 'health',
             title: l10n.settingsHealth,

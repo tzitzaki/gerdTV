@@ -145,6 +145,8 @@
   "playerEngineGerdtv": "gerdTV build (newer mpv and FFmpeg)",
   "playerEngineHint": "Takes effect after restarting gerdTV",
   "playerEngineStandard": "Standard",
+  "playerGestures": "Player gestures",
+  "playerGesturesHint": "Swipe sideways or double-tap to seek in movies and episodes; swipe up or down on the right to change the volume.",
   "playerNext": "Next: {title}",
   "@playerNext": {
     "placeholders": {
@@ -243,6 +245,7 @@
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsData": "export import backup favourites file transfer",
   "settingsKeywordsEngine": "engine mpv ffmpeg libmpv decoder player",
+  "settingsKeywordsGestures": "swipe touch seek volume double tap",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
   "settingsKeywordsHidden": "hide groups categories adult",

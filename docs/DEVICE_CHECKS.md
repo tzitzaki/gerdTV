@@ -25,7 +25,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 - Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
 
-## iPhone
+## iPhone and iPad
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV and a movie play in full screen with sound; logos show in the lists.
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
@@ -33,9 +33,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
-
-## iPad
-- PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
+- iPad PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
+- Swipe: from the left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
 
 ## Android phone
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
@@ -43,6 +42,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
 - Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
+- Swipe: left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
 
 ## Shield
 - Install: the APK installs and gerdTV appears in the TV launcher row with its banner.

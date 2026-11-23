@@ -11,6 +11,7 @@
 // Pause and rewind live (timeshift window > 0): the controls' seek bar spans the back buffer up to live; "−5:12" and
 // Go live show at the top while behind live (live_edge.dart says where live is); Left/Right skip 10 s on phone and
 // TV (the D-pad), 2 s on desktop as before.
+// Touch (phones): media_kit's gestures, switchable in Settings → Playback (withGestures below).
 
 import 'dart:async';
 
@@ -28,6 +29,31 @@ import '../theme.dart';
 import '../player/live_edge.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
+
+/// The profile setting for the player gestures: on unless "off" (Settings → Playback).
+const playerGesturesSetting = 'player_gestures';
+
+/// The player gestures on touch screens (owner decision; media_kit's own, so they work in fullscreen too):
+/// - movies and episodes: a horizontal swipe seeks (the further, the more), a double tap on the left or right third
+///   skips 10 s;
+/// - everything: a vertical swipe on the right half sets the player's volume (mpv's 0–100 %, not the system's: iOS has
+///   no public API for that).
+/// Live channels don't seek by swipe: media_kit seeks against the stream's duration, which a live stream doesn't
+/// have, and timeshift has its own bar and live edge. Off: none of them (the controls still work by tap).
+MaterialVideoControlsThemeData withGestures(
+  MaterialVideoControlsThemeData base, {
+  required bool enabled,
+  required bool vod,
+  required double volume,
+  required ValueChanged<double> onVolume,
+}) => base.copyWith(
+  seekGesture: enabled && vod,
+  seekOnDoubleTap: enabled && vod,
+  volumeGesture: enabled,
+  brightnessGesture: false, // would need a platform channel; not asked for
+  initialVolume: volume.clamp(0.0, 1.0),
+  onVolumeChanged: onVolume,
+);
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key, required this.session, required this.item});
@@ -309,21 +335,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// Phone and TV controls, the same change.
-  MaterialVideoControlsThemeData get _mobileControls => _shiftable
-      ? MaterialVideoControlsThemeData(
-          displaySeekBar: false,
-          primaryButtonBar: [
-            const Spacer(),
-            _pauseButton(desktop: false),
-            const Spacer(),
-          ],
-          bottomButtonBar: [
-            Expanded(child: _timeshiftBar()),
-            const MaterialFullscreenButton(),
-          ],
-        )
-      : kDefaultMaterialVideoControlsThemeData;
+  /// Phone and TV controls, the same change, plus the player gestures (Settings → Playback).
+  MaterialVideoControlsThemeData get _mobileControls {
+    final p = widget.session.player;
+    return withGestures(
+      _shiftable
+          ? MaterialVideoControlsThemeData(
+              displaySeekBar: false,
+              primaryButtonBar: [
+                const Spacer(),
+                _pauseButton(desktop: false),
+                const Spacer(),
+              ],
+              bottomButtonBar: [
+                Expanded(child: _timeshiftBar()),
+                const MaterialFullscreenButton(),
+              ],
+            )
+          : kDefaultMaterialVideoControlsThemeData,
+      enabled:
+          widget.session.library?.setting(key: playerGesturesSetting) != 'off',
+      vod: _current.kind != ItemKind.live,
+      volume: p.state.volume / 100,
+      onVolume: (v) => p.setVolume(v * 100),
+    );
+  }
 
   /// The seek bar over the back buffer: from the window's start (or the stream's) to live.
   Widget _timeshiftBar() {
