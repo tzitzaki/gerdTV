@@ -1,9 +1,11 @@
-// Browse one kind (Live TV, Movies, Series): the provider's groups in provider order, then a group's items
-// (paged, 100 at a time, more on scroll) in the section's list mode, live channels with what's on now and next.
-// Series open their episodes; everything else plays. A group's own search field searches the whole group in the
+// Browse one kind (Live TV, Movies, Series): the provider's groups (in the section's group order), then a group's
+// items (paged, 100 at a time, more on scroll, in the section's item order) in the section's list mode, live channels
+// with what's on now and next. Series open their episodes under a blurred backdrop of their poster; everything else
+// plays. Loading shows skeleton rows. A group's own search field searches the whole group in the
 // core (section_search.dart), not just the rows loaded so far.
 
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -84,7 +86,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
             }
             final list = snap.data;
             if (list == null) {
-              return const Center(child: CircularProgressIndicator());
+              return ListView(
+                children: [for (var i = 0; i < 8; i++) const SkeletonRow()],
+              );
             }
             if (list.isEmpty) {
               return _Message(
@@ -216,8 +220,9 @@ class ContinueRow extends StatelessWidget {
                                 child: LayoutBuilder(
                                   builder: (context, c) => Logo(
                                     url: r.item.logo,
-                                    size: c.biggest.shortestSide,
+                                    size: c.maxWidth,
                                     icon: kindIcon(r.item.kind),
+                                    fill: true,
                                   ),
                                 ),
                               ),
@@ -470,25 +475,98 @@ class EpisodesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(series.name)),
-      body: FutureBuilder<List<ItemInfo>>(
-        future: session.library!.episodes(seriesKey: series.key),
-        builder: (context, snap) {
-          if (snap.hasError) return _Message(l10n.syncFailed('${snap.error}'));
-          final eps = snap.data;
-          if (eps == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (eps.isEmpty) return _Message(l10n.episodesEmpty);
-          return ListView.builder(
-            itemCount: eps.length,
-            itemBuilder: (context, i) => ItemTile(
-              item: eps[i],
-              onTap: () => openItem(context, session, eps[i]),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 240,
+            title: Text(series.name),
+            flexibleSpace: FlexibleSpaceBar(
+              background: _Backdrop(item: series),
             ),
-          );
-        },
+          ),
+          FutureBuilder<List<ItemInfo>>(
+            future: session.library!.episodes(seriesKey: series.key),
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return SliverFillRemaining(
+                  child: _Message(l10n.syncFailed('${snap.error}')),
+                );
+              }
+              final eps = snap.data;
+              if (eps == null) {
+                return SliverList.builder(
+                  itemCount: 6,
+                  itemBuilder: (_, _) => const SkeletonRow(),
+                );
+              }
+              if (eps.isEmpty) {
+                return SliverFillRemaining(child: _Message(l10n.episodesEmpty));
+              }
+              return SliverList.builder(
+                itemCount: eps.length,
+                itemBuilder: (context, i) => ItemTile(
+                  item: eps[i],
+                  onTap: () => openItem(context, session, eps[i]),
+                ),
+              );
+            },
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// A series' header (the cinematic look): its poster blurred and darkened across the whole bar, fading into the
+/// page, with the poster itself in front (flown in from its tile: the Hero tag matches ItemCard's).
+class _Backdrop extends StatelessWidget {
+  const _Backdrop({required this.item});
+  final ItemInfo item;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Logo(
+            url: item.logo,
+            size: 160, // decoded small: it is blurred anyway
+            icon: kindIcon(item.kind),
+            fill: true,
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [surface.withValues(alpha: 0.35), surface],
+            ),
+          ),
+        ),
+        Positioned(
+          left: Tokens.space * 2,
+          bottom: Tokens.space * 2,
+          width: 100,
+          height: 150,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Tokens.radius / 2),
+            child: Hero(
+              tag: 'poster:${item.key}',
+              child: Logo(
+                url: item.logo,
+                size: 100,
+                icon: kindIcon(item.kind),
+                fill: true,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

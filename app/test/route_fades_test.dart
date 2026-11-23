@@ -13,7 +13,9 @@ void main() {
     TargetPlatform.iOS,
     TargetPlatform.linux,
   ]) {
-    testWidgets('routes fade in 150 ms on ${platform.name}', (tester) async {
+    testWidgets('routes fade in Tokens.motion on ${platform.name}', (
+      tester,
+    ) async {
       debugDefaultTargetPlatformOverride = platform;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final nav = GlobalKey<NavigatorState>();
@@ -34,8 +36,12 @@ void main() {
       )!;
       expect(route.transitionDuration, Tokens.motion);
       await tester.pump(Tokens.motion);
-      // Fully opaque after 150 ms (a 300 ms slide would be half-way); the status turns "completed" a tick later.
-      expect(route.animation!.value, 1.0, reason: 'fully shown after 150 ms');
+      // Fully shown after Tokens.motion (a platform slide would be half-way); the status turns "completed" a tick later.
+      expect(
+        route.animation!.value,
+        1.0,
+        reason: 'fully shown after Tokens.motion',
+      );
       expect(find.byType(FadeTransition), findsWidgets);
     });
   }

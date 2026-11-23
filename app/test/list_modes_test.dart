@@ -204,4 +204,63 @@ void main() {
     await tester.pumpAndSettle();
     expect(picked, [ListSort.number]);
   });
+
+  // The cinematic tiles: a focused or hovered tile lifts (5 % larger), never with reduced motion; a poster's name sits
+  // on the picture in white, a channel's below its logo.
+  for (final still in [false, true]) {
+    testWidgets(
+      'a focused tile lifts${still ? ', not with reduced motion' : ''}',
+      (tester) async {
+        final movie = ItemInfo(
+          key: 'movie:1',
+          kind: ItemKind.movie,
+          name: 'A film',
+          category: 'g',
+          logo: '',
+          number: null,
+          archiveDays: 0,
+          group: '',
+        );
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(disableAnimations: still),
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: Scaffold(
+                body: ItemsView(
+                  mode: ListMode.tiles,
+                  items: [movie, channel(2)],
+                  nowNext: const {},
+                  now: now,
+                  onTap: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        double scaleOf(String key) => tester
+            .widget<AnimatedScale>(
+              find.ancestor(
+                of: find.byKey(Key(key)),
+                matching: find.byType(AnimatedScale),
+              ),
+            )
+            .scale;
+        expect(scaleOf('item.movie:1'), 1.0);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+        expect(scaleOf('item.movie:1'), still ? 1.0 : 1.05);
+        expect(scaleOf('item.live:2'), 1.0);
+        final name = tester.widget<RichText>(
+          find
+              .descendant(
+                of: find.byKey(const Key('item.movie:1')),
+                matching: find.byType(RichText),
+              )
+              .last,
+        );
+        expect(name.text.style?.color, Colors.white, reason: 'on the poster');
+      },
+    );
+  }
 }

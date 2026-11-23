@@ -29,7 +29,9 @@ class Tokens {
   static const ink = Color(0xFF12121A);
   static const space = 8.0; // the spacing unit: paddings are multiples of it
   static const radius = 12.0;
-  static const motion = Duration(milliseconds: 150);
+
+  /// Every animation's length (owner decision: the cinematic look, about 200–250 ms; none with reduced motion).
+  static const motion = Duration(milliseconds: 220);
 
   /// Lists switch to the sidebar layout above this width.
   static const wideLayout = 720.0;
@@ -161,7 +163,7 @@ ThemeData gerdTheme(
 /// Every route's transition, in [Tokens.motion] (instead of the platform's 300–500 ms slides):
 /// - phones (iOS and Android below [Tokens.wideLayout], the shell's phone layout): the iOS slide, whose left-edge
 ///   swipe closes the page (owner decision: swipe-back on phones; Android's system back keeps working too);
-/// - everything else (desktop, tablet, TV): a fade;
+/// - everything else (desktop, tablet, TV): a fade with a slight zoom;
 /// - none when the system asks for reduced motion (then the page just appears; Back still closes it).
 /// Debugging: a page that won't swipe back usually isn't a PageRoute, or the window is wider than the phone layout.
 class RouteTransitions extends PageTransitionsBuilder {
@@ -196,6 +198,17 @@ class RouteTransitions extends PageTransitionsBuilder {
         child,
       );
     }
-    return FadeTransition(opacity: animation, child: child);
+    // Wide windows: the new page fades in while growing from 97 % (a calm zoom, not a slide).
+    final eased = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+    );
+    return FadeTransition(
+      opacity: eased,
+      child: ScaleTransition(
+        scale: Tween(begin: 0.97, end: 1.0).animate(eased),
+        child: child,
+      ),
+    );
   }
 }

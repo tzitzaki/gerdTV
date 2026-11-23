@@ -128,7 +128,20 @@ class _ShellState extends State<Shell> {
             return const SizedBox(height: 2);
           },
         ),
-        Expanded(child: page),
+        // A new section fades in (only the new one is built: the old one is gone at once, so finders and focus never
+        // see two sections).
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            key: ValueKey(_index),
+            tween: Tween(begin: 0, end: 1),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : Tokens.motion,
+            curve: Curves.easeOut,
+            builder: (context, t, child) => Opacity(opacity: t, child: child),
+            child: page,
+          ),
+        ),
       ],
     );
     // Typing in a section searches it; `/` and Ctrl/Cmd+F focus its field (in Settings: the settings search).
