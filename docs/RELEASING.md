@@ -9,7 +9,7 @@
 3. `gh run watch`, then `just verify-release <tag>`: downloads the release, checks every asset's size and SHA-256 and the manifest signature.
 
 ## What release.yml builds
-- `macos-latest`: `gerdTV-macos-<version>.zip` (the app signed with the stable self-signed certificate, packed with `ditto -c -k --keepParent`) and `gerdTV-ios-unsigned-<version>.ipa` (`flutter build ios --release --no-codesign`, `Payload/Runner.app` zipped, for a re-signing service).
+- `macos-latest`: `gerdTV-macos-<version>.zip` (the app signed with the stable self-signed certificate, packed with `ditto -c -k --keepParent`; the updater's file in `latest.json`), `gerdTV-macos-<version>.dmg` (the same app with an Applications link for the first install, `scripts/macos-dmg.sh`; not in `latest.json`, `just verify-release` checks it is there) and `gerdTV-ios-unsigned-<version>.ipa` (`flutter build ios --release --no-codesign`, `Payload/Runner.app` zipped, for a re-signing service).
 - `ubuntu-latest`: `gerdTV-android-<version>.apk` (arm64-v8a, release keystore) and `gerdTV-linux-x64-<version>.tar.gz`.
 - Last job: `latest.json` (version, notes, per platform: asset, size, SHA-256, minimum OS) signed with the ed25519 update key into `latest.json.sig` (`gerdtv-release`), then `gh release create` with every asset. Notes: the merged PR titles since the previous published release (a tag whose release run failed has no release and is skipped) plus install hints linking `docs/INSTALL.md`. Any failed platform job means no release (no half releases). Tags with a `-` (e.g. a test tag) are published as pre-releases.
 

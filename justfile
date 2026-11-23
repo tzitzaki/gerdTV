@@ -166,6 +166,9 @@ verify-release tag:
     dir="$(mktemp -d)"; trap 'rm -rf "$dir"' EXIT
     gh release download "{{tag}}" -R tzitzaki/gerdTV -D "$dir"
     cargo run -q -p gerdtv-release -- check keys/update-public-key.hex "$dir"
+    # The first-install DMG isn't in latest.json (the updater uses the zip): check it's there and not empty.
+    [[ -s "$(ls "$dir"/gerdTV-macos-*.dmg 2>/dev/null | head -1)" ]] || { echo "verify-release: no macOS DMG"; exit 1; }
+    echo "macOS DMG present"
 
 # Check that every bundled dependency's licence is GPL-3.0 compatible (scripts/licences.sh).
 licences:

@@ -32,6 +32,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
 - Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
+- macOS releases ship a DMG for the first install and keep the zip for the in-app updater.
 - Releases: one per wrap-up from `release.yml`; macOS signed with a stable self-signed certificate; Android with the release keystore; an unsigned iOS IPA; a signed `latest.json` for the in-app updater.
 - No automated installs on the owner's devices; the owner installs every first copy.
 - The logo is drawn in code, the user picks it in Settings, and the pick switches the launcher icon on Android and iOS and the Dock or window icon on macOS and Linux.
