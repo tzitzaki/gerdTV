@@ -53,6 +53,9 @@
   "favourites": "Favourites",
   "goLive": "Live",
   "guideAddUrl": "Extra XMLTV URL",
+  "guideCommunity": "Community guides",
+  "guideCommunityAdd": "Add a community guide",
+  "guideCommunityHint": "Free XMLTV files per country from the epgshare01 project, rebuilt daily, about 4 days ahead. Where they overlap with your provider's guide, the provider's wins.",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
   "@guideFailed": {

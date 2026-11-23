@@ -158,9 +158,15 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE hidden_groups (kind INTEGER NOT NULL, category TEXT NOT NULL, updated_at INTEGER NOT NULL,
         PRIMARY KEY (kind, category));",
     // 8 → 9: sort by "recently added" and "rating" (Xtream Codes `added` / `last_modified` and `rating`; M3U has
-    // neither, so both stay NULL there). Catalogue data: the next sync fills them.
+    // neither, so both stay NULL there). Catalogue data: the next sync fills them. And a display name may name a
+    // channel in several guide sources (the match picks the one with programmes, the provider's first), so
+    // `epg_names` is keyed by name and channel (derived data: copied over, rebuilt by every import).
     "ALTER TABLE items ADD COLUMN added INTEGER;
-     ALTER TABLE items ADD COLUMN rating REAL;",
+     ALTER TABLE items ADD COLUMN rating REAL;
+     CREATE TABLE epg_names_new (norm TEXT NOT NULL, channel TEXT NOT NULL, PRIMARY KEY (norm, channel));
+     INSERT INTO epg_names_new SELECT norm, channel FROM epg_names;
+     DROP TABLE epg_names;
+     ALTER TABLE epg_names_new RENAME TO epg_names;",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -320,7 +326,8 @@ pub fn m3u_key(kind: Kind, templated_url: &str) -> String {
 
 /// The searchable alternative name: without country prefixes (`DE |`, `[DE]`, `DE:`) and quality tags.
 pub fn clean_name(name: &str) -> String {
-    let mut s = name.trim();
+    // "|DE| Name" is "DE| Name" below.
+    let mut s = name.trim().trim_start_matches('|');
     // "DE | Name", "DE: Name", "[DE] Name", "DE - Name"
     if let Some(rest) = s
         .strip_prefix('[')
@@ -1729,6 +1736,7 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             ("Sky Cinema (HEVC)", "Sky Cinema"),
             ("Arte", "Arte"),
             ("Disney Channel: Kids", "Disney Channel: Kids"),
+            ("|DE| 3sat HD", "3sat"),
         ] {
             assert_eq!(clean_name(raw), clean, "{raw}");
         }
