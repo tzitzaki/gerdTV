@@ -40,6 +40,7 @@ else
         if version_only "$f"; then set_on rules; else all; fi ;;
       *.md) set_on rules ;;
       crates/*|rust-toolchain.toml|keys/*) all ;;
+      scripts/*libmpv-android*|scripts/ci-android-emulator.sh) set_on android ;;
       scripts/build-libmpv*) set_on rust linux ;;
       app/linux/*) set_on flutter linux ;;
       app/macos/*|app/ios/*) set_on macos ;;

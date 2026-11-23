@@ -205,9 +205,17 @@ ci-linux rust="true" flutter="true" linux="true" rules="true":
 build-linux:
     cd app && {{heavy}} flutter build linux --release
 
-# Debug APK only; release APKs come from release.yml. Gradle gets 2 GB and no daemon on a shared machine.
+# Debug APK only; release APKs come from release.yml. Gradle gets 2 GB and no daemon on a shared machine. With
+# gerdTV's own libmpv built (`just libmpv-android`) it goes into the APK and Settings → Player engine offers it.
 build-android:
-    cd app && GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g" {{heavy}} flutter build apk --debug --target-platform android-arm64
+    #!/usr/bin/env bash
+    set -euo pipefail
+    define="$(scripts/bundle-libmpv-android.sh arm64-v8a)"
+    cd app && GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g" {{heavy}} flutter build apk --debug --target-platform android-arm64 $define
+
+# gerdTV's own libmpv for Android (arm64-v8a, x86_64) into build/libmpv-android (needs docker and the NDK).
+libmpv-android:
+    {{heavy}} scripts/build-libmpv-android-container.sh build/libmpv-android
 
 # Download a release and check every asset's SHA-256 and the signed manifest (docs/RELEASING.md).
 verify-release tag:
