@@ -121,11 +121,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (mounted) setState(() {});
   }
 
-  /// Back to live: to the edge, playing.
+  /// Back to live: just short of the edge, playing. Exactly at the cache's end mpv has nothing left to play and
+  /// waits for new data (macOS CI: the position stood still); half the live slack still counts as live.
   Future<void> _goLive() async {
     final live = _liveEdge.live(DateTime.now());
     if (live == null) return;
-    await _seekTo(live);
+    await _seekTo(live - liveSlack / 2);
     if (_paused) await _togglePause();
   }
 
