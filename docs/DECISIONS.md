@@ -33,4 +33,5 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - No automated installs on the owner's devices; the owner installs every first copy.
 - The logo is drawn in code, the user picks it in Settings, and the pick switches the launcher icon on Android and iOS and the Dock or window icon on macOS and Linux.
 - Screen changes fade in 150 ms on every platform instead of the platforms' 300–500 ms slides.
+- Android has no cleartext network config: nothing in the app uses Android's HTTP stack (libmpv and the core bring their own).
 - UI strings in English and German via gen-l10n; the UI follows the system language; the name is spelled "gerdTV" everywhere visible.
