@@ -198,6 +198,7 @@
       }
     }
   },
+  "searchVoice": "Search by voice",
   "secondsShort": "{seconds} s",
   "@secondsShort": {
     "placeholders": {

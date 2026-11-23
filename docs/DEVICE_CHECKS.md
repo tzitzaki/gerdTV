@@ -38,6 +38,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
+- Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
 
 ## Shield
 - Install: the APK installs and gerdTV appears in the TV launcher row with its banner.
@@ -48,6 +49,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Plain HTTP: with a provider on http://, sync, logos, the guide and playback all still work (the cleartext config is gone).
 - Lists: the D-pad moves through tiles and large tiles row by row, and the mode toggle is reachable.
 - Search: Up from a list reaches the section's search field; the on-screen keyboard's text finds channels of every group.
+- Voice search: the field's mic (OK on it) opens the speech prompt; the spoken words become the search.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: in the player Up/Down switch channels with the banner, OK opens the channel list, Back closes it, Back again leaves.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
