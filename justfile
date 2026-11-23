@@ -177,21 +177,30 @@ ready body="":
     step "Linux release build" "just build-linux"
     echo; echo "PR body lines:"; printf '%s\n' "${lines[@]}"
 
-# What the `linux` CI job runs (.github/workflows/ci.yml).
-ci-linux:
-    cargo fmt --all --check
-    cargo clippy --workspace --all-targets --quiet -- -D warnings
-    just test
-    just test-harness
-    just test-harness-gerdmpv
-    just l10n
-    cd app && flutter analyze
-    just licences
+# What the `linux` CI job runs (.github/workflows/ci.yml): the areas scripts/ci-scope.sh picked (true|false each);
+# all of them by default (the nightly). The Linux release build is left to release.yml: the integration tests' debug
+# build already compiles the same code.
+ci-linux rust="true" flutter="true" linux="true" rules="true":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ {{rust}} == true ]]; then
+      cargo fmt --all --check
+      cargo clippy --workspace --all-targets --quiet -- -D warnings
+      just test-rust   # the repo rules included
+      just test-harness
+      just test-harness-gerdmpv
+    elif [[ {{rules}} == true ]]; then
+      just test-docs
+    fi
+    if [[ {{flutter}} == true ]]; then
+      just test-flutter
+      (cd app && flutter analyze)
+    fi
+    if [[ {{rust}} == true || {{flutter}} == true ]]; then just licences; fi
     # Integration tests only on gerdTV's own libmpv (owner decision): the system libmpv's Lua scripts sometimes
     # deadlock media_kit's start in CI (main thread in mpv_hook_add / mpv_get_property while the script threads
     # start), and media_kit sets no load-scripts=no before mpv_initialize. The own build has no Lua.
-    just test-integration-gerdmpv
-    just build-linux
+    if [[ {{linux}} == true ]]; then just test-integration-gerdmpv; fi
 
 build-linux:
     cd app && {{heavy}} flutter build linux --release

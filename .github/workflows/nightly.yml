@@ -34,6 +34,7 @@ jobs:
             libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq
       - run: scripts/ci-install-flutter.sh
       - run: just ci-linux
+      - run: just build-linux   # PR CI leaves it to release.yml; the nightly keeps it checked daily
       - run: just soak
       - run: just test-epg-budget
       - run: just bench
