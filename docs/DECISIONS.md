@@ -15,6 +15,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Favourites: a Favourites group on top of each section's groups, in provider order; toggled by a star on every row and tile, a long press, or a long OK.
+- Export/import of user data: one JSON file per profile without secrets; an import merges and newer rows win; no file picker (the Downloads folder on desktop, the app's own folder on phones and TV).
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
