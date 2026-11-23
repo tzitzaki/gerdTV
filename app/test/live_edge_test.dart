@@ -32,6 +32,11 @@ void main() {
       e.cache(400, at(0));
       expect(e.earliest(120, at(0)), 280);
       expect(e.earliest(3600, at(0)), 100);
+    // A start from the previous channel (a position event after a switch) is later than this stream's live: the
+    // range never ends before it starts (seen: Live threw on clamp).
+    final z = LiveEdge()..position(7.3);
+    z.cache(2, at(0));
+    expect(z.earliest(3600, at(0)), 2);
     },
   );
 

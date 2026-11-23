@@ -50,12 +50,14 @@ class LiveEdge {
     return b < liveSlack ? 0 : b.round();
   }
 
-  /// The earliest seekable moment: [windowSecs] back from live, not before the stream's start.
+  /// The earliest seekable moment: [windowSecs] back from live, not before the stream's start, never after live
+  /// (a start recorded from the previous channel can lie after this stream's live).
   double earliest(int windowSecs, DateTime now) {
     final l = live(now) ?? 0;
     final from = l - windowSecs;
     final s = start ?? from;
-    return from < s ? s : from;
+    final e = from < s ? s : from;
+    return e > l ? l : e;
   }
 }
 
