@@ -119,9 +119,9 @@ void main() {
       expect(starred, ['live:1', 'live:2']);
       expect(opened, isEmpty);
       // The remote: Tab focuses the first row, then OK briefly (opens) and held (toggles).
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump();
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
       expect(opened, ['live:1']);

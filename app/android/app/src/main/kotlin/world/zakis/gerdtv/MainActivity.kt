@@ -10,8 +10,11 @@ package world.zakis.gerdtv
 //   gerdTV needs no microphone permission. voiceAvailable says whether one is installed (<queries> in the manifest).
 // - Updates: installApk hands the downloaded APK to the system's installer through a FileProvider (res/xml/
 //   file_paths.xml); the user confirms there, and allows "install unknown apps" for gerdTV the first time.
+// - Settings → Your data: saveToDownloads writes the export into the public Downloads folder (MediaStore, Android
+//   10+, no permission needed); older Android gets the app's own Downloads folder and the path is returned.
 // Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name), installApk(String
-// path), voiceAvailable(), listen(String prompt) → String? (null: cancelled or nothing heard); native →
+// path), saveToDownloads(String name, String text) → String, voiceAvailable(), listen(String prompt) → String?
+// (null: cancelled or nothing heard); native →
 // pictureMode(Boolean).
 // Debug hints: `adb shell dumpsys activity services world.zakis.gerdtv` shows the service; PiP needs
 // android:supportsPictureInPicture in the manifest and Android 8+.
@@ -20,7 +23,10 @@ import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.ContentValues
 import android.content.res.Configuration
+import android.os.Environment
+import android.provider.MediaStore
 import android.os.Build
 import android.speech.RecognizerIntent
 import android.util.Rational
@@ -65,10 +71,37 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    "saveToDownloads" -> {
+                        val name = call.argument<String>("name") ?: "gerdtv.json"
+                        val text = call.argument<String>("text") ?: ""
+                        try {
+                            result.success(saveToDownloads(name, text.toByteArray()))
+                        } catch (e: Exception) {
+                            result.error("save", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
         }
+    }
+
+    /// Writes [bytes] as [name] into Downloads; returns where it went (shown to the user).
+    private fun saveToDownloads(name: String, bytes: ByteArray): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+            val file = java.io.File(dir, name)
+            file.writeBytes(bytes)
+            return file.path
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, name)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+        }
+        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw java.io.IOException("Downloads refused the file")
+        contentResolver.openOutputStream(uri).use { it!!.write(bytes) }
+        return "Downloads/$name"
     }
 
     /// Enables the chosen logo's launcher alias and disables the others. DONT_KILL_APP keeps this process running;

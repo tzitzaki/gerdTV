@@ -916,6 +916,19 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// The profile's user data as JSON (Settings → Your data; crate::userdata).
+    pub fn export_user_data(&self) -> Result<String> {
+        Ok(crate::userdata::export(&self.conn.lock().unwrap())?)
+    }
+
+    /// Merges an exported file into this profile (newer rows win, nothing is deleted).
+    pub fn import_user_data(
+        &self,
+        json: &str,
+    ) -> std::result::Result<crate::userdata::ImportCounts, crate::userdata::UserDataError> {
+        crate::userdata::import(&mut self.conn.lock().unwrap(), json)
+    }
+
     /// A profile setting, or None when never set.
     pub fn setting(&self, key: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().unwrap();

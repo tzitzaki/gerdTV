@@ -34,6 +34,9 @@ Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never re
 - M3U: the same forms when the URL has the Xtream Codes path (`…/live/<user>/<pass>/<id>.ts`), otherwise `url:<FNV-1a 64 of the credential-free URL>`.
 - User data refers to items only by key, so a re-sync never orphans favourites or recents (sync-ready for a later hub).
 
+## Export and import
+Settings → Your data writes the open profile's user data as one JSON file (`crates/gerdtv-core/src/userdata.rs`, format `gerdtv-user-data`, version 1): favourites, recents, `epg_map`, reminders, settings (without the derived `xc_time_offset` and `m3u_tvg_url`), per-channel buffer choices and the extra guide URLs (with their `{secretN}` placeholders). Import merges row by row in one transaction: a row is taken when it is new or its `updated_at` is newer, nothing is deleted; a foreign file or a newer format is refused unchanged.
+
 ## No credentials on disk
 M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `{secret1}` …; the player gets the real URL at play time. Xtream Codes URLs are not stored at all; they are built from the profile's credentials when playing.
 
