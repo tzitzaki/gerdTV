@@ -620,6 +620,23 @@ impl Library {
     }
 
     /// Sets or clears a reminder.
+    /// The profile's user data as JSON, for a file the user keeps (no secrets).
+    pub fn export_user_data(&self) -> Result<String, String> {
+        self.0.export_user_data().map_err(err)
+    }
+
+    /// Merges an exported file; returns how many entries were new or newer. The error says why a file is refused.
+    pub fn import_user_data(&self, json: String) -> Result<usize, String> {
+        let n = self.0.import_user_data(&json).map_err(|e| e.to_string())?;
+        Ok(n.favourites
+            + n.recents
+            + n.guide_map
+            + n.reminders
+            + n.settings
+            + n.channel_buffers
+            + n.guide_urls)
+    }
+
     pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {
         let r = core::Reminder {
             item_key: reminder.item_key,

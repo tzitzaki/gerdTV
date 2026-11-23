@@ -62,6 +62,10 @@ abstract class Library implements RustOpaqueInterface {
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
+  /// Sets or clears a reminder.
+  /// The profile's user data as JSON, for a file the user keeps (no secrets).
+  Future<String> exportUserData();
+
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
     required String query,
@@ -86,6 +90,9 @@ abstract class Library implements RustOpaqueInterface {
 
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
+
+  /// Merges an exported file; returns how many entries were new or newer. The error says why a file is refused.
+  Future<BigInt> importUserData({required String json});
 
   /// One item by its key (a reminder's channel); None when it is gone from the catalogue.
   Future<ItemInfo?> item({required String key});
@@ -166,7 +173,6 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> setPreferHls({required String key, required bool hls});
 
-  /// Sets or clears a reminder.
   Future<void> setReminder({required ReminderInfo reminder, required bool on_});
 
   void setSetting({required String key, required String value});
