@@ -43,6 +43,9 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 abstract class Library implements RustOpaqueInterface {
   Future<void> addGuideUrl({required String url});
 
+  /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+  Future<List<GroupVisibility>> allGroups({required ItemKind kind});
+
   /// The item's last measured video bitrate (bit/s, 0 = unknown).
   BigInt bitrate({required String key});
 
@@ -196,6 +199,13 @@ abstract class Library implements RustOpaqueInterface {
   /// Marks or unmarks a favourite (the star, a long press, a long OK).
   void setFavourite({required String key, required bool favourite});
 
+  /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+  void setGroupHidden({
+    required ItemKind kind,
+    required String category,
+    required bool hidden,
+  });
+
   Future<void> setPreferHls({required String key, required bool hls});
 
   /// Sets or clears a reminder.
@@ -291,6 +301,25 @@ class GroupHit {
           id == other.id &&
           name == other.name &&
           count == other.count;
+}
+
+/// A group and whether the user hid it.
+class GroupVisibility {
+  final CategoryInfo group;
+  final bool hidden;
+
+  const GroupVisibility({required this.group, required this.hidden});
+
+  @override
+  int get hashCode => group.hashCode ^ hidden.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GroupVisibility &&
+          runtimeType == other.runtimeType &&
+          group == other.group &&
+          hidden == other.hidden;
 }
 
 /// One channel's programmes in a time window (the guide grid's row).

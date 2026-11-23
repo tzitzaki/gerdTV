@@ -318,22 +318,46 @@ impl Library {
         }
     }
 
-    /// Categories of a kind in provider order, with their item counts (empty ones hidden).
+    /// Categories of a kind in provider order, with their item counts (empty ones and the ones the user hid left out).
     pub fn categories(&self, kind: Kind) -> Result<Vec<Category>> {
+        Ok(self
+            .all_categories(kind)?
+            .into_iter()
+            .filter(|(_, hidden)| !hidden)
+            .map(|(c, _)| c)
+            .collect())
+    }
+
+    /// Every non-empty category of a kind with whether the user hid it (Settings → Hidden groups).
+    pub fn all_categories(&self, kind: Kind) -> Result<Vec<(Category, bool)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
-            "SELECT c.id, c.name, count(i.key) FROM categories c
+            "SELECT c.id, c.name, count(i.key),
+                    EXISTS (SELECT 1 FROM hidden_groups h WHERE h.kind = c.kind AND h.category = c.id)
+             FROM categories c
              JOIN items i ON i.kind = c.kind AND i.category = c.id
              WHERE c.kind = ?1 GROUP BY c.id ORDER BY c.position",
         )?;
         let rows = stmt.query_map([kind as i64], |r| {
-            Ok(Category {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                count: r.get::<_, i64>(2)? as usize,
-            })
+            Ok((
+                Category {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    count: r.get::<_, i64>(2)? as usize,
+                },
+                r.get(3)?,
+            ))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn set_group_hidden(&self, kind: Kind, category: &str, hidden: bool) -> Result<()> {
+        Ok(db::set_group_hidden(
+            &self.conn.lock().unwrap(),
+            kind,
+            category,
+            hidden,
+        )?)
     }
 
     /// One item by its key (a reminder names its channel by key); None when it is gone from the catalogue.

@@ -64,6 +64,13 @@ class Session extends ChangeNotifier {
     return _favourites;
   }
 
+  /// A group was hidden or shown again: every list reloads (as after a sync).
+  void groupsChanged() {
+    generation++;
+    favouritesChanged.value++; // the Favourites group and continue watching may lose or regain items
+    notifyListeners();
+  }
+
   /// The star, a long press or a long OK: in or out of the favourites.
   void toggleFavourite(ItemInfo item) {
     final lib = library;

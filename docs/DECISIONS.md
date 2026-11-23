@@ -15,6 +15,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Favourites: a Favourites group on top of each section's groups, in provider order; toggled by a star on every row and tile, a long press, or a long OK.
+- Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
 - Search ranking: favourites and recents first, then name matches, the group's name, mid-word, typos (from 4 letters); typing anywhere starts the search.

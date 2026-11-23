@@ -123,6 +123,8 @@
       }
     }
   },
+  "hiddenGroups": "Hidden groups",
+  "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
@@ -222,6 +224,7 @@
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
+  "settingsKeywordsHidden": "hide groups categories adult",
   "settingsKeywordsLicences": "licenses open source",
   "settingsKeywordsLists": "layout tiles compact view",
   "settingsKeywordsLogo": "icon app launcher",

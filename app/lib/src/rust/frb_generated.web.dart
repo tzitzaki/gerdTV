@@ -126,6 +126,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupHit dco_decode_group_hit(dynamic raw);
 
   @protected
+  GroupVisibility dco_decode_group_visibility(dynamic raw);
+
+  @protected
   GuideRow dco_decode_guide_row(dynamic raw);
 
   @protected
@@ -160,6 +163,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupHit> dco_decode_list_group_hit(dynamic raw);
+
+  @protected
+  List<GroupVisibility> dco_decode_list_group_visibility(dynamic raw);
 
   @protected
   List<GuideRow> dco_decode_list_guide_row(dynamic raw);
@@ -378,6 +384,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupHit sse_decode_group_hit(SseDeserializer deserializer);
 
   @protected
+  GroupVisibility sse_decode_group_visibility(SseDeserializer deserializer);
+
+  @protected
   GuideRow sse_decode_guide_row(SseDeserializer deserializer);
 
   @protected
@@ -414,6 +423,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupHit> sse_decode_list_group_hit(SseDeserializer deserializer);
+
+  @protected
+  List<GroupVisibility> sse_decode_list_group_visibility(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<GuideRow> sse_decode_list_guide_row(SseDeserializer deserializer);
@@ -669,6 +683,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_group_hit(GroupHit self, SseSerializer serializer);
 
   @protected
+  void sse_encode_group_visibility(
+    GroupVisibility self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_guide_row(GuideRow self, SseSerializer serializer);
 
   @protected
@@ -712,6 +732,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_group_hit(List<GroupHit> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_group_visibility(
+    List<GroupVisibility> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_guide_row(List<GuideRow> self, SseSerializer serializer);

@@ -177,6 +177,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keywords: l10n.settingsKeywordsLists,
               build: (_) => _ListSettings(session: session),
             ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'hidden',
+              title: l10n.hiddenGroups,
+              keywords: l10n.settingsKeywordsHidden,
+              build: (context) => ListTile(
+                key: const Key('settings.hidden'),
+                title: Text(l10n.hiddenGroups),
+                subtitle: Text(l10n.hiddenGroupsHint),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HiddenGroupsScreen(session: session),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       SettingsCategory(
@@ -651,6 +668,73 @@ class _ListSettingsState extends State<_ListSettings> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Settings → Appearance → Hidden groups: every group of Live TV, Movies and Series; a ticked one disappears from the
+/// lists, search, the guide, favourites and continue watching (user data, kept across syncs by group id).
+class HiddenGroupsScreen extends StatefulWidget {
+  const HiddenGroupsScreen({super.key, required this.session});
+  final Session session;
+
+  @override
+  State<HiddenGroupsScreen> createState() => _HiddenGroupsScreenState();
+}
+
+class _HiddenGroupsScreenState extends State<HiddenGroupsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final lib = widget.session.library!;
+    final sections = [
+      (ItemKind.live, l10n.navLive),
+      (ItemKind.movie, l10n.navMovies),
+      (ItemKind.series, l10n.navSeries),
+    ];
+    return DefaultTabController(
+      length: sections.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.hiddenGroups),
+          bottom: TabBar(tabs: [for (final (_, n) in sections) Tab(text: n)]),
+        ),
+        body: TabBarView(
+          children: [
+            for (final (kind, _) in sections)
+              FutureBuilder<List<GroupVisibility>>(
+                // Re-read after each change (setState): the list is small.
+                future: lib.allGroups(kind: kind),
+                builder: (context, snap) {
+                  final groups = snap.data;
+                  if (groups == null) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return ListView(
+                    children: [
+                      for (final g in groups)
+                        CheckboxListTile(
+                          key: Key('hidden.${kind.name}.${g.group.id}'),
+                          title: Text(g.group.name),
+                          subtitle: Text('${g.group.count}'),
+                          value: g.hidden,
+                          onChanged: (on) {
+                            lib.setGroupHidden(
+                              kind: kind,
+                              category: g.group.id,
+                              hidden: on ?? false,
+                            );
+                            widget.session.groupsChanged();
+                            setState(() {});
+                          },
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

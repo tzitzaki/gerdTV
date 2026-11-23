@@ -15,6 +15,7 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `items_fts`, `items_tri`, `items_vocab` | search: contentless FTS5 index over `name`, `alt` (the cleaned name plus tvg-name) and `cat` (the group's name), `unicode61 remove_diacritics 2`; a trigram index over name and alt for mid-word matches; the word index's vocabulary for typo matching; rowids match `items` | rowid |
 | `search_history` | user data: a section's searches whose result was opened (section, query, `updated_at`); the newest 20 per section are kept | `section, query` |
 | `favourites`, `recents` | user data: item key + `updated_at` (recents: written whenever something starts playing) | `key` |
+| `hidden_groups` | user data: groups the user hid (kind, provider category id, `updated_at`); an Xtream Codes episode is hidden with its series' group | `kind, category` |
 | `resume` | user data: where a movie or episode was left (position and duration in seconds, `updated_at`); kept from 2 min, removed from 95 % | `key` |
 | `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
 | `epg_channels`, `epg_names` | guide channels per source (id, first display name, icon) and every display name normalised for matching | `id` / `norm` |
@@ -41,5 +42,5 @@ M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `
 - Rows not seen in a sync are removed, except: when a source list comes back empty while the catalogue has rows of that kind, those rows are kept (panels answer `[]` now and then under load).
 
 ## Migrations
-Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`; version 6 rebuilt the search index with the group's name, added the trigram index, the vocabulary and `search_history`, and refilled the indexes from `items` (the next sync adds the tvg-names); version 7 added `resume`.
+Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`; version 6 rebuilt the search index with the group's name, added the trigram index, the vocabulary and `search_history`, and refilled the indexes from `items` (the next sync adds the tvg-names); version 7 added `resume`; version 8 added `hidden_groups`.
 - Xtream Codes episodes are fetched when a series opens and kept until the next full sync.

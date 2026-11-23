@@ -517,9 +517,10 @@ pub fn search(
         "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
          FROM programmes p
          JOIN items i ON i.key = (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1)
-         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) AND (p.stop < ?2) = {}
+         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) AND (p.stop < ?2) = {} {}
          ORDER BY p.start {} LIMIT ?3",
         earlier as i32,
+        crate::db::visible_and(conn, "i")?,
         if earlier { "DESC" } else { "ASC" }
     ))?;
     st.query_map(params![q, now, limit as i64], |r| {

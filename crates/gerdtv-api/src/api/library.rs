@@ -160,6 +160,12 @@ pub struct SearchPage {
     pub groups: Vec<GroupHit>,
 }
 
+/// A group and whether the user hid it.
+pub struct GroupVisibility {
+    pub group: CategoryInfo,
+    pub hidden: bool,
+}
+
 /// A started movie or episode with where it was left (seconds).
 pub struct ResumeItem {
     pub item: ItemInfo,
@@ -455,6 +461,37 @@ impl Library {
     #[flutter_rust_bridge::frb(sync)]
     pub fn touch_recent(&self, key: String) -> Result<(), String> {
         self.0.touch_recent(&key).map_err(err)
+    }
+
+    /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+    pub fn all_groups(&self, kind: ItemKind) -> Result<Vec<GroupVisibility>, String> {
+        Ok(self
+            .0
+            .all_categories(to_core(kind))
+            .map_err(err)?
+            .into_iter()
+            .map(|(c, hidden)| GroupVisibility {
+                group: CategoryInfo {
+                    id: c.id,
+                    name: c.name,
+                    count: c.count as u32,
+                },
+                hidden,
+            })
+            .collect())
+    }
+
+    /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_group_hidden(
+        &self,
+        kind: ItemKind,
+        category: String,
+        hidden: bool,
+    ) -> Result<(), String> {
+        self.0
+            .set_group_hidden(to_core(kind), &category, hidden)
+            .map_err(err)
     }
 
     /// Every favourite's key, for the stars in the lists.
