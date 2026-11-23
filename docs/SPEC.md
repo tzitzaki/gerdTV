@@ -43,4 +43,4 @@ Live TV, movies and series from Xtream Codes or M3U with provider groups; TMDB e
 - iOS/iPadOS: updates are notified only; the IPA is re-signed and installed by hand.
 - Linux: updates are downloaded and verified, then replaced by hand.
 - macOS: no app sandbox (the updater replaces the bundle in place); the first start without it copies the old container's data over and leaves the container as a backup.
-- Player engine: Settings → Playback offers gerdTV's own libmpv build (newer mpv and FFmpeg) besides the standard one where it is bundled (Linux and Android so far); the choice applies after a restart.
+- Player engine: Settings → Playback offers gerdTV's own libmpv build (newer mpv and FFmpeg) besides the standard one on Linux, Android, macOS, iPhone and iPad; the choice applies after a restart.

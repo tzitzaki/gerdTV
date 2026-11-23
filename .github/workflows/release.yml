@@ -20,6 +20,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # gerdTV's own libmpv for macOS and iOS: main's cache (CI's libmpv-apple job), built here when it misses.
+      - id: libmpv
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-apple/GerdMpv.xcframework
+            build/libmpv-apple/libgerdmpv-apple.txt
+          key: libmpv-apple-${{ hashFiles('scripts/build-libmpv-apple.sh') }}
+      - if: steps.libmpv.outputs.cache-hit != 'true'
+        run: |
+          brew install meson ninja pkgconf
+          scripts/build-libmpv-apple.sh build/libmpv-apple
       - run: scripts/ci-install-flutter.sh
       - name: Import the code-signing certificate into a temporary keychain
         env:

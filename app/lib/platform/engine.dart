@@ -8,7 +8,11 @@
 // - Android: the video plugin only hands media_kit a surface, so the app picks the library itself ([startEngine]):
 //   media_kit opens libgerdmpv.so instead of its libmpv.so, and FFmpeg inside it gets the JavaVM for MediaCodec.
 //   Builds that bundle it are made with --dart-define=GERDTV_OWN_LIBMPV=true (CI and release.yml).
+// - macOS, iOS: gerdTV's GerdMpv.framework sits in the app's Frameworks folder, copied in but not linked
+//   (scripts/embed-libmpv-apple.sh); media_kit is told to open it, and GERDTV_LIBMPV tells the vendored video plugin
+//   which library to call (third_party/README.md).
 // Debugging (Android): "mpv: … mediacodec … no JavaVM" in logcat means av_jni_set_java_vm wasn't reached.
+// Debugging (Apple): "MPV: …" lines in the system log come from the video plugin's lookup.
 
 import 'dart:ffi';
 import 'dart:io';
@@ -25,9 +29,23 @@ const engineMarker = 'player-engine-gerdtv';
 const bundledOwnLibmpv = bool.fromEnvironment('GERDTV_OWN_LIBMPV');
 
 /// gerdTV's own libmpv in this installation (a path, or on Android the library's name), or null where there is none.
-String? ownLibmpv({String? executable, bool Function(String path)? exists}) {
-  if (Platform.isAndroid) return bundledOwnLibmpv ? 'libgerdmpv.so' : null;
-  if (!Platform.isLinux) return null;
+String? ownLibmpv({
+  String? executable,
+  bool Function(String path)? exists,
+  String? os,
+}) {
+  os ??= Platform.operatingSystem;
+  if (os == 'android') return bundledOwnLibmpv ? 'libgerdmpv.so' : null;
+  if (os == 'macos' || os == 'ios') {
+    // The executable is in gerdTV.app/Contents/MacOS (macOS) or Runner.app (iOS); frameworks beside it.
+    final dir = File(executable ?? Platform.resolvedExecutable).parent.path;
+    final frameworks = os == 'macos' ? '$dir/../Frameworks' : '$dir/Frameworks';
+    final found = (exists ?? (p) => Directory(p).existsSync())(
+      '$frameworks/GerdMpv.framework',
+    );
+    return found ? 'GerdMpv.framework/GerdMpv' : null;
+  }
+  if (os != 'linux') return null;
   final path =
       '${File(executable ?? Platform.resolvedExecutable).parent.path}/lib/libgerdmpv.so';
   return (exists ?? (p) => File(p).existsSync())(path) ? path : null;
@@ -49,15 +67,26 @@ void writeEngine(String supportDir, PlayerEngine engine) {
   }
 }
 
-/// Starts media_kit with the chosen engine. On Linux the runner already chose (see above); on Android media_kit is
-/// told which library to open, and FFmpeg inside the own build gets the JavaVM that media_kit's helper holds (media_kit
-/// only hands it to its own libmpv).
+/// Starts media_kit with the chosen engine. On Linux the runner already chose (see above); on Android and Apple
+/// media_kit is told which library to open. Android: FFmpeg inside the own build gets the JavaVM that media_kit's
+/// helper holds (media_kit only hands it to its own libmpv). Apple: the video plugin learns the library from
+/// GERDTV_LIBMPV.
 void startEngine(String supportDir) {
   final own = ownLibmpv();
-  if (!Platform.isAndroid ||
+  if (Platform.isLinux ||
       own == null ||
       readEngine(supportDir) != PlayerEngine.gerdtv) {
     MediaKit.ensureInitialized();
+    return;
+  }
+  if (Platform.isMacOS || Platform.isIOS) {
+    final setenv = DynamicLibrary.process()
+        .lookupFunction<
+          Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Int32),
+          int Function(Pointer<Uint8>, Pointer<Uint8>, int)
+        >('setenv');
+    setenv(_cString('GERDTV_LIBMPV'), _cString(own), 1);
+    MediaKit.ensureInitialized(libmpv: own);
     return;
   }
   MediaKit.ensureInitialized(libmpv: own);
@@ -70,4 +99,20 @@ void startEngine(String supportDir) {
     Int32 Function(Pointer<Void>, Pointer<Void>),
     int Function(Pointer<Void>, Pointer<Void>)
   >('av_jni_set_java_vm')(vm, nullptr);
+}
+
+/// [s] as a NUL-terminated C string from libc's malloc (ASCII only; never freed: setenv copies it, and it is two small
+/// strings once per process).
+Pointer<Uint8> _cString(String s) {
+  final malloc = DynamicLibrary.process()
+      .lookupFunction<
+        Pointer<Uint8> Function(IntPtr),
+        Pointer<Uint8> Function(int)
+      >('malloc');
+  final p = malloc(s.length + 1);
+  for (var i = 0; i < s.length; i++) {
+    p[i] = s.codeUnitAt(i);
+  }
+  p[s.length] = 0;
+  return p;
 }

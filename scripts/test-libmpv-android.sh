@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the smoke test of gerdTV's own libmpv for Android (scripts/libmpv-android-smoke.c) on a running x86_64
+# Runs the smoke test of gerdTV's own libmpv for Android (scripts/libmpv-smoke.c) on a running x86_64
 # emulator: builds the test with the NDK against build/libmpv-android/x86_64/libgerdmpv.so, pushes it with the
 # library and the testkit's synthetic clip to /data/local/tmp, and runs it. Never against a real device: it refuses
 # anything that isn't an emulator (CLAUDE.md: no automated installs on the owner's devices).
@@ -12,7 +12,7 @@ lib=build/libmpv-android/x86_64/libgerdmpv.so
 include=build/libmpv-android/work-x86_64/mpv/include
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
-"$cc" -I"$include" scripts/libmpv-android-smoke.c -L"$(dirname "$lib")" -lgerdmpv -o "$out/smoke"
+"$cc" -I"$include" scripts/libmpv-smoke.c -L"$(dirname "$lib")" -lgerdmpv -o "$out/smoke"
 qemu="$(adb shell getprop ro.kernel.qemu; adb shell getprop ro.boot.qemu)"
 [[ "$qemu" == *1* ]] || { echo "test-libmpv-android: not an emulator"; exit 1; }
 adb push "$lib" "$out/smoke" crates/gerdtv-testkit/media/clip.ts /data/local/tmp/ >/dev/null

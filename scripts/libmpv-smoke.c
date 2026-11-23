@@ -1,7 +1,8 @@
-// The smoke test of gerdTV's own libmpv for Android (scripts/test-libmpv-android.sh runs it on an emulator): the
-// library loads, plays the testkit's synthetic clip to its end with software decoding (no picture, no sound), and
-// offers https (mbedTLS inside FFmpeg). Prints "smoke: ok" and exits 0, or names what failed and exits 1.
-// Debugging: run it by hand with `adb shell LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/smoke <clip.ts>`.
+// The smoke test of gerdTV's own libmpv on Android and macOS (scripts/test-libmpv-android.sh runs it on an
+// emulator, CI's libmpv-apple job on the runner): the library loads, plays the testkit's synthetic clip to its end
+// with software decoding (no picture, no sound), and offers https. Prints "smoke: ok" and exits 0, or names what
+// failed and exits 1.
+// Debugging: on Android `adb shell LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/smoke <clip.ts>`.
 #include <mpv/client.h>
 #include <stdio.h>
 #include <string.h>
