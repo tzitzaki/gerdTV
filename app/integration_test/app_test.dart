@@ -508,8 +508,15 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     // The guide's field lists programmes instead of the grid.
-    await tapReady(tester, find.text('Guide'));
+    await tapReady(
+      tester,
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Guide'),
+      ),
+    );
     final guideField = find.byKey(const Key('search.guide'));
+    await waitFor(tester, guideField.hitTestable());
     await tester.enterText(guideField, 'sport');
     await waitFor(tester, programmeHit);
     await tester.tap(find.byKey(const Key('search.clear')));
