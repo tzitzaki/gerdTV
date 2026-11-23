@@ -97,6 +97,12 @@ const MIGRATIONS: &[&str] = &[
      CREATE VIRTUAL TABLE items_vocab USING fts5vocab(items_fts, 'row');
      CREATE TABLE search_history (section TEXT NOT NULL, query TEXT NOT NULL, updated_at INTEGER NOT NULL,
         PRIMARY KEY (section, query));",
+    // 6 → 7: continue watching: where a movie or episode was left (user data, seconds).
+    "CREATE TABLE resume (key TEXT PRIMARY KEY, position INTEGER NOT NULL, duration INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL);",
+    // 7 → 8: groups the user hid (user data): left out of the lists, search, the guide and every row.
+    "CREATE TABLE hidden_groups (kind INTEGER NOT NULL, category TEXT NOT NULL, updated_at INTEGER NOT NULL,
+        PRIMARY KEY (kind, category));",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -745,6 +751,15 @@ fn candidates(conn: &Connection, input: &str) -> Result<Option<Candidates>> {
     }))
 }
 
+/// `AND NOT <hidden>` for a WHERE clause, or nothing when no group is hidden.
+pub fn visible_and(conn: &Connection, i: &str) -> Result<String> {
+    Ok(if any_hidden(conn)? {
+        format!("AND NOT {}", hidden_sql(i))
+    } else {
+        String::new()
+    })
+}
+
 /// A bit per kind for `kinds` (empty = every kind), for `(mask >> kind) & 1` in SQL.
 fn kind_mask(kinds: &[Kind]) -> i64 {
     if kinds.is_empty() {
@@ -776,11 +791,12 @@ pub fn search(
          LEFT JOIN favourites f ON f.key = i.key
          LEFT JOIN recents r ON r.key = i.key
          LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
-         WHERE (?{m} >> i.kind) & 1 AND (?{g} IS NULL OR i.category = ?{g})
+         WHERE (?{m} >> i.kind) & 1 AND (?{g} IS NULL OR i.category = ?{g}) {visible}
          ORDER BY f.key IS NULL, r.updated_at IS NULL, r.updated_at DESC, tier, i.name NOT LIKE ?{p}, i.position
          LIMIT ?{l} OFFSET ?{o}",
         cte = c.cte,
         tier = c.tier,
+        visible = visible_and(conn, "i")?,
         m = n + 2,
         g = n + 3,
         p = n + 4,
@@ -820,9 +836,10 @@ pub fn search_counts(conn: &Connection, input: &str) -> Result<Vec<(Kind, usize)
         return Ok(vec![]);
     };
     let sql = format!(
-        "WITH {} SELECT i.kind, count(*) FROM cand JOIN items i ON i.rowid = cand.rowid
+        "WITH {} SELECT i.kind, count(*) FROM cand JOIN items i ON i.rowid = cand.rowid WHERE 1 {}
          GROUP BY i.kind ORDER BY i.kind",
-        c.cte
+        c.cte,
+        visible_and(conn, "i")?
     );
     let mut st = conn.prepare_cached(&sql)?;
     // The tier probes aren't part of the CTE, but their parameters are numbered with it: bind them all.
@@ -862,7 +879,9 @@ pub fn search_groups(
     let mut st = conn.prepare_cached(
         "SELECT c.kind, c.id, c.name, count(i.key) FROM categories c
          JOIN items i ON i.kind = c.kind AND i.category = c.id
-         WHERE (?1 >> c.kind) & 1 GROUP BY c.kind, c.id ORDER BY c.position",
+         WHERE (?1 >> c.kind) & 1
+           AND NOT EXISTS (SELECT 1 FROM hidden_groups h WHERE h.kind = c.kind AND h.category = c.id)
+         GROUP BY c.kind, c.id ORDER BY c.position",
     )?;
     let rows = st.query_map([kind_mask(kinds)], |r| {
         Ok(GroupHit {
@@ -908,6 +927,156 @@ pub fn record_search(conn: &Connection, section: &str, query: &str) -> Result<()
         [section],
     )?;
     Ok(())
+}
+
+/// Marks (`on`) or unmarks an item as a favourite. User data by stable key with `updated_at`: a favourite the provider
+/// drops for a while comes back with the item.
+pub fn set_favourite(conn: &Connection, key: &str, on: bool) -> Result<()> {
+    if on {
+        conn.execute(
+            "INSERT INTO favourites (key, updated_at) VALUES (?1, ?2)
+             ON CONFLICT (key) DO UPDATE SET updated_at = ?2",
+            params![key, unix_now()],
+        )?;
+    } else {
+        conn.execute("DELETE FROM favourites WHERE key = ?1", [key])?;
+    }
+    Ok(())
+}
+
+/// The favourites of `kinds` (empty = all) in provider order (channel numbers stay in order, zapping follows the
+/// list), with their group's name; ones the catalogue doesn't have right now are left out.
+pub fn favourites(conn: &Connection, kinds: &[Kind]) -> Result<Vec<Hit>> {
+    let mut st = conn.prepare_cached(&format!(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, '')
+         FROM favourites f JOIN items i ON i.key = f.key
+         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
+         WHERE (?1 >> i.kind) & 1 {} ORDER BY i.kind, i.position",
+        visible_and(conn, "i")?
+    ))?;
+    let rows = st.query_map([kind_mask(kinds)], |r| {
+        Ok(Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: r.get(7)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// SQL: true when the item `i` sits in a hidden group. Xtream Codes episodes name their series as category, so an
+/// episode is also hidden with its series' group. Callers add it only when something is hidden (`any_hidden`): the
+/// probe runs per row, and search sorts tens of thousands.
+pub fn hidden_sql(i: &str) -> String {
+    format!(
+        "EXISTS (SELECT 1 FROM hidden_groups h WHERE (h.kind = {i}.kind AND h.category = {i}.category)
+            OR ({i}.kind = 2 AND (h.kind, h.category) = (SELECT s.kind, s.category FROM items s WHERE s.key = {i}.category)))"
+    )
+}
+
+/// Whether the user hid any group (most never do: the queries skip the probe then).
+pub fn any_hidden(conn: &Connection) -> Result<bool> {
+    conn.query_row("SELECT EXISTS (SELECT 1 FROM hidden_groups)", [], |r| {
+        r.get(0)
+    })
+}
+
+/// Hides or shows a group (Settings → Hidden groups).
+pub fn set_group_hidden(conn: &Connection, kind: Kind, category: &str, hidden: bool) -> Result<()> {
+    if hidden {
+        conn.execute(
+            "INSERT INTO hidden_groups (kind, category, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (kind, category) DO UPDATE SET updated_at = ?3",
+            params![kind as i64, category, unix_now()],
+        )?;
+    } else {
+        conn.execute(
+            "DELETE FROM hidden_groups WHERE kind = ?1 AND category = ?2",
+            params![kind as i64, category],
+        )?;
+    }
+    Ok(())
+}
+
+/// Counts as started after this many seconds (owner decision: 2 min), as finished from this share of the duration.
+pub const RESUME_FROM_SECS: u32 = 120;
+pub const FINISHED_AT: f64 = 0.95;
+
+/// Remembers how far a movie or episode played. Under 2 min nothing is kept (zapping through isn't "started"), from
+/// 95 % it counts as finished and leaves continue watching.
+pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32) -> Result<()> {
+    if duration > 0 && position as f64 >= duration as f64 * FINISHED_AT {
+        conn.execute("DELETE FROM resume WHERE key = ?1", [key])?;
+    } else if position >= RESUME_FROM_SECS {
+        conn.execute(
+            "INSERT INTO resume (key, position, duration, updated_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (key) DO UPDATE SET position = ?2, duration = ?3, updated_at = ?4",
+            params![key, position, duration, unix_now()],
+        )?;
+    }
+    Ok(())
+}
+
+/// Where to resume an item (seconds), if it was left part-way.
+pub fn resume_position(conn: &Connection, key: &str) -> Result<Option<u32>> {
+    conn.query_row("SELECT position FROM resume WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
+}
+
+/// Started, unfinished items of `kinds`, last watched first, with (position, duration) in seconds; at most `limit`.
+pub fn continue_watching(
+    conn: &Connection,
+    kinds: &[Kind],
+    limit: usize,
+) -> Result<Vec<(Hit, u32, u32)>> {
+    let mut st = conn.prepare_cached(&format!(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, ''),
+                p.position, p.duration
+         FROM resume p JOIN items i ON i.key = p.key
+         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
+         WHERE (?1 >> i.kind) & 1 {} ORDER BY p.updated_at DESC, p.rowid DESC LIMIT ?2",
+        visible_and(conn, "i")?
+    ))?;
+    let rows = st.query_map(params![kind_mask(kinds), limit as i64], |r| {
+        Ok((
+            Hit {
+                key: r.get(0)?,
+                kind: Kind::from_i64(r.get(1)?),
+                name: r.get(2)?,
+                category: r.get(3)?,
+                logo: r.get(4)?,
+                number: r.get(5)?,
+                archive_days: r.get(6)?,
+                group: r.get(7)?,
+            },
+            r.get(8)?,
+            r.get(9)?,
+        ))
+    })?;
+    rows.collect()
+}
+
+/// Marks an item as watched just now (search ranks recently watched items first).
+pub fn touch_recent(conn: &Connection, key: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO recents (key, updated_at) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET updated_at = ?2",
+        params![key, unix_now()],
+    )?;
+    Ok(())
+}
+
+/// Every favourite's key (the lists' stars).
+pub fn favourite_keys(conn: &Connection) -> Result<Vec<String>> {
+    let mut st = conn.prepare_cached("SELECT key FROM favourites")?;
+    let rows = st.query_map([], |r| r.get(0))?;
+    rows.collect()
 }
 
 /// The newest searches of a section, newest first.
@@ -1120,6 +1289,101 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             names(&search(&c, "kino", &[], None, 2, 2).unwrap()),
             ["Kino Welt", "Kino Plus"],
             "paging"
+        );
+    }
+
+    #[test]
+    fn favourites_survive_a_resync_and_list_in_provider_order() {
+        let mut c = db();
+        set_favourite(&c, "live:102", true).unwrap();
+        set_favourite(&c, "live:101", true).unwrap();
+        set_favourite(&c, "movie:201", true).unwrap();
+        assert_eq!(
+            names(&favourites(&c, &[Kind::Live]).unwrap()),
+            ["DE | ARD Sportschau HD", "BR München FHD"]
+        );
+        assert_eq!(
+            favourites(&c, &[Kind::Live]).unwrap()[0].group,
+            "DE | Vollprogramm"
+        );
+        // The provider drops a channel for one sync: it is not listed, but comes back with it.
+        let without = PLAYLIST.replace("#EXTINF:-1 tvg-chno=\"7\" group-title=\"DE | Regional\",BR München FHD\nhttp://h.example.invalid/live/alice/s3cret/102.ts\n", "");
+        import_m3u(&mut c, without.as_bytes(), &["alice", "s3cret"]).unwrap();
+        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 1);
+        import_m3u(&mut c, PLAYLIST.as_bytes(), &["alice", "s3cret"]).unwrap();
+        assert_eq!(favourites(&c, &[Kind::Live]).unwrap().len(), 2);
+        set_favourite(&c, "live:101", false).unwrap();
+        let mut keys = favourite_keys(&c).unwrap();
+        keys.sort();
+        assert_eq!(keys, ["live:102", "movie:201"]);
+    }
+
+    #[test]
+    fn progress_counts_from_two_minutes_until_95_percent() {
+        let c = db();
+        // (position, duration, kept afterwards)
+        for (pos, dur, kept) in [
+            (60, 6000, None),         // under 2 min: not started
+            (600, 6000, Some(600)),   // started
+            (1200, 6000, Some(1200)), // moved on
+            (5800, 6000, None),       // 96 %: finished, leaves the row
+            (300, 0, Some(300)),      // unknown duration (a stream without one): kept
+        ] {
+            save_progress(&c, "movie:201", pos, dur).unwrap();
+            assert_eq!(
+                resume_position(&c, "movie:201").unwrap(),
+                kept,
+                "{pos}/{dur}"
+            );
+        }
+        save_progress(&c, "episode:301", 900, 2700).unwrap();
+        let row = continue_watching(&c, &[Kind::Movie, Kind::Episode], 10).unwrap();
+        assert_eq!(
+            names(&row.iter().map(|r| r.0.clone()).collect::<Vec<_>>()),
+            ["Planet Wissen S01E02", "Die Reise (2019)"]
+        );
+        assert_eq!((row[0].1, row[0].2), (900, 2700));
+        assert!(continue_watching(&c, &[Kind::Live], 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn hidden_groups_leave_search_favourites_and_their_episodes() {
+        let mut c = db();
+        // An Xtream Codes-style series in group "Kids" with an episode whose category is the series' key.
+        // (Added outside a full sync, like opened episodes: a full sync here would drop the playlist's rows.)
+        let series = NewItem {
+            key: "series:9".into(),
+            name: "Maus Show".into(),
+            category: "k".into(),
+            ..Default::default()
+        };
+        Sync::add_items(&mut c, Kind::Series, &[series]).unwrap();
+        let ep = NewItem {
+            key: "episode:91".into(),
+            name: "Maus Show S01E01".into(),
+            category: "series:9".into(),
+            ..Default::default()
+        };
+        Sync::add_items(&mut c, Kind::Episode, &[ep]).unwrap();
+        set_favourite(&c, "live:102", true).unwrap();
+        assert_eq!(search(&c, "maus", &[], None, 10, 0).unwrap().len(), 2);
+        set_group_hidden(&c, Kind::Live, "DE | Regional", true).unwrap();
+        set_group_hidden(&c, Kind::Series, "k", true).unwrap();
+        assert!(
+            search(&c, "munchen", &[], None, 10, 0).unwrap().is_empty(),
+            "the channel is hidden"
+        );
+        assert!(
+            search(&c, "maus", &[], None, 10, 0).unwrap().is_empty(),
+            "the series and its episode"
+        );
+        assert!(search_counts(&c, "maus").unwrap().is_empty());
+        assert!(favourites(&c, &[]).unwrap().is_empty());
+        assert!(search_groups(&c, "regional", &[], 5).unwrap().is_empty());
+        set_group_hidden(&c, Kind::Live, "DE | Regional", false).unwrap();
+        assert_eq!(
+            names(&search(&c, "munchen", &[], None, 10, 0).unwrap()),
+            ["BR München FHD"]
         );
     }
 

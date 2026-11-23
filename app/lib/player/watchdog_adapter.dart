@@ -100,6 +100,7 @@ class WatchdogAdapter {
     bool adaptive = false,
     bool preferHls = false,
     List<MpvOption> extraOptions = const [],
+    Duration? start,
   }) async {
     await stop();
     _urlFor = urlFor;
@@ -162,7 +163,9 @@ class WatchdogAdapter {
     );
     // Back from sleep or the background: a live connection is almost surely dead.
     _lifecycle = AppLifecycleListener(onResume: wake);
-    await player.open(Media(urlFor(hls: preferHls)));
+    await player.open(
+      Media(urlFor(hls: preferHls), start: start),
+    ); // start: continue watching
   }
 
   /// A new buffer for the running stream (the player's "Buffer for this channel"); mpv applies it at once.

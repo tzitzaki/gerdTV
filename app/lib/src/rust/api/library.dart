@@ -43,6 +43,9 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 abstract class Library implements RustOpaqueInterface {
   Future<void> addGuideUrl({required String url});
 
+  /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+  Future<List<GroupVisibility>> allGroups({required ItemKind kind});
+
   /// The item's last measured video bitrate (bit/s, 0 = unknown).
   BigInt bitrate({required String key});
 
@@ -59,8 +62,24 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
+  /// The continue-watching row of a section: started, unfinished items, last watched first.
+  Future<List<ResumeItem>> continueWatching({
+    required List<ItemKind> kinds,
+    required int limit,
+  });
+
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
+
+  /// The profile's user data (favourites, progress, hidden groups, settings, mapping, reminders …) as JSON; no
+  /// secrets. Settings → Account → Export.
+  Future<String> exportUserData();
+
+  /// Every favourite's key, for the stars in the lists.
+  List<String> favouriteKeys();
+
+  /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+  Future<List<ItemInfo>> favourites({required List<ItemKind> kinds});
 
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
@@ -86,6 +105,9 @@ abstract class Library implements RustOpaqueInterface {
 
   /// The newest stream_health rows (Settings → Stream health).
   Future<List<HealthInfo>> health({required int limit});
+
+  /// Merges an exported file; newer rows win. Returns how many rows changed.
+  Future<int> importUserData({required String text});
 
   /// One item by its key (a reminder's channel); None when it is gone from the catalogue.
   Future<ItemInfo?> item({required String key});
@@ -144,6 +166,16 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
+  /// Where to resume an item (seconds), if it was left part-way.
+  int? resumePosition({required String key});
+
+  /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+  void saveProgress({
+    required String key,
+    required int position,
+    required int duration,
+  });
+
   /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
   Future<SearchPage> search({
     required BigInt seq,
@@ -171,6 +203,16 @@ abstract class Library implements RustOpaqueInterface {
     required int customSeconds,
   });
 
+  /// Marks or unmarks a favourite (the star, a long press, a long OK).
+  void setFavourite({required String key, required bool favourite});
+
+  /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+  void setGroupHidden({
+    required ItemKind kind,
+    required String category,
+    required bool hidden,
+  });
+
   Future<void> setPreferHls({required String key, required bool hls});
 
   /// Sets or clears a reminder.
@@ -185,6 +227,9 @@ abstract class Library implements RustOpaqueInterface {
   String streamUrl({required String key, required bool preferHls});
 
   Future<SyncSummary> sync_();
+
+  /// Something started playing: search ranks recently watched items first.
+  void touchRecent({required String key});
 
   /// Live channels without a guide match, in provider order (the mapping screen).
   Future<List<ChannelRef>> unmatchedChannels({
@@ -263,6 +308,25 @@ class GroupHit {
           id == other.id &&
           name == other.name &&
           count == other.count;
+}
+
+/// A group and whether the user hid it.
+class GroupVisibility {
+  final CategoryInfo group;
+  final bool hidden;
+
+  const GroupVisibility({required this.group, required this.hidden});
+
+  @override
+  int get hashCode => group.hashCode ^ hidden.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GroupVisibility &&
+          runtimeType == other.runtimeType &&
+          group == other.group &&
+          hidden == other.hidden;
 }
 
 /// One channel's programmes in a time window (the guide grid's row).
@@ -602,6 +666,31 @@ class ReminderInfo {
           start == other.start &&
           stop == other.stop &&
           title == other.title;
+}
+
+/// A started movie or episode with where it was left (seconds).
+class ResumeItem {
+  final ItemInfo item;
+  final int position;
+  final int duration;
+
+  const ResumeItem({
+    required this.item,
+    required this.position,
+    required this.duration,
+  });
+
+  @override
+  int get hashCode => item.hashCode ^ position.hashCode ^ duration.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResumeItem &&
+          runtimeType == other.runtimeType &&
+          item == other.item &&
+          position == other.position &&
+          duration == other.duration;
 }
 
 /// One page of search results. `seq` echoes the caller's sequence number, so the UI drops answers to keystrokes

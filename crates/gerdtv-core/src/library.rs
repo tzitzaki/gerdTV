@@ -318,22 +318,59 @@ impl Library {
         }
     }
 
-    /// Categories of a kind in provider order, with their item counts (empty ones hidden).
+    /// Categories of a kind in provider order, with their item counts (empty ones and the ones the user hid left out).
     pub fn categories(&self, kind: Kind) -> Result<Vec<Category>> {
+        Ok(self
+            .all_categories(kind)?
+            .into_iter()
+            .filter(|(_, hidden)| !hidden)
+            .map(|(c, _)| c)
+            .collect())
+    }
+
+    /// Every non-empty category of a kind with whether the user hid it (Settings → Hidden groups).
+    pub fn all_categories(&self, kind: Kind) -> Result<Vec<(Category, bool)>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
-            "SELECT c.id, c.name, count(i.key) FROM categories c
+            "SELECT c.id, c.name, count(i.key),
+                    EXISTS (SELECT 1 FROM hidden_groups h WHERE h.kind = c.kind AND h.category = c.id)
+             FROM categories c
              JOIN items i ON i.kind = c.kind AND i.category = c.id
              WHERE c.kind = ?1 GROUP BY c.id ORDER BY c.position",
         )?;
         let rows = stmt.query_map([kind as i64], |r| {
-            Ok(Category {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                count: r.get::<_, i64>(2)? as usize,
-            })
+            Ok((
+                Category {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    count: r.get::<_, i64>(2)? as usize,
+                },
+                r.get(3)?,
+            ))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The profile's user data as JSON (crate::userdata).
+    pub fn export_user_data(&self) -> std::result::Result<String, crate::userdata::UserDataError> {
+        crate::userdata::export(&self.conn.lock().unwrap())
+    }
+
+    /// Merges an exported file (newer rows win); the number of rows added or replaced.
+    pub fn import_user_data(
+        &self,
+        text: &str,
+    ) -> std::result::Result<usize, crate::userdata::UserDataError> {
+        crate::userdata::import(&mut self.conn.lock().unwrap(), text)
+    }
+
+    pub fn set_group_hidden(&self, kind: Kind, category: &str, hidden: bool) -> Result<()> {
+        Ok(db::set_group_hidden(
+            &self.conn.lock().unwrap(),
+            kind,
+            category,
+            hidden,
+        )?)
     }
 
     /// One item by its key (a reminder names its channel by key); None when it is gone from the catalogue.
@@ -423,6 +460,43 @@ impl Library {
             section,
             query,
         )?)
+    }
+
+    pub fn set_favourite(&self, key: &str, on: bool) -> Result<()> {
+        Ok(db::set_favourite(&self.conn.lock().unwrap(), key, on)?)
+    }
+
+    pub fn favourites(&self, kinds: &[Kind]) -> Result<Vec<Hit>> {
+        Ok(db::favourites(&self.conn.lock().unwrap(), kinds)?)
+    }
+
+    pub fn save_progress(&self, key: &str, position: u32, duration: u32) -> Result<()> {
+        Ok(db::save_progress(
+            &self.conn.lock().unwrap(),
+            key,
+            position,
+            duration,
+        )?)
+    }
+
+    pub fn resume_position(&self, key: &str) -> Result<Option<u32>> {
+        Ok(db::resume_position(&self.conn.lock().unwrap(), key)?)
+    }
+
+    pub fn continue_watching(&self, kinds: &[Kind], limit: usize) -> Result<Vec<(Hit, u32, u32)>> {
+        Ok(db::continue_watching(
+            &self.conn.lock().unwrap(),
+            kinds,
+            limit,
+        )?)
+    }
+
+    pub fn touch_recent(&self, key: &str) -> Result<()> {
+        Ok(db::touch_recent(&self.conn.lock().unwrap(), key)?)
+    }
+
+    pub fn favourite_keys(&self) -> Result<Vec<String>> {
+        Ok(db::favourite_keys(&self.conn.lock().unwrap())?)
     }
 
     pub fn recent_searches(&self, section: &str, limit: usize) -> Result<Vec<String>> {

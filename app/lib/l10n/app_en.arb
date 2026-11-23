@@ -43,10 +43,14 @@
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
   "clear": "Clear",
+  "continueWatching": "Continue watching",
   "dayToday": "Today",
   "dayTomorrow": "Tomorrow",
   "dayYesterday": "Yesterday",
   "episodesEmpty": "This series has no episodes.",
+  "favouriteAdd": "Add to favourites",
+  "favouriteRemove": "Remove from favourites",
+  "favourites": "Favourites",
   "guideAddUrl": "Extra XMLTV URL",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
@@ -119,6 +123,8 @@
       }
     }
   },
+  "hiddenGroups": "Hidden groups",
+  "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
@@ -151,6 +157,19 @@
     }
   },
   "playerZapHint": "↑ ↓ channels · OK channel list",
+  "profileAdd": "Add a provider",
+  "profileAlways": "Always open this one",
+  "profileChoose": "Which provider?",
+  "profileFailed": "Could not open (sign in again by adding it anew)",
+  "profileSwitch": "Switch to {name}",
+  "@profileSwitch": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profiles": "Profiles",
   "programmeFromStart": "From the start",
   "programmeNow": "Now",
   "programmeRemind": "Remind me",
@@ -218,14 +237,17 @@
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
+  "settingsKeywordsHidden": "hide groups categories adult",
   "settingsKeywordsLicences": "licenses open source",
   "settingsKeywordsLists": "layout tiles compact view",
   "settingsKeywordsLogo": "icon app launcher",
   "settingsKeywordsOffset": "time zone hours",
+  "settingsKeywordsProfiles": "profile account provider switch add another",
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsTimeshift": "pause rewind live",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
+  "settingsKeywordsUserData": "backup export import file transfer",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -318,5 +340,32 @@
   },
   "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
   "updateNone": "gerdTV is up to date.",
-  "updateShowFolder": "Show in folder"
+  "updateShowFolder": "Show in folder",
+  "userDataExport": "Export user data",
+  "userDataExported": "Saved to {path}",
+  "@userDataExported": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "userDataHint": "Favourites, progress, hidden groups, settings and reminders as a file; no passwords",
+  "userDataImport": "Import user data",
+  "userDataImported": "{count} changes imported",
+  "@userDataImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "userDataNone": "No gerdTV files in {path}",
+  "@userDataNone": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  }
 }

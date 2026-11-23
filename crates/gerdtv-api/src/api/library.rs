@@ -160,6 +160,19 @@ pub struct SearchPage {
     pub groups: Vec<GroupHit>,
 }
 
+/// A group and whether the user hid it.
+pub struct GroupVisibility {
+    pub group: CategoryInfo,
+    pub hidden: bool,
+}
+
+/// A started movie or episode with where it was left (seconds).
+pub struct ResumeItem {
+    pub item: ItemInfo,
+    pub position: u32,
+    pub duration: u32,
+}
+
 /// A group whose name matches a search (opens like a group in the browse list).
 pub struct GroupHit {
     pub kind: ItemKind,
@@ -392,6 +405,113 @@ impl Library {
     #[flutter_rust_bridge::frb(sync)]
     pub fn record_search(&self, section: String, query: String) -> Result<(), String> {
         self.0.record_search(&section, &query).map_err(err)
+    }
+
+    /// Marks or unmarks a favourite (the star, a long press, a long OK).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_favourite(&self, key: String, favourite: bool) -> Result<(), String> {
+        self.0.set_favourite(&key, favourite).map_err(err)
+    }
+
+    /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+    pub fn favourites(&self, kinds: Vec<ItemKind>) -> Result<Vec<ItemInfo>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .favourites(&kinds)
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn save_progress(&self, key: String, position: u32, duration: u32) -> Result<(), String> {
+        self.0.save_progress(&key, position, duration).map_err(err)
+    }
+
+    /// Where to resume an item (seconds), if it was left part-way.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn resume_position(&self, key: String) -> Result<Option<u32>, String> {
+        self.0.resume_position(&key).map_err(err)
+    }
+
+    /// The continue-watching row of a section: started, unfinished items, last watched first.
+    pub fn continue_watching(
+        &self,
+        kinds: Vec<ItemKind>,
+        limit: u32,
+    ) -> Result<Vec<ResumeItem>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .continue_watching(&kinds, limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(|(h, position, duration)| ResumeItem {
+                item: h.into(),
+                position,
+                duration,
+            })
+            .collect())
+    }
+
+    /// Something started playing: search ranks recently watched items first.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn touch_recent(&self, key: String) -> Result<(), String> {
+        self.0.touch_recent(&key).map_err(err)
+    }
+
+    /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+    pub fn all_groups(&self, kind: ItemKind) -> Result<Vec<GroupVisibility>, String> {
+        Ok(self
+            .0
+            .all_categories(to_core(kind))
+            .map_err(err)?
+            .into_iter()
+            .map(|(c, hidden)| GroupVisibility {
+                group: CategoryInfo {
+                    id: c.id,
+                    name: c.name,
+                    count: c.count as u32,
+                },
+                hidden,
+            })
+            .collect())
+    }
+
+    /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_group_hidden(
+        &self,
+        kind: ItemKind,
+        category: String,
+        hidden: bool,
+    ) -> Result<(), String> {
+        self.0
+            .set_group_hidden(to_core(kind), &category, hidden)
+            .map_err(err)
+    }
+
+    /// The profile's user data (favourites, progress, hidden groups, settings, mapping, reminders …) as JSON; no
+    /// secrets. Settings → Account → Export.
+    pub fn export_user_data(&self) -> Result<String, String> {
+        self.0.export_user_data().map_err(|e| e.to_string())
+    }
+
+    /// Merges an exported file; newer rows win. Returns how many rows changed.
+    pub fn import_user_data(&self, text: String) -> Result<u32, String> {
+        self.0
+            .import_user_data(&text)
+            .map(|n| n as u32)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Every favourite's key, for the stars in the lists.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn favourite_keys(&self) -> Result<Vec<String>, String> {
+        self.0.favourite_keys().map_err(err)
     }
 
     /// The section's newest searches, newest first (the field's suggestions while empty).

@@ -124,6 +124,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupHit dco_decode_group_hit(dynamic raw);
 
   @protected
+  GroupVisibility dco_decode_group_visibility(dynamic raw);
+
+  @protected
   GuideRow dco_decode_guide_row(dynamic raw);
 
   @protected
@@ -158,6 +161,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupHit> dco_decode_list_group_hit(dynamic raw);
+
+  @protected
+  List<GroupVisibility> dco_decode_list_group_visibility(dynamic raw);
 
   @protected
   List<GuideRow> dco_decode_list_guide_row(dynamic raw);
@@ -197,6 +203,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
+
+  @protected
+  List<ResumeItem> dco_decode_list_resume_item(dynamic raw);
 
   @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
@@ -242,6 +251,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
+
+  @protected
+  ResumeItem dco_decode_resume_item(dynamic raw);
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
@@ -370,6 +382,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupHit sse_decode_group_hit(SseDeserializer deserializer);
 
   @protected
+  GroupVisibility sse_decode_group_visibility(SseDeserializer deserializer);
+
+  @protected
   GuideRow sse_decode_guide_row(SseDeserializer deserializer);
 
   @protected
@@ -406,6 +421,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupHit> sse_decode_list_group_hit(SseDeserializer deserializer);
+
+  @protected
+  List<GroupVisibility> sse_decode_list_group_visibility(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<GuideRow> sse_decode_list_guide_row(SseDeserializer deserializer);
@@ -453,6 +473,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReminderInfo> sse_decode_list_reminder_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<ResumeItem> sse_decode_list_resume_item(SseDeserializer deserializer);
 
   @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
@@ -506,6 +529,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
+
+  @protected
+  ResumeItem sse_decode_resume_item(SseDeserializer deserializer);
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
@@ -655,6 +681,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_group_hit(GroupHit self, SseSerializer serializer);
 
   @protected
+  void sse_encode_group_visibility(
+    GroupVisibility self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_guide_row(GuideRow self, SseSerializer serializer);
 
   @protected
@@ -698,6 +730,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_group_hit(List<GroupHit> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_group_visibility(
+    List<GroupVisibility> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_guide_row(List<GuideRow> self, SseSerializer serializer);
@@ -766,6 +804,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_resume_item(
+    List<ResumeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -827,6 +871,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resume_item(ResumeItem self, SseSerializer serializer);
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);
