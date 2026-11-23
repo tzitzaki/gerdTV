@@ -248,7 +248,7 @@ void main() {
     }
     final liveGroups = {
       for (final r in tester.widgetList<ItemRow>(find.byType(ItemRow)))
-        r.item.group,
+        r.item.category,
     };
     expect(liveGroups.length, greaterThan(1), reason: 'hits from every group');
     expect(

@@ -106,6 +106,10 @@ class _SectionSearchState extends State<SectionSearch> {
   bool _voice = false;
   final Map<String, NowNext> _nowNext = {};
 
+  /// The section's group names by (kind, id): the core's search leaves them out (they cost it a sixth of a short
+  /// search), each hit shows its group. Loaded once; a group missing here (an episode's series) shows none.
+  final Map<(ItemKind, String), String> _groupNames = {};
+
   bool get _items => widget.section != SearchSection.guide;
   bool get _withProgrammes =>
       widget.section == SearchSection.live ||
@@ -127,6 +131,16 @@ class _SectionSearchState extends State<SectionSearch> {
     _focus.addListener(_onFocus);
     _model.addListener(_onResults);
     _search(); // a query kept from before (the section was shown earlier)
+    for (final kind in sectionKinds(widget.section)) {
+      widget.session.library?.categories(kind: kind).then((groups) {
+        if (!mounted) return;
+        setState(() {
+          for (final g in groups) {
+            _groupNames[(kind, g.id)] = g.name;
+          }
+        });
+      });
+    }
     widget.session.platform.voiceAvailable.then((v) {
       if (mounted && v) setState(() => _voice = true);
     });
@@ -259,6 +273,22 @@ class _SectionSearchState extends State<SectionSearch> {
     );
   }
 
+  /// [h] with its group's name, when the hit came without one.
+  ItemInfo _withGroup(ItemInfo h) {
+    final name = _groupNames[(h.kind, h.category)];
+    if (h.group.isNotEmpty || name == null) return h;
+    return ItemInfo(
+      key: h.key,
+      kind: h.kind,
+      name: h.name,
+      category: h.category,
+      logo: h.logo,
+      number: h.number,
+      archiveDays: h.archiveDays,
+      group: name,
+    );
+  }
+
   String _hint(AppLocalizations l10n) => widget.group != null
       ? l10n.searchHintGroup(widget.group!.name)
       : switch (widget.section) {
@@ -384,7 +414,7 @@ class _SectionSearchState extends State<SectionSearch> {
     final all = _countOf(widget.section);
     return ItemsView(
       mode: _mode,
-      items: _model.hits,
+      items: [for (final h in _model.hits) _withGroup(h)],
       nowNext: _nowNext,
       now: DateTime.now(),
       onNearEnd: _model.loadMore,

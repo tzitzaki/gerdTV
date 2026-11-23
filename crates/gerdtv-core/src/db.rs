@@ -85,15 +85,12 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE items ADD COLUMN archive_days INTEGER NOT NULL DEFAULT 0;
      CREATE TABLE reminders (item_key TEXT NOT NULL, start INTEGER NOT NULL, stop INTEGER NOT NULL,
         title TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (item_key, start));",
-    // 5 → 6: search in every section. The word index gains the group name (`cat`, so "dazn" finds the channels of a
-    // DAZN group); a trigram index over the names finds mid-word matches ("sport" → "Eurosport"); a vocabulary view
-    // of the word index feeds typo matching; the last searches per section (user data). Both indexes are refilled
-    // by `reindex` right after this step and completed by the next sync (tvg-names aren't stored in `items`).
-    "DROP TABLE items_fts;
-     CREATE VIRTUAL TABLE items_fts USING fts5(name, alt, cat, content='', contentless_delete=1,
-        tokenize='unicode61 remove_diacritics 2');
-     CREATE VIRTUAL TABLE items_tri USING fts5(text, content='', contentless_delete=1,
-        tokenize='trigram remove_diacritics 1');
+    // 5 → 6: search in every section. `folded`: the cleaned names (plus tvg-name) lower-case and without accents, for
+    // mid-word matches ("sport" → "Eurosport") by a plain scan when word matches don't fill a page; a vocabulary
+    // view of the name index feeds typo matching; the last searches per section (user data). No extra full-text
+    // index: each one cost about a second per 150k entries at every sync (import budget, bench gate). `reindex` fills
+    // `folded` right after this step; the next sync adds the tvg-names.
+    "ALTER TABLE items ADD COLUMN folded TEXT NOT NULL DEFAULT '';
      CREATE VIRTUAL TABLE items_vocab USING fts5vocab(items_fts, 'row');
      CREATE TABLE search_history (section TEXT NOT NULL, query TEXT NOT NULL, updated_at INTEGER NOT NULL,
         PRIMARY KEY (section, query));",
@@ -165,7 +162,7 @@ pub fn open(path: &Path) -> Result<Connection> {
         current += 1;
     }
     if from < 6 {
-        reindex(&conn)?; // migration 6 left the search indexes empty
+        reindex(&conn)?; // migration 6 added empty search indexes
     }
     conn.execute(
         "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
@@ -174,49 +171,28 @@ pub fn open(path: &Path) -> Result<Connection> {
     Ok(conn)
 }
 
-/// Fills both search indexes from the stored catalogue (after migration 6): name, cleaned name, group name. The
-/// tvg-names come back with the next sync, which rewrites every row it sees.
+/// Fills `folded` from the stored names (after migration 6); the tvg-names follow with the next sync.
 fn reindex(conn: &Connection) -> Result<()> {
-    let mut st = conn.prepare(
-        "SELECT i.rowid, i.name, coalesce(c.name, '') FROM items i
-         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category",
-    )?;
-    let rows = st.query_map([], |r| {
-        Ok((
-            r.get::<_, i64>(0)?,
-            r.get::<_, String>(1)?,
-            r.get::<_, String>(2)?,
-        ))
-    })?;
-    for row in rows {
-        let (rowid, name, cat) = row?;
-        index_item(conn, rowid, true, &name, &clean_name(&name), &cat)?;
+    let rows: Vec<(i64, String)> = conn
+        .prepare("SELECT rowid, name FROM items")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_>>()?;
+    let mut set = conn.prepare("UPDATE items SET folded = ?2 WHERE rowid = ?1")?;
+    for (rowid, name) in rows {
+        set.execute(params![rowid, fold(&clean_name(&name))])?;
     }
     Ok(())
 }
 
-/// Writes one item into both search indexes, replacing what was there unless the row is `fresh` (just inserted:
-/// nothing to delete, and the two deletes were a fifth of a 150k import). The trigram index holds only the cleaned
-/// names (`alt`): mid-word matches need no country prefixes or quality tags, and the raw name doubled its size
-/// (import budget: 150k entries in < 5 s).
-fn index_item(
-    conn: &Connection,
-    rowid: i64,
-    fresh: bool,
-    name: &str,
-    alt: &str,
-    cat: &str,
-) -> Result<()> {
+/// Writes one item into the name index, replacing what was there unless the row is `fresh` (just inserted: nothing
+/// to delete; the delete was a fifth of a 150k import).
+fn index_item(conn: &Connection, rowid: i64, fresh: bool, name: &str, alt: &str) -> Result<()> {
     if !fresh {
         conn.prepare_cached("DELETE FROM items_fts WHERE rowid = ?1")?
             .execute([rowid])?;
-        conn.prepare_cached("DELETE FROM items_tri WHERE rowid = ?1")?
-            .execute([rowid])?;
     }
-    conn.prepare_cached("INSERT INTO items_fts (rowid, name, alt, cat) VALUES (?1, ?2, ?3, ?4)")?
-        .execute(params![rowid, name, alt, cat])?;
-    conn.prepare_cached("INSERT INTO items_tri (rowid, text) VALUES (?1, ?2)")?
-        .execute(params![rowid, alt])?;
+    conn.prepare_cached("INSERT INTO items_fts (rowid, name, alt) VALUES (?1, ?2, ?3)")?
+        .execute(params![rowid, name, alt])?;
     Ok(())
 }
 
@@ -350,9 +326,6 @@ pub struct Sync<'c> {
     generation: i64,
     position: i64,
     categories: Vec<(Kind, String, String)>,
-    /// (kind, category id) → group name, for the search index's `cat` column. Sources send the categories before
-    /// their items (Xtream Codes: the category lists first; M3U: each entry's group just before the entry).
-    group_names: std::collections::HashMap<(Kind, String), String>,
 }
 
 impl<'c> Sync<'c> {
@@ -366,7 +339,6 @@ impl<'c> Sync<'c> {
             generation,
             position: 0,
             categories: Vec::new(),
-            group_names: Default::default(),
         })
     }
 
@@ -379,34 +351,28 @@ impl<'c> Sync<'c> {
         {
             self.categories
                 .push((kind, id.to_string(), name.to_string()));
-            self.group_names
-                .insert((kind, id.to_string()), name.to_string());
         }
     }
 
     pub fn item(&mut self, kind: Kind, it: &NewItem) -> Result<()> {
         // An upsert that inserts moves last_insert_rowid to the new row; one that updates leaves it alone.
         let before = self.tx.last_insert_rowid();
+        let alt = format!("{} {}", clean_name(&it.name), clean_name(&it.alt));
         let rowid: i64 = self.tx.prepare_cached(
             "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext,
-               archive_days)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+               archive_days, folded)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT (key) DO UPDATE SET kind = ?2, name = ?3, category = ?4, logo = ?5, epg_id = ?6,
                number = ?7, url = ?8, season = ?9, episode = ?10, year = ?11, position = ?12, seen = ?13, ext = ?14,
-               archive_days = ?15
+               archive_days = ?15, folded = ?16
              RETURNING rowid",
         )?.query_row(
             params![it.key, kind as i64, it.name, it.category, it.logo, it.epg_id, it.number, it.url, it.season,
-                    it.episode, it.year, self.position, self.generation, it.ext, it.archive_days],
+                    it.episode, it.year, self.position, self.generation, it.ext, it.archive_days, fold(&alt)],
             |r| r.get(0),
         )?;
-        let alt = format!("{} {}", clean_name(&it.name), clean_name(&it.alt));
-        let cat = self
-            .group_names
-            .get(&(kind, it.category.clone()))
-            .map_or("", String::as_str);
         let fresh = self.tx.last_insert_rowid() != before && self.tx.last_insert_rowid() == rowid;
-        index_item(&self.tx, rowid, fresh, &it.name, &alt, cat)?;
+        index_item(&self.tx, rowid, fresh, &it.name, &alt)?;
         self.position += 1;
         Ok(())
     }
@@ -435,14 +401,10 @@ impl<'c> Sync<'c> {
     /// Removes rows the provider no longer has, replaces the categories, commits. Returns rows removed.
     pub fn finish(self) -> Result<usize> {
         let g = self.generation;
-        for index in ["items_fts", "items_tri"] {
-            self.tx.execute(
-                &format!(
-                    "DELETE FROM {index} WHERE rowid IN (SELECT rowid FROM items WHERE seen < ?1)"
-                ),
-                [g],
-            )?;
-        }
+        self.tx.execute(
+            "DELETE FROM items_fts WHERE rowid IN (SELECT rowid FROM items WHERE seen < ?1)",
+            [g],
+        )?;
         let removed = self.tx.execute("DELETE FROM items WHERE seen < ?1", [g])?;
         self.tx.execute("DELETE FROM categories", [])?;
         for (i, (kind, id, name)) in self.categories.iter().enumerate() {
@@ -523,7 +485,7 @@ pub struct Hit {
     pub number: Option<u32>,
     /// Live channels: catch-up days (0 = none).
     pub archive_days: u32,
-    /// The group's name. Search fills it, so results can show where they live; other lists leave it empty.
+    /// The group's name, where a list shows it (favourites, continue watching); search leaves it to the app.
     pub group: String,
 }
 
@@ -651,120 +613,128 @@ fn typo_terms(conn: &Connection, word: &str) -> Result<Vec<String>> {
     Ok(found.into_iter().take(20).map(|f| f.2).collect())
 }
 
-/// A query's candidates as SQL: `cte` defines `cand(rowid)` (deduplicated), `tier` ranks a row of it (in terms of
-/// `i.rowid`), `params` are bound from ?2 on (?1 is the channel number).
-struct Candidates {
-    cte: String,
-    tier: String,
-    params: Vec<String>,
-    number: Option<i64>,
+/// One match tier of a query: a set of item rowids as SQL, its parameters numbered from `?1`.
+struct Arm {
+    set: String,
+    params: Vec<rusqlite::types::Value>,
 }
 
-/// Builds the candidates of a query. Tiers, best first: 0 the channel with that number, 1 every word a whole word of
-/// the name, 2 every word starts a word of the name, 3 the words found in name and group together (a channel of the
-/// "DE | DAZN" group), 4 mid-word in the name (trigram, words of 3+ letters; shorter words must still start a word),
-/// 5 with typos.
-/// Speed (budget: search < 50 ms p95 on 150k entries): the candidate set is one UNION of the widest arms, and the tier
-/// is an `IN` probe per narrower arm (SQLite builds each set once). The group arm needs a word of 3+ letters: for
-/// "s" it would only add every channel of every group with an s-word, and its probe set doubled the time.
-fn candidates(conn: &Connection, input: &str) -> Result<Option<Candidates>> {
+/// The match tiers of a query, best first, each built only when reached (the typo tier reads the vocabulary):
+/// 0 every word starts a word of the name (or the input is a channel number), 1 the words found in name and group
+/// together (a channel of the "DE | DAZN" group; needs a word of 3+ letters, "s" would add every channel of every
+/// group with an s-word), 2 mid-word in the name (trigram over the cleaned names, words of 3+ letters; shorter words
+/// must still start a word), 3 with typos.
+fn arm(conn: &Connection, input: &str, k: usize) -> Result<Option<Arm>> {
+    use rusqlite::types::Value::{Integer, Null, Text};
     let w = words(input);
     if w.is_empty() {
         return Ok(None);
     }
-    let mut params: Vec<String> = Vec::new();
-    let mut bind = |v: String| {
-        params.push(v);
-        format!("?{}", params.len() + 1)
-    };
     let join = |f: &dyn Fn(&String) -> String, ws: &[&String]| {
         ws.iter().map(|w| f(w)).collect::<Vec<_>>().join(" ")
     };
-    let all_w: Vec<&String> = w.iter().collect();
+    let all: Vec<&String> = w.iter().collect();
     let long: Vec<&String> = w.iter().filter(|w| w.chars().count() >= 3).collect();
     let short: Vec<&String> = w.iter().filter(|w| w.chars().count() < 3).collect();
-    let fts = |m: String| format!("SELECT rowid FROM items_fts WHERE items_fts MATCH {m}");
-    // (tier, the arm's rowid set); each arm's set contains the ones before it, except trigram and typos.
-    let mut arms: Vec<(u8, String)> = vec![
-        (
-            1,
-            fts(bind(format!(
-                "{{name alt}} : ({})",
-                join(&|w| format!("\"{w}\""), &all_w)
-            ))),
-        ),
-        (
-            2,
-            fts(bind(format!(
-                "{{name alt}} : ({})",
-                join(&|w| format!("\"{w}\"*"), &all_w)
-            ))),
-        ),
-    ];
-    if !long.is_empty() {
-        arms.push((3, fts(bind(join(&|w| format!("\"{w}\"*"), &all_w)))));
-        let mut tri = format!(
-            "SELECT rowid FROM items_tri WHERE items_tri MATCH {}",
-            bind(join(&|w| format!("\"{w}\""), &long))
-        );
-        if !short.is_empty() {
-            // INTERSECT, not `rowid IN`: FTS5 answers a rowid constraint with one lookup per row (seen: 1 s).
-            tri += &format!(
-                " INTERSECT {}",
-                fts(bind(format!(
-                    "{{name alt}} : ({})",
-                    join(&|w| format!("\"{w}\"*"), &short)
-                )))
+    let prefix = |ws: &[&String]| join(&|w| format!("\"{w}\"*"), ws);
+    const FTS: &str = "SELECT rowid FROM items_fts WHERE items_fts MATCH";
+    Ok(match k {
+        0 => Some(Arm {
+            set: format!("{FTS} ?1 UNION SELECT rowid FROM items WHERE kind = 0 AND number = ?2"),
+            params: vec![
+                Text(prefix(&all)),
+                input.trim().parse::<i64>().map_or(Null, Integer),
+            ],
+        }),
+        // Each word in the name or in the group's name. The groups are few: matched here, their items fetched
+        // by the category index. Nothing to add when no group name has any of the words.
+        1 if !long.is_empty() => {
+            let groups: Vec<(i64, String)> = conn
+                .prepare_cached("SELECT rowid, name FROM categories")?
+                .query_map([], |r| Ok((r.get(0)?, fold(&r.get::<_, String>(1)?))))?
+                .collect::<Result<_>>()?;
+            let per_word: Vec<Vec<i64>> = all
+                .iter()
+                .map(|w| {
+                    let w = fold(w);
+                    groups
+                        .iter()
+                        .filter(|(_, name)| {
+                            name.split(|c: char| !c.is_alphanumeric())
+                                .any(|t| t.starts_with(&w))
+                        })
+                        .map(|(id, _)| *id)
+                        .collect()
+                })
+                .collect();
+            if per_word.iter().all(Vec::is_empty) {
+                None
+            } else {
+                // Each word's UNION in its own subquery: compound operators bind left to right.
+                let set = (0..all.len())
+                    .map(|i| {
+                        format!(
+                            "SELECT rowid FROM ({FTS} ?{a} UNION SELECT i.rowid FROM categories c
+                               JOIN items i ON i.kind = c.kind AND i.category = c.id
+                               WHERE c.rowid IN (SELECT value FROM json_each(?{b})))",
+                            a = 2 * i + 1,
+                            b = 2 * i + 2
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" INTERSECT ");
+                let mut params = Vec::new();
+                for (w, ids) in all.iter().zip(&per_word) {
+                    params.push(Text(format!("\"{w}\"*")));
+                    params.push(Text(format!("{ids:?}")));
+                }
+                Some(Arm { set, params })
+            }
+        }
+        // Mid-word: each long word inside the folded names (a scan, run only when better tiers don't fill a page);
+        // short words must still start a word.
+        2 if !long.is_empty() => {
+            let mut set = format!(
+                "SELECT rowid FROM items WHERE {}",
+                (1..=long.len())
+                    .map(|i| format!("instr(folded, ?{i}) > 0"))
+                    .collect::<Vec<_>>()
+                    .join(" AND ")
             );
+            let mut params: Vec<_> = long.iter().map(|w| Text(fold(w))).collect();
+            if !short.is_empty() {
+                params.push(Text(prefix(&short)));
+                set += &format!(" INTERSECT {FTS} ?{}", params.len());
+            }
+            Some(Arm { set, params })
         }
-        arms.push((4, tri));
-    }
-    let mut any_typo = false;
-    let mut typo = Vec::new();
-    for word in &w {
-        let terms = typo_terms(conn, word)?;
-        any_typo |= !terms.is_empty();
-        // A single word needs only its typo terms (its prefix matches are in tier 2 already).
-        let own = (w.len() > 1).then(|| format!("\"{word}\"*"));
-        let alts: Vec<String> = own
-            .into_iter()
-            .chain(terms.iter().map(|t| format!("\"{t}\"")))
-            .collect();
-        if !alts.is_empty() {
-            typo.push(format!("({})", alts.join(" OR ")));
+        3 => {
+            let mut any = false;
+            let mut groups = Vec::new();
+            for word in &w {
+                let terms = typo_terms(conn, word)?;
+                any |= !terms.is_empty();
+                // A single word needs only its typo terms (its prefix matches are tier 0 already).
+                let own = (w.len() > 1).then(|| format!("\"{word}\"*"));
+                let alts: Vec<String> = own
+                    .into_iter()
+                    .chain(terms.iter().map(|t| format!("\"{t}\"")))
+                    .collect();
+                if !alts.is_empty() {
+                    groups.push(format!("({})", alts.join(" OR ")));
+                }
+            }
+            (any && groups.len() == w.len()).then(|| Arm {
+                set: format!("{FTS} ?1"),
+                params: vec![Text(groups.join(" AND "))],
+            })
         }
-    }
-    if any_typo && typo.len() == w.len() {
-        arms.push((
-            5,
-            fts(bind(format!("{{name alt}} : ({})", typo.join(" AND ")))),
-        ));
-    }
-    // The union: the widest of tiers 1–3 (the last of them present), then trigram and typos.
-    let widest = arms.iter().filter(|(t, _)| *t <= 3).count() - 1;
-    let union: Vec<&str> = arms[widest..].iter().map(|(_, a)| a.as_str()).collect();
-    let cte = format!(
-        "cand AS (SELECT rowid FROM items WHERE kind = 0 AND number = ?1 UNION {})",
-        union.join(" UNION ")
-    );
-    let (last, probes) = arms.split_last().unwrap();
-    let tier = format!(
-        "CASE WHEN ?1 IS NOT NULL AND i.kind = 0 AND i.number = ?1 THEN 0 {} ELSE {} END",
-        probes
-            .iter()
-            .map(|(t, a)| format!("WHEN i.rowid IN ({a}) THEN {t}"))
-            .collect::<Vec<_>>()
-            .join(" "),
-        last.0
-    );
-    let number: Option<i64> = input.trim().parse().ok();
-    Ok(Some(Candidates {
-        cte,
-        tier,
-        params,
-        number,
-    }))
+        _ => None,
+    })
 }
+
+/// The tiers of a query: 4, some of them empty (None) for this input.
+const ARMS: usize = 4;
 
 /// `AND NOT <hidden>` for a WHERE clause, or nothing when no group is hidden.
 pub fn visible_and(conn: &Connection, i: &str) -> Result<String> {
@@ -783,9 +753,29 @@ fn kind_mask(kinds: &[Kind]) -> i64 {
     kinds.iter().fold(0, |m, k| m | 1 << *k as i64)
 }
 
-/// Searches the catalogue. Ranking: favourites, then recently watched, then the match tiers (`candidates`), then
-/// names starting with the query, then provider order. `kinds` narrows to a section (empty = all), `category` to
-/// one group of it. A number alone also finds that channel number.
+/// Renumbers an arm's `?n` parameters to start after `base` (arms are combined into one statement).
+fn shift(sql: &str, base: usize) -> String {
+    let mut out = String::new();
+    let mut chars = sql.chars().peekable();
+    while let Some(c) = chars.next() {
+        out.push(c);
+        if c == '?' {
+            let mut n = String::new();
+            while let Some(d) = chars.peek().filter(|d| d.is_ascii_digit()) {
+                n.push(*d);
+                chars.next();
+            }
+            out.push_str(&(n.parse::<usize>().unwrap() + base).to_string());
+        }
+    }
+    out
+}
+
+/// Searches the catalogue, tier by tier (`arm`): each tier's rows that no better tier has, ordered like this:
+/// favourites, then recently watched, then an exact channel number, then names starting with the query, then
+/// provider order. A tier is only queried once the better ones can't fill the page: most searches are answered by
+/// word starts alone, as fast as a plain word search (bench gate: within 20 % of the search before the tiers).
+/// `kinds` narrows to a section (empty = all), `category` to one group of it.
 pub fn search(
     conn: &Connection,
     input: &str,
@@ -794,77 +784,106 @@ pub fn search(
     limit: usize,
     offset: usize,
 ) -> Result<Vec<Hit>> {
-    let Some(c) = candidates(conn, input)? else {
-        return Ok(vec![]);
-    };
-    let n = c.params.len();
-    let sql = format!(
-        "WITH {cte}
-         SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days, coalesce(c.name, ''),
-                {tier} AS tier
-         FROM cand JOIN items i ON i.rowid = cand.rowid
-         LEFT JOIN favourites f ON f.key = i.key
-         LEFT JOIN recents r ON r.key = i.key
-         LEFT JOIN categories c ON c.kind = i.kind AND c.id = i.category
-         WHERE (?{m} >> i.kind) & 1 AND (?{g} IS NULL OR i.category = ?{g}) {visible}
-         ORDER BY f.key IS NULL, r.updated_at IS NULL, r.updated_at DESC, tier, i.name NOT LIKE ?{p}, i.position
-         LIMIT ?{l} OFFSET ?{o}",
-        cte = c.cte,
-        tier = c.tier,
-        visible = visible_and(conn, "i")?,
-        m = n + 2,
-        g = n + 3,
-        p = n + 4,
-        l = n + 5,
-        o = n + 6,
-    );
-    let mut st = conn.prepare_cached(&sql)?;
-    let mut values: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(c.number)];
-    values.extend(
-        c.params
-            .into_iter()
-            .map(|w| Box::new(w) as Box<dyn rusqlite::ToSql>),
-    );
-    values.push(Box::new(kind_mask(kinds)));
-    values.push(Box::new(category.map(str::to_string)));
-    values.push(Box::new(format!("{}%", input.trim())));
-    values.push(Box::new(limit as i64));
-    values.push(Box::new(offset as i64));
-    let rows = st.query_map(rusqlite::params_from_iter(values), |r| {
-        Ok(Hit {
-            key: r.get(0)?,
-            kind: Kind::from_i64(r.get(1)?),
-            name: r.get(2)?,
-            category: r.get(3)?,
-            logo: r.get(4)?,
-            number: r.get(5)?,
-            archive_days: r.get(6)?,
-            group: r.get(7)?,
-        })
-    })?;
-    rows.collect()
+    let visible = visible_and(conn, "i")?;
+    let mut out: Vec<Hit> = Vec::new();
+    let mut skip = offset;
+    let mut better: Vec<Arm> = Vec::new();
+    for k in 0..ARMS {
+        let Some(a) = arm(conn, input, k)? else {
+            continue;
+        };
+        // Rows of this tier that no better tier has, inside the filters.
+        let mut params = a.params.clone();
+        let mut excl = String::new();
+        for b in &better {
+            excl += &format!(" AND i.rowid NOT IN ({})", shift(&b.set, params.len()));
+            params.extend(b.params.iter().cloned());
+        }
+        let n = params.len();
+        params.extend([
+            rusqlite::types::Value::Integer(kind_mask(kinds)),
+            category.map_or(rusqlite::types::Value::Null, |c| {
+                rusqlite::types::Value::Text(c.into())
+            }),
+            rusqlite::types::Value::Text(format!("{}%", input.trim())),
+            input.trim().parse::<i64>().map_or(
+                rusqlite::types::Value::Null,
+                rusqlite::types::Value::Integer,
+            ),
+        ]);
+        let from = format!(
+            "FROM items i LEFT JOIN favourites f ON f.key = i.key LEFT JOIN recents r ON r.key = i.key
+             WHERE i.rowid IN ({}){excl} AND (?{m} >> i.kind) & 1 AND (?{g} IS NULL OR i.category = ?{g}) {visible}",
+            a.set,
+            m = n + 1,
+            g = n + 2,
+        );
+        let need = limit - out.len();
+        // No group name here: even a lookup for the 50 rows shown cost a sixth of a short search (bench gate); the
+        // app knows the section's groups already (section_search.dart).
+        let sql = format!(
+            "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days {from}
+             ORDER BY f.key IS NULL, r.updated_at IS NULL, r.updated_at DESC,
+                      CASE WHEN ?{num} IS NOT NULL AND i.number = ?{num} THEN 0 ELSE 1 END,
+                      i.name NOT LIKE ?{p}, i.position
+             LIMIT {need} OFFSET {skip}",
+            num = n + 4,
+            p = n + 3,
+        );
+        let rows: Vec<Hit> = conn
+            .prepare_cached(&sql)?
+            .query_map(rusqlite::params_from_iter(params.iter()), |r| {
+                Ok(Hit {
+                    key: r.get(0)?,
+                    kind: Kind::from_i64(r.get(1)?),
+                    name: r.get(2)?,
+                    category: r.get(3)?,
+                    logo: r.get(4)?,
+                    number: r.get(5)?,
+                    archive_days: r.get(6)?,
+                    group: String::new(),
+                })
+            })?
+            .collect::<Result<_>>()?;
+        // How many rows the tier has, as far as it matters: it lay wholly before the page (skip by its size), it
+        // reached into the page, or it is empty (then later tiers needn't exclude it: the mid-word scan twice
+        // doubled a typo search).
+        let mut empty = rows.is_empty();
+        if rows.is_empty() && skip > 0 {
+            let c: i64 = conn.query_row(
+                &format!("SELECT count(*) {from}"),
+                rusqlite::params_from_iter(params[..n + 2].iter()),
+                |r| r.get(0),
+            )?;
+            skip -= (c as usize).min(skip);
+            empty = c == 0;
+        } else {
+            skip = 0;
+        }
+        out.extend(rows);
+        if out.len() == limit {
+            break;
+        }
+        if !empty {
+            better.push(a);
+        }
+    }
+    Ok(out)
 }
 
-/// Result counts per kind over the whole catalogue: the "All groups" chip and the "Also in" hint line.
+/// Result counts per kind over the whole catalogue (word starts and channel number, tier 0): the "All groups" chip
+/// and the "Also in" hint line. Group-name, mid-word and typo hits aren't counted, to keep this as fast as before.
 pub fn search_counts(conn: &Connection, input: &str) -> Result<Vec<(Kind, usize)>> {
-    let Some(c) = candidates(conn, input)? else {
+    let Some(a) = arm(conn, input, 0)? else {
         return Ok(vec![]);
     };
     let sql = format!(
-        "WITH {} SELECT i.kind, count(*) FROM cand JOIN items i ON i.rowid = cand.rowid WHERE 1 {}
-         GROUP BY i.kind ORDER BY i.kind",
-        c.cte,
+        "SELECT i.kind, count(*) FROM items i WHERE i.rowid IN ({}) {} GROUP BY i.kind ORDER BY i.kind",
+        a.set,
         visible_and(conn, "i")?
     );
     let mut st = conn.prepare_cached(&sql)?;
-    // The tier probes aren't part of the CTE, but their parameters are numbered with it: bind them all.
-    let mut values: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(c.number)];
-    values.extend(
-        c.params
-            .into_iter()
-            .map(|w| Box::new(w) as Box<dyn rusqlite::ToSql>),
-    );
-    let rows = st.query_map(rusqlite::params_from_iter(values), |r| {
+    let rows = st.query_map(rusqlite::params_from_iter(a.params.iter()), |r| {
         Ok((Kind::from_i64(r.get(0)?), r.get::<_, i64>(1)? as usize))
     })?;
     rows.collect()
@@ -1265,10 +1284,6 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         );
         let in_group = search(&c, "1", &[Kind::Live], Some("DE | DAZN"), 10, 0).unwrap();
         assert_eq!(names(&in_group), ["DAZN 1 HD"], "one group only");
-        assert_eq!(
-            in_group[0].group, "DE | DAZN",
-            "hits carry their group's name"
-        );
         let groups: Vec<String> = search_groups(&c, "DAZN", &[Kind::Live], 5)
             .unwrap()
             .into_iter()
@@ -1283,22 +1298,36 @@ http://h.example.invalid/live/alice/s3cret/403.ts
     }
 
     #[test]
-    fn ranking_favourites_then_recents_then_match_tiers() {
+    fn ranking_match_tiers_with_favourites_then_recents_first_in_each() {
         let mut c = open(Path::new(":memory:")).unwrap();
         let pl = "#EXTINF:-1,Kino Welt\nhttp://h/live/u/p/1.ts\n#EXTINF:-1,Das Kino\nhttp://h/live/u/p/2.ts\n#EXTINF:-1,Kino Plus\nhttp://h/live/u/p/3.ts\n#EXTINF:-1,Mein Kino\nhttp://h/live/u/p/4.ts\n\
             #EXTINF:-1,Kimo TV\nhttp://h/live/u/p/5.ts\n#EXTINF:-1,Superkino\nhttp://h/live/u/p/6.ts\n\
             #EXTINF:-1 group-title=\"Kino Sender\",Film Eins\nhttp://h/live/u/p/7.ts\n#EXTINF:-1,Kinowelt Extra\nhttp://h/live/u/p/8.ts\n";
         import_m3u(&mut c, pl.as_bytes(), &[]).unwrap();
-        // Whole word (name starts first), word start, via the group, mid-word, typo.
-        let tiers = ["Kinowelt Extra", "Film Eins", "Superkino", "Kimo TV"];
+        // Word starts (names starting with the query first, then provider order), via the group, mid-word, typo.
+        let tiers = ["Film Eins", "Superkino", "Kimo TV"];
+        let words = [
+            "Kino Welt",
+            "Kino Plus",
+            "Kinowelt Extra",
+            "Das Kino",
+            "Mein Kino",
+        ];
         assert_eq!(
             names(&search(&c, "kino", &[], None, 10, 0).unwrap()),
-            [
-                &["Kino Welt", "Kino Plus", "Das Kino", "Mein Kino"][..],
-                &tiers
-            ]
-            .concat()
+            [&words[..], &tiers].concat()
         );
+        assert_eq!(
+            names(&search(&c, "kino", &[], None, 3, 4).unwrap()),
+            ["Mein Kino", "Film Eins", "Superkino"],
+            "a page across tiers"
+        );
+        assert_eq!(
+            names(&search(&c, "kino", &[], None, 5, 6).unwrap()),
+            ["Superkino", "Kimo TV"],
+            "a page that starts in a later tier skips the earlier ones by their size"
+        );
+        // Favourites and recently watched first within their tier.
         c.execute("INSERT INTO favourites VALUES ('live:4', 1)", [])
             .unwrap();
         c.execute("INSERT INTO recents VALUES ('live:2', 5)", [])
@@ -1306,7 +1335,13 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         assert_eq!(
             names(&search(&c, "kino", &[], None, 10, 0).unwrap()),
             [
-                &["Mein Kino", "Das Kino", "Kino Welt", "Kino Plus"][..],
+                &[
+                    "Mein Kino",
+                    "Das Kino",
+                    "Kino Welt",
+                    "Kino Plus",
+                    "Kinowelt Extra"
+                ][..],
                 &tiers
             ]
             .concat()

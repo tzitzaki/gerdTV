@@ -20,7 +20,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
-- Search ranking: favourites and recents first, then name matches, the group's name, mid-word, typos (from 4 letters); typing anywhere starts the search.
+- Search ranking: tiers (word starts, group name, mid-word, typos from 4 letters), favourites and recents first within each tier; a tier is searched only when the better ones don't fill the page, so a search stays as fast as a plain word search (bench gate); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
