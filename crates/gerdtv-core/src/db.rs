@@ -190,21 +190,33 @@ fn reindex(conn: &Connection) -> Result<()> {
     })?;
     for row in rows {
         let (rowid, name, cat) = row?;
-        index_item(conn, rowid, &name, &clean_name(&name), &cat)?;
+        index_item(conn, rowid, true, &name, &clean_name(&name), &cat)?;
     }
     Ok(())
 }
 
-/// Writes one item into both search indexes (replacing what was there).
-fn index_item(conn: &Connection, rowid: i64, name: &str, alt: &str, cat: &str) -> Result<()> {
-    conn.prepare_cached("DELETE FROM items_fts WHERE rowid = ?1")?
-        .execute([rowid])?;
+/// Writes one item into both search indexes, replacing what was there unless the row is `fresh` (just inserted:
+/// nothing to delete, and the two deletes were a fifth of a 150k import). The trigram index holds only the cleaned
+/// names (`alt`): mid-word matches need no country prefixes or quality tags, and the raw name doubled its size
+/// (import budget: 150k entries in < 5 s).
+fn index_item(
+    conn: &Connection,
+    rowid: i64,
+    fresh: bool,
+    name: &str,
+    alt: &str,
+    cat: &str,
+) -> Result<()> {
+    if !fresh {
+        conn.prepare_cached("DELETE FROM items_fts WHERE rowid = ?1")?
+            .execute([rowid])?;
+        conn.prepare_cached("DELETE FROM items_tri WHERE rowid = ?1")?
+            .execute([rowid])?;
+    }
     conn.prepare_cached("INSERT INTO items_fts (rowid, name, alt, cat) VALUES (?1, ?2, ?3, ?4)")?
         .execute(params![rowid, name, alt, cat])?;
-    conn.prepare_cached("DELETE FROM items_tri WHERE rowid = ?1")?
-        .execute([rowid])?;
     conn.prepare_cached("INSERT INTO items_tri (rowid, text) VALUES (?1, ?2)")?
-        .execute(params![rowid, format!("{name} {alt}")])?;
+        .execute(params![rowid, alt])?;
     Ok(())
 }
 
@@ -373,6 +385,8 @@ impl<'c> Sync<'c> {
     }
 
     pub fn item(&mut self, kind: Kind, it: &NewItem) -> Result<()> {
+        // An upsert that inserts moves last_insert_rowid to the new row; one that updates leaves it alone.
+        let before = self.tx.last_insert_rowid();
         let rowid: i64 = self.tx.prepare_cached(
             "INSERT INTO items (key, kind, name, category, logo, epg_id, number, url, season, episode, year, position, seen, ext,
                archive_days)
@@ -391,7 +405,8 @@ impl<'c> Sync<'c> {
             .group_names
             .get(&(kind, it.category.clone()))
             .map_or("", String::as_str);
-        index_item(&self.tx, rowid, &it.name, &alt, cat)?;
+        let fresh = self.tx.last_insert_rowid() != before && self.tx.last_insert_rowid() == rowid;
+        index_item(&self.tx, rowid, fresh, &it.name, &alt, cat)?;
         self.position += 1;
         Ok(())
     }
