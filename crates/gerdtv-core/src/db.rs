@@ -859,28 +859,39 @@ pub fn search_groups(
     if w.is_empty() {
         return Ok(vec![]);
     }
+    // Names first, counts only for the matches: counting every group's items on each keystroke cost 16 ms on 150k
+    // entries (the count is one indexed lookup per matching group, items_by_category).
     let mut st = conn.prepare_cached(
-        "SELECT c.kind, c.id, c.name, count(i.key) FROM categories c
-         JOIN items i ON i.kind = c.kind AND i.category = c.id
-         WHERE (?1 >> c.kind) & 1 GROUP BY c.kind, c.id ORDER BY c.position",
+        "SELECT kind, id, name FROM categories WHERE (?1 >> kind) & 1 ORDER BY position",
     )?;
     let rows = st.query_map([kind_mask(kinds)], |r| {
-        Ok(GroupHit {
-            kind: Kind::from_i64(r.get(0)?),
-            id: r.get(1)?,
-            name: r.get(2)?,
-            count: r.get::<_, i64>(3)? as usize,
-        })
+        Ok((
+            Kind::from_i64(r.get(0)?),
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+        ))
     })?;
+    let mut count =
+        conn.prepare_cached("SELECT count(*) FROM items WHERE kind = ?1 AND category = ?2")?;
     let mut out = Vec::new();
-    for g in rows {
-        let g = g?;
-        let name = fold(&g.name);
-        if w.iter().all(|w| name.contains(w.as_str())) {
-            out.push(g);
-            if out.len() == limit {
-                break;
-            }
+    for row in rows {
+        let (kind, id, name) = row?;
+        let folded = fold(&name);
+        if !w.iter().all(|w| folded.contains(w.as_str())) {
+            continue;
+        }
+        let n: i64 = count.query_row(params![kind as i64, id], |r| r.get(0))?;
+        if n == 0 {
+            continue; // empty groups are hidden, as in the browse lists
+        }
+        out.push(GroupHit {
+            kind,
+            id,
+            name,
+            count: n as usize,
+        });
+        if out.len() == limit {
+            break;
         }
     }
     Ok(out)
