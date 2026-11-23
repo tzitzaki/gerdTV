@@ -1,14 +1,14 @@
 # Handover
 
 ## State
-- Version 0.261123.52: updates install in place (macOS swap with the sandbox off, Android installer), and a DMG for the first Mac install.
-- Also new: Settings → Your data exports and imports favourites, history, hidden groups, reminders and settings as one JSON file.
-- Also new: search in every section, favourites, continue watching, hidden groups, profiles, the timeshift UI and Android voice search.
-- Also new: gerdTV's own libmpv on Linux (mpv 0.42.0, FFmpeg 9.1) in Settings → Playback → Player engine; the standard engine stays default.
+- Version 0.261123.53: CI runs only the areas a change touches, and a session is one PR with a commit per feature, the wrap-up last.
+- Before (0.261123.52): updates install in place, a DMG for the first Mac install, and Settings → Your data (export and import as one JSON file).
+- Also in .52: search in every section, favourites, continue watching, hidden groups, profiles, the timeshift UI and Android voice search.
+- Also in .52: gerdTV's own libmpv on Linux (mpv 0.42.0, FFmpeg 9.1) in Settings → Playback → Player engine; the standard engine stays default.
 - Before (0.261123.43): Earlier in programme search, 150 ms fades, a never-empty guide header, no Android cleartext config, a CI hang watchdog.
 - Before: settings in categories, gTV logos, reminders, the updater's download, catch-up, the Licences screen and the full TV guide.
 - `just bench` compares main and the branch back to back in one run; a screen check visits every screen with screenshots in ~/gerdTV-screens/.
-- Session 3 is done: Blocks A, B and C shipped in 0.261122.21, .31, .34, .40, 0.261123.43 and this release.
+- Session 3 is done (Blocks A, B and C, up to 0.261123.52); this release changes only CI, release notes and the dev loop.
 
 ## Owner decisions
 - All Phase 0 questions are answered; the standing decisions are in docs/DECISIONS.md.
@@ -46,6 +46,8 @@
 - In the journey, typing into search after the catch-up step doesn't arrive (cause open; a real keyboard is not involved).
 - Integration tests take about 8–16 min (the screen check plays video at every size); watch it as screens are added.
 - Release builds restore CI's Android cache from main; a release tagged before main's android run finished builds cold.
+- New branches restore main's libmpv and linux caches (warm-caches job); right after a key change on main, a branch's first run builds cold.
+- The version-bump check in scripts/ci-scope.sh trusts the six-digit minor; a dependency versioned 0.YYMMDD.x would slip through as a bump.
 - The provider panel once answered an empty VOD list under load; sync keeps the known entries in that case.
 
 ## Ideas not chosen
