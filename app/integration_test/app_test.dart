@@ -280,6 +280,9 @@ void main() {
           w.key is ValueKey<String> &&
           (w.key! as ValueKey<String>).value.startsWith('search.programme.'),
     );
+    // (Scrolled to the programmes' header, the one unique widget there: a programme row isn't built until it is
+    // near the screen, and a finder for "the first of none" throws.)
+    await waitFor(tester, find.byType(ItemRow));
     final results = find
         .ancestor(
           of: find.byType(ItemRow).first,
@@ -287,11 +290,13 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      programmeHit.first,
+      find.byKey(const Key('search.programmes.all')),
       400,
       scrollable: results,
       maxScrolls: 60,
     );
+    await tester.drag(results, const Offset(0, -200));
+    await tester.pump();
     await tapReady(tester, programmeHit);
     // The programme's sheet: the top hit is running, Watch plays its channel live.
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
@@ -372,6 +377,10 @@ void main() {
     // "Show all" lists every programme hit: ended ones under "Earlier", after the running and upcoming ones (missed
     // shows aren't pushed out by what's still to come). The field still holds "sport", whose ended programmes exist
     // in the mock guide; the group is built only once scrolled to.
+    await waitFor(
+      tester,
+      find.byType(ItemRow),
+    ); // the results load after the player closed
     final showAll = find.byKey(const Key('search.programmes.all'));
     await tester.scrollUntilVisible(
       showAll,
@@ -412,6 +421,10 @@ void main() {
 
     debugPrint('JOURNEY: search lists ended programmes under Earlier');
     // "Also in": Movies with the same query; a typo still finds movies; each section keeps its own query.
+    await waitFor(
+      tester,
+      find.byType(ItemRow),
+    ); // the results load after the player closed
     final also = find.byKey(const Key('search.also.movies'));
     await tester.scrollUntilVisible(
       also,

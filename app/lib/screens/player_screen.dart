@@ -480,32 +480,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             },
                           ),
                         ),
-                      // Buffered seconds vs. the target (bottom left): the stream's cushion right now.
-                      Positioned(
-                        left: Tokens.space * 2,
-                        bottom: Tokens.space * 2,
-                        child: StreamBuilder<Duration>(
-                          stream: widget.session.player.stream.buffer,
-                          builder: (context, snap) {
-                            final buffered =
-                                ((snap.data ?? Duration.zero) -
-                                        widget.session.player.state.position)
-                                    .inSeconds;
-                            return ValueListenableBuilder<int>(
-                              valueListenable: adapter.target,
-                              builder: (context, target, _) => Text(
-                                l10n.bufferReadout(
-                                  buffered < 0 ? 0 : buffered,
-                                  target,
+                      // Buffered seconds vs. the target (bottom left): the stream's cushion right now. Hidden under the
+                      // channel list, which reaches that corner on a phone (the screen check found them overlapping).
+                      if (!_panel)
+                        Positioned(
+                          left: Tokens.space * 2,
+                          bottom: Tokens.space * 2,
+                          child: StreamBuilder<Duration>(
+                            stream: widget.session.player.stream.buffer,
+                            builder: (context, snap) {
+                              final buffered =
+                                  ((snap.data ?? Duration.zero) -
+                                          widget.session.player.state.position)
+                                      .inSeconds;
+                              return ValueListenableBuilder<int>(
+                                valueListenable: adapter.target,
+                                builder: (context, target, _) => Text(
+                                  l10n.bufferReadout(
+                                    buffered < 0 ? 0 : buffered,
+                                    target,
+                                  ),
+                                  key: const Key('player.bufferReadout'),
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(color: Colors.white70),
                                 ),
-                                key: const Key('player.bufferReadout'),
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(color: Colors.white70),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Padding(
