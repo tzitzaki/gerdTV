@@ -72,20 +72,29 @@ test-docs:
 test-harness:
     cargo test -q -p gerdtv-testkit --test libmpv_watchdog -- --ignored --nocapture --test-threads 1 --skip soak
 
-# gerdTV's own libmpv into build/libmpv (scripts/build-libmpv.sh): about 15 min the first time; the downloaded
-# sources stay in build/libmpv/work. The Linux build bundles it when it is there (app/linux/CMakeLists.txt).
+# gerdTV's own libmpv into build/libmpv (scripts/build-libmpv.sh inside an Ubuntu 24.04 container, needs docker):
+# about 15 min; the downloaded sources stay in build/libmpv/work. The Linux build bundles it when it is there
+# (app/linux/CMakeLists.txt).
 libmpv:
-    {{heavy}} scripts/build-libmpv.sh build/libmpv
+    {{heavy}} scripts/build-libmpv-container.sh build/libmpv
 
-# The harness on the own build: the test binary links libmpv.so.2, and a symlink of that name in front of the
-# system's points it at libgerdmpv.so.
-test-harness-gerdmpv:
-    mkdir -p build/libmpv/as-system && ln -sfn ../libgerdmpv.so build/libmpv/as-system/libmpv.so.2
+# The harness on the own build: the test binary links libmpv.so.2, and links of that name in front of the system's
+# point it at libgerdmpv.so (the same mechanism the app uses, app/linux/runner/main.cc).
+test-harness-gerdmpv: _gerdmpv-links
     LD_LIBRARY_PATH="$PWD/build/libmpv/as-system" just test-harness
 
-# The integration tests with the own build (media_kit loads LIBMPV_LIBRARY_PATH when the default engine is chosen).
-test-integration-gerdmpv:
-    LIBMPV_LIBRARY_PATH="$PWD/build/libmpv/libgerdmpv.so" just test-integration
+# The integration tests with the own build loaded by the whole app (the video plugin links libmpv.so.2 itself);
+# first proof that the plugin really resolves it, so a silent fallback to the system's libmpv can't pass.
+test-integration-gerdmpv: _gerdmpv-links
+    cd app && flutter build linux --debug >/dev/null
+    LD_LIBRARY_PATH="$PWD/build/libmpv/as-system" ldd app/build/linux/x64/debug/bundle/lib/libmedia_kit_video_plugin.so \
+      | grep -q "libmpv.so.2 => $PWD/build/libmpv/as-system/" || { echo "the video plugin doesn't resolve libgerdmpv"; exit 1; }
+    LD_LIBRARY_PATH="$PWD/build/libmpv/as-system" just test-integration
+
+_gerdmpv-links:
+    mkdir -p build/libmpv/as-system
+    ln -sfn ../libgerdmpv.so build/libmpv/as-system/libmpv.so.2
+    ln -sfn ../libgerdmpv.so build/libmpv/as-system/libmpv.so
 
 # The soak: GERDTV_SOAK_MINUTES (default 30) of playback with random faults; every fault must recover (nightly).
 soak:

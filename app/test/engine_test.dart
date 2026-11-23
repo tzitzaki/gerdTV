@@ -1,19 +1,24 @@
-// New, because nothing owned the engine choice: which libmpv media_kit is asked to load at start.
+// New, because nothing owned the engine choice: the marker the Linux runner reads before Flutter starts, and where
+// the own build is looked for.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/platform/engine.dart';
 
 void main() {
-  test('engine choice → library', () {
-    expect(parsePlayerEngine(null), PlayerEngine.standard);
-    expect(parsePlayerEngine('junk'), PlayerEngine.standard);
-    expect(parsePlayerEngine('gerdtv'), PlayerEngine.gerdtv);
-    const own = '/opt/gerdTV/lib/libgerdmpv.so';
-    expect(libmpvFor(PlayerEngine.gerdtv, own), own);
-    expect(libmpvFor(PlayerEngine.standard, own), isNull);
-    // Chosen but not installed (e.g. a build without it): media_kit's default instead of a failed start.
-    expect(libmpvFor(PlayerEngine.gerdtv, null), isNull);
+  test('the choice is the marker file', () {
+    final dir = Directory.systemTemp.createTempSync('engine').path;
+    expect(readEngine(dir), PlayerEngine.standard);
+    writeEngine(dir, PlayerEngine.gerdtv);
+    expect(
+      File('$dir/$engineMarker').existsSync(),
+      isTrue,
+      reason: 'linux/runner/main.cc looks for this name',
+    );
+    expect(readEngine(dir), PlayerEngine.gerdtv);
+    writeEngine(dir, PlayerEngine.standard);
+    expect(readEngine(dir), PlayerEngine.standard);
+    writeEngine(dir, PlayerEngine.standard); // no marker to delete: no error
   });
 
   test('own build is looked for next to the executable', () {

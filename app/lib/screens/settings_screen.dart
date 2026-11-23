@@ -336,9 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     build: (_) => StatefulBuilder(
       builder: (context, setState) {
         final dir = session.appDir!;
-        final engine = parsePlayerEngine(
-          appSetting(dir: dir, key: settingPlayerEngine),
-        );
+        final engine = readEngine(dir);
         return ListTile(
           title: Text(l10n.playerEngine),
           subtitle: Text(l10n.playerEngineHint),
@@ -355,13 +353,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Text(l10n.playerEngineGerdtv),
               ),
             ],
-            onChanged: (v) => setState(
-              () => setAppSetting(
-                dir: dir,
-                key: settingPlayerEngine,
-                value: (v ?? PlayerEngine.standard).name,
-              ),
-            ),
+            onChanged: (v) =>
+                setState(() => writeEngine(dir, v ?? PlayerEngine.standard)),
           ),
         );
       },

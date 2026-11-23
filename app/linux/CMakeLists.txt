@@ -107,10 +107,17 @@ foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
 endforeach(bundled_library)
 
 # gerdTV's own libmpv (scripts/build-libmpv.sh, Settings → Player engine), bundled when it has been built; a build
-# without it simply offers no engine choice (app/lib/platform/engine.dart looks for lib/libgerdmpv.so).
+# without it simply offers no engine choice (app/lib/platform/engine.dart looks for lib/libgerdmpv.so). lib/gerdmpv/
+# holds libmpv.so.2 and libmpv.so as links to it: runner/main.cc puts that folder first in LD_LIBRARY_PATH when the
+# own engine is chosen, so the video plugin and Dart both load it.
 set(GERDTV_LIBMPV "${CMAKE_CURRENT_SOURCE_DIR}/../../build/libmpv/libgerdmpv.so")
 if(EXISTS "${GERDTV_LIBMPV}")
   install(FILES "${GERDTV_LIBMPV}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+  install(CODE "
+    file(MAKE_DIRECTORY \"${INSTALL_BUNDLE_LIB_DIR}/gerdmpv\")
+    file(CREATE_LINK ../libgerdmpv.so \"${INSTALL_BUNDLE_LIB_DIR}/gerdmpv/libmpv.so.2\" SYMBOLIC)
+    file(CREATE_LINK ../libgerdmpv.so \"${INSTALL_BUNDLE_LIB_DIR}/gerdmpv/libmpv.so\" SYMBOLIC)
+    " COMPONENT Runtime)
 endif()
 
 # Copy the native assets provided by the hook/build.dart from all packages.
