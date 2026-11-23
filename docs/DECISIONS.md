@@ -14,6 +14,13 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
+- Favourites: a Favourites group on top of each section's groups, in provider order; toggled by a star on every row and tile, a long press, or a long OK.
+- Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
+- Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
+- Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
+- Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
+- Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
+- Search ranking: tiers (word starts, group name, mid-word, typos from 4 letters), favourites and recents first within each tier; a tier is searched only when the better ones don't fill the page, so a search stays as fast as a plain word search (bench gate); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.

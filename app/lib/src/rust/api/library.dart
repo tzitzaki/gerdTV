@@ -43,6 +43,9 @@ Future<void> deleteProfile({required String dir, required String id}) =>
 abstract class Library implements RustOpaqueInterface {
   Future<void> addGuideUrl({required String url});
 
+  /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+  Future<List<GroupVisibility>> allGroups({required ItemKind kind});
+
   /// The item's last measured video bitrate (bit/s, 0 = unknown).
   BigInt bitrate({required String key});
 
@@ -59,12 +62,24 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<List<CategoryInfo>> categories({required ItemKind kind});
 
+  /// The continue-watching row of a section: started, unfinished items, last watched first.
+  Future<List<ResumeItem>> continueWatching({
+    required List<ItemKind> kinds,
+    required int limit,
+  });
+
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
   /// Sets or clears a reminder.
   /// The profile's user data as JSON, for a file the user keeps (no secrets).
   Future<String> exportUserData();
+
+  /// Every favourite's key, for the stars in the lists.
+  List<String> favouriteKeys();
+
+  /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+  Future<List<ItemInfo>> favourites({required List<ItemKind> kinds});
 
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
@@ -128,6 +143,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Adaptive mode: one step more buffer for this item; returns the new choice.
   BufferChoice raiseBuffer({required String key});
 
+  /// The section's newest searches, newest first (the field's suggestions while empty).
+  List<String> recentSearches({required String section, required int limit});
+
   /// Logs a recovery episode (the watchdog's Health command).
   Future<void> recordHealth({
     required String key,
@@ -137,6 +155,9 @@ abstract class Library implements RustOpaqueInterface {
     required int secs,
   });
 
+  /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
+  void recordSearch({required String section, required String query});
+
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});
 
@@ -145,11 +166,22 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
-  /// Search as the user types; `kind` None = all kinds.
+  /// Where to resume an item (seconds), if it was left part-way.
+  int? resumePosition({required String key});
+
+  /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+  void saveProgress({
+    required String key,
+    required int position,
+    required int duration,
+  });
+
+  /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
   Future<SearchPage> search({
     required BigInt seq,
     required String query,
-    ItemKind? kind,
+    required List<ItemKind> kinds,
+    String? category,
     required int limit,
     required int offset,
   });
@@ -171,6 +203,16 @@ abstract class Library implements RustOpaqueInterface {
     required int customSeconds,
   });
 
+  /// Marks or unmarks a favourite (the star, a long press, a long OK).
+  void setFavourite({required String key, required bool favourite});
+
+  /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+  void setGroupHidden({
+    required ItemKind kind,
+    required String category,
+    required bool hidden,
+  });
+
   Future<void> setPreferHls({required String key, required bool hls});
 
   Future<void> setReminder({required ReminderInfo reminder, required bool on_});
@@ -184,6 +226,9 @@ abstract class Library implements RustOpaqueInterface {
   String streamUrl({required String key, required bool preferHls});
 
   Future<SyncSummary> sync_();
+
+  /// Something started playing: search ranks recently watched items first.
+  void touchRecent({required String key});
 
   /// Live channels without a guide match, in provider order (the mapping screen).
   Future<List<ChannelRef>> unmatchedChannels({
@@ -233,6 +278,54 @@ class ChannelRef {
           runtimeType == other.runtimeType &&
           id == other.id &&
           name == other.name;
+}
+
+/// A group whose name matches a search (opens like a group in the browse list).
+class GroupHit {
+  final ItemKind kind;
+  final String id;
+  final String name;
+  final int count;
+
+  const GroupHit({
+    required this.kind,
+    required this.id,
+    required this.name,
+    required this.count,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^ id.hashCode ^ name.hashCode ^ count.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GroupHit &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          id == other.id &&
+          name == other.name &&
+          count == other.count;
+}
+
+/// A group and whether the user hid it.
+class GroupVisibility {
+  final CategoryInfo group;
+  final bool hidden;
+
+  const GroupVisibility({required this.group, required this.hidden});
+
+  @override
+  int get hashCode => group.hashCode ^ hidden.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GroupVisibility &&
+          runtimeType == other.runtimeType &&
+          group == other.group &&
+          hidden == other.hidden;
 }
 
 /// One channel's programmes in a time window (the guide grid's row).
@@ -355,6 +448,9 @@ class ItemInfo {
   /// Live channels: catch-up days (0 = none).
   final int archiveDays;
 
+  /// The group's name; filled by search only.
+  final String group;
+
   const ItemInfo({
     required this.key,
     required this.kind,
@@ -363,6 +459,7 @@ class ItemInfo {
     required this.logo,
     this.number,
     required this.archiveDays,
+    required this.group,
   });
 
   @override
@@ -373,7 +470,8 @@ class ItemInfo {
       category.hashCode ^
       logo.hashCode ^
       number.hashCode ^
-      archiveDays.hashCode;
+      archiveDays.hashCode ^
+      group.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -386,7 +484,8 @@ class ItemInfo {
           category == other.category &&
           logo == other.logo &&
           number == other.number &&
-          archiveDays == other.archiveDays;
+          archiveDays == other.archiveDays &&
+          group == other.group;
 }
 
 enum ItemKind { live, movie, episode, series }
@@ -568,23 +667,53 @@ class ReminderInfo {
           title == other.title;
 }
 
+/// A started movie or episode with where it was left (seconds).
+class ResumeItem {
+  final ItemInfo item;
+  final int position;
+  final int duration;
+
+  const ResumeItem({
+    required this.item,
+    required this.position,
+    required this.duration,
+  });
+
+  @override
+  int get hashCode => item.hashCode ^ position.hashCode ^ duration.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResumeItem &&
+          runtimeType == other.runtimeType &&
+          item == other.item &&
+          position == other.position &&
+          duration == other.duration;
+}
+
 /// One page of search results. `seq` echoes the caller's sequence number, so the UI drops answers to keystrokes
 /// that are no longer current (the list never flickers back).
 class SearchPage {
   final BigInt seq;
   final List<ItemInfo> hits;
 
-  /// Per-kind totals; only on the first page (offset 0).
+  /// Per-kind totals over every section; only on the first page (offset 0).
   final List<KindCount> counts;
+
+  /// Groups whose name matches; only on the first page of a whole-section search.
+  final List<GroupHit> groups;
 
   const SearchPage({
     required this.seq,
     required this.hits,
     required this.counts,
+    required this.groups,
   });
 
   @override
-  int get hashCode => seq.hashCode ^ hits.hashCode ^ counts.hashCode;
+  int get hashCode =>
+      seq.hashCode ^ hits.hashCode ^ counts.hashCode ^ groups.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -593,7 +722,8 @@ class SearchPage {
           runtimeType == other.runtimeType &&
           seq == other.seq &&
           hits == other.hits &&
-          counts == other.counts;
+          counts == other.counts &&
+          groups == other.groups;
 }
 
 enum SourceKind { xtream, m3UUrl, m3UFile }

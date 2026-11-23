@@ -16,6 +16,7 @@ import 'licences.dart';
 import 'platform/sandbox_migration.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
+import 'screens/profile_picker.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
 import 'services/reminders.dart';
@@ -99,6 +100,7 @@ class GerdTvApp extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           ),
           SessionState.needsSetup => SetupScreen(session: session),
+          SessionState.choosing => ProfilePicker(session: session),
           SessionState.ready => Shell(session: session),
         },
       ),

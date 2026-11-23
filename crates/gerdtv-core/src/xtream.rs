@@ -441,7 +441,11 @@ mod tests {
             })
             .unwrap();
         assert!(year.is_some_and(|y| (1960..2030).contains(&y)));
-        assert!(!db::search(&conn, "munchen", None, 5, 0).unwrap().is_empty());
+        assert!(
+            !db::search(&conn, "munchen", &[], None, 5, 0)
+                .unwrap()
+                .is_empty()
+        );
 
         // Stream URLs are built, not stored.
         let url: String = conn

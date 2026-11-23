@@ -85,9 +85,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ItemInfo dco_decode_box_autoadd_item_info(dynamic raw);
 
   @protected
-  ItemKind dco_decode_box_autoadd_item_kind(dynamic raw);
-
-  @protected
   ProfileInfo dco_decode_box_autoadd_profile_info(dynamic raw);
 
   @protected
@@ -124,6 +121,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double dco_decode_f_64(dynamic raw);
 
   @protected
+  GroupHit dco_decode_group_hit(dynamic raw);
+
+  @protected
+  GroupVisibility dco_decode_group_visibility(dynamic raw);
+
+  @protected
   GuideRow dco_decode_guide_row(dynamic raw);
 
   @protected
@@ -157,6 +160,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ChannelRef> dco_decode_list_channel_ref(dynamic raw);
 
   @protected
+  List<GroupHit> dco_decode_list_group_hit(dynamic raw);
+
+  @protected
+  List<GroupVisibility> dco_decode_list_group_visibility(dynamic raw);
+
+  @protected
   List<GuideRow> dco_decode_list_guide_row(dynamic raw);
 
   @protected
@@ -167,6 +176,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ItemInfo> dco_decode_list_item_info(dynamic raw);
+
+  @protected
+  List<ItemKind> dco_decode_list_item_kind(dynamic raw);
 
   @protected
   List<KindCount> dco_decode_list_kind_count(dynamic raw);
@@ -193,6 +205,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
 
   @protected
+  List<ResumeItem> dco_decode_list_resume_item(dynamic raw);
+
+  @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
 
   @protected
@@ -212,9 +227,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ItemInfo? dco_decode_opt_box_autoadd_item_info(dynamic raw);
-
-  @protected
-  ItemKind? dco_decode_opt_box_autoadd_item_kind(dynamic raw);
 
   @protected
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
@@ -239,6 +251,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
+
+  @protected
+  ResumeItem dco_decode_resume_item(dynamic raw);
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
@@ -324,9 +339,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ItemInfo sse_decode_box_autoadd_item_info(SseDeserializer deserializer);
 
   @protected
-  ItemKind sse_decode_box_autoadd_item_kind(SseDeserializer deserializer);
-
-  @protected
   ProfileInfo sse_decode_box_autoadd_profile_info(SseDeserializer deserializer);
 
   @protected
@@ -367,6 +379,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
+  GroupHit sse_decode_group_hit(SseDeserializer deserializer);
+
+  @protected
+  GroupVisibility sse_decode_group_visibility(SseDeserializer deserializer);
+
+  @protected
   GuideRow sse_decode_guide_row(SseDeserializer deserializer);
 
   @protected
@@ -402,6 +420,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ChannelRef> sse_decode_list_channel_ref(SseDeserializer deserializer);
 
   @protected
+  List<GroupHit> sse_decode_list_group_hit(SseDeserializer deserializer);
+
+  @protected
+  List<GroupVisibility> sse_decode_list_group_visibility(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<GuideRow> sse_decode_list_guide_row(SseDeserializer deserializer);
 
   @protected
@@ -414,6 +440,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ItemInfo> sse_decode_list_item_info(SseDeserializer deserializer);
+
+  @protected
+  List<ItemKind> sse_decode_list_item_kind(SseDeserializer deserializer);
 
   @protected
   List<KindCount> sse_decode_list_kind_count(SseDeserializer deserializer);
@@ -446,6 +475,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ResumeItem> sse_decode_list_resume_item(SseDeserializer deserializer);
+
+  @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
     SseDeserializer deserializer,
   );
@@ -469,9 +501,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ItemInfo? sse_decode_opt_box_autoadd_item_info(SseDeserializer deserializer);
-
-  @protected
-  ItemKind? sse_decode_opt_box_autoadd_item_kind(SseDeserializer deserializer);
 
   @protected
   ProgrammeInfo? sse_decode_opt_box_autoadd_programme_info(
@@ -500,6 +529,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
+
+  @protected
+  ResumeItem sse_decode_resume_item(SseDeserializer deserializer);
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
@@ -598,12 +630,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_item_kind(
-    ItemKind self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_profile_info(
     ProfileInfo self,
     SseSerializer serializer,
@@ -652,6 +678,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
+  void sse_encode_group_hit(GroupHit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_group_visibility(
+    GroupVisibility self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_guide_row(GuideRow self, SseSerializer serializer);
 
   @protected
@@ -694,6 +729,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_group_hit(List<GroupHit> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_group_visibility(
+    List<GroupVisibility> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_guide_row(List<GuideRow> self, SseSerializer serializer);
 
   @protected
@@ -710,6 +754,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_item_info(List<ItemInfo> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_item_kind(List<ItemKind> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_kind_count(
@@ -757,6 +804,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_resume_item(
+    List<ResumeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -790,12 +843,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_box_autoadd_item_kind(
-    ItemKind? self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_opt_box_autoadd_programme_info(
     ProgrammeInfo? self,
     SseSerializer serializer,
@@ -824,6 +871,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resume_item(ResumeItem self, SseSerializer serializer);
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);

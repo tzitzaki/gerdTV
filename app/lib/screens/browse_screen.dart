@@ -1,6 +1,7 @@
 // Browse one kind (Live TV, Movies, Series): the provider's groups in provider order, then a group's items
 // (paged, 100 at a time, more on scroll) in the section's list mode, live channels with what's on now and next.
-// Series open their episodes; everything else plays.
+// Series open their episodes; everything else plays. A group's own search field searches the whole group in the
+// core (section_search.dart), not just the rows loaded so far.
 
 import 'dart:async';
 
@@ -12,7 +13,9 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
+import 'logo.dart';
 import 'player_screen.dart';
+import 'section_search.dart';
 
 /// Plays an item, or opens a series' episodes. [channels]: the live channels around it (Up/Down in the player).
 void openItem(
@@ -21,7 +24,7 @@ void openItem(
   ItemInfo item, {
   List<ItemInfo>? channels,
 }) {
-  // Opened without its group (search): no zapping through an older list.
+  // Opened without a list (a programme, an episode): no zapping through an older list.
   if (item.kind == ItemKind.live) session.zapList = channels ?? const [];
   if (item.kind == ItemKind.series) {
     Navigator.of(context).push(
@@ -67,23 +70,145 @@ class BrowseScreen extends StatelessWidget {
                 session.syncing ? l10n.syncing : l10n.browseEmpty,
               );
             }
-            return ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (context, i) => ListTile(
-                title: Text(list[i].name),
-                trailing: Text('${list[i].count}'),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ItemsScreen(
-                      session: session,
-                      kind: kind,
-                      group: list[i],
-                    ),
-                  ),
-                ),
+            // The favourites of this section come first, as a group of their own (when there are any); movies and
+            // series show what was left part-way above them (refreshed whenever playback starts or stops).
+            return ListenableBuilder(
+              listenable: Listenable.merge([
+                session.favouritesChanged,
+                session.nowPlaying,
+              ]),
+              builder: (context, _) => FutureBuilder<List<ItemInfo>>(
+                future: lib.favourites(kinds: sectionKinds(sectionOf(kind))),
+                builder: (context, favs) {
+                  final n = favs.data?.length ?? 0;
+                  final all = [
+                    if (n > 0)
+                      CategoryInfo(id: '', name: l10n.favourites, count: n),
+                    ...list,
+                  ];
+                  final resume = kind == ItemKind.live
+                      ? null
+                      : ContinueRow(session: session, kind: kind);
+                  return ListView.builder(
+                    itemCount: all.length + (resume == null ? 0 : 1),
+                    itemBuilder: (context, row) {
+                      if (resume != null && row == 0) return resume;
+                      final i = resume == null ? row : row - 1;
+                      return ListTile(
+                        key: n > 0 && i == 0
+                            ? const Key('browse.favourites')
+                            : null,
+                        leading: n > 0 && i == 0
+                            ? const Icon(Icons.star)
+                            : null,
+                        title: Text(all[i].name),
+                        trailing: Text('${all[i].count}'),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ItemsScreen(
+                              session: session,
+                              kind: kind,
+                              group: all[i],
+                              favourites: n > 0 && i == 0,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// Continue watching (movies, series): started, unfinished movies or episodes as a row of tiles with how far they
+/// got, last watched first; a tile continues where it was left. Shows nothing until something was started.
+class ContinueRow extends StatelessWidget {
+  const ContinueRow({super.key, required this.session, required this.kind});
+  final Session session;
+  final ItemKind kind;
+
+  static const _limit = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+    return FutureBuilder<List<ResumeItem>>(
+      future: session.library!.continueWatching(
+        kinds: sectionKinds(sectionOf(kind)),
+        limit: _limit,
+      ),
+      builder: (context, snap) {
+        final rows = snap.data ?? const [];
+        if (rows.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Tokens.space * 2,
+                Tokens.space,
+                Tokens.space * 2,
+                0,
+              ),
+              child: Text(l10n.continueWatching, style: text.titleSmall),
+            ),
+            SizedBox(
+              height: 200,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(Tokens.space),
+                children: [
+                  for (final r in rows)
+                    SizedBox(
+                      width: 130,
+                      child: Card(
+                        key: Key('continue.${r.item.key}'),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => openItem(context, session, r.item),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, c) => Logo(
+                                    url: r.item.logo,
+                                    size: c.biggest.shortestSide,
+                                    icon: kindIcon(r.item.kind),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(Tokens.space / 2),
+                                child: Text(
+                                  r.item.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: text.bodySmall,
+                                ),
+                              ),
+                              LinearProgressIndicator(
+                                value: r.duration > 0
+                                    ? r.position / r.duration
+                                    : null,
+                                minHeight: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -96,10 +221,14 @@ class ItemsScreen extends StatefulWidget {
     required this.session,
     required this.kind,
     required this.group,
+    this.favourites = false,
   });
   final Session session;
   final ItemKind kind;
   final CategoryInfo group;
+
+  /// The section's Favourites group (its items come from the favourites, all at once).
+  final bool favourites;
 
   @override
   State<ItemsScreen> createState() => _ItemsScreenState();
@@ -110,7 +239,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   final List<ItemInfo> _items = [];
   bool _loading = false;
   bool _done = false;
-  final _filter = TextEditingController();
+  final _search = TextEditingController();
+  final _searchFocus = FocusNode();
 
   /// What is on for the loaded live items; refreshed every minute (progress, the next programme) and after each
   /// guide import.
@@ -139,7 +269,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   void dispose() {
     widget.session.removeListener(_onSession);
     _tick?.cancel();
-    _filter.dispose();
+    _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -167,16 +298,19 @@ class _ItemsScreenState extends State<ItemsScreen> {
   Future<void> _more() async {
     if (_loading || _done) return;
     setState(() => _loading = true);
-    final next = await widget.session.library!.items(
-      kind: widget.kind,
-      category: widget.group.id,
-      limit: page,
-      offset: _items.length,
-    );
+    final lib = widget.session.library!;
+    final next = widget.favourites
+        ? await lib.favourites(kinds: sectionKinds(sectionOf(widget.kind)))
+        : await lib.items(
+            kind: widget.kind,
+            category: widget.group.id,
+            limit: page,
+            offset: _items.length,
+          );
     if (!mounted) return;
     setState(() {
       _items.addAll(next);
-      _done = next.length < page;
+      _done = widget.favourites || next.length < page;
       _loading = false;
     });
     await _nowNextFor(next);
@@ -195,11 +329,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final f = _filter.text.toLowerCase();
-    // The instant filter narrows what is loaded; groups beyond a few pages are rare and load on scroll.
-    final shown = f.isEmpty
-        ? _items
-        : _items.where((i) => i.name.toLowerCase().contains(f)).toList();
     final next = ListMode.values[(_mode.index + 1) % ListMode.values.length];
     return Scaffold(
       appBar: AppBar(
@@ -213,36 +342,42 @@ class _ItemsScreenState extends State<ItemsScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(Tokens.space),
-            child: TextField(
-              controller: _filter,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.filter_list),
-                hintText: l10n.filterHint,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          Expanded(
-            child: ItemsView(
+      body: TypeToSearch(
+        focus: _searchFocus,
+        field: _search,
+        child: SectionSearch(
+          session: widget.session,
+          section: sectionOf(widget.kind),
+          controller: _search,
+          focus: _searchFocus,
+          // The Favourites group spans several groups: its search covers the section.
+          group: widget.favourites ? null : widget.group,
+          child: ValueListenableBuilder<int>(
+            valueListenable: widget.session.favouritesChanged,
+            builder: (context, _, _) => ItemsView(
               mode: _mode,
-              items: shown,
+              // In Favourites, an unstarred item leaves the list at once.
+              items: widget.favourites
+                  ? [
+                      for (final i in _items)
+                        if (widget.session.favourites.contains(i.key)) i,
+                    ]
+                  : _items,
               nowNext: _nowNext,
               now: DateTime.now(),
               loading: _loading,
               onNearEnd: _more,
+              favourites: widget.session.favourites,
+              onFavourite: widget.session.toggleFavourite,
               onTap: (it) => openItem(
                 context,
                 widget.session,
                 it,
-                channels: widget.kind == ItemKind.live ? List.of(shown) : null,
+                channels: widget.kind == ItemKind.live ? List.of(_items) : null,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

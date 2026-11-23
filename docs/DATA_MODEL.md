@@ -12,8 +12,11 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `meta` | schema version and similar settings | `key` |
 | `categories` | provider groups in provider order (`kind`, provider id or M3U group name, name, position) | `kind, id` |
 | `items` | the catalogue: live channels, movies, episodes, series; name, category (for Xtream Codes episodes: their series key), logo, EPG id, channel number, credential-free URL (M3U only), season/episode/year, container extension (Xtream Codes movies/episodes), catch-up days (live channels; 0 = none), provider position, sync generation | `key` |
-| `items_fts` | contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`; rowids match `items` | rowid |
-| `favourites`, `recents` | user data: item key + `updated_at` | `key` |
+| `items_fts`, `items_vocab` | search: contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`, rowids match `items`; its vocabulary for typo matching. `items.folded` holds `alt` lower-case without accents for mid-word matches (a scan, no extra index: every index costs at each sync) | rowid |
+| `search_history` | user data: a section's searches whose result was opened (section, query, `updated_at`); the newest 20 per section are kept | `section, query` |
+| `favourites`, `recents` | user data: item key + `updated_at` (recents: written whenever something starts playing) | `key` |
+| `hidden_groups` | user data: groups the user hid (kind, provider category id, `updated_at`); an Xtream Codes episode is hidden with its series' group | `kind, category` |
+| `resume` | user data: where a movie or episode was left (position and duration in seconds, `updated_at`); kept from 2 min, removed from 95 % | `key` |
 | `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
 | `epg_channels`, `epg_names` | guide channels per source (id, first display name, icon) and every display name normalised for matching | `id` / `norm` |
 | `programmes`, `programmes_fts` | guide programmes (channel, start/stop UTC, title, sub-title, description, category, episode, icon, source) with an FTS index over title, sub-title and description; kept 2 days back to 7 ahead | `id` |
@@ -42,5 +45,5 @@ M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `
 - Rows not seen in a sync are removed, except: when a source list comes back empty while the catalogue has rows of that kind, those rows are kept (panels answer `[]` now and then under load).
 
 ## Migrations
-Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`.
+Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`; version 6 added `items.folded` (filled from the stored names; the next sync adds the tvg-names), the vocabulary view and `search_history`; version 7 added `resume`; version 8 added `hidden_groups`.
 - Xtream Codes episodes are fetched when a series opens and kept until the next full sync.

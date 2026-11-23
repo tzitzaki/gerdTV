@@ -1,6 +1,7 @@
 // The app shell (docs/DESIGN.md): a sidebar on wide windows (desktop, tablet), a bottom bar on phones. Sections:
-// Live TV, Guide, Movies, Series, Search, Settings. While a sync runs, a thin bar shows at the top; a failed sync says so
-// with a retry, over the cached catalogue.
+// Live TV, Guide, Movies, Series, Settings; the first four have their own search on top (section_search.dart), whose
+// query the shell keeps while another section is shown. While a sync runs, a thin bar shows at the top; a failed sync
+// says so with a retry, over the cached catalogue.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -11,7 +12,7 @@ import '../theme.dart';
 import 'app_logo.dart';
 import 'browse_screen.dart';
 import 'guide_screen.dart';
-import 'search_screen.dart';
+import 'section_search.dart';
 import 'settings_screen.dart';
 
 class Shell extends StatefulWidget {
@@ -24,20 +25,50 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int _index = 0;
-  final _searchFocus = FocusNode();
+
+  /// Navigation index → section (Settings, index 4, has its own settings search).
+  static const _sections = [
+    SearchSection.live,
+    SearchSection.guide,
+    SearchSection.movies,
+    SearchSection.series,
+  ];
+  final _queries = {
+    for (final s in SearchSection.values) s: TextEditingController(),
+  };
+  final _focus = {for (final s in SearchSection.values) s: FocusNode()};
+  final _settingsFocus = FocusNode();
 
   @override
   void dispose() {
-    _searchFocus.dispose();
+    for (final c in _queries.values) {
+      c.dispose();
+    }
+    for (final f in _focus.values) {
+      f.dispose();
+    }
+    _settingsFocus.dispose();
     super.dispose();
   }
 
-  void _goSearch() {
-    setState(() => _index = 4);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _searchFocus.requestFocus(),
+  /// The "Also in" line: the other section with the same query.
+  void _jump(SearchSection to, String query) {
+    _queries[to]!.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
     );
+    setState(() => _index = _sections.indexOf(to));
   }
+
+  Widget _search(SearchSection s, Widget child) => SectionSearch(
+    key: ValueKey(s),
+    session: widget.session,
+    section: s,
+    controller: _queries[s]!,
+    focus: _focus[s],
+    onJump: _jump,
+    child: child,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -48,29 +79,37 @@ class _ShellState extends State<Shell> {
       (Icons.calendar_view_week, l10n.navGuide),
       (Icons.movie_outlined, l10n.navMovies),
       (Icons.video_library_outlined, l10n.navSeries),
-      (Icons.search, l10n.navSearch),
       (Icons.settings_outlined, l10n.navSettings),
     ];
     final page = switch (_index) {
-      0 => BrowseScreen(
-        key: const ValueKey('live'),
-        session: s,
-        kind: ItemKind.live,
+      0 => _search(
+        SearchSection.live,
+        BrowseScreen(
+          key: const ValueKey('live'),
+          session: s,
+          kind: ItemKind.live,
+        ),
       ),
-      1 => GuideScreen(session: s),
-      2 => BrowseScreen(
-        key: const ValueKey('movies'),
-        session: s,
-        kind: ItemKind.movie,
+      1 => _search(SearchSection.guide, GuideScreen(session: s)),
+      2 => _search(
+        SearchSection.movies,
+        BrowseScreen(
+          key: const ValueKey('movies'),
+          session: s,
+          kind: ItemKind.movie,
+        ),
       ),
-      3 => BrowseScreen(
-        key: const ValueKey('series'),
-        session: s,
-        kind: ItemKind.series,
+      3 => _search(
+        SearchSection.series,
+        BrowseScreen(
+          key: const ValueKey('series'),
+          session: s,
+          kind: ItemKind.series,
+        ),
       ),
-      4 => SearchScreen(session: s, focus: _searchFocus),
-      _ => SettingsScreen(session: s),
+      _ => SettingsScreen(session: s, focus: _settingsFocus),
     };
+    final section = _index < _sections.length ? _sections[_index] : null;
     final body = Column(
       children: [
         ListenableBuilder(
@@ -91,8 +130,10 @@ class _ShellState extends State<Shell> {
         Expanded(child: page),
       ],
     );
-    return CallbackShortcuts(
-      bindings: {for (final a in searchShortcuts) a: _goSearch},
+    // Typing in a section searches it; `/` and Ctrl/Cmd+F focus its field (in Settings: the settings search).
+    return TypeToSearch(
+      focus: section == null ? _settingsFocus : _focus[section]!,
+      field: section == null ? null : _queries[section],
       child: Focus(
         autofocus: true,
         child: LayoutBuilder(

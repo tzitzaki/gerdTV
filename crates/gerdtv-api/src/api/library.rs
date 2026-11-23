@@ -125,6 +125,8 @@ pub struct ItemInfo {
     pub number: Option<u32>,
     /// Live channels: catch-up days (0 = none).
     pub archive_days: u32,
+    /// The group's name; filled by search only.
+    pub group: String,
 }
 
 impl From<gerdtv_core::db::Hit> for ItemInfo {
@@ -137,6 +139,7 @@ impl From<gerdtv_core::db::Hit> for ItemInfo {
             logo: h.logo,
             number: h.number,
             archive_days: h.archive_days,
+            group: h.group,
         }
     }
 }
@@ -151,8 +154,31 @@ pub struct KindCount {
 pub struct SearchPage {
     pub seq: u64,
     pub hits: Vec<ItemInfo>,
-    /// Per-kind totals; only on the first page (offset 0).
+    /// Per-kind totals over every section; only on the first page (offset 0).
     pub counts: Vec<KindCount>,
+    /// Groups whose name matches; only on the first page of a whole-section search.
+    pub groups: Vec<GroupHit>,
+}
+
+/// A group and whether the user hid it.
+pub struct GroupVisibility {
+    pub group: CategoryInfo,
+    pub hidden: bool,
+}
+
+/// A started movie or episode with where it was left (seconds).
+pub struct ResumeItem {
+    pub item: ItemInfo,
+    pub position: u32,
+    pub duration: u32,
+}
+
+/// A group whose name matches a search (opens like a group in the browse list).
+pub struct GroupHit {
+    pub kind: ItemKind,
+    pub id: String,
+    pub name: String,
+    pub count: u32,
 }
 
 pub struct SyncSummary {
@@ -332,18 +358,26 @@ impl Library {
             .collect())
     }
 
-    /// Search as the user types; `kind` None = all kinds.
+    /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
     pub fn search(
         &self,
         seq: u64,
         query: String,
-        kind: Option<ItemKind>,
+        kinds: Vec<ItemKind>,
+        category: Option<String>,
         limit: u32,
         offset: u32,
     ) -> Result<SearchPage, String> {
-        let (hits, counts) = self
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        let (hits, counts, groups) = self
             .0
-            .search(&query, kind.map(to_core), limit as usize, offset as usize)
+            .search(
+                &query,
+                &kinds,
+                category.as_deref(),
+                limit as usize,
+                offset as usize,
+            )
             .map_err(err)?;
         Ok(SearchPage {
             seq,
@@ -355,7 +389,123 @@ impl Library {
                     count: n as u32,
                 })
                 .collect(),
+            groups: groups
+                .into_iter()
+                .map(|g| GroupHit {
+                    kind: from_core(g.kind),
+                    id: g.id,
+                    name: g.name,
+                    count: g.count as u32,
+                })
+                .collect(),
         })
+    }
+
+    /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn record_search(&self, section: String, query: String) -> Result<(), String> {
+        self.0.record_search(&section, &query).map_err(err)
+    }
+
+    /// Marks or unmarks a favourite (the star, a long press, a long OK).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_favourite(&self, key: String, favourite: bool) -> Result<(), String> {
+        self.0.set_favourite(&key, favourite).map_err(err)
+    }
+
+    /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
+    pub fn favourites(&self, kinds: Vec<ItemKind>) -> Result<Vec<ItemInfo>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .favourites(&kinds)
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    /// How far a movie or episode played (seconds); kept from 2 min, dropped from 95 % (continue watching).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn save_progress(&self, key: String, position: u32, duration: u32) -> Result<(), String> {
+        self.0.save_progress(&key, position, duration).map_err(err)
+    }
+
+    /// Where to resume an item (seconds), if it was left part-way.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn resume_position(&self, key: String) -> Result<Option<u32>, String> {
+        self.0.resume_position(&key).map_err(err)
+    }
+
+    /// The continue-watching row of a section: started, unfinished items, last watched first.
+    pub fn continue_watching(
+        &self,
+        kinds: Vec<ItemKind>,
+        limit: u32,
+    ) -> Result<Vec<ResumeItem>, String> {
+        let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
+        Ok(self
+            .0
+            .continue_watching(&kinds, limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(|(h, position, duration)| ResumeItem {
+                item: h.into(),
+                position,
+                duration,
+            })
+            .collect())
+    }
+
+    /// Something started playing: search ranks recently watched items first.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn touch_recent(&self, key: String) -> Result<(), String> {
+        self.0.touch_recent(&key).map_err(err)
+    }
+
+    /// Every non-empty group of a kind with whether the user hid it (Settings → Hidden groups).
+    pub fn all_groups(&self, kind: ItemKind) -> Result<Vec<GroupVisibility>, String> {
+        Ok(self
+            .0
+            .all_categories(to_core(kind))
+            .map_err(err)?
+            .into_iter()
+            .map(|(c, hidden)| GroupVisibility {
+                group: CategoryInfo {
+                    id: c.id,
+                    name: c.name,
+                    count: c.count as u32,
+                },
+                hidden,
+            })
+            .collect())
+    }
+
+    /// Hides a group everywhere (lists, search, the guide, favourites, continue watching) or shows it again.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_group_hidden(
+        &self,
+        kind: ItemKind,
+        category: String,
+        hidden: bool,
+    ) -> Result<(), String> {
+        self.0
+            .set_group_hidden(to_core(kind), &category, hidden)
+            .map_err(err)
+    }
+
+    /// Every favourite's key, for the stars in the lists.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn favourite_keys(&self) -> Result<Vec<String>, String> {
+        self.0.favourite_keys().map_err(err)
+    }
+
+    /// The section's newest searches, newest first (the field's suggestions while empty).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn recent_searches(&self, section: String, limit: u32) -> Result<Vec<String>, String> {
+        self.0
+            .recent_searches(&section, limit as usize)
+            .map_err(err)
     }
 
     /// Logs a recovery episode (the watchdog's Health command).

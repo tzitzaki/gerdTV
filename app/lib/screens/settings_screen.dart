@@ -19,12 +19,16 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'settings_model.dart';
+import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.session});
+  const SettingsScreen({super.key, required this.session, this.focus});
   final Session session;
+
+  /// The settings search field's focus (the shell's Ctrl/Cmd+F and `/`).
+  final FocusNode? focus;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -91,6 +95,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : last == null
                     ? ''
                     : l10n.settingsLastSync(last.entries, last.categories),
+              ),
+            ),
+          ),
+          // Profiles: switch to another provider account, add one, and whether this one opens without asking.
+          SettingsEntry(
+            id: 'profiles',
+            title: l10n.profiles,
+            keywords: l10n.settingsKeywordsProfiles,
+            build: (context) => StatefulBuilder(
+              builder: (context, setState) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final p in session.profiles)
+                    if (p.id != session.profile?.id)
+                      ListTile(
+                        key: Key('settings.profile.${p.id}'),
+                        leading: const Icon(Icons.swap_horiz),
+                        title: Text(l10n.profileSwitch(p.name)),
+                        onTap: () => session.openProfile(p),
+                      ),
+                  if (session.profiles.length > 1 && session.profile != null)
+                    SwitchListTile(
+                      key: const Key('settings.profileAlways'),
+                      title: Text(l10n.profileAlways),
+                      value: session.opensAlways(session.profile!),
+                      onChanged: (on) => setState(() {
+                        setAppSetting(
+                          dir: session.appDir!,
+                          key: Session.settingAlwaysProfile,
+                          value: on ? session.profile!.id : '',
+                        );
+                      }),
+                    ),
+                  ListTile(
+                    key: const Key('settings.profileAdd'),
+                    leading: const Icon(Icons.add),
+                    title: Text(l10n.profileAdd),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SetupScreen(session: session),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -174,6 +222,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: l10n.settingsLists,
               keywords: l10n.settingsKeywordsLists,
               build: (_) => _ListSettings(session: session),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'hidden',
+              title: l10n.hiddenGroups,
+              keywords: l10n.settingsKeywordsHidden,
+              build: (context) => ListTile(
+                key: const Key('settings.hidden'),
+                title: Text(l10n.hiddenGroups),
+                subtitle: Text(l10n.hiddenGroupsHint),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HiddenGroupsScreen(session: session),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
@@ -346,6 +411,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: TextField(
         key: const Key('settings.search'),
         controller: _query,
+        focusNode: widget.focus,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.search),
           hintText: l10n.settingsSearchHint,
@@ -662,6 +728,73 @@ class _ListSettingsState extends State<_ListSettings> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Settings → Appearance → Hidden groups: every group of Live TV, Movies and Series; a ticked one disappears from the
+/// lists, search, the guide, favourites and continue watching (user data, kept across syncs by group id).
+class HiddenGroupsScreen extends StatefulWidget {
+  const HiddenGroupsScreen({super.key, required this.session});
+  final Session session;
+
+  @override
+  State<HiddenGroupsScreen> createState() => _HiddenGroupsScreenState();
+}
+
+class _HiddenGroupsScreenState extends State<HiddenGroupsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final lib = widget.session.library!;
+    final sections = [
+      (ItemKind.live, l10n.navLive),
+      (ItemKind.movie, l10n.navMovies),
+      (ItemKind.series, l10n.navSeries),
+    ];
+    return DefaultTabController(
+      length: sections.length,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.hiddenGroups),
+          bottom: TabBar(tabs: [for (final (_, n) in sections) Tab(text: n)]),
+        ),
+        body: TabBarView(
+          children: [
+            for (final (kind, _) in sections)
+              FutureBuilder<List<GroupVisibility>>(
+                // Re-read after each change (setState): the list is small.
+                future: lib.allGroups(kind: kind),
+                builder: (context, snap) {
+                  final groups = snap.data;
+                  if (groups == null) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return ListView(
+                    children: [
+                      for (final g in groups)
+                        CheckboxListTile(
+                          key: Key('hidden.${kind.name}.${g.group.id}'),
+                          title: Text(g.group.name),
+                          subtitle: Text('${g.group.count}'),
+                          value: g.hidden,
+                          onChanged: (on) {
+                            lib.setGroupHidden(
+                              kind: kind,
+                              category: g.group.id,
+                              hidden: on ?? false,
+                            );
+                            widget.session.groupsChanged();
+                            setState(() {});
+                          },
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

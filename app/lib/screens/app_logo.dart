@@ -40,23 +40,36 @@ Future<Uint8List> renderLogoPng(
   return png!.buffer.asUint8List();
 }
 
-/// The logo on its rounded dark tile, [size] logical pixels square.
+/// The logo inside the app, [size] logical pixels square. Its tile takes the surface colour (owner decision): the
+/// icon's blue-black tile showed as a faint square on the warm surfaces. App icons keep [Tokens.ink].
 class AppLogoMark extends StatelessWidget {
   const AppLogoMark({super.key, required this.logo, this.size = 40});
   final AppLogo logo;
   final double size;
 
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: Size.square(size), painter: AppLogoPainter(logo));
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: AppLogoPainter(
+      logo,
+      tileColor: Theme.of(context).colorScheme.surface,
+    ),
+  );
 }
 
 class AppLogoPainter extends CustomPainter {
-  const AppLogoPainter(this.logo, {this.tile = true});
+  const AppLogoPainter(
+    this.logo, {
+    this.tile = true,
+    this.tileColor = Tokens.ink,
+  });
   final AppLogo logo;
 
   /// Draw the rounded background tile. Off for the Android banner, which has its own background.
   final bool tile;
+
+  /// The tile's colour: [Tokens.ink] for app icons, the surface inside the app.
+  final Color tileColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -69,7 +82,7 @@ class AppLogoPainter extends CustomPainter {
           Rect.fromLTWH(0, 0, s, s),
           Radius.circular(s * 0.22),
         ),
-        Paint()..color = Tokens.ink,
+        Paint()..color = tileColor,
       );
     }
     Offset p(double x, double y) => Offset(x * s, y * s);
@@ -180,5 +193,5 @@ class AppLogoPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(AppLogoPainter old) =>
-      old.logo != logo || old.tile != tile;
+      old.logo != logo || old.tile != tile || old.tileColor != tileColor;
 }

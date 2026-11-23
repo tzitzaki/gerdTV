@@ -257,8 +257,8 @@ void main() {
         await checkScreen(tester, form, name, size);
       }
 
-      await section('Search');
-      // Programmes are searched when the query changes: wait for the background guide import first.
+      // Search in Live TV: channels from every group, matching groups, programmes below (searched when the query
+      // changes: wait for the background guide import first). Movies: tiles with each one's group.
       final end = DateTime.now().add(const Duration(seconds: 30));
       while (session.guideGeneration == guideBefore) {
         if (DateTime.now().isAfter(end)) {
@@ -268,31 +268,16 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 200)),
         );
       }
-      await tester.enterText(find.byKey(const Key('search.field')), 'sport');
-      // The chip row scrolls sideways; on a phone the Programmes chip starts out of reach (not built yet).
-      // (Found from a chip: the search field has a sideways Scrollable of its own.)
-      final chips = find.ancestor(
-        of: find.byKey(const Key('search.chip.live')),
-        matching: find.byType(Scrollable),
-      );
-      await waitFor(tester, chips);
-      // The programme search answers asynchronously: swipe the row along until the chip is there.
-      final programmes = find.byKey(const Key('search.chip.programmes'));
-      final until = DateTime.now().add(const Duration(seconds: 30));
-      while (programmes.hitTestable().evaluate().isEmpty) {
-        if (DateTime.now().isAfter(until)) {
-          await screenshot(tester, '$form-search-nochip');
-          fail('$form: no Programmes chip');
-        }
-        await tester.drag(chips.first, const Offset(-200, 0));
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 200)),
-        );
-        await tester.pump();
-      }
+      await section('Live TV');
+      await tester.enterText(find.byKey(const Key('search.live')), 'sport');
+      await waitFor(tester, find.byType(ItemRow).hitTestable());
       await checkScreen(tester, form, 'search', size);
-      await tapReady(tester, find.byKey(const Key('search.chip.programmes')));
-      await checkScreen(tester, form, 'search-programmes', size);
+      await tester.tap(find.byKey(const Key('search.clear')));
+      await section('Movies');
+      await tester.enterText(find.byKey(const Key('search.movies')), 'sport');
+      await waitFor(tester, find.byType(ItemCard).hitTestable());
+      await checkScreen(tester, form, 'search-movies', size);
+      await tester.tap(find.byKey(const Key('search.clear')));
 
       // The guide grid (the guide imported above) and a programme's sheet.
       await section('Guide');
@@ -309,6 +294,23 @@ void main() {
       await waitFor(tester, find.byKey(const Key('guide.sheet.watch')));
       await checkScreen(tester, form, 'guide-sheet', size);
       await tester.tapAt(const Offset(10, 10)); // the sheet's barrier closes it
+      await settle(tester);
+      // The guide's search: programmes instead of the grid.
+      await tester.enterText(find.byKey(const Key('search.guide')), 'sport');
+      await waitFor(
+        tester,
+        find
+            .byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith(
+                    'search.programme.',
+                  ),
+            )
+            .hitTestable(),
+      );
+      await checkScreen(tester, form, 'search-guide', size);
+      await tester.tap(find.byKey(const Key('search.clear')));
       await settle(tester);
 
       await section('Settings');

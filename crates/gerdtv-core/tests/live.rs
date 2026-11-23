@@ -73,7 +73,7 @@ async fn live_xtream_sync() {
     );
     for q in ["s", "sport", "news hd", "1"] {
         let t = Instant::now();
-        let hits = db::search(&conn, q, None, 50, 0).unwrap().len();
+        let hits = db::search(&conn, q, &[], None, 50, 0).unwrap().len();
         println!(
             "search {q:?}: {hits} hits (first page) in {} µs",
             t.elapsed().as_micros()
