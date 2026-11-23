@@ -98,11 +98,12 @@ void main() {
       tester,
     ) async {
       await pump(tester, const Size(1280, 800));
-      for (final id in ['account', 'health', 'about']) {
+      // Five categories (owner decision): Your data sits in Account, Stream health in Playback, Updates in About.
+      for (final id in ['account', 'playback', 'about']) {
         expect(find.byKey(Key('settings.cat.$id')), findsOneWidget);
       }
-      // Profile categories need an open library (none here).
-      for (final id in ['playback', 'data']) {
+      // The guide needs an open library (none here); the merged categories are gone.
+      for (final id in ['guide', 'data', 'updates', 'health']) {
         expect(find.byKey(Key('settings.cat.$id')), findsNothing);
       }
       // The first category shows; another one replaces it.
@@ -111,6 +112,7 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('settings.remove')), findsNothing);
       expect(find.text('Licences'), findsOneWidget);
+      expect(find.text('Check for updates'), findsOneWidget);
 
       // Search across categories: only the matching entry, under its category.
       await tester.enterText(

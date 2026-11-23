@@ -5499,7 +5499,7 @@ class LibraryImpl extends RustOpaque implements Library {
   bool hasChannelBuffer({required String key}) => RustLib.instance.api
       .crateApiLibraryLibraryHasChannelBuffer(that: this, key: key);
 
-  /// The newest stream_health rows (Settings → Stream health).
+  /// The newest stream_health rows (Settings → Playback → Stream health).
   Future<List<HealthInfo>> health({required int limit}) => RustLib.instance.api
       .crateApiLibraryLibraryHealth(that: this, limit: limit);
 

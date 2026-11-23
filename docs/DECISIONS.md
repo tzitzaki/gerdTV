@@ -16,6 +16,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
 - Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
+- Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
@@ -27,7 +28,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
-- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Your data), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n) and material_ui (Material moved out of the SDK).
+- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n) and material_ui (Material moved out of the SDK).
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
 - Benchmarks compare A/B in one run (origin/main's core, then the branch's), not against a stored baseline.
 - Own libmpv: one self-contained library per platform (mpv + FFmpeg + libplacebo, LGPL), built by our scripts in CI, named libgerdmpv; media_kit's engine stays the default until ours passes the harness, the journeys and the owner's device checks.

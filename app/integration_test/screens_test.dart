@@ -322,9 +322,6 @@ void main() {
         'playback',
         'guide',
         'appearance',
-        'data',
-        'updates',
-        'health',
         'about',
       ]) {
         await tapReady(tester, find.byKey(Key('settings.cat.$cat')));

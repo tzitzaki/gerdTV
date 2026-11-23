@@ -1,4 +1,4 @@
-// Settings → Updates: checks the latest release (signed manifest, newer version, a build for this platform; the
+// Settings → About → Updates: checks the latest release (signed manifest, newer version, a build for this platform; the
 // checks are the core's, gerdtv_core::update), shows its notes and downloads the file, kept only when its SHA-256
 // matches. Installing: macOS swaps the bundle in place and restarts (platform/mac_install.dart), Android hands the APK
 // to the system's installer, Linux opens the download folder; on iPhone/iPad the IPA has to be re-signed first, so

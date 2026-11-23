@@ -530,7 +530,7 @@ impl Library {
             .map_err(err)
     }
 
-    /// The newest stream_health rows (Settings → Stream health).
+    /// The newest stream_health rows (Settings → Playback → Stream health).
     pub fn health(&self, limit: u32) -> Result<Vec<HealthInfo>, String> {
         Ok(self
             .0

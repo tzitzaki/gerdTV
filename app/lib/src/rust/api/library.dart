@@ -110,7 +110,7 @@ abstract class Library implements RustOpaqueInterface {
   /// Whether the item has its own buffer (else it follows the profile's preset).
   bool hasChannelBuffer({required String key});
 
-  /// The newest stream_health rows (Settings → Stream health).
+  /// The newest stream_health rows (Settings → Playback → Stream health).
   Future<List<HealthInfo>> health({required int limit});
 
   /// Merges an exported file; returns how many entries were new or newer. The error says why a file is refused.

@@ -19,7 +19,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Zapping and timeshift: Up/Down switch channels; Space on live, then a minute later the top shows −1:00 and Live; the seek bar drags back.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
-- Updates: Settings → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
+- Updates: Settings → About → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
 - Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.

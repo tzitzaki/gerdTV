@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS favourites (key TEXT PRIMARY KEY, updated_at INTEGER 
 CREATE TABLE IF NOT EXISTS recents (key TEXT PRIMARY KEY, updated_at INTEGER NOT NULL);
 -- Per channel: the URL form that last worked (the watchdog's TS ↔ HLS switch).
 CREATE TABLE IF NOT EXISTS stream_prefs (key TEXT PRIMARY KEY, prefer_hls INTEGER NOT NULL, updated_at INTEGER NOT NULL);
--- Every recovery the watchdog made or gave up on (Settings → Stream health, diagnostics export).
+-- Every recovery the watchdog made or gave up on (Settings → Playback → Stream health, diagnostics export).
 CREATE TABLE IF NOT EXISTS stream_health (
     id INTEGER PRIMARY KEY, at INTEGER NOT NULL, key TEXT NOT NULL, trigger TEXT NOT NULL,
     attempts INTEGER NOT NULL, recovered INTEGER NOT NULL, secs INTEGER NOT NULL);

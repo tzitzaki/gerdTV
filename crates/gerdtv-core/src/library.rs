@@ -920,7 +920,7 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The profile's user data as JSON (Settings → Your data; crate::userdata).
+    /// The profile's user data as JSON (Settings → Account → Your data; crate::userdata).
     pub fn export_user_data(&self) -> Result<String> {
         Ok(crate::userdata::export(&self.conn.lock().unwrap())?)
     }

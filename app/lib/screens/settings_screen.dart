@@ -1,5 +1,5 @@
-// Settings, in categories: Account, Playback, TV guide, Appearance, Updates, Stream health,
-// About (docs/SPEC.md, "Settings").
+// Settings, in five categories (owner decision): Account (with Your data), Playback (with Stream health), TV guide,
+// Appearance, About (with Updates) (docs/SPEC.md, "Settings").
 // Wide windows (desktop, TV) show the categories on the left and the chosen one on the right; phones show the
 // categories as a list that opens a page. A search field on top filters every entry of every category as you type
 // (settings_model.dart) and shows the matches grouped by category.
@@ -155,6 +155,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: session.sync,
             ),
           ),
+          // Your data: export and import the profile's user data (one JSON file).
+          if (lib != null)
+            SettingsEntry(
+              id: 'userData',
+              title: l10n.userDataExport,
+              keywords: l10n.settingsKeywordsData,
+              build: (_) => UserDataSettings(session: session),
+            ),
           SettingsEntry(
             id: 'remove',
             title: l10n.settingsRemove,
@@ -175,6 +183,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           if (lib != null) ..._playbackEntries(l10n, lib),
           if (ownLibmpv() != null) _engineEntry(l10n),
+          SettingsEntry(
+            id: 'health',
+            title: l10n.settingsHealth,
+            keywords: l10n.settingsKeywordsHealth,
+            build: (_) => _HealthList(library: lib),
+          ),
         ],
       ),
       SettingsCategory(
@@ -247,46 +261,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       SettingsCategory(
-        id: 'data',
-        icon: Icons.import_export,
-        title: l10n.settingsData,
-        entries: [
-          if (lib != null)
-            SettingsEntry(
-              id: 'userData',
-              title: l10n.userDataExport,
-              keywords: l10n.settingsKeywordsData,
-              build: (_) => UserDataSettings(session: session),
-            ),
-        ],
-      ),
-      SettingsCategory(
-        id: 'updates',
-        icon: Icons.system_update_outlined,
-        title: l10n.settingsUpdates,
-        entries: [
-          SettingsEntry(
-            id: 'updates',
-            title: l10n.updateCheck,
-            keywords: l10n.settingsKeywordsUpdates,
-            build: (_) => const UpdateSettings(),
-          ),
-        ],
-      ),
-      SettingsCategory(
-        id: 'health',
-        icon: Icons.monitor_heart_outlined,
-        title: l10n.settingsHealth,
-        entries: [
-          SettingsEntry(
-            id: 'health',
-            title: l10n.settingsHealth,
-            keywords: l10n.settingsKeywordsHealth,
-            build: (_) => _HealthList(library: lib),
-          ),
-        ],
-      ),
-      SettingsCategory(
         id: 'about',
         icon: Icons.info_outline,
         title: l10n.settingsAbout,
@@ -298,6 +272,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: AppLogoMark(logo: session.logo, size: 32),
               title: Text(l10n.aboutVersion(coreVersion())),
             ),
+          ),
+          SettingsEntry(
+            id: 'updates',
+            title: l10n.updateCheck,
+            keywords: l10n.settingsKeywordsUpdates,
+            build: (_) => const UpdateSettings(),
           ),
           SettingsEntry(
             id: 'licences',
@@ -630,7 +610,7 @@ class _CategoryContent extends StatelessWidget {
   );
 }
 
-/// Settings → Stream health: the last 50 recoveries the watchdog made or gave up on.
+/// Settings → Playback → Stream health: the last 50 recoveries the watchdog made or gave up on.
 class _HealthList extends StatelessWidget {
   const _HealthList({required this.library});
   final Library? library;
