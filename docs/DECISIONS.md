@@ -23,6 +23,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
 - Benchmarks compare A/B in one run (origin/main's core, then the branch's), not against a stored baseline.
 - Own libmpv: one self-contained library per platform (mpv + FFmpeg + libplacebo, LGPL), built by our scripts in CI, named libgerdmpv; media_kit's engine stays the default until ours passes the harness, the journeys and the owner's device checks.
+- Linux CI runs the integration tests on gerdTV's own libmpv only (no Lua scripts to deadlock media_kit's start); the standard engine keeps the libmpv harness.
 - State management with `ChangeNotifier`/`ValueListenable`, navigation with `Navigator`/`Router`; images fetched and disk-cached by the core, shown with `Image.file`.
 - Native code only as small, commented Swift/Kotlin platform channels; no third-party native libraries.
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.

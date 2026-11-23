@@ -187,7 +187,9 @@ ci-linux:
     just l10n
     cd app && flutter analyze
     just licences
-    just test-integration
+    # Integration tests only on gerdTV's own libmpv (owner decision): the system libmpv's Lua scripts sometimes
+    # deadlock media_kit's start in CI (main thread in mpv_hook_add / mpv_get_property while the script threads
+    # start), and media_kit sets no load-scripts=no before mpv_initialize. The own build has no Lua.
     just test-integration-gerdmpv
     just build-linux
 
