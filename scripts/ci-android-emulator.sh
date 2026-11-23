@@ -9,7 +9,8 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger --name-match=kvm
 image="system-images;android-34;default;x86_64"
 sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-yes | "$sdkmanager" --install emulator platform-tools "$image" >/dev/null
+# (yes ends with a broken pipe once sdkmanager stops reading: not an error, but pipefail would make it one.)
+(yes || true) | "$sdkmanager" --install emulator platform-tools "$image" >/dev/null
 echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n smoke -k "$image" --force >/dev/null
 "$ANDROID_HOME/emulator/emulator" -avd smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
   >"${RUNNER_TEMP:-/tmp}/emulator.log" 2>&1 &
