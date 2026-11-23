@@ -1,17 +1,17 @@
 # Releasing
 
 ## Versions
-`0.YYMMDD.<PR#>`: the date of the wrap-up and the wrap-up PR's number. In `Cargo.toml` (workspace) and `app/pubspec.yaml` as `0.YYMMDD.<PR#>+<PR#>`, so Android's versionCode and iOS's build number always grow. The major stays 0 until the owner changes it.
+`0.YYMMDD.<PR#>`: the date of the wrap-up and the number of the PR that carries it (the session's PR). In `Cargo.toml` (workspace) and `app/pubspec.yaml` as `0.YYMMDD.<PR#>+<PR#>`, so Android's versionCode and iOS's build number always grow. The major stays 0 until the owner changes it.
 
 ## Flow
-1. The wrap-up PR sets the version and rewrites `docs/HANDOVER.md`; it merges like any PR.
+1. The session PR's last commit sets the version and rewrites `docs/HANDOVER.md`; the PR merges like any other (CI runs only the repo rules for a wrap-up on its own: `scripts/ci-scope.sh`).
 2. Tag the merge commit `v0.YYMMDD.<PR#>` and push the tag. `.github/workflows/release.yml` runs.
 3. `gh run watch`, then `just verify-release <tag>`: downloads the release, checks every asset's size and SHA-256 and the manifest signature.
 
 ## What release.yml builds
 - `macos-latest`: `gerdTV-macos-<version>.zip` (the app signed with the stable self-signed certificate, packed with `ditto -c -k --keepParent`; the updater's file in `latest.json`), `gerdTV-macos-<version>.dmg` (the same app with an Applications link for the first install, `scripts/macos-dmg.sh`; not in `latest.json`, `just verify-release` checks it is there) and `gerdTV-ios-unsigned-<version>.ipa` (`flutter build ios --release --no-codesign`, `Payload/Runner.app` zipped, for a re-signing service).
 - `ubuntu-latest`: `gerdTV-android-<version>.apk` (arm64-v8a, release keystore) and `gerdTV-linux-x64-<version>.tar.gz`.
-- Last job: `latest.json` (version, notes, per platform: asset, size, SHA-256, minimum OS) signed with the ed25519 update key into `latest.json.sig` (`gerdtv-release`), then `gh release create` with every asset. Notes: the merged PR titles since the previous published release (a tag whose release run failed has no release and is skipped) plus install hints linking `docs/INSTALL.md`. Any failed platform job means no release (no half releases). Tags with a `-` (e.g. a test tag) are published as pre-releases.
+- Last job: `latest.json` (version, notes, per platform: asset, size, SHA-256, minimum OS) signed with the ed25519 update key into `latest.json.sig` (`gerdtv-release`), then `gh release create` with every asset. Notes: the merged PR titles since the previous published release, each with its commit subjects when it has several (without the version commit; `scripts/release-notes.sh`) (a tag whose release run failed has no release and is skipped) plus install hints linking `docs/INSTALL.md`. Any failed platform job means no release (no half releases). Tags with a `-` (e.g. a test tag) are published as pre-releases.
 
 ## Why a stable self-signed certificate on macOS
 An ad-hoc signature changes with every build, so the Keychain would ask again (or refuse) for stored credentials after each update. A stable certificate keeps the Keychain's access rules valid across updates.
