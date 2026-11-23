@@ -67,6 +67,10 @@ class PlatformBridge {
     }
   }
 
+  /// Android: opens the system's package installer for the downloaded [apk] (the user confirms there).
+  static Future<void> installApk(String apk) =>
+      channel.invokeMethod('installApk', {'path': apk});
+
   /// Android: writes [text] as [name] into Downloads; returns where it went.
   static Future<String> saveToDownloads(String name, String text) async =>
       (await channel.invokeMethod<String>('saveToDownloads', {

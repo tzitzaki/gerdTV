@@ -6,10 +6,12 @@ package world.zakis.gerdtv
 // - Background playback: PlaybackService (a foreground service with a notification, wake and Wi-Fi locks) keeps the
 //   process and the stream alive with the screen off, until Dart says playback stopped.
 // - The launcher icon: one <activity-alias> per logo in the manifest, exactly one enabled (setLogo).
+// - Updates: installApk hands the downloaded APK to the system's installer through a FileProvider (res/xml/
+//   file_paths.xml); the user confirms there, and allows "install unknown apps" for gerdTV the first time.
 // - Settings → Your data: saveToDownloads writes the export into the public Downloads folder (MediaStore, Android
 //   10+, no permission needed); older Android gets the app's own Downloads folder and the path is returned.
-// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name),
-// saveToDownloads(String name, String text) → String; native →
+// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name), installApk(String
+// path), saveToDownloads(String name, String text) → String; native →
 // pictureMode(Boolean).
 // Debug hints: `adb shell dumpsys activity services world.zakis.gerdtv` shows the service; PiP needs
 // android:supportsPictureInPicture in the manifest and Android 8+.
@@ -24,6 +26,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.os.Build
 import android.util.Rational
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -47,6 +50,16 @@ class MainActivity : FlutterActivity() {
                     }
                     "setLogo" -> {
                         setLogo(call.argument<String>("name") ?: "gtv")
+                        result.success(null)
+                    }
+                    "installApk" -> {
+                        val apk = java.io.File(call.argument<String>("path") ?: "")
+                        val uri = FileProvider.getUriForFile(this, "$packageName.files", apk)
+                        startActivity(
+                            Intent(Intent.ACTION_VIEW)
+                                .setDataAndType(uri, "application/vnd.android.package-archive")
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
                         result.success(null)
                     }
                     "saveToDownloads" -> {

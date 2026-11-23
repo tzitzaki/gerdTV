@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The folders MainActivity.installApk may share: the cache, where Settings → Updates downloads the APK
+     (path_provider's getTemporaryDirectory). -->
+<paths>
+    <cache-path name="updates" path="." />
+</paths>

@@ -139,6 +139,8 @@
   "updateDownloaded": "Geladen und geprüft: {file}",
   "updateDownloading": "Wird geladen…",
   "updateFailed": "Update fehlgeschlagen: {error}",
+  "updateInstall": "Installieren",
+  "updateInstallRestart": "Installieren und neu starten",
   "updateIosHint": "Die neue IPA mit dem Re-Signing-Dienst signieren und installieren.",
   "updateNone": "gerdTV ist aktuell.",
   "updateShowFolder": "Im Ordner zeigen",

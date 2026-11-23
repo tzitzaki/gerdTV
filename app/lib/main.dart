@@ -5,6 +5,7 @@
 // (Cargokit, app/rust_builder; see docs/ARCHITECTURE.md, "The seam"). Missing German strings: app/lib/l10n/*.arb.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
@@ -12,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'l10n/gen/app_localizations.dart';
 import 'licences.dart';
+import 'platform/sandbox_migration.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
 import 'screens/setup_screen.dart';
@@ -29,6 +31,17 @@ Future<void> main() async {
   // Logos and posters are kept on disk (the OS may clear this folder; they are fetched again then).
   initLogoCache(dir: '${(await getApplicationCacheDirectory()).path}/logos');
   MediaKit.ensureInitialized();
+  if (Platform.isMacOS) {
+    // First start without the sandbox: copy the old container's data over (see sandbox_migration.dart).
+    final copied = migrateSandboxData(
+      sandboxSupportDir(
+        Platform.environment['HOME'] ?? '',
+        'world.zakis.gerdtv',
+      ),
+      await getApplicationSupportDirectory(),
+    );
+    if (copied > 0) debugPrint('sandbox-migration: copied $copied files');
+  }
   final session = Session();
   // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
   session.reminders = Reminders(
