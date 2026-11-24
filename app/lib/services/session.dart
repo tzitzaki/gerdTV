@@ -518,7 +518,12 @@ class Session extends ChangeNotifier {
   /// and the tracking services hear of it.
   Future<void> userPause(bool pause) async {
     _track(pause ? 'pause' : 'start');
-    pause ? await adapter.pause() : await adapter.resume();
+    if (onAvPlayer.value) {
+      // AVPlayer has no watchdog here: the core keeps its provider connection alive while paused.
+      pause ? await player.pause() : await player.play();
+    } else {
+      pause ? await adapter.pause() : await adapter.resume();
+    }
   }
 
   /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
@@ -539,6 +544,8 @@ class Session extends ChangeNotifier {
     final lib = library;
     if (lib == null || nowPlaying.value?.key == item.key) return;
     _saveProgress();
+    await _useMpv();
+    _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = item.key;
     bufferRaisedTo.value = null;
@@ -620,9 +627,9 @@ class Session extends ChangeNotifier {
     platform.onPipCommand ??= (action, secs) {
       switch (action) {
         case 'play':
-          unawaited(adapter.resume());
+          unawaited(userPause(false));
         case 'pause':
-          unawaited(adapter.pause());
+          unawaited(userPause(true));
         case 'skip':
           unawaited(
             player.seek(
