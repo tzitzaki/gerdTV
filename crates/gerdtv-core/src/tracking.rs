@@ -106,6 +106,17 @@ pub enum Watching {
     },
 }
 
+/// An item's row as tracking needs it (Library::track_info); `show`, `season` and `number` only for episodes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrackInfo {
+    pub movie: bool,
+    pub name: String,
+    pub year: Option<u32>,
+    pub show: String,
+    pub season: u32,
+    pub number: u32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Action {
     Start,

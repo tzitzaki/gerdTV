@@ -11,6 +11,7 @@ import 'api/logos.dart';
 import 'api/playback.dart';
 import 'api/premiumize.dart';
 import 'api/simple.dart';
+import 'api/tracking.dart';
 import 'api/update.dart';
 
 import 'dart:async';
@@ -98,6 +99,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo dco_decode_box_autoadd_reminder_info(dynamic raw);
+
+  @protected
+  TrackItem dco_decode_box_autoadd_track_item(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -250,6 +254,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
 
   @protected
+  TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -293,6 +300,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncSummary dco_decode_sync_summary(dynamic raw);
+
+  @protected
+  TrackDeviceCode dco_decode_track_device_code(dynamic raw);
+
+  @protected
+  TrackItem dco_decode_track_item(dynamic raw);
+
+  @protected
+  TrackPoll dco_decode_track_poll(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -383,6 +399,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReminderInfo sse_decode_box_autoadd_reminder_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  TrackItem sse_decode_box_autoadd_track_item(SseDeserializer deserializer);
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -553,6 +572,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TrackItem? sse_decode_opt_box_autoadd_track_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -598,6 +622,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncSummary sse_decode_sync_summary(SseDeserializer deserializer);
+
+  @protected
+  TrackDeviceCode sse_decode_track_device_code(SseDeserializer deserializer);
+
+  @protected
+  TrackItem sse_decode_track_item(SseDeserializer deserializer);
+
+  @protected
+  TrackPoll sse_decode_track_poll(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -704,6 +737,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_reminder_info(
     ReminderInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_track_item(
+    TrackItem self,
     SseSerializer serializer,
   );
 
@@ -924,6 +963,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_track_item(
+    TrackItem? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
@@ -970,6 +1015,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_sync_summary(SyncSummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_track_device_code(
+    TrackDeviceCode self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_track_item(TrackItem self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_track_poll(TrackPoll self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

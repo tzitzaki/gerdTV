@@ -381,6 +381,22 @@ impl Library {
             .collect())
     }
 
+    /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
+    pub fn track_item(&self, key: String) -> Result<Option<super::tracking::TrackItem>, String> {
+        Ok(self
+            .0
+            .track_info(&key)
+            .map_err(err)?
+            .map(|t| super::tracking::TrackItem {
+                movie: t.movie,
+                name: t.name,
+                year: t.year,
+                show: t.show,
+                season: t.season,
+                number: t.number,
+            }))
+    }
+
     /// A movie's or series' details, from the panel when the page opens.
     pub async fn details(&self, key: String) -> Result<ItemDetails, String> {
         let d = self.0.details(&key).await.map_err(err)?;

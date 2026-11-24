@@ -3,4 +3,5 @@ pub mod logos;
 pub mod playback;
 pub mod premiumize;
 pub mod simple;
+pub mod tracking;
 pub mod update;

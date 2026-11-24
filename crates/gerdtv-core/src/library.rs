@@ -530,6 +530,28 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// What watch tracking sends for a movie or episode; None for other kinds and unknown keys. An episode's show is its series' name (`category` is the series key).
+    pub fn track_info(&self, key: &str) -> Result<Option<crate::tracking::TrackInfo>> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn
+            .query_row(
+                "SELECT i.kind, i.name, i.year, coalesce(s.name, ''), coalesce(i.season, 0), coalesce(i.episode, 0)
+                 FROM items i LEFT JOIN items s ON s.key = i.category WHERE i.key = ?1 AND i.kind IN (1, 2)",
+                [key],
+                |r| {
+                    Ok(crate::tracking::TrackInfo {
+                        movie: r.get::<_, i64>(0)? == 1,
+                        name: r.get(1)?,
+                        year: r.get(2)?,
+                        show: r.get(3)?,
+                        season: r.get(4)?,
+                        number: r.get(5)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
     /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
     /// for other kinds and for M3U sources, which have none.
     pub async fn details(&self, key: &str) -> Result<xtream::Details> {
@@ -1320,6 +1342,23 @@ mod tests {
         assert_eq!(lib.item(&archive.key).unwrap().unwrap().name, archive.name);
         assert!(lib.item("live:0").unwrap().is_none());
         assert_eq!(lib.guide_sources().unwrap().len(), 1);
+
+        // Watch tracking: a movie by its name and year, an episode by its series' name, season and number.
+        let series: String = lib
+            .conn
+            .lock()
+            .unwrap()
+            .query_row("SELECT key FROM items WHERE kind = 3 LIMIT 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let eps = lib.episodes(&series).await.unwrap();
+        let t = lib.track_info(&eps[0].key).unwrap().unwrap();
+        assert!(!t.movie && !t.show.is_empty() && t.season > 0 && t.number > 0);
+        assert!(
+            lib.track_info(&archive.key).unwrap().is_none(),
+            "live: nothing to track"
+        );
 
         // Cache-first: reopening without network shows the catalogue at once.
         drop(lib);

@@ -8,6 +8,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'playback.dart';
+import 'tracking.dart';
 
 // These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `to_core`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`
@@ -240,6 +241,9 @@ abstract class Library implements RustOpaqueInterface {
 
   /// Something started playing: search ranks recently watched items first.
   void touchRecent({required String key});
+
+  /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
+  Future<TrackItem?> trackItem({required String key});
 
   /// Live channels without a guide match, in provider order (the mapping screen); an empty query lists all,
   /// otherwise those whose name contains it.
