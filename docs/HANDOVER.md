@@ -1,8 +1,8 @@
 # Handover
 
 ## State
-- Version 0.261124.58: channels with DVB sound (MP2 first, AC-3) play in AVPlayer; whatever AVPlayer doesn't play goes to mpv within 15 s.
-- In .57: live on iPhone, iPad and Mac plays in AVPlayer from the core's local HLS: the whole timeshift, provider drops unseen.
+- Version 0.261124.58: mpv plays everything on Apple again (one player, every format); Apple's player for live is a Settings choice.
+- Also .58: with Apple's player, DVB-sound channels play (MP2 left out, AC-3 kept) and what it can't play goes to mpv within 15 s.
 - Also .57: PiP without a hand-over (Home floats it on iOS), no reload after background sound, a leaner mpv frame path, Apple 26.0+.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
@@ -24,7 +24,7 @@
 
 ## Open work
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- Flaky journey on mpv (main too): after Live mpv sometimes waits for cache and the cache end stops growing (app_test "keeps playing"); fix by cause.
+- Flaky journey on mpv (main too, ~half of CI runs): after Live mpv waits for cache, cache end stuck at pause point + read-ahead; harness can't repeat it.
 - A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
@@ -41,9 +41,9 @@
 - The community guide presets point at epgshare01, a third party: a file that moves shows as the source's error in Settings → Guide.
 - About 1000 provider channels are listed without programmes; they now count as "without guide" and can take a community guide or a mapping.
 - Own engines in CI: Android and macOS play the testkit clip headless (smoke: ok); iOS only compiles; picture, hwdec and PiP are device checks.
-- AVPlayer gets a channel once its local HLS has three segments (~6 s), so zapping on Apple is slower than mpv's Fast zap.
+- With Apple's player chosen, a channel starts once its local HLS has three segments (~6 s): slower zapping than mpv's Fast zap.
 - Background PiP of mpv's picture switches mpv to software rendering at PiP size: a short picture hiccup on leaving and returning.
-- German public channels send no IDR frames (open GOP): AVPlayer segments start on recovery-point I-frames; if a device shows none, see DEVICE_CHECKS.
+- German public channels send no IDR frames (open GOP): with Apple's player, segments start on recovery-point I-frames.
 - Both libmpvs may be in one Apple process (media_kit links Mpv); the plugin calls only the chosen one, and mpv's ObjC class names may warn twice.
 - Linux CI hang: the app blocks at player start in the system libmpv while its Lua scripts start; CI runs integration on the own engine.
 - The own Linux libmpv is built in an Ubuntu 24.04 container and must need at most glibc 2.39; the build fails otherwise.
