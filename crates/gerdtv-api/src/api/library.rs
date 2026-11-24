@@ -722,11 +722,17 @@ impl Library {
             .collect())
     }
 
-    /// Live channels without a guide match, in provider order (the mapping screen).
-    pub fn unmatched_channels(&self, limit: u32, offset: u32) -> Result<Vec<ChannelRef>, String> {
+    /// Live channels without a guide match, in provider order (the mapping screen); an empty query lists all,
+    /// otherwise those whose name contains it.
+    pub fn unmatched_channels(
+        &self,
+        limit: u32,
+        offset: u32,
+        query: String,
+    ) -> Result<Vec<ChannelRef>, String> {
         Ok(refs(
             self.0
-                .unmatched_channels(limit as usize, offset as usize)
+                .unmatched_channels(limit as usize, offset as usize, &query)
                 .map_err(err)?,
         ))
     }

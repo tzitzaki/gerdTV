@@ -399,6 +399,10 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
   final List<ChannelRef> _channels = [];
   bool _loading = false;
   bool _done = false;
+  // The search runs in the core over all of them (not just the loaded pages); each keystroke starts over, and an
+  // answer to an older query is dropped (_query no longer matches).
+  final _search = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
@@ -406,14 +410,32 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
     _more();
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _searchFor(String text) {
+    setState(() {
+      _query = text.trim();
+      _channels.clear();
+      _done = false;
+      _loading = false;
+    });
+    _more();
+  }
+
   Future<void> _more() async {
     if (_loading || _done) return;
+    final query = _query;
     setState(() => _loading = true);
     final next = await widget.library.unmatchedChannels(
       limit: _page,
       offset: _channels.length,
+      query: query,
     );
-    if (!mounted) return;
+    if (!mounted || query != _query) return;
     setState(() {
       _channels.addAll(next);
       _done = next.length < _page;
@@ -426,44 +448,70 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.guideUnmatched)),
-      body: _channels.isEmpty && _done
-          ? Center(child: Text(l10n.guideUnmatchedNone))
-          : NotificationListener<ScrollNotification>(
-              onNotification: (n) {
-                if (n.metrics.extentAfter < 600) _more();
-                return false;
-              },
-              child: ListView.builder(
-                itemCount: _channels.length + (_loading ? 1 : 0),
-                itemBuilder: (context, i) {
-                  if (i == _channels.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(Tokens.space * 2),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final c = _channels[i];
-                  return ListTile(
-                    key: Key('guide.unmatched.${c.id}'),
-                    title: Text(c.name),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      final mapped = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => PickGuideChannelScreen(
-                            library: widget.library,
-                            item: c,
-                          ),
-                        ),
-                      );
-                      // A mapped channel has a guide now: it leaves the list.
-                      if (mapped == true) setState(() => _channels.remove(c));
-                    },
-                  );
-                },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(Tokens.space),
+            child: TextField(
+              key: const Key('guide.unmatched.search'),
+              controller: _search,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: l10n.searchHintChannels,
               ),
+              onChanged: _searchFor,
             ),
+          ),
+          Expanded(child: _list(l10n)),
+        ],
+      ),
     );
+  }
+
+  Widget _list(AppLocalizations l10n) {
+    return _channels.isEmpty && _done
+        ? Center(
+            child: Text(
+              _query.isEmpty
+                  ? l10n.guideUnmatchedNone
+                  : l10n.searchNoResults(_query),
+            ),
+          )
+        : NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n.metrics.extentAfter < 600) _more();
+              return false;
+            },
+            child: ListView.builder(
+              itemCount: _channels.length + (_loading ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (i == _channels.length) {
+                  return const Padding(
+                    padding: EdgeInsets.all(Tokens.space * 2),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final c = _channels[i];
+                return ListTile(
+                  key: Key('guide.unmatched.${c.id}'),
+                  title: Text(c.name),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final mapped = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => PickGuideChannelScreen(
+                          library: widget.library,
+                          item: c,
+                        ),
+                      ),
+                    );
+                    // A mapped channel has a guide now: it leaves the list.
+                    if (mapped == true) setState(() => _channels.remove(c));
+                  },
+                );
+              },
+            ),
+          );
   }
 }
 

@@ -104,6 +104,7 @@
   "searchAllGroups": "Alle Gruppen {count}",
   "searchAlsoIn": "Auch in",
   "searchEarlier": "Früher",
+  "searchHintChannels": "Sender suchen",
   "searchHintGroup": "{group} durchsuchen",
   "searchHintGuide": "Sendungen suchen",
   "searchHintLive": "Sender und Sendungen suchen",

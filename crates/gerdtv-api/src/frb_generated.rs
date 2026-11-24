@@ -2532,6 +2532,7 @@ fn wire__crate__api__library__Library_unmatched_channels_impl(
             >>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
             let api_offset = <u32>::sse_decode(&mut deserializer);
+            let api_query = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -2553,6 +2554,7 @@ fn wire__crate__api__library__Library_unmatched_channels_impl(
                         &*api_that_guard,
                         api_limit,
                         api_offset,
+                        api_query,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())

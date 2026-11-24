@@ -620,12 +620,19 @@ pub fn search(
 }
 
 /// Live items without a guide match (the mapping screen), in provider order.
-pub fn unmatched(conn: &Connection, limit: usize, offset: usize) -> Result<Vec<(String, String)>> {
+pub fn unmatched(
+    conn: &Connection,
+    limit: usize,
+    offset: usize,
+    query: &str,
+) -> Result<Vec<(String, String)>> {
+    // An empty query lists all; otherwise names containing it (LIKE: ASCII case-insensitive, like find_channels).
     let mut st = conn.prepare_cached(
         "SELECT key, name FROM items WHERE kind = 0 AND key NOT IN (SELECT item_key FROM item_epg)
+         AND (?3 = '' OR name LIKE '%' || ?3 || '%')
          ORDER BY position LIMIT ?1 OFFSET ?2",
     )?;
-    st.query_map(params![limit as i64, offset as i64], |r| {
+    st.query_map(params![limit as i64, offset as i64, query], |r| {
         Ok((r.get(0)?, r.get(1)?))
     })?
     .collect()
@@ -806,17 +813,23 @@ mod tests {
         assert_eq!(search(&c, "munchen", later, 10, true).unwrap().len(), 1);
         // Manual mapping wins and survives a rebuild; unmatched lists the rest.
         assert_eq!(
-            unmatched(&c, 10, 0).unwrap(),
+            unmatched(&c, 10, 0, "").unwrap(),
             [
                 ("live:2".to_string(), "Arte".to_string()),
                 ("live:4".to_string(), "Unknown Channel".to_string())
             ]
         );
+        // The screen's search: part of the name, any case, over every page.
+        assert_eq!(
+            unmatched(&c, 10, 0, "known").unwrap(),
+            [("live:4".to_string(), "Unknown Channel".to_string())]
+        );
+        assert!(unmatched(&c, 10, 0, "zdf").unwrap().is_empty());
         assert_eq!(find_channels(&c, "Erste", 5).unwrap()[0].0, "ard.de");
         map_channel(&mut c, "live:4", Some("ard.de"), now).unwrap();
         map_channel(&mut c, "live:2", Some("Arte.FR"), now).unwrap();
         assert!(
-            unmatched(&c, 10, 0).unwrap().is_empty(),
+            unmatched(&c, 10, 0, "").unwrap().is_empty(),
             "a manual mapping counts, programmes or not"
         );
         assert!(now_next(&c, &keys[3..], now).unwrap()[0].0.is_some());

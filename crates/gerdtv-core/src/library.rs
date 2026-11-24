@@ -857,8 +857,18 @@ impl Library {
         )?)
     }
 
-    pub fn unmatched_channels(&self, limit: usize, offset: usize) -> Result<Vec<(String, String)>> {
-        Ok(epg::unmatched(&self.conn.lock().unwrap(), limit, offset)?)
+    pub fn unmatched_channels(
+        &self,
+        limit: usize,
+        offset: usize,
+        query: &str,
+    ) -> Result<Vec<(String, String)>> {
+        Ok(epg::unmatched(
+            &self.conn.lock().unwrap(),
+            limit,
+            offset,
+            query,
+        )?)
     }
 
     pub fn find_guide_channels(&self, query: &str, limit: usize) -> Result<Vec<(String, String)>> {
@@ -1213,7 +1223,7 @@ mod tests {
             "some channels show now/next"
         );
         assert!(
-            !lib.unmatched_channels(100, 0).unwrap().is_empty(),
+            !lib.unmatched_channels(100, 0, "").unwrap().is_empty(),
             "channels without epg id stay unmatched"
         );
         let hits = lib.search_programmes("sport", 5, false).unwrap();

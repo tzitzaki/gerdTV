@@ -351,6 +351,7 @@ abstract class RustLibApi extends BaseApi {
     required Library that,
     required int limit,
     required int offset,
+    required String query,
   });
 
   Watchdog crateApiPlaybackWatchdogNew({
@@ -2232,6 +2233,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required Library that,
     required int limit,
     required int offset,
+    required String query,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2243,6 +2245,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_u_32(limit, serializer);
           sse_encode_u_32(offset, serializer);
+          sse_encode_String(query, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -2255,7 +2258,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibraryUnmatchedChannelsConstMeta,
-        argValues: [that, limit, offset],
+        argValues: [that, limit, offset, query],
         apiImpl: this,
       ),
     );
@@ -2264,7 +2267,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibraryUnmatchedChannelsConstMeta =>
       const TaskConstMeta(
         debugName: "Library_unmatched_channels",
-        argNames: ["that", "limit", "offset"],
+        argNames: ["that", "limit", "offset", "query"],
       );
 
   @override
@@ -5720,14 +5723,17 @@ class LibraryImpl extends RustOpaque implements Library {
   void touchRecent({required String key}) => RustLib.instance.api
       .crateApiLibraryLibraryTouchRecent(that: this, key: key);
 
-  /// Live channels without a guide match, in provider order (the mapping screen).
+  /// Live channels without a guide match, in provider order (the mapping screen); an empty query lists all,
+  /// otherwise those whose name contains it.
   Future<List<ChannelRef>> unmatchedChannels({
     required int limit,
     required int offset,
+    required String query,
   }) => RustLib.instance.api.crateApiLibraryLibraryUnmatchedChannels(
     that: this,
     limit: limit,
     offset: offset,
+    query: query,
   );
 }
 

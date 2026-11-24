@@ -207,6 +207,7 @@
   },
   "searchAlsoIn": "Also in",
   "searchEarlier": "Earlier",
+  "searchHintChannels": "Search channels",
   "searchHintGroup": "Search {group}",
   "@searchHintGroup": {
     "placeholders": {

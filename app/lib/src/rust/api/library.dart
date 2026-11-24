@@ -238,10 +238,12 @@ abstract class Library implements RustOpaqueInterface {
   /// Something started playing: search ranks recently watched items first.
   void touchRecent({required String key});
 
-  /// Live channels without a guide match, in provider order (the mapping screen).
+  /// Live channels without a guide match, in provider order (the mapping screen); an empty query lists all,
+  /// otherwise those whose name contains it.
   Future<List<ChannelRef>> unmatchedChannels({
     required int limit,
     required int offset,
+    required String query,
   });
 }
 
