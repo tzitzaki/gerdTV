@@ -41,7 +41,7 @@ import UserNotifications
 }
 
 /// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip, setLogo(name),
-/// openUrl(url) → Bool;
+/// openUrl(url) → Bool, brightness → Double, setBrightness(value), resetBrightness;
 /// → pipEnded.
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
   private let channel: FlutterMethodChannel
@@ -49,10 +49,16 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
   private var host: UIView?
   private var pip: AVPictureInPictureController?
   private var observations: [NSKeyValueObservation] = []
+  /// The screen's brightness before the player's swipe changed it (nil: unchanged).
+  private var ownBrightness: CGFloat?
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "gerdtv/platform", binaryMessenger: messenger)
     super.init()
+    // Leaving the app gives the screen its own brightness back (the swipe's is for watching in gerdTV).
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in self?.restoreBrightness() }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       switch call.method {
@@ -74,6 +80,18 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
           return
         }
         UIApplication.shared.setAlternateIconName(name == "gtv" ? nil : "AppIcon-\(name)") { _ in result(nil) }
+      case "brightness":
+        result(Double(UIScreen.main.brightness))
+      case "setBrightness":
+        // iOS's brightness is the screen's and stays after the app: remember the user's own to put it back.
+        if let value = (call.arguments as? [String: Any])?["value"] as? Double {
+          if self.ownBrightness == nil { self.ownBrightness = UIScreen.main.brightness }
+          UIScreen.main.brightness = CGFloat(min(max(value, 0), 1))
+        }
+        result(nil)
+      case "resetBrightness":
+        self.restoreBrightness()
+        result(nil)
       case "openUrl":
         guard let url = (call.arguments as? [String: Any])?["url"] as? String, let u = URL(string: url) else {
           result(false)
@@ -87,6 +105,11 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  private func restoreBrightness() {
+    if let own = ownBrightness { UIScreen.main.brightness = own }
+    ownBrightness = nil
   }
 
   private func startPip(_ url: URL) -> Bool {

@@ -23,6 +23,7 @@ import 'package:window_manager/window_manager.dart' show DragToMoveArea;
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
+import '../platform/platform_bridge.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
@@ -37,7 +38,8 @@ const playerGesturesSetting = 'player_gestures';
 /// - movies and episodes: a horizontal swipe seeks (the further, the more), a double tap on the left or right third
 ///   skips 10 s;
 /// - everything: a vertical swipe on the right half sets the player's volume (mpv's 0–100 %, not the system's: iOS has
-///   no public API for that).
+///   no public API for that), one on the left half the screen's brightness (owner decision; PlatformBridge, put back
+///   when the player closes).
 /// Live channels don't seek by swipe: media_kit seeks against the stream's duration, which a live stream doesn't
 /// have, and timeshift has its own bar and live edge. Off: none of them (the controls still work by tap).
 MaterialVideoControlsThemeData withGestures(
@@ -46,13 +48,19 @@ MaterialVideoControlsThemeData withGestures(
   required bool vod,
   required double volume,
   required ValueChanged<double> onVolume,
+  required double brightness,
+  required ValueChanged<double> onBrightness,
+  required VoidCallback onBrightnessReset,
 }) => base.copyWith(
   seekGesture: enabled && vod,
   seekOnDoubleTap: enabled && vod,
   volumeGesture: enabled,
-  brightnessGesture: false, // would need a platform channel; not asked for
+  brightnessGesture: enabled,
   initialVolume: volume.clamp(0.0, 1.0),
   onVolumeChanged: onVolume,
+  initialBrightness: brightness.clamp(0.0, 1.0),
+  onBrightnessChanged: onBrightness,
+  onBrightnessReset: onBrightnessReset,
 );
 
 /// Every video view of the one stream (player, picture mode, now-playing bar). media_kit pauses the player when the
@@ -94,6 +102,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _bufferSub;
 
+  /// The screen's brightness when the player opened (the brightness swipe starts there); 0.5 until it is known.
+  double _brightness = 0.5;
+
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
   List<ItemInfo> get _channels => widget.session.zapList;
   static final _miniWindow = MiniWindow();
@@ -116,6 +127,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
+    PlatformBridge.brightness().then((b) {
+      if (b != null && mounted) setState(() => _brightness = b);
+    });
     // The "behind live" label counts up while paused or rewound.
     _shiftTick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _shiftable) setState(() {});
@@ -372,6 +386,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       vod: _current.kind != ItemKind.live,
       volume: p.state.volume / 100,
       onVolume: (v) => p.setVolume(v * 100),
+      brightness: _brightness,
+      onBrightness: PlatformBridge.setBrightness,
+      onBrightnessReset: PlatformBridge.resetBrightness,
     );
   }
 

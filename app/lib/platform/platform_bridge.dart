@@ -3,7 +3,7 @@
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
 // the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc). Android only: voice search through the
 // system's speech recognizer (voiceAvailable, listen); iOS and macOS have dictation on their keyboards.
-// openUrl opens a web page (Android, iOS; desktop runs the system's opener). Platforms without a native side ignore
+// brightness/setBrightness/resetBrightness serve the player's left-half swipe; openUrl opens a web page (Android, iOS; desktop runs the system's opener). Platforms without a native side ignore
 // the calls.
 
 import 'dart:io';
@@ -88,6 +88,27 @@ class PlatformBridge {
       return await channel.invokeMethod<bool>('openUrl', {'url': url}) ?? false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Phones and tablets: the screen's brightness for the player's swipe (0–1), null where there is none.
+  /// Android sets only gerdTV's window (the system setting stays); iOS sets the screen's and puts the old value back on
+  /// [resetBrightness] and when the app leaves the foreground, since iOS keeps it otherwise.
+  static Future<double?> brightness() => _brightness('brightness');
+  static Future<void> setBrightness(double value) =>
+      _brightness('setBrightness', value);
+  static Future<void> resetBrightness() => _brightness('resetBrightness');
+
+  static Future<double?> _brightness(String method, [double? value]) async {
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return null;
+    }
+    try {
+      return await channel.invokeMethod<double>(method, {'value': ?value});
+    } on MissingPluginException {
+      return null;
     }
   }
 

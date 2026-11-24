@@ -11,5 +11,7 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   app without linking it.
 - `media_kit_video` 2.0.1: `queryDecoders` no longer re-runs media_kit's library lookup (it fell back to Mpv.framework
   and crashed on GerdMpv's handle), and `MPV.swift` reads GERDTV_LIBMPV with getenv.
+- `media_kit_video` 2.0.1: the mobile controls take a changed `initialBrightness` (the app reads the screen's brightness
+  asynchronously), and their theme notifies when it changed (upstream had the test inverted).
 
 Updating it: copy the new release over the folder in one commit, then re-apply the patches (see git log).

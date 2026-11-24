@@ -515,9 +515,11 @@ class MaterialVideoControlsTheme extends InheritedWidget {
   }
 
   @override
+  // gerdTV patch: upstream notified only when nothing changed (identical && identical), so new theme data never
+  // reached the controls.
   bool updateShouldNotify(MaterialVideoControlsTheme oldWidget) =>
-      identical(normal, oldWidget.normal) &&
-      identical(fullscreen, oldWidget.fullscreen);
+      !identical(normal, oldWidget.normal) ||
+      !identical(fullscreen, oldWidget.fullscreen);
 }
 
 /// {@macro material_video_controls}
@@ -601,9 +603,20 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     }
   }
 
+  // gerdTV patch: the app learns the screen's brightness from the platform only after the controls are built; take
+  // the theme's newer initialBrightness when it changes, so the first swipe starts from the real brightness.
+  double? _initialBrightnessSeen;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final initialBrightness = _theme(context).initialBrightness;
+    if (subscriptions.isNotEmpty &&
+        initialBrightness != null &&
+        initialBrightness != _initialBrightnessSeen) {
+      _brightnessValue = initialBrightness;
+    }
+    _initialBrightnessSeen = initialBrightness;
     if (subscriptions.isEmpty) {
       mount = _theme(context).visibleOnMount;
       visible = _theme(context).visibleOnMount;

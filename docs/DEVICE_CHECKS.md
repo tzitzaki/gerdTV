@@ -32,7 +32,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 - iPad PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
-- Swipe: from the left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
+- Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
@@ -41,7 +41,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
 - Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
-- Swipe: left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
+- Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Shield
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
