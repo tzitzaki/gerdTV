@@ -28,7 +28,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live TV and a movie play in full screen with sound; logos show in the lists.
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
 - Background: locking the phone while a channel plays keeps the sound going; the lock screen shows it.
-- PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
+- PiP: the PiP button floats the channel over other apps; closing PiP continues in gerdTV (if it fails, note the message shown).
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 - iPad PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
