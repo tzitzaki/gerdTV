@@ -71,6 +71,18 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    "openUrl" -> {
+                        // A TV may have no browser: false lets Dart show the address instead.
+                        try {
+                            startActivity(
+                                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(call.argument<String>("url") ?: ""))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                            result.success(true)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            result.success(false)
+                        }
+                    }
                     "saveToDownloads" -> {
                         val name = call.argument<String>("name") ?: "gerdtv.json"
                         val text = call.argument<String>("text") ?: ""

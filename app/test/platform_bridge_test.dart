@@ -1,6 +1,6 @@
 // Owns: the platform channel: picture mode follows the system's Picture-in-Picture, every start and stop of
 // playback reaches the native side (Android's foreground service and auto-PiP depend on it), setLogo hands it the
-// logo's name plus, on desktop, its PNG, and voice search exists only on Android and returns what was heard.
+// logo's name plus, on desktop, its PNG, openUrl reaches the phone side, and voice search exists only on Android and returns what was heard.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +58,31 @@ void main() {
         {'playing': true, 'title': 'Channel One'},
         {'playing': false, 'title': ''},
       ]);
+    },
+  );
+
+  test(
+    'openUrl hands the address to the phone side, false without one',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final urls = <Object?>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+        if (call.method == 'openUrl') urls.add(call.arguments);
+        return true;
+      });
+      expect(await PlatformBridge.openUrl('https://example.invalid/r'), isTrue);
+      expect(urls, [
+        {'url': 'https://example.invalid/r'},
+      ]);
+      messenger.setMockMethodCallHandler(PlatformBridge.channel, null);
+      expect(
+        await PlatformBridge.openUrl('https://example.invalid/r'),
+        isFalse,
+        reason: 'no native side: the caller shows the address',
+      );
     },
   );
 

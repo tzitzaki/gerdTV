@@ -655,10 +655,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// Picture mode: only the video, with Restore and Stop; the whole picture drags the floating window (desktop).
   Widget _pictureOnly(AppLocalizations l10n) {
-    final video = playerVideo(
-      widget.session.video,
-      controls: NoVideoControls,
-    );
+    final video = playerVideo(widget.session.video, controls: NoVideoControls);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(

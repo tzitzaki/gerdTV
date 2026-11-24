@@ -40,7 +40,8 @@ import UserNotifications
   }
 }
 
-/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip, setLogo(name);
+/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip, setLogo(name),
+/// openUrl(url) → Bool;
 /// → pipEnded.
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
   private let channel: FlutterMethodChannel
@@ -73,6 +74,12 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
           return
         }
         UIApplication.shared.setAlternateIconName(name == "gtv" ? nil : "AppIcon-\(name)") { _ in result(nil) }
+      case "openUrl":
+        guard let url = (call.arguments as? [String: Any])?["url"] as? String, let u = URL(string: url) else {
+          result(false)
+          return
+        }
+        UIApplication.shared.open(u) { opened in result(opened) }
       case "stopPip":
         self.pip?.stopPictureInPicture()
         result(nil)

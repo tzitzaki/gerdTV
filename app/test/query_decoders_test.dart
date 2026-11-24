@@ -14,18 +14,14 @@ import 'package:media_kit_video/src/utils/query_decoders.dart';
 void main() {
   const lib = '/usr/lib/x86_64-linux-gnu/libmpv.so.2';
 
-  test(
-    'reading the decoders keeps the chosen libmpv',
-    () async {
-      NativeLibrary.ensureInitialized(libmpv: lib);
-      final mpv = MPV(DynamicLibrary.open(lib));
-      final handle = mpv.mpv_create();
-      mpv.mpv_initialize(handle);
-      final decoders = await queryDecoders(handle.address);
-      expect(decoders, isNotEmpty, reason: 'decoder-list read from the handle');
-      expect(NativeLibrary.path, lib);
-      mpv.mpv_terminate_destroy(handle);
-    },
-    skip: File(lib).existsSync() ? false : 'needs the system libmpv',
-  );
+  test('reading the decoders keeps the chosen libmpv', () async {
+    NativeLibrary.ensureInitialized(libmpv: lib);
+    final mpv = MPV(DynamicLibrary.open(lib));
+    final handle = mpv.mpv_create();
+    mpv.mpv_initialize(handle);
+    final decoders = await queryDecoders(handle.address);
+    expect(decoders, isNotEmpty, reason: 'decoder-list read from the handle');
+    expect(NativeLibrary.path, lib);
+    mpv.mpv_terminate_destroy(handle);
+  }, skip: File(lib).existsSync() ? false : 'needs the system libmpv');
 }

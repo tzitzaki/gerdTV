@@ -80,7 +80,10 @@ void main() {
         );
         expect(tester.takeException(), isNull, reason: 'no overflow');
         // The name alone: no channel number in front (owner decision), though channel(1) has number 1.
-        expect(find.text('Channel 1 with a rather long name HD'), findsOneWidget);
+        expect(
+          find.text('Channel 1 with a rather long name HD'),
+          findsOneWidget,
+        );
         expect(
           find.text('News at eight'),
           showsNow ? findsOneWidget : findsNothing,

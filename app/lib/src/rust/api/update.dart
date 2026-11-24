@@ -9,6 +9,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
 
+/// The newest release's page on GitHub.
+String releasePage() => RustLib.instance.api.crateApiUpdateReleasePage();
+
 /// A newer, correctly signed release with a build for `platform` ("macos", "ios", "android", "linux"), or None.
 Future<UpdateInfo?> checkUpdate({required String platform}) =>
     RustLib.instance.api.crateApiUpdateCheckUpdate(platform: platform);

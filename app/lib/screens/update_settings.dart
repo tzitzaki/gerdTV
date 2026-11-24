@@ -2,7 +2,7 @@
 // checks are the core's, gerdtv_core::update), shows its notes and downloads the file, kept only when its SHA-256
 // matches. Installing: macOS swaps the bundle in place and restarts (platform/mac_install.dart), Android hands the APK
 // to the system's installer, Linux opens the download folder; on iPhone/iPad the IPA has to be re-signed first, so
-// there is only a hint.
+// there is a hint and, like everywhere, a link to the release page.
 // Debugging: a failure shows the core's reason (signature, size/SHA-256, network).
 
 import 'dart:io';
@@ -115,8 +115,9 @@ class _UpdateSettingsState extends State<UpdateSettings> {
                 ? null
                 : Text(u.notes, maxLines: 8, overflow: TextOverflow.ellipsis),
           ),
+          // iPhone/iPad: no download here; the release page below has the IPA.
           if (updatePlatform == 'ios')
-            ListTile(title: Text(l10n.updateIosHint))
+            const SizedBox.shrink()
           else if (_file == null)
             ListTile(
               key: const Key('update.download'),
@@ -147,7 +148,33 @@ class _UpdateSettingsState extends State<UpdateSettings> {
               ),
           ],
         ],
+        // Every platform: the newest release's page (its notes and all files); on iOS the way to the new IPA.
+        ListTile(
+          key: const Key('update.page'),
+          leading: const Icon(Icons.open_in_new),
+          title: Text(l10n.updatePage),
+          subtitle: updatePlatform == 'ios' ? Text(l10n.updateIosHint) : null,
+          onTap: () => openOrShow(context, releasePage()),
+        ),
       ],
     );
   }
+}
+
+/// Opens [url]; where nothing can open it (a TV without a browser) the address shows in a dialog instead.
+Future<void> openOrShow(BuildContext context, String url) async {
+  if (await PlatformBridge.openUrl(url) || !context.mounted) return;
+  final l10n = AppLocalizations.of(context);
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      content: SelectableText(url),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.close),
+        ),
+      ],
+    ),
+  );
 }

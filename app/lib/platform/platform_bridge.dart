@@ -3,7 +3,10 @@
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
 // the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc). Android only: voice search through the
 // system's speech recognizer (voiceAvailable, listen); iOS and macOS have dictation on their keyboards.
-// Platforms without a native side ignore the calls.
+// openUrl opens a web page (Android, iOS; desktop runs the system's opener). Platforms without a native side ignore
+// the calls.
+
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +68,26 @@ class PlatformBridge {
       await channel.invokeMethod('setLogo', args);
     } on MissingPluginException {
       // Tests and builds without the native side.
+    }
+  }
+
+  /// Opens [url] in the browser (or the app registered for it); false when nothing can open it (e.g. a TV without a
+  /// browser), so the caller can show the address instead. Desktop asks the system's opener, phones and TVs the
+  /// platform channel (no url_launcher: one call isn't worth a dependency).
+  static Future<bool> openUrl(String url) async {
+    if (kIsWeb) return false;
+    if (defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      final r = await Process.run(
+        defaultTargetPlatform == TargetPlatform.macOS ? 'open' : 'xdg-open',
+        [url],
+      );
+      return r.exitCode == 0;
+    }
+    try {
+      return await channel.invokeMethod<bool>('openUrl', {'url': url}) ?? false;
+    } on MissingPluginException {
+      return false;
     }
   }
 

@@ -40,6 +40,10 @@ class FakeCore implements RustLibApi {
   }) async => profiles;
 
   @override
+  String crateApiUpdateReleasePage() =>
+      'https://example.invalid/releases/latest';
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
     'FakeCore: no fake for ${invocation.memberName}',
   );
