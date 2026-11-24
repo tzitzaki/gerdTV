@@ -18,6 +18,7 @@ import 'item_tile.dart';
 import 'list_modes.dart';
 import 'logo.dart';
 import 'player_screen.dart';
+import 'premiumize_screen.dart';
 import 'section_search.dart';
 
 /// Plays an item, or opens a series' episodes or a movie's page ([page] false: a movie plays at once, as from
@@ -127,9 +128,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       CategoryInfo(id: '', name: l10n.favourites, count: n),
                     ...list,
                   ];
+                  // Movies also get the Premiumize cloud while it is linked (premiumize_screen.dart).
                   final resume = kind == ItemKind.live
                       ? null
-                      : ContinueRow(session: session, kind: kind);
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (kind == ItemKind.movie &&
+                                session.premiumizeToken != null)
+                              PremiumizeRow(session: session),
+                            ContinueRow(session: session, kind: kind),
+                          ],
+                        );
                   // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
                   final header = Align(
                     alignment: AlignmentDirectional.centerEnd,

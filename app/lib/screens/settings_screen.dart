@@ -21,6 +21,7 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'player_screen.dart' show playerGesturesSetting;
+import 'premiumize_screen.dart';
 import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
@@ -164,6 +165,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: l10n.userDataExport,
               keywords: l10n.settingsKeywordsData,
               build: (_) => UserDataSettings(session: session),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'premiumize',
+              title: l10n.premiumize,
+              keywords: l10n.settingsKeywordsPremiumize,
+              build: (_) => PremiumizeSettings(session: session),
             ),
           SettingsEntry(
             id: 'remove',

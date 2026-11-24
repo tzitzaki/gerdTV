@@ -39,6 +39,12 @@ class FakeCore implements RustLibApi {
     required String dir,
   }) async => profiles;
 
+  /// Premiumize: every key but "bad" is accepted (the real check asks Premiumize's account/info).
+  @override
+  Future<void> crateApiPremiumizePmCheck({required String token}) async {
+    if (token == 'bad') throw 'Premiumize: authentication_failed';
+  }
+
   @override
   String crateApiUpdateReleasePage() =>
       'https://example.invalid/releases/latest';

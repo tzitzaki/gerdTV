@@ -22,6 +22,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
+- Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or, in builds with gerdTV's client id, a device code; no torrent search.
 - Trailers: the panel's YouTube trailer in YouTube's embed (webview_flutter), muted behind a movie's or series' title after 2 s, with sound from the Trailer button; movies open a page before playing (Continue watching plays at once).
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
@@ -43,7 +44,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
 - Missing guide data: twins (same name, other quality) borrow a match; community guide presets from epgshare01 (a third party; files may go away).
-- Secrets (provider credentials, TMDB key, PIN) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
+- Secrets (provider credentials, TMDB key, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
 - Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.

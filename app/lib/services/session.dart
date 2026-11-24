@@ -17,6 +17,7 @@ import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
+import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'reminders.dart';
 import 'secrets.dart';
@@ -308,6 +309,7 @@ class Session extends ChangeNotifier {
         secrets: s,
       );
       profile = p;
+      premiumizeToken = await secrets.readService(p.id, 'premiumize');
       state = SessionState.ready;
       notifyListeners();
       unawaited(
@@ -407,6 +409,9 @@ class Session extends ChangeNotifier {
     await stopPlayback();
     await deleteProfile(dir: await _dir(), id: p.id);
     await secrets.delete(p.id);
+    for (final service in linkedServices) {
+      await secrets.writeService(p.id, service, null);
+    }
     library = null;
     profile = null;
     profiles = [...profiles.where((o) => o.id != p.id)];
@@ -430,6 +435,43 @@ class Session extends ChangeNotifier {
     nowPlaying.value = item;
     _playingKey = item.key;
     await _start(item, lib);
+  }
+
+  /// The services a profile can link (their tokens live in [secrets], one per profile and service).
+  static const linkedServices = ['premiumize', 'trakt', 'simkl'];
+
+  /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
+  String? premiumizeToken;
+
+  /// Links Premiumize with an API key or a device-login token, after Premiumize accepted it (throws its reason).
+  Future<void> linkPremiumize(String? token) async {
+    final p = profile;
+    if (p == null) return;
+    if (token != null) await pmCheck(token: token.trim());
+    await secrets.writeService(p.id, 'premiumize', token?.trim());
+    premiumizeToken = token?.trim();
+    notifyListeners();
+  }
+
+  /// Plays a file by its own URL (a Premiumize cloud file): like a recording, seekable, no progress kept.
+  Future<void> playUrl(ItemInfo item, String url) async {
+    final lib = library;
+    if (lib == null || nowPlaying.value?.key == item.key) return;
+    _saveProgress();
+    nowPlaying.value = item;
+    _playingKey = item.key;
+    bufferRaisedTo.value = null;
+    timeshiftWindow.value = 0;
+    final choice = lib.bufferFor(key: item.key);
+    await adapter.play(
+      ({required hls}) => url,
+      live: false,
+      preset: choice.preset,
+      customSeconds: choice.seconds,
+      adaptive: false,
+      preferHls: false,
+      extraOptions: const [],
+    );
   }
 
   /// Plays a programme from the channel's catch-up archive, from its start (false when there is none: no archive,
@@ -555,7 +597,8 @@ class Session extends ChangeNotifier {
     if (it == null ||
         lib == null ||
         !(it.kind == ItemKind.movie || it.kind == ItemKind.episode) ||
-        it.key.startsWith('catchup:')) {
+        it.key.startsWith('catchup:') ||
+        it.key.startsWith('premiumize:')) {
       return;
     }
     final pos = player.state.position.inSeconds;
