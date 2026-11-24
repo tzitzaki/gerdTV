@@ -715,20 +715,33 @@ class Session extends ChangeNotifier {
         defaultTimeshiftSeconds(desktop: isDesktop);
     String url;
     var window = 0;
-    try {
-      final hls = await lib.startLocalHls(
-        key: item.key,
-        cacheDir: (await getTemporaryDirectory()).path,
-        windowSecs: shift,
-        // The same disk budget as mpv's back buffer: a quarter of it.
-        maxBytes: BigInt.from((isDesktop ? 16000000000 : 4000000000) ~/ 4),
-      );
-      _hls = hls;
-      url = hls.url();
-      window = shift;
-    } catch (e) {
-      debugPrint('local HLS: $e');
-      url = lib.streamUrl(key: item.key, preferHls: false);
+    final upstream = lib.streamUrl(key: item.key, preferHls: false);
+    if (upstream.split('?').first.endsWith('.m3u8')) {
+      url = upstream; // the provider sends HLS itself (M3U profiles)
+    } else {
+      try {
+        // Returns once the playlist has its first segments (about 6 s at live pace).
+        final hls = await lib.startLocalHls(
+          key: item.key,
+          cacheDir: (await getTemporaryDirectory()).path,
+          windowSecs: shift,
+          // The same disk budget as mpv's back buffer: a quarter of it.
+          maxBytes: BigInt.from((isDesktop ? 16000000000 : 4000000000) ~/ 4),
+        );
+        if (nowPlaying.value?.key != item.key) {
+          hls.stop(); // zapped or stopped meanwhile
+          return;
+        }
+        _hls = hls;
+        url = hls.url();
+        window = shift;
+      } catch (e) {
+        // Refused or no data: mpv plays it, and its watchdog shows why.
+        debugPrint('local HLS: $e; ${item.name} plays in mpv');
+        _avFailed.add(item.key);
+        await _start(item, lib);
+        return;
+      }
     }
     bufferRaisedTo.value = null;
     timeshiftWindow.value = window;

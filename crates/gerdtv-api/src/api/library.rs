@@ -676,8 +676,9 @@ impl Library {
     }
 
     /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
-    /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`. Fails when the provider sends HLS
-    /// already (play that URL directly) or the cache folder can't be written.
+    /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`; returns once the playlist has its
+    /// first segments. Fails (with the message to show) when the provider sends HLS already, refuses the stream,
+    /// sends nothing for 20 s, or the cache folder can't be written.
     pub async fn start_local_hls(
         &self,
         key: String,
@@ -706,6 +707,8 @@ impl Library {
         )
         .await
         .map_err(|e| e.to_string())?;
+        // Only a playlist with segments: AVPlayer gives up on an empty one ("Playback Stopped").
+        stream.ready().await.map_err(|e| e.to_string())?;
         Ok(crate::api::hls::LocalHlsStream(std::sync::Mutex::new(
             stream,
         )))

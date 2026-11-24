@@ -6977,8 +6977,9 @@ class LibraryImpl extends RustOpaque implements Library {
       RustLib.instance.api.crateApiLibraryLibrarySetting(that: this, key: key);
 
   /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
-  /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`. Fails when the provider sends HLS
-  /// already (play that URL directly) or the cache folder can't be written.
+  /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`; returns once the playlist has its
+  /// first segments. Fails (with the message to show) when the provider sends HLS already, refuses the stream,
+  /// sends nothing for 20 s, or the cache folder can't be written.
   Future<LocalHlsStream> startLocalHls({
     required String key,
     required String cacheDir,

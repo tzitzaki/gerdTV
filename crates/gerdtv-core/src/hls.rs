@@ -23,6 +23,8 @@ use tokio::net::{TcpListener, TcpStream};
 pub const SEGMENT_SECS: f64 = 2.0;
 /// No upstream bytes for this long: the connection is dead, reconnect.
 pub const STALL_SECS: u64 = 10;
+/// How long [LocalHls::ready] waits for the first segments.
+pub const READY_SECS: u64 = 20;
 /// Longest wait between reconnect attempts (1, 2, 4, 8, 10, 10 … s).
 const MAX_BACKOFF_SECS: u64 = 10;
 /// Timestamps jumping by more than this (backwards or forwards) mean the provider restarted its encoder.
@@ -446,6 +448,23 @@ impl LocalHls {
         })
     }
 
+    /// Waits until the playlist has [MIN_SEGMENTS] (AVPlayer gives up on a live playlist without segments, as
+    /// "Playback Stopped"): at real-time pace about 3 × [SEGMENT_SECS]. Fails with the message to show when the
+    /// provider refused the stream, or after [READY_SECS] without enough data.
+    pub async fn ready(&self) -> io::Result<()> {
+        for _ in 0..READY_SECS * 10 {
+            let s = self.status();
+            if let Some(code) = s.refused {
+                return Err(io::Error::other(refusal_message(code)));
+            }
+            if self.segments() >= MIN_SEGMENTS {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        Err(io::Error::other("The channel sent no picture."))
+    }
+
     /// The playlist URL for AVPlayer.
     pub fn url(&self) -> &str {
         &self.url
@@ -725,7 +744,11 @@ mod tests {
     async fn serves_playlist_and_segments() {
         let server = gerdtv_testkit::fault::FaultServer::start().await;
         let mut hls = start(&server, "serve").await;
-        let p = wait_for(&hls, 15, |p| p.matches("#EXTINF").count() >= 2).await;
+        // AVPlayer gives up on a live playlist without segments ("Playback Stopped", macOS CI): the app opens it
+        // only after ready(), and then it already has MIN_SEGMENTS.
+        hls.ready().await.unwrap();
+        let p = get(hls.url()).await.1;
+        assert!(p.matches("#EXTINF").count() >= MIN_SEGMENTS, "{p}");
         let first = p.lines().find(|l| l.ends_with(".ts")).unwrap();
         let seg_url = hls.url().replace("index.m3u8", first);
         let r = reqwest::get(&seg_url).await.unwrap();
@@ -779,12 +802,8 @@ mod tests {
         let server = gerdtv_testkit::fault::FaultServer::start().await;
         server.set(Fault::Status { code: 403 });
         let hls = start(&server, "refused").await;
-        for _ in 0..40 {
-            if hls.status().refused.is_some() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
+        let err = hls.ready().await.unwrap_err();
+        assert_eq!(err.to_string(), refusal_message(403));
         assert_eq!(hls.status().refused, Some(403));
         tokio::time::sleep(Duration::from_secs(2)).await;
         assert_eq!(server.stats().faulted, 1, "no retries");
