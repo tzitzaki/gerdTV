@@ -628,6 +628,42 @@ impl Library {
             .map_err(err)
     }
 
+    /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
+    /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`. Fails when the provider sends HLS
+    /// already (play that URL directly) or the cache folder can't be written.
+    pub async fn start_local_hls(
+        &self,
+        key: String,
+        cache_dir: String,
+        window_secs: u32,
+        max_bytes: u64,
+    ) -> Result<crate::api::hls::LocalHlsStream, String> {
+        use gerdtv_core::hls;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static STARTS: AtomicU64 = AtomicU64::new(0);
+        let url = self.0.stream_url(&key, "ts").map_err(err)?;
+        if url.split('?').next().unwrap_or("").ends_with(".m3u8") {
+            return Err("The provider sends this channel as HLS already.".into());
+        }
+        let cache = PathBuf::from(cache_dir);
+        let n = STARTS.fetch_add(1, Ordering::SeqCst);
+        if n == 0 {
+            hls::sweep(&cache); // segments a crash or kill left behind
+        }
+        let stream = hls::LocalHls::start(
+            url,
+            &self.0.profile().user_agent,
+            hls::stream_dir(&cache, n),
+            window_secs as f64,
+            max_bytes,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        Ok(crate::api::hls::LocalHlsStream(std::sync::Mutex::new(
+            stream,
+        )))
+    }
+
     // The guide (logic: gerdtv_core::epg). Settings → Guide, now/next in lists, the grid and programme search.
 
     /// The guide sources, the provider's first.

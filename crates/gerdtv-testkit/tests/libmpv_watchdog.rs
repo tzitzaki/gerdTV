@@ -347,6 +347,45 @@ fn live_hls_with_rotating_segment_urls_plays() {
     assert_eq!(h.reloads, 0);
 }
 
+/// The local HLS for AVPlayer (gerdtv_core::hls), played by FFmpeg's HLS demuxer here: it starts, plays through a
+/// provider drop without the player noticing (the core reconnects; a discontinuity), and rewinds inside the window.
+#[test]
+#[ignore = "libmpv harness: just test-harness"]
+fn local_hls_plays_through_a_provider_drop() {
+    let _serial = serial();
+    let rt = runtime();
+    let srv = rt.block_on(FaultServer::start());
+    let dir = std::env::temp_dir().join(format!("gerdtv-local-hls-{}", std::process::id()));
+    let hls = rt
+        .block_on(gerdtv_core::hls::LocalHls::start(
+            srv.url("/live/x.ts"),
+            "",
+            dir,
+            3600.0,
+            u64::MAX,
+        ))
+        .unwrap();
+    // AVPlayer waits for a few segments too.
+    while hls.segments() < 3 {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    let mut h = Harness::new(srv.url("/live/unused"), true, BufferPreset::FastZap);
+    h.mpv.command("loadfile", &[hls.url(), "replace"]).unwrap();
+    let t = h.playing_for(4.0, Duration::from_secs(40));
+    println!("local hls: 4 s played within {:.1} s", t.as_secs_f64());
+    srv.cut();
+    let t = h.playing_for(8.0, Duration::from_secs(60));
+    println!(
+        "local hls: 8 s more through a provider drop within {:.1} s",
+        t.as_secs_f64()
+    );
+    assert!(hls.status().reconnects >= 1);
+    let before = h.position;
+    h.mpv.command("seek", &["-6", "relative"]).unwrap();
+    h.run_until(Duration::from_secs(10), |h| h.position < before - 4.0);
+    assert_eq!(h.reloads, 0, "the player never had to reconnect");
+}
+
 #[test]
 #[ignore = "libmpv harness: just test-harness"]
 fn a_refused_stream_stops_without_looping() {

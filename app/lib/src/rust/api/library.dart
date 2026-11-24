@@ -4,6 +4,7 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import 'hls.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -229,6 +230,16 @@ abstract class Library implements RustOpaqueInterface {
 
   /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
   String? setting({required String key});
+
+  /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
+  /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`. Fails when the provider sends HLS
+  /// already (play that URL directly) or the cache folder can't be written.
+  Future<LocalHlsStream> startLocalHls({
+    required String key,
+    required String cacheDir,
+    required int windowSecs,
+    required BigInt maxBytes,
+  });
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});
