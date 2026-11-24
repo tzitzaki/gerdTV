@@ -11,6 +11,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/menu_bar.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/switch_player.dart';
@@ -19,9 +20,11 @@ import '../player/watchdog_adapter.dart';
 import '../src/rust/api/hls.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
+import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'reminders.dart';
 import 'secrets.dart';
+import 'tracking.dart';
 
 /// `choosing`: more than one profile and none set to open by itself: the start picker shows.
 enum SessionState { loading, needsSetup, choosing, ready }
@@ -265,6 +268,19 @@ class Session extends ChangeNotifier {
     theme.value = t;
   }
 
+  /// macOS: whether closing keeps gerdTV in the menu bar (Settings → Playback; app-wide).
+  bool menuBar = true;
+
+  Future<void> setMenuBar(bool on) async {
+    setAppSetting(
+      dir: await _dir(),
+      key: settingMenuBar,
+      value: on ? 'on' : 'off',
+    );
+    menuBar = on;
+    await applyMenuBar(on);
+  }
+
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
@@ -275,6 +291,12 @@ class Session extends ChangeNotifier {
       tinted: appSetting(dir: dir, key: settingThemeTinted),
       black: appSetting(dir: dir, key: settingThemeBlack),
     );
+    menuBar = menuBarOn(appSetting(dir: dir, key: settingMenuBar));
+    unawaited(applyMenuBar(menuBar));
+    platform.onMenuBar = (action) async {
+      if (action == 'stop') return stopPlayback();
+      await userPause(player.state.playing);
+    };
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
     profiles = await listProfiles(dir: dir);
@@ -341,6 +363,8 @@ class Session extends ChangeNotifier {
         secrets: s,
       );
       profile = p;
+      premiumizeToken = await secrets.readService(p.id, 'premiumize');
+      await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
       unawaited(
@@ -440,6 +464,13 @@ class Session extends ChangeNotifier {
     await stopPlayback();
     await deleteProfile(dir: await _dir(), id: p.id);
     await secrets.delete(p.id);
+    // Only the links that exist: deleting a key that was never written crashed the app on Linux (libsecret,
+    // flutter_secure_storage_linux 3.0.3), seen in the journey's "remove" step.
+    if (premiumizeToken != null) {
+      await secrets.writeService(p.id, 'premiumize', null);
+    }
+    premiumizeToken = null;
+    await tracking.forget();
     library = null;
     profile = null;
     profiles = [...profiles.where((o) => o.id != p.id)];
@@ -455,6 +486,7 @@ class Session extends ChangeNotifier {
       return; // reopening the player for the running stream: keep it going
     }
     _saveProgress(); // the one playing until now
+    _track('stop');
     _progressTimer ??= Timer.periodic(
       const Duration(seconds: 10),
       (_) => _saveProgress(),
@@ -463,6 +495,64 @@ class Session extends ChangeNotifier {
     nowPlaying.value = item;
     _playingKey = item.key;
     await _start(item, lib);
+    _track('start', item: item);
+  }
+
+  /// Trakt and Simkl for the open profile (services/tracking.dart).
+  late final tracking = Tracking(secrets);
+
+  /// Tells Trakt and Simkl what the running movie or episode does ([action]: start, pause, stop), with how far it
+  /// got; nothing for anything else.
+  void _track(String action, {ItemInfo? item}) {
+    final it = item ?? nowPlaying.value;
+    final lib = library;
+    if (it == null || lib == null) return;
+    final dur = player.state.duration.inSeconds;
+    final progress = dur > 0
+        ? player.state.position.inSeconds * 100 / dur
+        : 0.0;
+    unawaited(tracking.scrobble(lib, it.key, action, progress.toDouble()));
+  }
+
+  /// A pause or resume by the user (the player's button or Space, the macOS menu bar): the watchdog's own pause,
+  /// and the tracking services hear of it.
+  Future<void> userPause(bool pause) async {
+    _track(pause ? 'pause' : 'start');
+    pause ? await adapter.pause() : await adapter.resume();
+  }
+
+  /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
+  String? premiumizeToken;
+
+  /// Links Premiumize with an API key or a device-login token, after Premiumize accepted it (throws its reason).
+  Future<void> linkPremiumize(String? token) async {
+    final p = profile;
+    if (p == null) return;
+    if (token != null) await pmCheck(token: token.trim());
+    await secrets.writeService(p.id, 'premiumize', token?.trim());
+    premiumizeToken = token?.trim();
+    notifyListeners();
+  }
+
+  /// Plays a file by its own URL (a Premiumize cloud file): like a recording, seekable, no progress kept.
+  Future<void> playUrl(ItemInfo item, String url) async {
+    final lib = library;
+    if (lib == null || nowPlaying.value?.key == item.key) return;
+    _saveProgress();
+    nowPlaying.value = item;
+    _playingKey = item.key;
+    bufferRaisedTo.value = null;
+    timeshiftWindow.value = 0;
+    final choice = lib.bufferFor(key: item.key);
+    await adapter.play(
+      ({required hls}) => url,
+      live: false,
+      preset: choice.preset,
+      customSeconds: choice.seconds,
+      adaptive: false,
+      preferHls: false,
+      extraOptions: const [],
+    );
   }
 
   /// Plays a programme from the channel's catch-up archive, from its start (false when there is none: no archive,
@@ -504,13 +594,18 @@ class Session extends ChangeNotifier {
     return true;
   }
 
+  /// Why the last Picture-in-Picture didn't start (the player shows it once), null when it did.
+  final pipFailure = ValueNotifier<String?>(null);
+
   /// Picture-in-Picture on Apple platforms: a live channel in AVPlayer floats as it is; on iOS, mpv's picture floats
   /// from its own frames (no hand-over, so nothing reconnects).
   Future<void> startApplePip() async {
-    if (onAvPlayer.value) {
-      await _avEngine.startPip();
-    } else {
-      await platform.startApplePip();
+    pipFailure.value = null;
+    final started = onAvPlayer.value
+        ? await _avEngine.startPip()
+        : await platform.startApplePip();
+    if (!started) {
+      pipFailure.value = 'PiP: not possible right now';
     }
   }
 
@@ -687,7 +782,8 @@ class Session extends ChangeNotifier {
     if (it == null ||
         lib == null ||
         !(it.kind == ItemKind.movie || it.kind == ItemKind.episode) ||
-        it.key.startsWith('catchup:')) {
+        it.key.startsWith('catchup:') ||
+        it.key.startsWith('premiumize:')) {
       return;
     }
     final pos = player.state.position.inSeconds;
@@ -702,6 +798,7 @@ class Session extends ChangeNotifier {
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
     _saveProgress();
+    _track('stop');
     _playingKey = null;
     nowPlaying.value = null;
     timeshiftWindow.value = 0;

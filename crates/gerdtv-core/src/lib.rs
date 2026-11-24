@@ -10,6 +10,8 @@ pub mod library;
 pub mod logos;
 pub mod m3u;
 pub mod playback;
+pub mod premiumize;
+pub mod tracking;
 pub mod update;
 pub mod userdata;
 pub mod xtream;

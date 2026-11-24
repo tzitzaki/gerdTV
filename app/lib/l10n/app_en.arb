@@ -51,10 +51,14 @@
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
   "clear": "Clear",
+  "close": "Close",
   "continueWatching": "Continue watching",
+  "copy": "Copy",
   "dayToday": "Today",
   "dayTomorrow": "Tomorrow",
   "dayYesterday": "Yesterday",
+  "detailsMinutes": "min",
+  "detailsPlay": "Play",
   "episodesEmpty": "This series has no episodes.",
   "favouriteAdd": "Add to favourites",
   "favouriteRemove": "Remove from favourites",
@@ -137,6 +141,7 @@
   },
   "hiddenGroups": "Hidden groups",
   "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
+  "linkCodeHint": "Open this address on another device and enter the code:",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
@@ -145,12 +150,18 @@
   "logoMonogram": "Monogram",
   "logoScreen": "TV screen",
   "logoSignal": "Signal",
+  "menuBar": "Keep in the menu bar when closed",
+  "menuBarHint": "Closing the window or quitting from the Dock keeps gerdTV playing in the menu bar; its Quit ends it.",
+  "menuBarOpen": "Open gerdTV",
+  "menuBarPlayPause": "Play/Pause",
+  "menuBarQuit": "Quit gerdTV",
   "miniPlayer": "Mini player",
   "navGuide": "Guide",
   "navLive": "Live TV",
   "navMovies": "Movies",
   "navSeries": "Series",
   "navSettings": "Settings",
+  "playerAudio": "Audio",
   "playerChannels": "Channels",
   "playerEngine": "Player engine",
   "playerEngineGerdtv": "gerdTV build (newer mpv and FFmpeg)",
@@ -166,6 +177,14 @@
       }
     }
   },
+  "playerPipFailed": "Picture-in-Picture didn’t start ({reason}).",
+  "@playerPipFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "playerReconnecting": "Reconnecting ({attempt})…",
   "@playerReconnecting": {
     "placeholders": {
@@ -174,7 +193,28 @@
       }
     }
   },
+  "playerSubtitles": "Subtitles",
+  "playerSubtitlesOff": "Off",
+  "playerTrack": "Track {n}",
+  "@playerTrack": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "playerTracks": "Audio and subtitles",
   "playerZapHint": "↑ ↓ channels · OK channel list",
+  "premiumize": "Premiumize",
+  "premiumizeCloud": "Premiumize cloud",
+  "premiumizeCode": "Sign in with a code",
+  "premiumizeEmpty": "Nothing here yet.",
+  "premiumizeKey": "Premiumize API key",
+  "premiumizeKeyHint": "On premiumize.me under Account → API key.",
+  "premiumizeLink": "Link",
+  "premiumizeLinked": "Premiumize is linked",
+  "premiumizeTransfers": "Transfers",
+  "premiumizeUnlink": "Unlink",
   "profileAdd": "Add a provider",
   "profileAlways": "Always open this one",
   "profileChoose": "Which provider?",
@@ -205,6 +245,7 @@
   },
   "searchAlsoIn": "Also in",
   "searchEarlier": "Earlier",
+  "searchHintChannels": "Search channels",
   "searchHintGroup": "Search {group}",
   "@searchHintGroup": {
     "placeholders": {
@@ -264,10 +305,12 @@
   "settingsKeywordsLists": "layout tiles compact view",
   "settingsKeywordsLogo": "icon app launcher",
   "settingsKeywordsOffset": "time zone hours",
+  "settingsKeywordsPremiumize": "debrid premiumize cloud",
   "settingsKeywordsProfiles": "profile account provider switch add another",
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",
   "settingsKeywordsTimeshift": "pause rewind live",
+  "settingsKeywordsTracking": "trakt simkl tracking scrobble watched history",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
   "settingsLastSync": "{entries} entries in {categories} groups",
@@ -287,6 +330,7 @@
   "settingsLogoHint": "Also changes the app icon.",
   "settingsNoMatch": "No settings match.",
   "settingsPlayback": "Playback",
+  "settingsProvider": "Provider",
   "settingsRemove": "Remove this account",
   "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",
   "settingsSearchHint": "Search settings",
@@ -348,6 +392,29 @@
     }
   },
   "timeshiftOff": "Off",
+  "trackClientId": "Client ID",
+  "trackClientSecret": "Client secret",
+  "trackHint": "Movies and episodes you watch are reported as you watch them; from 80 % they count as watched.",
+  "trackLink": "Link {service}",
+  "@trackLink": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "trackLinked": "{service} is linked",
+  "@trackLinked": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "trackOwnAppHint": "Trakt needs your own Trakt app (no secret ships with gerdTV): on trakt.tv under Settings → Your API Apps → New Application, with the redirect URI urn:ietf:wg:oauth:2.0:oob; enter its client ID and secret here.",
+  "trackUnavailable": "Not in this build: it needs gerdTV's registration with the service.",
+  "trailer": "Trailer",
+  "trailerOnYouTube": "Watch on YouTube",
   "updateAvailable": "Version {version} is available",
   "@updateAvailable": {
     "placeholders": {
@@ -378,8 +445,9 @@
   },
   "updateInstall": "Install",
   "updateInstallRestart": "Install and restart",
-  "updateIosHint": "Re-sign the new IPA with your re-signing service, then install it.",
+  "updateIosHint": "Download the new IPA there, re-sign it with your re-signing service, then install it.",
   "updateNone": "gerdTV is up to date.",
+  "updatePage": "Release page",
   "updateShowFolder": "Show in folder",
   "userDataExport": "Export your data",
   "userDataExportHint": "Favourites, history, hidden groups, reminders and settings of this profile, without the login",

@@ -1,3 +1,8 @@
+## gerdTV
+gerdTV is free software under the GNU General Public License, version 3 (GPL-3.0-only): you may use, study, share and change it under that licence's terms. It comes without any warranty.
+
+The complete source code, the build scripts of every bundled native library and the licence text: https://github.com/tzitzaki/gerdTV.
+
 ## libmpv, FFmpeg (Android)
 gerdTV for Android bundles libmpv and FFmpeg as built by media_kit (media_kit_libs_android_video): mpv (2023, between 0.36 and 0.37) built with -Dgpl=false and FFmpeg 6.0, both under the GNU Lesser General Public License (FFmpeg: LGPL-3.0; mpv: LGPL-2.1 or later).
 
@@ -27,5 +32,5 @@ gerdTV for macOS, iPhone and iPad also bundles its own libmpv (GerdMpv.framework
 The exact sources (pinned by SHA-256 or commit) and configure flags: scripts/build-libmpv-apple.sh in the gerdTV repository, https://github.com/tzitzaki/gerdTV.
 
 ## media_kit_video (vendored)
-gerdTV uses media_kit_video 2.0.1 (MIT licence, https://github.com/media-kit/media-kit) with a small change of its own on macOS and iOS (third_party/media_kit_video in the gerdTV repository).
+gerdTV uses media_kit_video 2.0.1 (MIT licence, https://github.com/media-kit/media-kit) with small changes of its own (third_party/media_kit_video in the gerdTV repository; third_party/README.md lists them).
 

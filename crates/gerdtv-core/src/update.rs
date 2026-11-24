@@ -13,6 +13,10 @@ use std::time::Duration;
 /// Where releases are published (GitHub's "latest release" download URLs; public).
 pub const RELEASES: &str = "https://github.com/tzitzaki/gerdTV/releases/latest/download";
 
+/// The newest release's page (notes and every file), for platforms without an in-app install (iOS) and for anyone
+/// who wants to read more.
+pub const RELEASE_PAGE: &str = "https://github.com/tzitzaki/gerdTV/releases/latest";
+
 /// The update key's public half, as committed (the release job signs with the secret half).
 pub const PUBLIC_KEY_HEX: &str = include_str!("../../../keys/update-public-key.hex");
 
@@ -208,6 +212,11 @@ mod tests {
             PUBLIC_KEY_HEX.trim().len(),
             64,
             "the committed public key is 32 bytes of hex"
+        );
+        assert_eq!(
+            RELEASES,
+            format!("{RELEASE_PAGE}/download"),
+            "the release page and the files are the same release"
         );
     }
 }

@@ -116,6 +116,21 @@ pub struct CategoryInfo {
     pub count: u32,
 }
 
+/// A movie's or series' page details (gerdtv_core::xtream::Details); empty strings and None where the panel has
+/// nothing.
+pub struct ItemDetails {
+    pub plot: String,
+    pub genre: String,
+    pub cast: String,
+    pub director: String,
+    pub release: String,
+    pub duration_secs: Option<u32>,
+    pub rating: Option<f64>,
+    pub backdrop: String,
+    /// The trailer's YouTube video id, "" when there is none.
+    pub trailer: String,
+}
+
 pub struct ItemInfo {
     pub key: String,
     pub kind: ItemKind,
@@ -364,6 +379,38 @@ impl Library {
             .into_iter()
             .map(Into::into)
             .collect())
+    }
+
+    /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
+    pub fn track_item(&self, key: String) -> Result<Option<super::tracking::TrackItem>, String> {
+        Ok(self
+            .0
+            .track_info(&key)
+            .map_err(err)?
+            .map(|t| super::tracking::TrackItem {
+                movie: t.movie,
+                name: t.name,
+                year: t.year,
+                show: t.show,
+                season: t.season,
+                number: t.number,
+            }))
+    }
+
+    /// A movie's or series' details, from the panel when the page opens.
+    pub async fn details(&self, key: String) -> Result<ItemDetails, String> {
+        let d = self.0.details(&key).await.map_err(err)?;
+        Ok(ItemDetails {
+            plot: d.plot,
+            genre: d.genre,
+            cast: d.cast,
+            director: d.director,
+            release: d.release,
+            duration_secs: d.duration_secs,
+            rating: d.rating,
+            backdrop: d.backdrop,
+            trailer: d.trailer,
+        })
     }
 
     /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
@@ -758,11 +805,17 @@ impl Library {
             .collect())
     }
 
-    /// Live channels without a guide match, in provider order (the mapping screen).
-    pub fn unmatched_channels(&self, limit: u32, offset: u32) -> Result<Vec<ChannelRef>, String> {
+    /// Live channels without a guide match, in provider order (the mapping screen); an empty query lists all,
+    /// otherwise those whose name contains it.
+    pub fn unmatched_channels(
+        &self,
+        limit: u32,
+        offset: u32,
+        query: String,
+    ) -> Result<Vec<ChannelRef>, String> {
         Ok(refs(
             self.0
-                .unmatched_channels(limit as usize, offset as usize)
+                .unmatched_channels(limit as usize, offset as usize, &query)
                 .map_err(err)?,
         ))
     }

@@ -29,6 +29,12 @@ impl From<core::Release> for UpdateInfo {
     }
 }
 
+/// The newest release's page on GitHub.
+#[flutter_rust_bridge::frb(sync)]
+pub fn release_page() -> String {
+    core::RELEASE_PAGE.to_string()
+}
+
 /// A newer, correctly signed release with a build for `platform` ("macos", "ios", "android", "linux"), or None.
 pub async fn check_update(platform: String) -> Result<Option<UpdateInfo>, String> {
     core::check(

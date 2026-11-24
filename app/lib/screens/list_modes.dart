@@ -283,9 +283,8 @@ class ItemRow extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final current = nowNext?.now;
     final next = nowNext?.next;
-    final name = item.number == null
-        ? item.name
-        : '${item.number}  ${item.name}';
+    // No channel number in front (owner decision: not important); sorting and search by number stay.
+    final name = item.name;
     final group = highlight != null && item.group.isNotEmpty
         ? Text(
             item.group,

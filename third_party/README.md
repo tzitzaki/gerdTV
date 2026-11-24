@@ -11,6 +11,8 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   app without linking it.
 - `media_kit_video` 2.0.1: `queryDecoders` no longer re-runs media_kit's library lookup (it fell back to Mpv.framework
   and crashed on GerdMpv's handle), and `MPV.swift` reads GERDTV_LIBMPV with getenv.
+- `media_kit_video` 2.0.1: the mobile controls take a changed `initialBrightness` (the app reads the screen's brightness
+  asynchronously), and their theme notifies when it changed (upstream had the test inverted).
 - `media_kit_video` 2.0.1, frame path (iOS and macOS, `TextureHW`, `VideoOutput`): mpv's update callback goes straight
   to the worker; a frame is drawn only when mpv has a new one (`mpv_render_context_update`) or the buffers were resized;
   Flutter hears about drawn frames asynchronously; the picture is rendered at most at the screen's pixel size; on iOS

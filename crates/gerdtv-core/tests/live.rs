@@ -162,7 +162,7 @@ async fn live_library_and_one_playback_probe() {
                 .map(|h| h.key),
         );
     }
-    let unmatched = lib.unmatched_channels(100_000, 0).unwrap().len();
+    let unmatched = lib.unmatched_channels(100_000, 0, "").unwrap().len();
     let on_now = lib
         .now_next(&live_keys)
         .unwrap()
@@ -336,7 +336,7 @@ async fn live_guide_gaps() {
         );
     }
     let report = |label: &str| {
-        let unmatched = lib.unmatched_channels(100_000, 0).unwrap().len();
+        let unmatched = lib.unmatched_channels(100_000, 0, "").unwrap().len();
         let on_now = lib
             .now_next(&live_keys)
             .unwrap()

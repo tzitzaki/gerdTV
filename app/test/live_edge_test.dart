@@ -40,6 +40,28 @@ void main() {
     },
   );
 
+  test('Live lands where mpv neither waits nor counts as behind', () {
+    // (cache-pause-wait of the buffer, where Live lands, up to where it's live): closer than twice the wait,
+    // mpv ran dry and froze right after Live (the journey's flaky "keeps playing" step); Live itself never shows
+    // "behind live".
+    for (final (wait, margin, slack) in [
+      (2, 5.0, 6.0),
+      (0, 1.0, 3.0),
+      (30, 61.0, 62.0),
+    ]) {
+      expect(goLiveMargin(wait), margin);
+      expect(liveSlackFor(wait), slack);
+      expect(goLiveMargin(wait), lessThan(liveSlackFor(wait)));
+    }
+    final e = LiveEdge()..cache(100, DateTime(2026));
+    expect(e.behind(100 - 61, DateTime(2026), slack: liveSlackFor(30)), 0);
+    expect(
+      e.behind(100 - 61, DateTime(2026)),
+      61,
+      reason: 'the plain slack is 3 s',
+    );
+  });
+
   test('labels', () {
     for (final (secs, label) in [
       (0, '−0:00'),

@@ -79,17 +79,23 @@ impl BufferPreset {
 pub const DEFAULT_BITRATE_BPS: u64 = 8_000_000;
 /// The demuxer never gets less than this, so short presets still hold a few seconds of a high-bitrate stream.
 const MIN_DEMUXER_BYTES: u64 = 32 * 1024 * 1024;
+/// Reading ahead goes this much further than the buffer mpv waits for (`cache-pause-wait`): with both equal, after a
+/// dip mpv waited for 2 s of data while the demuxer stopped reading at 2 s ahead, and playback froze
+/// (`paused-for-cache` yes, `demuxer-cache-idle` yes, `cache-buffering-state` stuck below 100).
+const READAHEAD_EXTRA_SECS: u32 = 5;
 
 /// The mpv options for a preset, as (name, value) pairs to set before `open()`.
 /// `bitrate_bps`: the stream's estimated bitrate, used to size the demuxer cache (target × bitrate × 1.5 headroom).
 pub fn mpv_options(preset: BufferPreset, bitrate_bps: u64) -> Vec<(String, String)> {
     let secs = preset.seconds();
     let bytes = (secs as u64 * bitrate_bps / 8 * 3 / 2).max(MIN_DEMUXER_BYTES);
-    let mut opts = vec![
+    let mut opts =
+        vec![
         ("cache", "yes".to_string()),
-        // Read ahead as far as the target; mpv waits for `cache-pause-wait` seconds before resuming.
-        ("cache-secs", secs.to_string()),
-        ("demuxer-readahead-secs", secs.to_string()),
+        // Read ahead past the target ([READAHEAD_EXTRA_SECS]); mpv waits for `cache-pause-wait` seconds before
+        // resuming.
+        ("cache-secs", (secs + READAHEAD_EXTRA_SECS).to_string()),
+        ("demuxer-readahead-secs", (secs + READAHEAD_EXTRA_SECS).to_string()),
         ("cache-pause", "yes".to_string()),
         ("cache-pause-initial", "yes".to_string()),
         ("cache-pause-wait", secs.to_string()),
@@ -536,7 +542,11 @@ mod tests {
         for (preset, secs, bytes, disk) in table {
             let o = mpv_options(preset, DEFAULT_BITRATE_BPS);
             assert_eq!(opt(&o, "cache-pause-wait"), secs.to_string(), "{preset:?}");
-            assert_eq!(opt(&o, "cache-secs"), secs.to_string(), "{preset:?}");
+            // Reading ahead stops later than mpv's wait: equal, mpv waited for data the demuxer no longer fetched
+            // and froze (paused for cache at 83–89 %, demuxer idle; the app journey's "keeps playing" step).
+            let ahead = (secs + READAHEAD_EXTRA_SECS).to_string();
+            assert_eq!(opt(&o, "cache-secs"), ahead, "{preset:?}");
+            assert_eq!(opt(&o, "demuxer-readahead-secs"), ahead, "{preset:?}");
             assert_eq!(
                 opt(&o, "demuxer-max-bytes"),
                 bytes.to_string(),

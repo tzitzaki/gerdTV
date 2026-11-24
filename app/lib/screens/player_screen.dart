@@ -17,18 +17,21 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:media_kit/media_kit.dart' show Tracks;
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:window_manager/window_manager.dart' show DragToMoveArea;
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
+import '../platform/platform_bridge.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import '../player/live_edge.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
+import 'track_sheet.dart';
 
 /// The profile setting for the player gestures: on unless "off" (Settings → Playback).
 const playerGesturesSetting = 'player_gestures';
@@ -37,7 +40,8 @@ const playerGesturesSetting = 'player_gestures';
 /// - movies and episodes: a horizontal swipe seeks (the further, the more), a double tap on the left or right third
 ///   skips 10 s;
 /// - everything: a vertical swipe on the right half sets the player's volume (mpv's 0–100 %, not the system's: iOS has
-///   no public API for that).
+///   no public API for that), one on the left half the screen's brightness (owner decision; PlatformBridge, put back
+///   when the player closes).
 /// Live channels don't seek by swipe: media_kit seeks against the stream's duration, which a live stream doesn't
 /// have, and timeshift has its own bar and live edge. Off: none of them (the controls still work by tap).
 MaterialVideoControlsThemeData withGestures(
@@ -46,13 +50,19 @@ MaterialVideoControlsThemeData withGestures(
   required bool vod,
   required double volume,
   required ValueChanged<double> onVolume,
+  required double brightness,
+  required ValueChanged<double> onBrightness,
+  required VoidCallback onBrightnessReset,
 }) => base.copyWith(
   seekGesture: enabled && vod,
   seekOnDoubleTap: enabled && vod,
   volumeGesture: enabled,
-  brightnessGesture: false, // would need a platform channel; not asked for
+  brightnessGesture: enabled,
   initialVolume: volume.clamp(0.0, 1.0),
   onVolumeChanged: onVolume,
+  initialBrightness: brightness.clamp(0.0, 1.0),
+  onBrightnessChanged: onBrightness,
+  onBrightnessReset: onBrightnessReset,
 );
 
 /// Every video view of the one stream (player, picture mode, now-playing bar). media_kit pauses the player when the
@@ -96,6 +106,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _bufferSub;
 
+  /// The screen's brightness when the player opened (the brightness swipe starts there); 0.5 until it is known.
+  double _brightness = 0.5;
+
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
   List<ItemInfo> get _channels => widget.session.zapList;
   static final _miniWindow = MiniWindow();
@@ -118,6 +131,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
+    session.pipFailure.addListener(_showPipFailure);
+    PlatformBridge.brightness().then((b) {
+      if (b != null && mounted) setState(() => _brightness = b);
+    });
     // The "behind live" label counts up while paused or rewound.
     _shiftTick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _shiftable) setState(() {});
@@ -125,6 +142,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   bool get _shiftable => widget.session.timeshiftWindow.value > 0;
+
+  /// iOS: why Picture-in-Picture didn't work, so a device report can name it (the stream plays on here).
+  void _showPipFailure() {
+    final failure = widget.session.pipFailure.value;
+    if (failure == null || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).playerPipFailed(failure)),
+      ),
+    );
+  }
 
   /// The edge of the running channel (reset when the channel changed: zapping keeps this screen).
   LiveEdge get _liveEdge {
@@ -150,21 +178,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
       e.earliest(widget.session.timeshiftWindow.value, now),
       live,
     );
-    live - to < liveSlack ? e.attach() : e.detach();
+    live - to < _slack ? e.attach() : e.detach();
     await widget.session.player.seek(
       Duration(milliseconds: (to * 1000).round()),
     );
     if (mounted) setState(() {});
   }
 
-  /// Back to live: just short of the cache's end, playing (exactly at it, mpv has nothing left to play and waits for
-  /// new data; half the live slack still counts as live).
+  /// The buffer's `cache-pause-wait` (the channel's or profile's preset) decides how close to the edge is "live".
+  int get _pauseWait => widget.session.adapter.target.value;
+  double get _slack => liveSlackFor(_pauseWait);
+
+  /// Back to live: short of the cache's end by [goLiveMargin] for the buffer, playing (closer, mpv runs dry and
+  /// pauses for cache right after Live); that still counts as live ([liveSlackFor]).
   Future<void> _goLive() async {
     final live = _liveEdge.live(DateTime.now());
     if (live == null) return;
     // Never past what is cached: on a slow connection the projected live edge runs ahead of the data (macOS CI).
     final cached = widget.session.player.state.buffer.inMilliseconds / 1000;
-    await _seekTo((cached < live ? cached : live) - liveSlack / 2);
+    await _seekTo((cached < live ? cached : live) - goLiveMargin(_pauseWait));
     if (_paused) await _togglePause();
   }
 
@@ -237,6 +269,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    widget.session.pipFailure.removeListener(_showPipFailure);
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
     _positionSub?.cancel();
@@ -371,6 +404,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       vod: _current.kind != ItemKind.live,
       volume: p.state.volume / 100,
       onVolume: (v) => p.setVolume(v * 100),
+      brightness: _brightness,
+      onBrightness: PlatformBridge.setBrightness,
+      onBrightnessReset: PlatformBridge.resetBrightness,
     );
   }
 
@@ -390,11 +426,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePause() async {
-    final a = widget.session.adapter;
     if (!_paused && _shiftable) {
       _liveEdge.detach(); // paused: live moves on without us
     }
-    _paused ? await a.resume() : await a.pause();
+    await widget.session.userPause(!_paused);
     setState(() => _paused = !_paused);
   }
 
@@ -501,6 +536,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
+                              // Audio and subtitles, when the stream has a choice (track_sheet.dart).
+                              StreamBuilder<Tracks>(
+                                stream: widget.session.player.stream.tracks,
+                                initialData: widget.session.player.state.tracks,
+                                builder: (context, snap) {
+                                  final p = widget.session.player;
+                                  if (!hasTrackChoice(snap.data!)) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: Tokens.space,
+                                    ),
+                                    child: IconButton.filledTonal(
+                                      key: const Key('player.tracks'),
+                                      tooltip: l10n.playerTracks,
+                                      icon: const Icon(
+                                        Icons.subtitles_outlined,
+                                      ),
+                                      onPressed: () => showTrackSheet(
+                                        context,
+                                        tracks: p.state.tracks,
+                                        current: p.state.track,
+                                        onAudio: p.setAudioTrack,
+                                        onSubtitle: p.setSubtitleTrack,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                               IconButton.filledTonal(
                                 key: const Key('player.buffer'),
                                 tooltip: l10n.bufferThisChannel,
@@ -638,7 +703,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// While behind live: how far ("−5:12") and Go live (reachable with the D-pad).
   List<Widget> _behindLive(AppLocalizations l10n) {
-    final behind = _shiftable ? _liveEdge.behind(_position, DateTime.now()) : 0;
+    final behind = _shiftable
+        ? _liveEdge.behind(_position, DateTime.now(), slack: _slack)
+        : 0;
     if (behind == 0) return const [];
     return [
       Text(
@@ -724,9 +791,7 @@ class _NowNextBanner extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              channel.number == null
-                  ? channel.name
-                  : '${channel.number}  ${channel.name}',
+              channel.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: text.titleMedium,
@@ -824,7 +889,7 @@ class _ChannelPanelState extends State<_ChannelPanel> {
                   autofocus: c.key == current.key,
                   selected: c.key == current.key,
                   title: Text(
-                    c.number == null ? c.name : '${c.number}  ${c.name}',
+                    c.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

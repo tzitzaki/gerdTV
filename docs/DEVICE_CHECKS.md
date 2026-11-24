@@ -6,9 +6,9 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own engine: Settings → Playback → Player engine gerdTV, restart; a movie plays with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
 - Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
-- Movies and series: a movie plays, a series opens its episodes; a movie stopped after 5 min shows under Continue watching and continues there.
+- Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
-- Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
+- Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
@@ -25,14 +25,14 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## iPhone and iPad
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
-- Live TV and a movie play in full screen with sound; logos show in the lists.
-- Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
+- Live TV and a movie play in full screen with logos in the lists; Back keeps the channel running in the bottom bar; Stop ends it.
 - Home: swiping to Home while a channel or a movie plays floats it by itself; tapping the window shows play/pause and skip, which work.
 - Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 - iPad: the floating window works over split view; live rewinds 20 min (timeshift 30 min in Settings → Playback) and Live returns.
-- Swipe: from the left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
+- Trailer: a movie's page plays its trailer muted after 2 s; Trailer plays it with sound (if not, note YouTube's error number).
+- Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
@@ -41,12 +41,12 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
 - Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
-- Swipe: left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
+- Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Shield
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
-- Install: the APK installs and gerdTV appears in the TV launcher row with its banner.
-- Remote: the D-pad reaches every section, list and the setup fields; OK opens; Back leaves the player.
+- Install and remote: gerdTV is in the launcher row with its banner; the D-pad reaches every section and field; Back leaves the player.
+- Movie page: OK on a movie opens its page with the muted trailer; OK plays, Trailer plays it with sound, Back returns.
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
 - PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.
 - Guide: the D-pad reaches every row of Settings → Guide, the offset list and the channels-without-guide screen.

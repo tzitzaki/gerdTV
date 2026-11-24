@@ -71,6 +71,37 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    // The player's brightness swipe: only this window's brightness, the system setting stays
+                    // (no permission needed). -1 in the window means "the system's": read that one then.
+                    "brightness" -> {
+                        val own = window.attributes.screenBrightness
+                        result.success(
+                            if (own >= 0) own.toDouble()
+                            else android.provider.Settings.System.getInt(
+                                contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS, 128
+                            ) / 255.0
+                        )
+                    }
+                    "setBrightness", "resetBrightness" -> {
+                        val value = call.argument<Double>("value")
+                        window.attributes = window.attributes.apply {
+                            screenBrightness = value?.toFloat()?.coerceIn(0.01f, 1f)
+                                ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        }
+                        result.success(null)
+                    }
+                    "openUrl" -> {
+                        // A TV may have no browser: false lets Dart show the address instead.
+                        try {
+                            startActivity(
+                                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(call.argument<String>("url") ?: ""))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                            result.success(true)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            result.success(false)
+                        }
+                    }
                     "saveToDownloads" -> {
                         val name = call.argument<String>("name") ?: "gerdtv.json"
                         val text = call.argument<String>("text") ?: ""

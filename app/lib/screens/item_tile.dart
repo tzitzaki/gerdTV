@@ -36,12 +36,6 @@ class ItemTile extends StatelessWidget {
       subtitle: subtitle == null
           ? null
           : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: item.number == null
-          ? null
-          : Text(
-              '${item.number}',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: Tokens.space * 2,
         vertical: Tokens.space / 2,

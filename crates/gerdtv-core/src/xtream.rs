@@ -87,6 +87,63 @@ fn text(v: &Value) -> String {
     }
 }
 
+/// A movie's or series' details for its page (get_vod_info / get_series_info), fetched when the page opens and not
+/// stored. Every field may be empty: panels fill them from TMDB, often only partly.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Details {
+    pub plot: String,
+    pub genre: String,
+    pub cast: String,
+    pub director: String,
+    /// As the panel sends it ("2019-05-01" or "2019").
+    pub release: String,
+    pub duration_secs: Option<u32>,
+    pub rating: Option<f64>,
+    /// The first backdrop picture's URL.
+    pub backdrop: String,
+    /// The YouTube video id of the trailer (panels send an id or a whole YouTube URL).
+    pub trailer: String,
+}
+
+/// A YouTube video id from what panels put into `youtube_trailer`: the id itself, or a watch, short, embed or
+/// youtu.be URL; "" for anything else (an id is 11 letters, digits, '-' or '_').
+pub fn trailer_id(raw: &str) -> String {
+    let raw = raw.trim();
+    let id = ["v=", "youtu.be/", "/embed/", "/shorts/"]
+        .iter()
+        .find_map(|m| raw.split_once(m).map(|(_, rest)| rest))
+        .unwrap_or(raw);
+    let id: String = id
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if id.len() == 11 { id } else { String::new() }
+}
+
+fn details(info: &Value) -> Details {
+    let first = |keys: &[&str]| {
+        keys.iter()
+            .map(|k| text(&info[*k]))
+            .find(|s| !s.trim().is_empty())
+            .unwrap_or_default()
+    };
+    Details {
+        plot: first(&["plot", "description"]),
+        genre: first(&["genre"]),
+        cast: first(&["cast", "actors"]),
+        director: first(&["director"]),
+        release: first(&["releasedate", "releaseDate", "release_date"]),
+        duration_secs: num(&info["duration_secs"]).map(|n| n as u32),
+        rating: rating(&info["rating"]),
+        backdrop: info["backdrop_path"]
+            .as_array()
+            .and_then(|a| a.first())
+            .map(text)
+            .unwrap_or_else(|| text(&info["backdrop_path"])),
+        trailer: trailer_id(&text(&info["youtube_trailer"])),
+    }
+}
+
 impl Xtream {
     /// `base` as the user typed it ("http://host:port", trailing slash and path tolerated).
     pub fn new(base: &str, user: &str, pass: &str, user_agent: Option<&str>) -> Xtream {
@@ -272,6 +329,25 @@ impl Xtream {
         Ok(out)
     }
 
+    /// A movie's details (get_vod_info); an unknown id gives empty details.
+    pub async fn vod_details(&self, vod_id: u64) -> Result<Details> {
+        let v = self
+            .api(Some("get_vod_info"), &[("vod_id", vod_id.to_string())])
+            .await?;
+        Ok(details(&v["info"]))
+    }
+
+    /// A series' details (get_series_info, the same call as [Self::episodes]).
+    pub async fn series_details(&self, series_id: u64) -> Result<Details> {
+        let v = self
+            .api(
+                Some("get_series_info"),
+                &[("series_id", series_id.to_string())],
+            )
+            .await?;
+        Ok(details(&v["info"]))
+    }
+
     /// The panel's own guide (XMLTV), built when needed and never stored (it holds the login).
     pub fn xmltv_url(&self) -> String {
         format!(
@@ -433,6 +509,63 @@ mod tests {
         assert_eq!(
             xc.catchup_url(42, 1_763_830_800, 90, 3600),
             "http://xc.example.invalid:8080/timeshift/u/p/90/2025-11-22:18-00/42.ts"
+        );
+    }
+
+    #[test]
+    fn trailer_ids_from_what_panels_send() {
+        for (raw, want) in [
+            ("abcDEF12_-x", "abcDEF12_-x"),
+            (
+                "https://www.youtube.com/watch?v=abcDEF12_-x&t=3",
+                "abcDEF12_-x",
+            ),
+            ("https://youtu.be/abcDEF12_-x", "abcDEF12_-x"),
+            (
+                "https://www.youtube.com/embed/abcDEF12_-x?rel=0",
+                "abcDEF12_-x",
+            ),
+            (" abcDEF12_-x ", "abcDEF12_-x"),
+            ("", ""),
+            ("n/a", ""),
+            ("https://example.invalid/trailer.mp4", ""),
+        ] {
+            assert_eq!(trailer_id(raw), want, "{raw}");
+        }
+    }
+
+    #[tokio::test]
+    async fn details_come_from_the_info_calls() {
+        let mock = MockXc::start(200, 5).await;
+        let xc = Xtream::new(&mock.base(), USER, PASS, None);
+        let mut conn = db::open(Path::new(":memory:")).unwrap();
+        sync(&mut conn, &xc).await.unwrap();
+        let id: u64 = conn
+            .query_row("SELECT key FROM items WHERE kind = 1 LIMIT 1", [], |r| {
+                r.get::<_, String>(0)
+            })
+            .unwrap()
+            .trim_start_matches("movie:")
+            .parse()
+            .unwrap();
+        let d = xc.vod_details(id).await.unwrap();
+        assert_eq!(d.plot, "A synthetic film.");
+        assert_eq!(d.duration_secs, Some(5400));
+        assert_eq!(d.trailer, "synthTrail1");
+        assert_eq!(d.backdrop, "https://example.invalid/backdrop.jpg");
+        assert_eq!(xc.vod_details(1).await.unwrap(), Details::default());
+        let series: u64 = conn
+            .query_row("SELECT key FROM items WHERE kind = 3 LIMIT 1", [], |r| {
+                r.get::<_, String>(0)
+            })
+            .unwrap()
+            .trim_start_matches("series:")
+            .parse()
+            .unwrap();
+        let s = xc.series_details(series).await.unwrap();
+        assert_eq!(
+            (s.plot.as_str(), s.trailer.as_str()),
+            ("A synthetic show.", "synthTrail2")
         );
     }
 

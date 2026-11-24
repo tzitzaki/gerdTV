@@ -43,7 +43,8 @@ import media_kit_video
 }
 
 /// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), pipState(playing, position,
-/// duration, live), startPip → Bool, stopPip, setLogo(name); → pipCommand(action "play"/"pause"/"skip", secs).
+/// duration, live), startPip → Bool, stopPip, setLogo(name), openUrl(url) → Bool, brightness → Double,
+/// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs).
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   AVPictureInPictureSampleBufferPlaybackDelegate
 {
@@ -56,10 +57,16 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   private var playing = false
   private var duration = 0.0
   private var live = false
+  /// The screen's brightness before the player's swipe changed it (nil: unchanged).
+  private var ownBrightness: CGFloat?
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "gerdtv/platform", binaryMessenger: messenger)
     super.init()
+    // Leaving the app gives the screen its own brightness back (the swipe's is for watching in gerdTV).
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in self?.restoreBrightness() }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       let args = call.arguments as? [String: Any] ?? [:]
@@ -93,6 +100,24 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
           return
         }
         UIApplication.shared.setAlternateIconName(name == "gtv" ? nil : "AppIcon-\(name)") { _ in result(nil) }
+      case "brightness":
+        result(Double(UIScreen.main.brightness))
+      case "setBrightness":
+        // iOS's brightness is the screen's and stays after the app: remember the user's own to put it back.
+        if let value = args["value"] as? Double {
+          if self.ownBrightness == nil { self.ownBrightness = UIScreen.main.brightness }
+          UIScreen.main.brightness = CGFloat(min(max(value, 0), 1))
+        }
+        result(nil)
+      case "resetBrightness":
+        self.restoreBrightness()
+        result(nil)
+      case "openUrl":
+        guard let url = args["url"] as? String, let u = URL(string: url) else {
+          result(false)
+          return
+        }
+        UIApplication.shared.open(u) { opened in result(opened) }
       case "stopPip":
         self.pip?.stopPictureInPicture()
         result(nil)
@@ -102,13 +127,19 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     }
   }
 
+  private func restoreBrightness() {
+    if let own = ownBrightness { UIScreen.main.brightness = own }
+    ownBrightness = nil
+  }
+
   /// mpv plays (on): its frames go to the PiP layer, and Home floats it. Off: AVPlayer or nothing plays.
   private func prepare(_ on: Bool) {
     if on && host == nil {
       guard
         let window = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first
       else { return }
-      // Behind the Flutter view, at window size: iOS starts PiP on its own only from a layer that counts as shown.
+      // Behind the Flutter view, at window size: PiP never became possible from a 2×2 layer, and iOS starts it on
+      // its own only from a layer that counts as shown.
       let host = UIView(frame: window.bounds)
       host.isUserInteractionEnabled = false
       host.autoresizingMask = [.flexibleWidth, .flexibleHeight]

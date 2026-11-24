@@ -7,8 +7,10 @@
 pub mod fault;
 pub mod generate;
 pub mod http;
+pub mod mock_premiumize;
 pub mod mock_release;
 pub mod mock_tmdb;
+pub mod mock_tracking;
 pub mod mock_xc;
 
 use std::path::PathBuf;
