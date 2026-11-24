@@ -3,7 +3,7 @@
 Things for the owner to look at on a real device; one line each, deleted once seen.
 
 ## Mac
-- Own engine: Settings → Playback → Player engine gerdTV, restart; a channel and a movie play with picture and sound, hardware decoded.
+- Own engine: Settings → Playback → Player engine gerdTV, restart; a movie plays with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
 - Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
 - Movies and series: a movie plays, a series opens its episodes; a movie stopped after 5 min shows under Continue watching and continues there.
@@ -13,7 +13,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
-- Zapping and timeshift: Up/Down switch channels; Space on live, then a minute later the top shows −1:00 and Live; the seek bar drags back.
+- Live in Apple's player: Up/Down zap; Space, a minute later −1:00 and Live; the seek bar drags back; the PiP button floats it in Apple's window.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
 - Updates: Settings → About → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
@@ -23,15 +23,15 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
 
 ## iPhone and iPad
-- Own engine: Player engine gerdTV, restart; a channel plays with picture and sound, also in PiP.
+- Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV and a movie play in full screen with sound; logos show in the lists.
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
-- Background: locking the phone while a channel plays keeps the sound going; the lock screen shows it.
-- PiP: the player's PiP button floats the channel over other apps; closing PiP continues in gerdTV without a long restart.
+- Home: swiping to Home while a channel or a movie plays floats it by itself; tapping the window shows play/pause and skip, which work.
+- Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
-- iPad PiP: the player's PiP button floats a live channel over other apps (split view and home screen).
+- iPad: the floating window works over split view; live rewinds 20 min (timeshift 30 min in Settings → Playback) and Live returns.
 - Swipe: from the left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
 
 ## Android phone
