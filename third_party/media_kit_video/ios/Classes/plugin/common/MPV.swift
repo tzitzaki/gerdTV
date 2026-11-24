@@ -6,9 +6,12 @@
 import Foundation
 
 enum MPV {
+  /// The chosen library's name. getenv, not ProcessInfo's environment: Dart sets GERDTV_LIBMPV with setenv after the
+  /// process started, and Foundation may hand out an earlier copy of the environment.
+  private static let name: String = getenv("GERDTV_LIBMPV").map { String(cString: $0) } ?? "Mpv.framework/Mpv"
+
   /// The chosen library, as the Dart side opened it (it is loaded already; this just gets its handle).
   private static let library: UnsafeMutableRawPointer? = {
-    let name = ProcessInfo.processInfo.environment["GERDTV_LIBMPV"] ?? "Mpv.framework/Mpv"
     guard let handle = dlopen(name, RTLD_NOW) else {
       NSLog("MPV: cannot open \(name)")
       exit(1)
@@ -16,10 +19,10 @@ enum MPV {
     return handle
   }()
 
-  /// The function [name] in the chosen library.
-  private static func symbol<T>(_ name: String, _: T.Type) -> T {
-    guard let address = dlsym(library, name) else {
-      NSLog("MPV: no \(name) in \(ProcessInfo.processInfo.environment["GERDTV_LIBMPV"] ?? "Mpv.framework/Mpv")")
+  /// The function [symbolName] in the chosen library.
+  private static func symbol<T>(_ symbolName: String, _: T.Type) -> T {
+    guard let address = dlsym(library, symbolName) else {
+      NSLog("MPV: no \(symbolName) in \(MPV.name)")
       exit(1)
     }
     return unsafeBitCast(address, to: T.self)

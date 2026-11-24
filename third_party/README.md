@@ -9,5 +9,7 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   app/lib/platform/engine.dart), instead of linking Mpv.framework. So the app can run media_kit's libmpv or
   gerdTV's own GerdMpv.framework (Settings → Player engine), which `scripts/embed-libmpv-apple.sh` copies into the
   app without linking it.
+- `media_kit_video` 2.0.1: `queryDecoders` no longer re-runs media_kit's library lookup (it fell back to Mpv.framework
+  and crashed on GerdMpv's handle), and `MPV.swift` reads GERDTV_LIBMPV with getenv.
 
 Updating it: copy the new release over the folder in one commit, then re-apply the patches (see git log).

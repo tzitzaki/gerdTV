@@ -22,7 +22,9 @@ Future<HashSet<String>> queryDecoders(int handle) {
       return _decoders;
     }
 
-    NativeLibrary.ensureInitialized();
+    // gerdTV patch: no NativeLibrary.ensureInitialized() here. MediaKit.ensureInitialized already chose the library
+    // (gerdTV's own build or media_kit's); calling it again without an argument fell back to the default name
+    // (Mpv.framework on Apple) and handed that library a handle of the other one: a crash in mp_dispatch_lock.
     final mpv = MPV(DynamicLibrary.open(NativeLibrary.path));
 
     if (_decoders.isEmpty) {
