@@ -52,7 +52,7 @@
 - In the journey, typing into search after the catch-up step doesn't arrive (cause open; a real keyboard is not involved).
 - Integration tests take about 9–16 min (the screen check plays video at every size, plus a light pass on the phone).
 - Release builds restore CI's Android and libmpv caches from main; a release tagged before main's runs finished builds them cold.
-- The version-bump check in scripts/ci-scope.sh trusts the six-digit minor; a dependency versioned 0.YYMMDD.x would slip through as a bump.
+- flutter_secure_storage_linux crashes the app when deleting a key that was never written: delete only what exists (Session.removeProfile).
 - The provider panel once answered an empty VOD list under load; sync keeps the known entries in that case.
 
 ## Ideas not chosen
