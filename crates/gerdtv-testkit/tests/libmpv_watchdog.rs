@@ -347,8 +347,9 @@ fn live_hls_with_rotating_segment_urls_plays() {
     assert_eq!(h.reloads, 0);
 }
 
-/// The local HLS for AVPlayer (gerdtv_core::hls), played by FFmpeg's HLS demuxer here: it starts, plays through a
-/// provider drop without the player noticing (the core reconnects; a discontinuity), and rewinds inside the window.
+/// The local HLS for AVPlayer (gerdtv_core::hls), played by FFmpeg's HLS demuxer here: it starts and plays through a
+/// provider drop without the player noticing (the core reconnects; a discontinuity). Rewinding is AVPlayer's (mpv
+/// versions differ in seeking live HLS); the playlist's window is checked in hls.rs.
 #[test]
 #[ignore = "libmpv harness: just test-harness"]
 fn local_hls_plays_through_a_provider_drop() {
@@ -380,9 +381,6 @@ fn local_hls_plays_through_a_provider_drop() {
         t.as_secs_f64()
     );
     assert!(hls.status().reconnects >= 1);
-    let before = h.position;
-    h.mpv.command("seek", &["-6", "relative"]).unwrap();
-    h.run_until(Duration::from_secs(10), |h| h.position < before - 4.0);
     assert_eq!(h.reloads, 0, "the player never had to reconnect");
 }
 
