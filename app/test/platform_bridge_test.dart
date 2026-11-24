@@ -1,7 +1,7 @@
 // Owns: the platform channel: picture mode follows the system's Picture-in-Picture, every start and stop of
 // playback reaches the native side (Android's foreground service and auto-PiP depend on it), setLogo hands it the
 // logo's name plus, on desktop, its PNG, openUrl reaches the phone side, the macOS menu bar
-// gets its setting and calls back, and voice search exists only on Android and returns what was heard.
+// gets its setting and calls back, iOS PiP's window buttons come back as commands, and voice search exists only on Android and returns what was heard.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,24 +129,47 @@ void main() {
     },
   );
 
-  test(
-    'iOS pipEnded reaches the resume callback with the failure reason',
-    () async {
-      final bridge = PlatformBridge(pictureMode: ValueNotifier(false))
-        ..attach();
-      String? failure;
-      bridge.onApplePipEnded = (f) => failure = f;
+  test('iOS PiP: the floating window\'s buttons arrive as commands, and mpv\'s PiP calls carry no stream URL', () async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+          calls.add(call);
+          return call.method == 'startPip' ? true : null;
+        });
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final bridge = PlatformBridge(pictureMode: ValueNotifier(false))..attach();
+    final got = <(String, double)>[];
+    bridge.onPipCommand = (a, s) => got.add((a, s));
+    for (final c in [
+      {'action': 'pause'},
+      {'action': 'skip', 'secs': -15.0},
+    ]) {
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
             PlatformBridge.channel.name,
             PlatformBridge.channel.codec.encodeMethodCall(
-              const MethodCall('pipEnded', {'failure': 'AVPlayer: x'}),
+              MethodCall('pipCommand', c),
             ),
             (_) {},
           );
-      expect(failure, 'AVPlayer: x');
-    },
-  );
+    }
+    expect(got, [('pause', 0.0), ('skip', -15.0)]);
+    await bridge.preparePip(true);
+    await bridge.pipState(
+      playing: true,
+      position: 12,
+      duration: 3600,
+      live: false,
+    );
+    expect(await bridge.startApplePip(), isTrue);
+    expect(calls.map((c) => c.method), ['preparePip', 'pipState', 'startPip']);
+    expect(calls.last.arguments, isNull, reason: 'no hand-over URL');
+    // Other platforms send nothing.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await bridge.preparePip(false);
+    expect(calls, hasLength(3));
+  });
 
   test('setLogo sends the name and, on Linux, a PNG of the logo', () async {
     final calls = <MethodCall>[];

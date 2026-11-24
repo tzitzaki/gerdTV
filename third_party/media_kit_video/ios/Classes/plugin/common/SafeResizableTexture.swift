@@ -23,10 +23,19 @@ public class SafeResizableTexture:
     }
   }
 
-  public func render(_ size: CGSize) {
+  public func render(_ size: CGSize) -> Bool {
     return locked {
       return child.render(size)
     }
+  }
+
+  public func useSoftware(_ on: Bool) {
+    locked { child.useSoftware(on) }
+  }
+
+  public var skipRendering: Bool {
+    get { locked { child.skipRendering } }
+    set { locked { child.skipRendering = newValue } }
   }
 
   public func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {

@@ -2,7 +2,7 @@ name: gerdtv
 description: "gerdTV: a multi-platform IPTV player (Flutter + Rust + libmpv)."
 publish_to: 'none'
 # Set by each wrap-up release: 0.YYMMDD.<PR#>+<PR#> (docs/RELEASING.md).
-version: 0.261124.56+56
+version: 0.261124.57+57
 
 environment:
   sdk: ^3.14.0
@@ -19,6 +19,8 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   gerdtv_api:
     path: rust_builder
+  gerdtv_avplayer: # the AVPlayer engine for live channels on iOS and macOS (lib/player/av_player.dart)
+    path: packages/gerdtv_avplayer
   intl: any
   material_ui: ^1.1.0
   media_kit: 1.2.6 # exact: an upstream release must not change playback unnoticed (DECISIONS)

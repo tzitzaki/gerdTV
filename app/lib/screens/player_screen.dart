@@ -73,6 +73,8 @@ Video playerVideo(
   VideoController controller, {
   required VideoControlsBuilder? controls,
 }) => Video(
+  // A new state per controller: the picture moves between engines (mpv, AVPlayer) with the same widget tree.
+  key: ObjectKey(controller),
   controller: controller,
   controls: controls,
   pauseUponEnteringBackgroundMode: false,
@@ -152,11 +154,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// The edge of the running channel (reset when the channel changed: zapping keeps this screen).
+  /// The edge of the running channel (reset when the channel or the engine changed: zapping keeps this screen, and
+  /// AVPlayer starts a moment after the channel is chosen).
   LiveEdge get _liveEdge {
-    if (_edgeKey != _current.key) {
+    final av = widget.session.onAvPlayer.value;
+    if (_edgeKey != _current.key || _edge.seekableEndIsLive != av) {
       _edgeKey = _current.key;
-      _edge = LiveEdge();
+      _edge = LiveEdge(seekableEndIsLive: av);
     }
     return _edge;
   }
@@ -318,7 +322,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           preset: c.preset,
                           customSeconds: c.seconds,
                         );
-                        widget.session.adapter.applyBuffer(c.preset, c.seconds);
+                        widget.session.applyBuffer(c.preset, c.seconds);
                         setSheet(() {});
                       },
                     ),
@@ -332,10 +336,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             customSeconds: 0,
                           );
                           final d = lib.bufferFor(key: key);
-                          widget.session.adapter.applyBuffer(
-                            d.preset,
-                            d.seconds,
-                          );
+                          widget.session.applyBuffer(d.preset, d.seconds);
                           setSheet(() {});
                         },
                         child: Text(
@@ -478,9 +479,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: ValueListenableBuilder<bool>(
-          valueListenable: widget.session.pictureMode,
-          builder: (context, picture, _) => picture
+        child: ListenableBuilder(
+          // The engine too: its picture is another controller (session.video).
+          listenable: Listenable.merge([
+            widget.session.pictureMode,
+            widget.session.onAvPlayer,
+          ]),
+          builder: (context, _) => widget.session.pictureMode.value
               ? _pictureOnly(l10n)
               : Scaffold(
                   backgroundColor: Colors.black,
@@ -570,7 +575,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 onPressed: _bufferSheet,
                               ),
                               const SizedBox(width: Tokens.space),
-                              if (isApple) ...[
+                              // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
+                              if (isApple ||
+                                  widget.session.onAvPlayer.value) ...[
                                 IconButton.filledTonal(
                                   key: const Key('player.applePip'),
                                   tooltip: l10n.miniPlayer,

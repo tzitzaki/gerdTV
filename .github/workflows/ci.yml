@@ -106,7 +106,7 @@ jobs:
           brew install meson ninja pkgconf
           scripts/build-libmpv-apple.sh build/libmpv-apple
           # The macOS slice plays the testkit's clip (scripts/libmpv-smoke.c).
-          fw=build/libmpv-apple/GerdMpv.xcframework/macos-arm64_x86_64
+          fw=build/libmpv-apple/GerdMpv.xcframework/macos-arm64
           clang -Ibuild/libmpv-apple/work-macos-arm64/mpv/include scripts/libmpv-smoke.c -F "$fw" -framework GerdMpv \
             -Wl,-rpath,"$PWD/$fw" -o "$RUNNER_TEMP/smoke"
           "$RUNNER_TEMP/smoke" crates/gerdtv-testkit/media/clip.ts

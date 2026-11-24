@@ -87,8 +87,8 @@ abstract class Watchdog implements RustOpaqueInterface {
 
   List<WatchdogCommand> onUserPause({required bool paused});
 
-  /// The app came back from sleep or the background.
-  List<WatchdogCommand> onWake();
+  /// The app came back from sleep or the background; `frozen_secs`: seconds since the last tick.
+  List<WatchdogCommand> onWake({required BigInt frozenSecs});
 }
 
 /// A preset as the UI shows it: the kind plus its seconds (for Custom, the chosen value).

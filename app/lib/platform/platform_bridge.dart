@@ -1,6 +1,7 @@
 // The Dart end of the "gerdtv/platform" channel (Android: MainActivity.kt, iOS: AppDelegate.swift). Tells the platform
 // whether something plays (background playback, Android Picture-in-Picture) and hears back when PiP starts or ends.
-// iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
+// iOS PiP of mpv shows mpv's own frames (preparePip, pipState, startApplePip); the floating window's buttons come back
+// as `onPipCommand`. Live channels in AVPlayer have their own PiP (lib/player/av_player.dart). setLogo switches
 // the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc). Android only: voice search through the
 // system's speech recognizer (voiceAvailable, listen); iOS and macOS have dictation on their keyboards.
 // brightness/setBrightness/resetBrightness serve the player's left-half swipe; openUrl opens a web page (Android, iOS; desktop runs the system's opener). Platforms without a native side ignore
@@ -16,9 +17,8 @@ import '../screens/app_logo.dart';
 class PlatformBridge {
   PlatformBridge({required this.pictureMode});
 
-  /// iOS: Apple's Picture-in-Picture ended; [failure] is the reason it couldn't start or play (null: it ended
-  /// normally), e.g. "AVPlayer: …" for a stream AVPlayer can't play.
-  void Function(String? failure)? onApplePipEnded;
+  /// iOS: a button in the PiP window of mpv's picture: "play", "pause" or "skip" by [secs] (negative: back).
+  void Function(String action, double secs)? onPipCommand;
 
   static const channel = MethodChannel('gerdtv/platform');
 
@@ -33,10 +33,14 @@ class PlatformBridge {
     channel.setMethodCallHandler((call) async {
       if (call.method == 'pictureMode') {
         pictureMode.value = call.arguments == true;
+      } else if (call.method == 'pipCommand') {
+        final m = call.arguments as Map;
+        onPipCommand?.call(
+          m['action'] as String,
+          (m['secs'] as num?)?.toDouble() ?? 0,
+        );
       } else if (call.method == 'menuBar') {
         onMenuBar?.call(call.arguments as String);
-      } else if (call.method == 'pipEnded') {
-        onApplePipEnded?.call((call.arguments as Map?)?['failure'] as String?);
       }
     });
   }
@@ -129,13 +133,38 @@ class PlatformBridge {
         'text': text,
       }))!;
 
-  /// iOS: hands the stream to AVPlayer and starts Picture-in-Picture. False when PiP isn't available.
-  Future<bool> startApplePip(String url) async {
+  /// iOS: starts Picture-in-Picture of mpv's picture. False when PiP isn't possible right now.
+  Future<bool> startApplePip() async {
     try {
-      return await channel.invokeMethod<bool>('startPip', {'url': url}) ??
-          false;
+      return await channel.invokeMethod<bool>('startPip') ?? false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// iOS: mpv plays (true) or stopped or handed over to AVPlayer (false). While true, mpv's frames feed the PiP
+  /// layer and swiping to Home floats the picture by itself.
+  Future<void> preparePip(bool on) => _ios('preparePip', {'on': on});
+
+  /// iOS: what the PiP window shows (play/pause button, the seek range; live has none).
+  Future<void> pipState({
+    required bool playing,
+    required double position,
+    required double duration,
+    required bool live,
+  }) => _ios('pipState', {
+    'playing': playing,
+    'position': position,
+    'duration': duration,
+    'live': live,
+  });
+
+  Future<void> _ios(String method, Map<String, Object> args) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
+      await channel.invokeMethod(method, args);
+    } on MissingPluginException {
+      // Tests and builds without the native side.
     }
   }
 

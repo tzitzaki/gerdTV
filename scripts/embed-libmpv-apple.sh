@@ -8,7 +8,7 @@ set -eu
 xcf="$SRCROOT/../../build/libmpv-apple/GerdMpv.xcframework"
 [ -d "$xcf" ] || { echo "embed-libmpv-apple: no GerdMpv.xcframework (only media_kit's engine)"; exit 0; }
 case "$PLATFORM_NAME" in
-  macosx) slice=macos-arm64_x86_64 ;;
+  macosx) slice=macos-arm64 ;;
   iphoneos) slice=ios-arm64 ;;
   iphonesimulator) slice=ios-arm64-simulator ;;
   *) echo "embed-libmpv-apple: no slice for $PLATFORM_NAME"; exit 0 ;;

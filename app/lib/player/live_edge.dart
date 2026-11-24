@@ -23,6 +23,11 @@ double liveSlackFor(int pauseWait) =>
     math.max(liveSlack, goLiveMargin(pauseWait) + 1);
 
 class LiveEdge {
+  /// [seekableEndIsLive]: AVPlayer's buffer end is its playlist's seekable end, the live edge even while paused or
+  /// rewound (and a segment or two behind the clock, so extrapolating from a frozen value would run ahead of it).
+  LiveEdge({this.seekableEndIsLive = false});
+
+  final bool seekableEndIsLive;
   double? _edge;
   DateTime _edgeAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _detached = false;
@@ -32,7 +37,7 @@ class LiveEdge {
 
   /// mpv's cache end (seconds) at [now]; taken as live unless the user paused or seeked back.
   void cache(double cacheEnd, DateTime now) {
-    if (_detached) return;
+    if (_detached && !seekableEndIsLive) return;
     _edge = cacheEnd;
     _edgeAt = now;
   }
@@ -51,7 +56,9 @@ class LiveEdge {
   double? live(DateTime now) {
     final e = _edge;
     if (e == null) return null;
-    return _detached ? e + now.difference(_edgeAt).inMilliseconds / 1000 : e;
+    return _detached && !seekableEndIsLive
+        ? e + now.difference(_edgeAt).inMilliseconds / 1000
+        : e;
   }
 
   /// Whole seconds behind live at [position] (0 within [slack] of the edge, liveSlackFor the buffer).

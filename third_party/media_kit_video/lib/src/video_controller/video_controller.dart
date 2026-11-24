@@ -69,10 +69,14 @@ class VideoController {
   final ValueNotifier<Rect?> rect = ValueNotifier<Rect?>(null);
 
   /// {@macro video_controller}
+  ///
+  /// gerdTV patch (third_party/README.md): [create] supplies the video output for a [Player] that isn't mpv (gerdTV's
+  /// AVPlayer engine on Apple platforms, which renders into its own Flutter texture).
   VideoController(
     this.player, {
     VideoControllerConfiguration configuration =
         const VideoControllerConfiguration(),
+    Future<PlatformVideoController> Function(Player player)? create,
   }) {
     player.platform?.isVideoControllerAttached = true;
 
@@ -82,7 +86,11 @@ class VideoController {
       await completer.future;
 
       try {
-        if (NativeVideoController.supported) {
+        if (create != null) {
+          final result = await create(player);
+          platform.complete(result);
+          notifier.value = result;
+        } else if (NativeVideoController.supported) {
           final result = await NativeVideoController.create(
             player,
             configuration,

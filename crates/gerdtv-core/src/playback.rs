@@ -163,6 +163,9 @@ pub fn behind_live(cache_end_secs: f64, position_secs: f64) -> u32 {
 }
 
 /// What the player reports (translated from media_kit's streams and the platform by the Dart adapter).
+/// A wake after at least this many seconds without ticks reloads a live stream (ticks come every second).
+pub const WAKE_FROZEN_SECS: u64 = 5;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerEvent {
     /// Playback advanced (no position known).
@@ -177,8 +180,9 @@ pub enum PlayerEvent {
     EndOfFile,
     /// mpv reported an error (message already redacted).
     Error(String),
-    /// The app came back from sleep or the background.
-    Wake,
+    /// The app came back from sleep or the background, after this many seconds without ticks (the app was frozen).
+    /// A short gap means it kept running (background sound on iOS and Android) and the stream is fine.
+    Wake(u64),
     /// The device's network changed (Wi-Fi ↔ Ethernet, new address).
     NetworkChanged,
     /// A second passed; drives timeouts and backoff.
@@ -378,9 +382,13 @@ impl Watchdog {
             (_, PlayerEvent::EndOfFile) => self.schedule_reload(Trigger::LiveEnd),
             (_, PlayerEvent::Error(_)) => self.schedule_reload(Trigger::Error),
             // Back from sleep or on a new network a live connection is almost surely dead: reload at once.
-            (_, PlayerEvent::Wake) if self.live => self.reload_now(Trigger::Wake),
+            // Only a frozen app's live connection is presumed dead; one that kept playing is left alone (reloading it
+            // rebuffered every return from the background). Debugging: stream_health rows with trigger "wake".
+            (_, PlayerEvent::Wake(frozen)) if self.live && frozen >= WAKE_FROZEN_SECS => {
+                self.reload_now(Trigger::Wake)
+            }
             (_, PlayerEvent::NetworkChanged) if self.live => self.reload_now(Trigger::Network),
-            (_, PlayerEvent::Wake | PlayerEvent::NetworkChanged) => vec![],
+            (_, PlayerEvent::Wake(_) | PlayerEvent::NetworkChanged) => vec![],
             (state, PlayerEvent::Tick) => {
                 if let Some((_, secs)) = &mut self.episode {
                     *secs += 1;
@@ -754,19 +762,22 @@ mod tests {
                 vec![Command::ShowReconnecting(1)],
                 State::Reconnecting,
             ),
+            // Back after the app was frozen (sleep, suspended): the connection is almost surely dead.
             (
                 true,
-                vec![Playing, Wake],
+                vec![Playing, Wake(60)],
                 vec![Command::ShowReconnecting(1), TS],
                 State::Starting,
             ),
+            // Back from the background where it kept playing (iOS/Android background sound): no reload.
+            (true, vec![Playing, Wake(1)], vec![], State::Playing),
             (
                 true,
                 vec![Playing, NetworkChanged],
                 vec![Command::ShowReconnecting(1), TS],
                 State::Starting,
             ),
-            (false, vec![Playing, Wake], vec![], State::Playing),
+            (false, vec![Playing, Wake(60)], vec![], State::Playing),
             (
                 false,
                 vec![Position(5000), Error("x".into()), Tick],
