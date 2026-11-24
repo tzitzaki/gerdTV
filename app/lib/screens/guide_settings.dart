@@ -453,7 +453,7 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
           Padding(
             padding: const EdgeInsets.all(Tokens.space),
             child: TextField(
-              key: const Key('guide.unmatched.search'),
+              key: const Key('guide.unmatchedSearch'),
               controller: _search,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),

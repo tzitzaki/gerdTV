@@ -40,7 +40,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Arte'), findsOneWidget);
     await tester.enterText(
-      find.byKey(const Key('guide.unmatched.search')),
+      find.byKey(const Key('guide.unmatchedSearch')),
       'erste',
     );
     await tester.pumpAndSettle();
@@ -49,7 +49,7 @@ void main() {
     expect(find.text('Das Erste'), findsOneWidget);
     expect(find.text('Erste Sport'), findsOneWidget);
     await tester.enterText(
-      find.byKey(const Key('guide.unmatched.search')),
+      find.byKey(const Key('guide.unmatchedSearch')),
       'zdf',
     );
     await tester.pumpAndSettle();

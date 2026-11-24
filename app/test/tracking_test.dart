@@ -1,6 +1,6 @@
 // New, because nothing owned watch tracking on the app side: only linked services hear of a movie or episode,
-// Trakt needs the user's own app (no secret ships with gerdTV), a refreshed token is stored, unlinking forgets the
-// app too, and items that aren't movies or episodes send nothing.
+// Trakt needs the user's own app (no secret ships with gerdTV), a refreshed token is stored, a removed profile
+// deletes only the links it has, and items that aren't movies or episodes send nothing.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/services/tracking.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -70,6 +70,20 @@ void main() {
       await again.load('p1');
       expect(again.client(trakt), ('my-id', 'my-secret'));
       expect(again.linked(simkl), isTrue);
+
+      // The profile's removal deletes only what exists (deleting a never-written key crashed on Linux).
+      secrets.writes.clear();
+      await again.forget();
+      expect(
+        secrets.writes,
+        unorderedEquals(['-trakt.p1', '-trakt-app.p1', '-simkl.p1']),
+      );
+      expect(secrets.services, isEmpty);
+      final empty = MemorySecrets();
+      final none = Tracking(empty, services: const [trakt, simkl]);
+      await none.load('p2');
+      await none.forget();
+      expect(empty.writes, isEmpty, reason: 'nothing linked: nothing deleted');
     },
   );
 }

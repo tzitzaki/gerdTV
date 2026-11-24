@@ -99,6 +99,15 @@ class Tracking extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Deletes the open profile's links and own apps (its removal); only keys that exist (see Session.removeProfile).
+  Future<void> forget() async {
+    for (final s in services) {
+      if (tokens.containsKey(s.id)) await link(s, null);
+      if (apps.containsKey(s.id)) await setApp(s, null);
+    }
+    _profile = null;
+  }
+
   /// Tells every linked service [action] ("start", "pause", "stop") for [key] at [progress] (0–100); items that
   /// aren't movies or episodes are skipped. Never throws.
   Future<void> scrobble(

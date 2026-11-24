@@ -14,6 +14,9 @@ import 'support/fake_core.dart';
 class MemorySecrets extends Secrets {
   final services = <String, String>{};
 
+  /// Every write and delete, as "key" (a delete as "-key").
+  final writes = <String>[];
+
   @override
   Future<String?> readService(String profileId, String service) async =>
       services['$service.$profileId'];
@@ -23,9 +26,12 @@ class MemorySecrets extends Secrets {
     String profileId,
     String service,
     String? token,
-  ) async => token == null
-      ? services.remove('$service.$profileId')
-      : services['$service.$profileId'] = token;
+  ) async {
+    writes.add('${token == null ? '-' : ''}$service.$profileId');
+    token == null
+        ? services.remove('$service.$profileId')
+        : services['$service.$profileId'] = token;
+  }
 }
 
 void main() {

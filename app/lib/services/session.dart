@@ -411,9 +411,13 @@ class Session extends ChangeNotifier {
     await stopPlayback();
     await deleteProfile(dir: await _dir(), id: p.id);
     await secrets.delete(p.id);
-    for (final service in linkedServices) {
-      await secrets.writeService(p.id, service, null);
+    // Only the links that exist: deleting a key that was never written crashed the app on Linux (libsecret,
+    // flutter_secure_storage_linux 3.0.3), seen in the journey's "remove" step.
+    if (premiumizeToken != null) {
+      await secrets.writeService(p.id, 'premiumize', null);
     }
+    premiumizeToken = null;
+    await tracking.forget();
     library = null;
     profile = null;
     profiles = [...profiles.where((o) => o.id != p.id)];
@@ -440,9 +444,6 @@ class Session extends ChangeNotifier {
     await _start(item, lib);
     _track('start', item: item);
   }
-
-  /// The services a profile can link (their tokens live in [secrets], one per profile and service).
-  static const linkedServices = ['premiumize', 'trakt', 'trakt-app', 'simkl'];
 
   /// Trakt and Simkl for the open profile (services/tracking.dart).
   late final tracking = Tracking(secrets);
