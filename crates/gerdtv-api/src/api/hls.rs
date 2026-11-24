@@ -14,8 +14,8 @@ pub struct LocalHlsStatus {
     pub reconnects: u32,
     /// The provider connection is being re-established right now.
     pub reconnecting: bool,
-    /// The provider refused the stream with this HTTP status; it was not retried.
-    pub refused: Option<u16>,
+    /// The provider refused the stream (the message to show); it was not retried.
+    pub failure: Option<String>,
 }
 
 impl LocalHlsStream {
@@ -32,7 +32,7 @@ impl LocalHlsStream {
             window_secs: s.window_secs,
             reconnects: s.reconnects,
             reconnecting: s.reconnecting,
-            refused: s.refused,
+            failure: s.refused.map(core::refusal_message),
         }
     }
 

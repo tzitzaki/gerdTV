@@ -387,6 +387,14 @@ pub struct Status {
     pub refused: Option<u16>,
 }
 
+/// The message the player shows when the provider refused the stream (the watchdog's wording for mpv).
+pub fn refusal_message(code: u16) -> String {
+    match crate::playback::hard_error(&format!("http error {code}")) {
+        Some(m) => m.to_string(),
+        None => "The provider doesn't offer this channel (any more).".to_string(),
+    }
+}
+
 struct Shared {
     window: Window,
     status: Status,

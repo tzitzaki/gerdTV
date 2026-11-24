@@ -15,5 +15,7 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   to the worker; a frame is drawn only when mpv has a new one (`mpv_render_context_update`) or the buffers were resized;
   Flutter hears about drawn frames asynchronously; the picture is rendered at most at the screen's pixel size; on iOS
   nothing is drawn while the app is in the background (no GL there).
+- `media_kit_video` 2.0.1: `VideoController(create: …)` takes the video output of a player that isn't mpv (gerdTV's
+  AVPlayer engine, `app/lib/player/av_player.dart`).
 
 Updating it: copy the new release over the folder in one commit, then re-apply the patches (see git log).

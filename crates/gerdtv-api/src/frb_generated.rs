@@ -31,7 +31,7 @@ use crate::api::hls::*;
 use crate::api::library::*;
 use crate::api::playback::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -4374,12 +4374,12 @@ impl SseDecode for crate::api::hls::LocalHlsStatus {
         let mut var_windowSecs = <f64>::sse_decode(deserializer);
         let mut var_reconnects = <u32>::sse_decode(deserializer);
         let mut var_reconnecting = <bool>::sse_decode(deserializer);
-        let mut var_refused = <Option<u16>>::sse_decode(deserializer);
+        let mut var_failure = <Option<String>>::sse_decode(deserializer);
         return crate::api::hls::LocalHlsStatus {
             window_secs: var_windowSecs,
             reconnects: var_reconnects,
             reconnecting: var_reconnecting,
-            refused: var_refused,
+            failure: var_failure,
         };
     }
 }
@@ -4461,17 +4461,6 @@ impl SseDecode for Option<crate::api::library::ProgrammeInfo> {
             return Some(<crate::api::library::ProgrammeInfo>::sse_decode(
                 deserializer,
             ));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl SseDecode for Option<u16> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<u16>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -4643,13 +4632,6 @@ impl SseDecode for crate::api::library::SyncSummary {
             max_connections: var_maxConnections,
             active_connections: var_activeConnections,
         };
-    }
-}
-
-impl SseDecode for u16 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_u16::<NativeEndian>().unwrap()
     }
 }
 
@@ -5245,7 +5227,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::hls::LocalHlsStatus {
             self.window_secs.into_into_dart().into_dart(),
             self.reconnects.into_into_dart().into_dart(),
             self.reconnecting.into_into_dart().into_dart(),
-            self.refused.into_into_dart().into_dart(),
+            self.failure.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -5991,7 +5973,7 @@ impl SseEncode for crate::api::hls::LocalHlsStatus {
         <f64>::sse_encode(self.window_secs, serializer);
         <u32>::sse_encode(self.reconnects, serializer);
         <bool>::sse_encode(self.reconnecting, serializer);
-        <Option<u16>>::sse_encode(self.refused, serializer);
+        <Option<String>>::sse_encode(self.failure, serializer);
     }
 }
 
@@ -6057,16 +6039,6 @@ impl SseEncode for Option<crate::api::library::ProgrammeInfo> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::library::ProgrammeInfo>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<u16> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <u16>::sse_encode(value, serializer);
         }
     }
 }
@@ -6193,13 +6165,6 @@ impl SseEncode for crate::api::library::SyncSummary {
     }
 }
 
-impl SseEncode for u16 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_u16::<NativeEndian>(self).unwrap();
-    }
-}
-
 impl SseEncode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6277,7 +6242,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -6346,7 +6311,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

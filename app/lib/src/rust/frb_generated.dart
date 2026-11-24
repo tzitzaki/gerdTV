@@ -3378,12 +3378,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int dco_decode_box_autoadd_u_16(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as int;
-  }
-
-  @protected
   int dco_decode_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -3703,7 +3697,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       windowSecs: dco_decode_f_64(arr[0]),
       reconnects: dco_decode_u_32(arr[1]),
       reconnecting: dco_decode_bool(arr[2]),
-      refused: dco_decode_opt_box_autoadd_u_16(arr[3]),
+      failure: dco_decode_opt_String(arr[3]),
     );
   }
 
@@ -3759,12 +3753,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_programme_info(raw);
-  }
-
-  @protected
-  int? dco_decode_opt_box_autoadd_u_16(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_u_16(raw);
   }
 
   @protected
@@ -3892,12 +3880,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       maxConnections: dco_decode_opt_box_autoadd_u_32(arr[3]),
       activeConnections: dco_decode_opt_box_autoadd_u_32(arr[4]),
     );
-  }
-
-  @protected
-  int dco_decode_u_16(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as int;
   }
 
   @protected
@@ -4128,12 +4110,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_reminder_info(deserializer));
-  }
-
-  @protected
-  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_u_16(deserializer));
   }
 
   @protected
@@ -4576,12 +4552,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_windowSecs = sse_decode_f_64(deserializer);
     var var_reconnects = sse_decode_u_32(deserializer);
     var var_reconnecting = sse_decode_bool(deserializer);
-    var var_refused = sse_decode_opt_box_autoadd_u_16(deserializer);
+    var var_failure = sse_decode_opt_String(deserializer);
     return LocalHlsStatus(
       windowSecs: var_windowSecs,
       reconnects: var_reconnects,
       reconnecting: var_reconnecting,
-      refused: var_refused,
+      failure: var_failure,
     );
   }
 
@@ -4655,17 +4631,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_programme_info(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
-  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_u_16(deserializer));
     } else {
       return null;
     }
@@ -4823,12 +4788,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       maxConnections: var_maxConnections,
       activeConnections: var_activeConnections,
     );
-  }
-
-  @protected
-  int sse_decode_u_16(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint16();
   }
 
   @protected
@@ -5085,12 +5044,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_reminder_info(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_16(self, serializer);
   }
 
   @protected
@@ -5485,7 +5438,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_64(self.windowSecs, serializer);
     sse_encode_u_32(self.reconnects, serializer);
     sse_encode_bool(self.reconnecting, serializer);
-    sse_encode_opt_box_autoadd_u_16(self.refused, serializer);
+    sse_encode_opt_String(self.failure, serializer);
   }
 
   @protected
@@ -5561,16 +5514,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_programme_info(self, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_u_16(self, serializer);
     }
   }
 
@@ -5679,12 +5622,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.categories, serializer);
     sse_encode_opt_box_autoadd_u_32(self.maxConnections, serializer);
     sse_encode_opt_box_autoadd_u_32(self.activeConnections, serializer);
-  }
-
-  @protected
-  void sse_encode_u_16(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint16(self);
   }
 
   @protected

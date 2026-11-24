@@ -1,0 +1,25 @@
+# gerdTV's AVPlayer engine for live channels on iOS and macOS (docs/ARCHITECTURE.md, "AVPlayer engine"): the native
+# side only, one Swift file shared by both platforms (darwin/); the Dart side is app/lib/player/av_player.dart.
+# A plugin rather than files in the Runner projects, so Flutter registers it and no Xcode project needs editing.
+name: gerdtv_avplayer
+description: "gerdTV: AVPlayer with a Flutter texture and Picture-in-Picture (iOS, macOS)."
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: GerdtvAvPlayerPlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: GerdtvAvPlayerPlugin
+        sharedDarwinSource: true

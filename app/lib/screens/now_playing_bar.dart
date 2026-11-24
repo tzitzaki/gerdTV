@@ -18,7 +18,11 @@ class NowPlayingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([session.nowPlaying, session.playerOpen]),
+      listenable: Listenable.merge([
+        session.nowPlaying,
+        session.playerOpen,
+        session.onAvPlayer, // the engine's picture is another controller
+      ]),
       builder: (context, _) {
         final item = session.nowPlaying.value;
         if (item == null || session.playerOpen.value) {

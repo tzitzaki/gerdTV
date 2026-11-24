@@ -12,8 +12,11 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../platform/platform_bridge.dart';
+import '../player/av_player.dart';
+import '../player/switch_player.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
+import '../src/rust/api/hls.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
 import '../theme.dart';
@@ -108,11 +111,47 @@ class Session extends ChangeNotifier {
   /// Days of guide kept ahead: a week on desktop, 3 days on phones and TVs (smaller storage, slower imports).
   static int get guideDaysAhead => isDesktop ? 7 : 3;
 
-  Player? _player;
+  Player? _player; // mpv (media_kit), driven by the watchdog adapter
   VideoController? _video;
   WatchdogAdapter? _adapter;
 
-  Player get player => _player ??= _newPlayer();
+  /// The player every screen listens to: it forwards whichever engine plays (lib/player/switch_player.dart).
+  Player get player => _front ??= Player(
+    platformPlayer: _switch = SwitchPlatformPlayer(_mpv.platform!),
+  );
+  Player? _front;
+  SwitchPlatformPlayer? _switch;
+
+  Player get _mpv => _player ??= _newPlayer();
+
+  // Live channels on iOS and macOS: AVPlayer over the core's local HLS (owner decision; lib/player/av_player.dart).
+  AvPlatformPlayer? _av;
+  Player? _avPlayer;
+  VideoController? _avVideo;
+  LocalHlsStream? _hls;
+  Timer? _hlsPoll;
+  StreamSubscription<String>? _avErrors;
+
+  /// Channels AVPlayer couldn't play this run (a codec it lacks): they play in mpv.
+  final Set<String> _avFailed = {};
+
+  /// True while AVPlayer plays (the player and the now-playing bar show its picture then).
+  final ValueNotifier<bool> onAvPlayer = ValueNotifier(false);
+
+  /// Live channels play in AVPlayer on Apple platforms.
+  static bool get _avForLive =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
+  AvPlatformPlayer get _avEngine {
+    if (_av == null) {
+      _av = AvPlatformPlayer();
+      _avPlayer = Player(platformPlayer: _av);
+      _avErrors = _av!.stream.error.listen(_onAvError);
+    }
+    return _av!;
+  }
 
   Player _newPlayer() {
     final p = Player(configuration: WatchdogAdapter.playerConfiguration);
@@ -130,14 +169,17 @@ class Session extends ChangeNotifier {
   /// texture stalled there (`just mac-check` sets GERDTV_SOFTWARE_VIDEO). Real devices use hardware rendering.
   static const _softwareVideo = bool.fromEnvironment('GERDTV_SOFTWARE_VIDEO');
 
-  VideoController get video => _video ??= VideoController(
-    player,
-    configuration: const VideoControllerConfiguration(
-      enableHardwareAcceleration: !_softwareVideo,
-    ),
-  );
+  /// The picture of whichever engine plays.
+  VideoController get video => onAvPlayer.value
+      ? _avVideo ??= VideoController(_avPlayer!, create: avVideoController)
+      : _video ??= VideoController(
+          _mpv,
+          configuration: const VideoControllerConfiguration(
+            enableHardwareAcceleration: !_softwareVideo,
+          ),
+        );
   WatchdogAdapter get adapter => _adapter ??= WatchdogAdapter(
-    player,
+    _mpv,
     onHealth: (trigger, attempts, recovered, secs) {
       final key = _playingKey;
       if (key != null) {
@@ -442,6 +484,7 @@ class Session extends ChangeNotifier {
       group: '',
     );
     if (nowPlaying.value?.key == item.key) return true;
+    await _useMpv();
     nowPlaying.value = item;
     _playingKey = channel.key;
     final choice = lib.bufferFor(key: channel.key);
@@ -460,9 +503,13 @@ class Session extends ChangeNotifier {
     return true;
   }
 
-  /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
-  /// ends, mpv resumes the same item. Live channels go as .m3u8 (AVPlayer can't play raw TS).
+  /// Picture-in-Picture on Apple platforms. A live channel in AVPlayer floats as it is. Otherwise (iOS, mpv) mpv
+  /// stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP ends, mpv resumes the item.
   Future<void> startApplePip() async {
+    if (onAvPlayer.value) {
+      await _avEngine.startPip();
+      return;
+    }
     final item = nowPlaying.value;
     final lib = library;
     if (item == null || lib == null) return;
@@ -489,6 +536,11 @@ class Session extends ChangeNotifier {
   /// live channels the timeshift back buffer (pause/rewind) from settings.
   Future<void> _start(ItemInfo item, Library lib) async {
     final live = item.kind == ItemKind.live;
+    if (live && _avForLive && !_avFailed.contains(item.key)) {
+      await _startAv(item, lib);
+      return;
+    }
+    await _useMpv();
     final choice = lib.bufferFor(key: item.key);
     final bitrate = lib.bitrate(key: item.key).toInt();
     final shift =
@@ -519,6 +571,83 @@ class Session extends ChangeNotifier {
           : const [],
     );
   }
+
+  /// A live channel in AVPlayer: the core reads the provider's stream into a local HLS with the timeshift window
+  /// (one provider connection; drops and stalls are reconnected there, so AVPlayer only sees a discontinuity).
+  /// A provider that sends HLS itself is played directly (rewinding only inside its own window).
+  Future<void> _startAv(ItemInfo item, Library lib) async {
+    await _adapter?.stop();
+    await _player?.stop();
+    await _stopAv();
+    final av = _avEngine;
+    player; // the front player exists before it follows AVPlayer
+    final choice = lib.bufferFor(key: item.key);
+    final shift =
+        int.tryParse(lib.setting(key: settingTimeshift) ?? '') ??
+        defaultTimeshiftSeconds(desktop: isDesktop);
+    String url;
+    var window = 0;
+    try {
+      final hls = await lib.startLocalHls(
+        key: item.key,
+        cacheDir: (await getTemporaryDirectory()).path,
+        windowSecs: shift,
+        // The same disk budget as mpv's back buffer: a quarter of it.
+        maxBytes: BigInt.from((isDesktop ? 16000000000 : 4000000000) ~/ 4),
+      );
+      _hls = hls;
+      url = hls.url();
+      window = shift;
+    } catch (e) {
+      debugPrint('local HLS: $e');
+      url = lib.streamUrl(key: item.key, preferHls: false);
+    }
+    bufferRaisedTo.value = null;
+    timeshiftWindow.value = window;
+    _switch!.switchTo(av);
+    onAvPlayer.value = true;
+    await av.openUrl(url, bufferSecs: choice.seconds);
+    // The core's view of the provider connection, shown like the watchdog's (reconnecting n, or why it stopped).
+    _hlsPoll = Timer.periodic(const Duration(seconds: 1), (_) {
+      final s = _hls?.status();
+      if (s == null) return;
+      adapter.reconnecting.value = s.reconnecting ? s.reconnects : 0;
+      adapter.failure.value = s.failure;
+    });
+  }
+
+  /// AVPlayer couldn't play the channel: it plays in mpv from now on (one restart, never mid-way otherwise).
+  void _onAvError(String message) {
+    final item = nowPlaying.value;
+    final lib = library;
+    if (!onAvPlayer.value || item == null || lib == null) return;
+    debugPrint('AVPlayer: $message; ${item.name} plays in mpv');
+    _avFailed.add(item.key);
+    unawaited(_start(item, lib));
+  }
+
+  /// mpv plays next: AVPlayer and its local HLS stop.
+  Future<void> _useMpv() async {
+    if (!onAvPlayer.value) return;
+    await _stopAv();
+    _switch?.switchTo(_mpv.platform!);
+    onAvPlayer.value = false;
+  }
+
+  Future<void> _stopAv() async {
+    _hlsPoll?.cancel();
+    _hlsPoll = null;
+    _hls?.stop();
+    _hls = null;
+    await _av?.stop();
+    _adapter?.reconnecting.value = 0;
+    _adapter?.failure.value = null;
+  }
+
+  /// The player's buffer button: the running stream's buffer, in whichever engine plays it.
+  Future<void> applyBuffer(BufferPreset preset, int seconds) => onAvPlayer.value
+      ? _avEngine.setBuffer(seconds)
+      : adapter.applyBuffer(preset, seconds);
 
   Future<String> _timeshiftDir() async {
     final dir = Directory('${(await getTemporaryDirectory()).path}/timeshift');
@@ -554,6 +683,7 @@ class Session extends ChangeNotifier {
     _playingKey = null;
     nowPlaying.value = null;
     timeshiftWindow.value = 0;
+    await _useMpv();
     await _adapter?.stop();
     await _player?.stop();
   }
@@ -561,6 +691,11 @@ class Session extends ChangeNotifier {
   @override
   void dispose() {
     _progressTimer?.cancel();
+    _hlsPoll?.cancel();
+    _hls?.stop();
+    unawaited(_avErrors?.cancel());
+    unawaited(_front?.dispose());
+    unawaited(_avPlayer?.dispose());
     unawaited(_player?.dispose());
     super.dispose();
   }

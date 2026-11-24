@@ -27,14 +27,14 @@ class LocalHlsStatus {
   /// The provider connection is being re-established right now.
   final bool reconnecting;
 
-  /// The provider refused the stream with this HTTP status; it was not retried.
-  final int? refused;
+  /// The provider refused the stream (the message to show); it was not retried.
+  final String? failure;
 
   const LocalHlsStatus({
     required this.windowSecs,
     required this.reconnects,
     required this.reconnecting,
-    this.refused,
+    this.failure,
   });
 
   @override
@@ -42,7 +42,7 @@ class LocalHlsStatus {
       windowSecs.hashCode ^
       reconnects.hashCode ^
       reconnecting.hashCode ^
-      refused.hashCode;
+      failure.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -52,5 +52,5 @@ class LocalHlsStatus {
           windowSecs == other.windowSecs &&
           reconnects == other.reconnects &&
           reconnecting == other.reconnecting &&
-          refused == other.refused;
+          failure == other.failure;
 }
