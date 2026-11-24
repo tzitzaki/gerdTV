@@ -17,5 +17,5 @@ trap 'rm -rf "$out"' EXIT
 qemu="$(adb shell getprop ro.kernel.qemu; adb shell getprop ro.boot.qemu)"
 [[ "$qemu" == *1* ]] || { echo "test-libmpv-android: not an emulator"; exit 1; }
 adb push "$lib" "$out/smoke" crates/gerdtv-testkit/media/clip.ts /data/local/tmp/ >/dev/null
-adb shell "cd /data/local/tmp && chmod 755 smoke && LD_LIBRARY_PATH=/data/local/tmp ./smoke clip.ts" | tee "$out/log"
+timeout 120 adb shell "cd /data/local/tmp && chmod 755 smoke && LD_LIBRARY_PATH=/data/local/tmp ./smoke clip.ts" | tee "$out/log"
 grep -q '^smoke: ok' "$out/log"
