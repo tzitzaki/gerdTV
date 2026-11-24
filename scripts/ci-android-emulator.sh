@@ -19,10 +19,19 @@ sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 # (yes ends with a broken pipe once sdkmanager stops reading: not an error, but pipefail would make it one.)
 (yes || true) | "$sdkmanager" --install emulator platform-tools "$image" >/dev/null
 emulator -accel-check || fail "no hardware acceleration (KVM)"
+# One AVD folder for avdmanager and the emulator (on the runner they looked in different places).
+export ANDROID_AVD_HOME="${RUNNER_TEMP:-/tmp}/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n smoke -k "$image" --force >/dev/null
+[[ -f "$ANDROID_AVD_HOME/smoke.ini" ]] || fail "avdmanager made no AVD in $ANDROID_AVD_HOME"
 emulator -avd smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on >"$log" 2>&1 &
 pid=$!
-timeout 300 adb wait-for-device || fail "no device within 5 min"
+for _ in $(seq 1 60); do
+  kill -0 "$pid" 2>/dev/null || fail "the emulator exited"
+  [[ "$(timeout 5 adb get-state 2>/dev/null)" == device ]] && break
+  sleep 5
+done
+[[ "$(timeout 5 adb get-state 2>/dev/null)" == device ]] || fail "no device within 5 min"
 for _ in $(seq 1 120); do
   kill -0 "$pid" 2>/dev/null || fail "the emulator exited"
   if [[ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then
