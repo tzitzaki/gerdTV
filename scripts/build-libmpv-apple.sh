@@ -147,14 +147,17 @@ EOF
   local mpv_flags=(
     --cross-file "$work/cross.ini" --buildtype=release --default-library=shared --auto-features=disabled
     --force-fallback-for=libplacebo
-    -Dlibmpv=true -Dcplayer=false -Dgpl=false -Dtests=false -Dswift-build=disabled
+    -Dlibmpv=true -Dcplayer=false -Dgpl=false -Dtests=false
     -Dlibplacebo:demos=false -Dlibplacebo:vulkan=disabled -Dlibplacebo:opengl=enabled
     -Dgl=enabled -Dplain-gl=enabled -Dzlib=enabled -Diconv=enabled
   )
   if [[ "$sdk" == macosx ]]; then
-    mpv_flags+=(-Dcocoa=enabled -Dcoreaudio=enabled -Dgl-cocoa=enabled -Dvideotoolbox-gl=enabled)
+    # mpv's Cocoa layer (needed by gl-cocoa, whose VideoToolbox interop keeps decoding in hardware) is partly Swift;
+    # swiftc gets the slice's target like clang (the Swift runtime is part of macOS 12).
+    mpv_flags+=(-Dcocoa=enabled -Dswift-build=enabled "-Dswift-flags=-target $target" -Dcoreaudio=enabled
+      -Dgl-cocoa=enabled -Dvideotoolbox-gl=enabled)
   else
-    mpv_flags+=(-Daudiounit=enabled -Dios-gl=enabled)
+    mpv_flags+=(-Dswift-build=disabled -Daudiounit=enabled -Dios-gl=enabled)
   fi
   stage mpv-configure meson setup "$work/mpv-build" "$work/mpv" "${mpv_flags[@]}"
   stage mpv-build ninja -C "$work/mpv-build"

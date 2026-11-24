@@ -3,11 +3,8 @@
 Things for the owner to look at on a real device; one line each, deleted once seen.
 
 ## Mac
-- Install: the zip unpacks to gerdTV.app, "Open Anyway" once, then the setup screen appears.
-- Setup: the Xtream Codes login connects, the catalogue appears, and after a restart it opens without asking again.
-- Profiles: a second provider added in Settings → Account; after a restart the picker asks, "Always open this one" stops it asking.
-- Keychain: no repeated password prompts after the first "Always Allow"; still none after updating to the next release.
-- Live TV: a channel plays with picture and sound; Esc returns to the list; logos show in the lists.
+- Own engine: Settings → Playback → Player engine gerdTV, restart; a channel and a movie play with picture and sound, hardware decoded.
+- Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
 - Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
 - Movies and series: a movie plays, a series opens its episodes; a movie stopped after 5 min shows under Continue watching and continues there.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
@@ -26,6 +23,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
 
 ## iPhone and iPad
+- Own engine: Player engine gerdTV, restart; a channel plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV and a movie play in full screen with sound; logos show in the lists.
 - Keep playing: Back from the player keeps the channel running in the bottom bar; Stop ends it.
@@ -37,6 +35,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Swipe: from the left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
 
 ## Android phone
+- Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
 - PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
@@ -45,6 +44,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Swipe: left edge closes a page; a fast sideways swipe switches section (not on Guide); in a movie, swipe seeks, right half swipes volume.
 
 ## Shield
+- Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
 - Install: the APK installs and gerdTV appears in the TV launcher row with its banner.
 - Remote: the D-pad reaches every section, list and the setup fields; OK opens; Back leaves the player.
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
