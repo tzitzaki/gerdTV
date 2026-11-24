@@ -193,10 +193,10 @@ impl Watchdog {
         self.feed(core::PlayerEvent::Error(message))
     }
 
-    /// The app came back from sleep or the background.
+    /// The app came back from sleep or the background; `frozen_secs`: seconds since the last tick.
     #[flutter_rust_bridge::frb(sync)]
-    pub fn on_wake(&self) -> Vec<WatchdogCommand> {
-        self.feed(core::PlayerEvent::Wake)
+    pub fn on_wake(&self, frozen_secs: u64) -> Vec<WatchdogCommand> {
+        self.feed(core::PlayerEvent::Wake(frozen_secs))
     }
 
     #[flutter_rust_bridge::frb(sync)]

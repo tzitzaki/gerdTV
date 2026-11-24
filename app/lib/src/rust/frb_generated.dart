@@ -394,6 +394,7 @@ abstract class RustLibApi extends BaseApi {
 
   List<WatchdogCommand> crateApiPlaybackWatchdogOnWake({
     required Watchdog that,
+    required BigInt frozenSecs,
   });
 
   String? crateApiLibraryAppSetting({required String dir, required String key});
@@ -2527,6 +2528,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   List<WatchdogCommand> crateApiPlaybackWatchdogOnWake({
     required Watchdog that,
+    required BigInt frozenSecs,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -2536,6 +2538,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_u_64(frozenSecs, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57)!;
         },
         codec: SseCodec(
@@ -2543,14 +2546,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiPlaybackWatchdogOnWakeConstMeta,
-        argValues: [that],
+        argValues: [that, frozenSecs],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiPlaybackWatchdogOnWakeConstMeta =>
-      const TaskConstMeta(debugName: "Watchdog_on_wake", argNames: ["that"]);
+      const TaskConstMeta(
+        debugName: "Watchdog_on_wake",
+        argNames: ["that", "frozenSecs"],
+      );
 
   @override
   String? crateApiLibraryAppSetting({
@@ -5780,7 +5786,9 @@ class WatchdogImpl extends RustOpaque implements Watchdog {
       .api
       .crateApiPlaybackWatchdogOnUserPause(that: this, paused: paused);
 
-  /// The app came back from sleep or the background.
-  List<WatchdogCommand> onWake() =>
-      RustLib.instance.api.crateApiPlaybackWatchdogOnWake(that: this);
+  /// The app came back from sleep or the background; `frozen_secs`: seconds since the last tick.
+  List<WatchdogCommand> onWake({required BigInt frozenSecs}) => RustLib
+      .instance
+      .api
+      .crateApiPlaybackWatchdogOnWake(that: this, frozenSecs: frozenSecs);
 }

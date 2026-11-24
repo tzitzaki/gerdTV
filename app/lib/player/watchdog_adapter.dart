@@ -87,6 +87,9 @@ class WatchdogAdapter {
   UrlFor? _urlFor;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _ticker;
+
+  /// When the last tick ran: a frozen app (sleep, suspended) misses ticks, one playing in the background doesn't.
+  DateTime _lastTick = DateTime.now();
   AppLifecycleListener? _lifecycle;
   Duration _lastPosition = Duration.zero;
 
@@ -157,11 +160,13 @@ class WatchdogAdapter {
         }
       }),
     ]);
-    _ticker = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _run(_watchdog?.onTick()),
-    );
-    // Back from sleep or the background: a live connection is almost surely dead.
+    _lastTick = DateTime.now();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      _lastTick = DateTime.now();
+      _run(_watchdog?.onTick());
+    });
+    // Back from sleep or the background: the core reloads live only if the app was frozen (seconds since the
+    // last tick), since a stream that kept playing in the background is fine.
     _lifecycle = AppLifecycleListener(onResume: wake);
     await player.open(
       Media(urlFor(hls: preferHls), start: start),
@@ -192,7 +197,11 @@ class WatchdogAdapter {
   }
 
   /// Platform code calls these on resume and on connectivity changes.
-  void wake() => _run(_watchdog?.onWake());
+  void wake() => _run(
+    _watchdog?.onWake(
+      frozenSecs: BigInt.from(DateTime.now().difference(_lastTick).inSeconds),
+    ),
+  );
   void networkChanged() => _run(_watchdog?.onNetworkChanged());
 
   Future<void> stop() async {
