@@ -1,22 +1,23 @@
 # Handover
 
 ## State
-- Version 0.261124.55: the own engine no longer crashes on macOS and iOS, and iOS keeps playing with the screen locked.
-- Session 6 continues (docs/notes/2026-11-24-session-6.md): track picker, brightness, Premiumize, Trakt/Simkl, trailers, menu bar.
-- In .54: sort for every list, Settings in five categories, swipe on phones, guide gaps, theme options and a cinematic look.
-- Also in .54: gerdTV's own libmpv on Android (libgerdmpv.so) and macOS/iOS (GerdMpv.framework) besides Linux; media_kit's engine stays default.
-- Before (0.261123.52): updates install in place, a DMG, Your data, search everywhere, favourites, continue watching, hidden groups, profiles, timeshift.
+- Version 0.261124.56: movie and series pages with trailers, a track picker, a brightness swipe, Premiumize, Trakt and Simkl, a macOS menu bar mode.
+- Also in .56: Account subcategories, no channel numbers, guide short names, unmatched search, Release page link, iOS PiP fixes, no stall after Live.
+- In .55: the own engine no longer crashes on macOS and iOS (a library mix-up in the video plugin), and iOS keeps playing when locked.
+- In .54: own libmpv on Android and macOS/iOS besides Linux (media_kit's stays default), sort everywhere, Settings in five categories.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
-- Live guide check (counts only): with the provider guide 2066 channels show a programme now (2042 before), 2087 with the community DE file.
 
 ## Owner decisions
-- Session 6's questions are answered (Premiumize cloud, Trakt and Simkl, embedded trailers); standing decisions are in docs/DECISIONS.md.
+- Session 6's questions are answered; standing decisions (including no secret in the repo or the app) are in docs/DECISIONS.md.
+- Open: Licences: full licence texts per Rust crate, one page grouped by kind, native flags from the build outputs: which of these do you want?
+- Open: device checks are full; dropped to fit: the Mac's "stopped movie continues" and "series opens episodes": done, or keep them?
 - Open: the TV layout's focus polish needs your feedback from the Shield (what feels wrong with the D-pad).
 - Open: start mpv with load-scripts=no in the vendored media_kit (fixes the Linux CI hang for the standard engine)?
-- Open: device checks were full: have you done the Mac's install, setup, profiles, keychain and live TV checks? Then they stay deleted.
 
 ## Owner one-off jobs
+- Register gerdTV at premiumize.me/registerclient and simkl.com/settings/developer (TV/device type), then `gh variable set` both ids (docs/RELEASING.md).
+- For Trakt: create your own app on trakt.tv (Settings → Your API Apps, redirect urn:ietf:wg:oauth:2.0:oob) and enter it in Settings → Account → Trakt.
 - Delete the release-less tag of the failed run: `git push origin --delete v0.261122.16` (the notes skip it either way; I was not allowed to delete it).
 - Delete the first revision of PR #6's description (it named the dev machine): "edited", oldest revision, "Delete revision from history".
 - Move the signing files from the private config folder into the password manager, then delete them there.
@@ -24,14 +25,17 @@
 
 ## Open work
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- Flaky journey: playback sometimes stalls after leaving the player (app_test.dart "keeps playing"); fix by cause, failing test first.
 - A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
+- Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
+- iOS PiP: if it still fails on the device, the player now shows the reason: build the fix from that message.
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
 - Phase 3 rest: PIN-locked groups and the TV-layout focus polish.
 - Phase 4 TMDB enrichment; Phase 5 recordings and menu bar/tray; lazy VOD details.
 
 ## Things to watch
+- Trailers play in YouTube's embed in a web view; YouTube refuses embeds without a referrer (error 153), so gerdTV sends its own origin.
+- Tracking matches by cleaned title and year; a provider name that keeps decorations clean_title misses is sent as it is (tracking.rs).
 - Player gestures use media_kit's own: no seek swipe on live channels (timeshift keeps its bar); the volume swipe sets mpv's volume, not the system's.
 - The community guide presets point at epgshare01, a third party: a file that moves shows as the source's error in Settings → Guide.
 - About 1000 provider channels are listed without programmes; they now count as "without guide" and can take a community guide or a mapping.
@@ -47,7 +51,7 @@
 - In the journey, typing into search after the catch-up step doesn't arrive (cause open; a real keyboard is not involved).
 - Integration tests take about 9–16 min (the screen check plays video at every size, plus a light pass on the phone).
 - Release builds restore CI's Android and libmpv caches from main; a release tagged before main's runs finished builds them cold.
-- The version-bump check in scripts/ci-scope.sh trusts the six-digit minor; a dependency versioned 0.YYMMDD.x would slip through as a bump.
+- flutter_secure_storage_linux crashes the app when deleting a key that was never written: delete only what exists (Session.removeProfile).
 - The provider panel once answered an empty VOD list under load; sync keeps the known entries in that case.
 
 ## Ideas not chosen

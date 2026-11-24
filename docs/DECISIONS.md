@@ -16,21 +16,25 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
 - Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
-- Swipe on phones: from the left edge back, sideways between sections (not on the Guide), and in the player media_kit's seek and volume swipes (the player's volume; switchable).
+- Swipe on phones: from the left edge back, sideways between sections (not on the Guide), and in the player media_kit's seek, volume and brightness swipes (the player's volume; brightness on the left half; switchable).
 - Theme: dark by default, or light or the system's; orange by default among eight accent presets; neutral surfaces by default (tinted on request); pure black on request; app-wide.
 - Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
+- Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or, in builds with gerdTV's client id, a device code; no torrent search.
+- Watch tracking: Trakt and Simkl by scrobbling (start, pause, stop with progress), linked by device code; no secret in the repository or the app: public client ids from repository variables, Trakt with the user's own app.
+- Trailers: the panel's YouTube trailer in YouTube's embed (webview_flutter), muted behind a movie's or series' title after 2 s, with sound from the Trailer button; movies open a page before playing (Continue watching plays at once).
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
 - Search ranking: tiers (word starts, group name, mid-word, typos from 4 letters), favourites and recents first within each tier; a tier is searched only when the better ones don't fill the page, so a search stays as fast as a plain word search (bench gate); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
+- macOS menu bar mode, on by default and switchable: closing or quitting from the Dock hides gerdTV into the menu bar; built natively in Swift (no tray_manager).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
-- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n), material_ui (Material moved out of the SDK) and cupertino_ui (its Cupertino counterpart, pulled in by material_ui; used for the phones' swipe-back slide).
+- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), webview_flutter with its Android and WebKit packages (trailers), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n), material_ui (Material moved out of the SDK) and cupertino_ui (its Cupertino counterpart, pulled in by material_ui; used for the phones' swipe-back slide).
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
 - Benchmarks compare A/B in one run (origin/main's core, then the branch's), not against a stored baseline.
 - Own libmpv: one self-contained library per platform (mpv + FFmpeg + libplacebo, LGPL), built by our scripts in CI, named libgerdmpv; media_kit's engine stays the default until ours passes the harness, the journeys and the owner's device checks.
@@ -41,7 +45,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
 - Missing guide data: twins (same name, other quality) borrow a match; community guide presets from epgshare01 (a third party; files may go away).
-- Secrets (provider credentials, TMDB key, PIN) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
+- Secrets (provider credentials, TMDB key, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
 - Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.

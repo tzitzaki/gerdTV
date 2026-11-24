@@ -7,8 +7,20 @@
 // Debugging a wrong "behind live" label: print cacheEnd and position per second; a cacheEnd that jumps back after a
 // seek is normal, a frozen one while attached means mpv stopped reading (network).
 
-/// Closer than this to live counts as live (mpv's cache end runs a little ahead of the position).
+import 'dart:math' as math;
+
+/// Closer than this to live always counts as live (mpv's cache end runs a little ahead of the position).
 const liveSlack = 3.0;
+
+/// How far behind the cache's end "Live" lands with a buffer whose `cache-pause-wait` is [pauseWait] seconds: twice
+/// that and a second. Right after the seek mpv may pause for cache until it holds [pauseWait] seconds more; the live
+/// stream only arrives in real time, so landing closer froze the picture for about [pauseWait] seconds (the
+/// journey's flaky "keeps playing" step: mpv paused for cache at 2.5 s behind the edge with Fast zap's 2 s).
+double goLiveMargin(int pauseWait) => pauseWait * 2 + 1.0;
+
+/// Up to this far behind still counts as live: always [liveSlack], and beyond where Live lands for the buffer.
+double liveSlackFor(int pauseWait) =>
+    math.max(liveSlack, goLiveMargin(pauseWait) + 1);
 
 class LiveEdge {
   double? _edge;
@@ -42,12 +54,12 @@ class LiveEdge {
     return _detached ? e + now.difference(_edgeAt).inMilliseconds / 1000 : e;
   }
 
-  /// Whole seconds behind live at [position] (0 at the edge).
-  int behind(double position, DateTime now) {
+  /// Whole seconds behind live at [position] (0 within [slack] of the edge, liveSlackFor the buffer).
+  int behind(double position, DateTime now, {double slack = liveSlack}) {
     final l = live(now);
     if (l == null) return 0;
     final b = l - position;
-    return b < liveSlack ? 0 : b.round();
+    return b < slack ? 0 : b.round();
   }
 
   /// The earliest seekable moment: [windowSecs] back from live, not before the stream's start, never after live

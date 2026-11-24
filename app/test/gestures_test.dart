@@ -1,6 +1,6 @@
 // New, because nothing owned touch gestures (owner decision): on phones a fast horizontal fling switches to the
 // neighbouring section (none where the shell turns it off, the Guide), and the player gestures follow their setting
-// (seek only in movies and episodes, volume everywhere, nothing when off).
+// (seek only in movies and episodes, volume and brightness everywhere, nothing when off).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/screens/player_screen.dart';
 import 'package:gerdtv/screens/shell.dart';
@@ -62,13 +62,20 @@ void main() {
         vod: vod,
         volume: 1.4, // mpv allows more than 100 %; the slider starts at its top
         onVolume: (_) {},
+        brightness: 0.3,
+        onBrightness: (_) {},
+        onBrightnessReset: () {},
       );
       expect(
         (t.seekGesture, t.seekOnDoubleTap, t.volumeGesture),
         (seek, seek, volume),
         reason: 'enabled $enabled vod $vod',
       );
-      expect(t.brightnessGesture, isFalse);
+      // Brightness on the left half goes with the volume swipe, from the screen's brightness.
+      expect(t.brightnessGesture, volume);
+      expect(t.initialBrightness, 0.3);
+      expect(t.onBrightnessChanged, isNotNull);
+      expect(t.onBrightnessReset, isNotNull);
       expect(t.initialVolume, 1.0);
       expect(t.onVolumeChanged, isNotNull);
     }

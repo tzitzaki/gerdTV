@@ -3,7 +3,10 @@
 // iOS PiP is a hand-over to AVPlayer (startApplePip); when it ends, `onApplePipEnded` resumes mpv. setLogo switches
 // the app icon (macOS: MainFlutterWindow.swift, Linux: my_application.cc). Android only: voice search through the
 // system's speech recognizer (voiceAvailable, listen); iOS and macOS have dictation on their keyboards.
-// Platforms without a native side ignore the calls.
+// brightness/setBrightness/resetBrightness serve the player's left-half swipe; openUrl opens a web page (Android, iOS; desktop runs the system's opener). Platforms without a native side ignore
+// the calls.
+
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -13,10 +16,14 @@ import '../screens/app_logo.dart';
 class PlatformBridge {
   PlatformBridge({required this.pictureMode});
 
-  /// iOS: Apple's Picture-in-Picture ended (or AVPlayer couldn't play the stream: failed = true).
-  void Function(bool failed)? onApplePipEnded;
+  /// iOS: Apple's Picture-in-Picture ended; [failure] is the reason it couldn't start or play (null: it ended
+  /// normally), e.g. "AVPlayer: …" for a stream AVPlayer can't play.
+  void Function(String? failure)? onApplePipEnded;
 
   static const channel = MethodChannel('gerdtv/platform');
+
+  /// macOS menu bar: its menu's "toggle" (play/pause) or "stop" (platform/menu_bar.dart).
+  void Function(String action)? onMenuBar;
 
   /// Set while the system's Picture-in-Picture window shows the app.
   final ValueNotifier<bool> pictureMode;
@@ -26,8 +33,10 @@ class PlatformBridge {
     channel.setMethodCallHandler((call) async {
       if (call.method == 'pictureMode') {
         pictureMode.value = call.arguments == true;
+      } else if (call.method == 'menuBar') {
+        onMenuBar?.call(call.arguments as String);
       } else if (call.method == 'pipEnded') {
-        onApplePipEnded?.call((call.arguments as Map?)?['failed'] == true);
+        onApplePipEnded?.call((call.arguments as Map?)?['failure'] as String?);
       }
     });
   }
@@ -65,6 +74,47 @@ class PlatformBridge {
       await channel.invokeMethod('setLogo', args);
     } on MissingPluginException {
       // Tests and builds without the native side.
+    }
+  }
+
+  /// Opens [url] in the browser (or the app registered for it); false when nothing can open it (e.g. a TV without a
+  /// browser), so the caller can show the address instead. Desktop asks the system's opener, phones and TVs the
+  /// platform channel (no url_launcher: one call isn't worth a dependency).
+  static Future<bool> openUrl(String url) async {
+    if (kIsWeb) return false;
+    if (defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      final r = await Process.run(
+        defaultTargetPlatform == TargetPlatform.macOS ? 'open' : 'xdg-open',
+        [url],
+      );
+      return r.exitCode == 0;
+    }
+    try {
+      return await channel.invokeMethod<bool>('openUrl', {'url': url}) ?? false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Phones and tablets: the screen's brightness for the player's swipe (0–1), null where there is none.
+  /// Android sets only gerdTV's window (the system setting stays); iOS sets the screen's and puts the old value back on
+  /// [resetBrightness] and when the app leaves the foreground, since iOS keeps it otherwise.
+  static Future<double?> brightness() => _brightness('brightness');
+  static Future<void> setBrightness(double value) =>
+      _brightness('setBrightness', value);
+  static Future<void> resetBrightness() => _brightness('resetBrightness');
+
+  static Future<double?> _brightness(String method, [double? value]) async {
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return null;
+    }
+    try {
+      return await channel.invokeMethod<double>(method, {'value': ?value});
+    } on MissingPluginException {
+      return null;
     }
   }
 

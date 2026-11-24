@@ -277,6 +277,13 @@ void main() {
       await tester.enterText(find.byKey(const Key('search.movies')), 'sport');
       await waitFor(tester, find.byType(ItemCard).hitTestable());
       await checkScreen(tester, form, 'search-movies', size);
+      // A movie's page: its details from the panel, Play and Trailer (the trailer itself plays in a web view, which
+      // the Linux build doesn't have: a device check).
+      await tapReady(tester, find.byType(ItemCard));
+      await waitFor(tester, find.byKey(const Key('details.trailer')));
+      await checkScreen(tester, form, 'movie-page', size);
+      await tester.pageBack();
+      await settle(tester);
       await tester.tap(find.byKey(const Key('search.clear')));
 
       // The guide grid (the guide imported above) and a programme's sheet.

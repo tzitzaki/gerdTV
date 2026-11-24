@@ -1,7 +1,7 @@
 // Browse one kind (Live TV, Movies, Series): the provider's groups (in the section's group order), then a group's
 // items (paged, 100 at a time, more on scroll, in the section's item order) in the section's list mode, live channels
-// with what's on now and next. Series open their episodes under a blurred backdrop of their poster; everything else
-// plays. Loading shows skeleton rows. A group's own search field searches the whole group in the
+// with what's on now and next. Series open their episodes under their page's header, movies their page
+// (details_screen.dart); everything else plays. Loading shows skeleton rows. A group's own search field searches the whole group in the
 // core (section_search.dart), not just the rows loaded so far.
 
 import 'dart:async';
@@ -13,19 +13,28 @@ import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'details_screen.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'logo.dart';
 import 'player_screen.dart';
+import 'premiumize_screen.dart';
 import 'section_search.dart';
 
-/// Plays an item, or opens a series' episodes. [channels]: the live channels around it (Up/Down in the player).
+/// Plays an item, or opens a series' episodes or a movie's page ([page] false: a movie plays at once, as from
+/// Continue watching). [channels]: the live channels around it (Up/Down in the player).
 void openItem(
   BuildContext context,
   Session session,
   ItemInfo item, {
   List<ItemInfo>? channels,
+  bool page = true,
 }) {
+  Future<void> play() => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => PlayerScreen(session: session, item: item),
+    ),
+  );
   // Opened without a list (a programme, an episode): no zapping through an older list.
   if (item.kind == ItemKind.live) session.zapList = channels ?? const [];
   if (item.kind == ItemKind.series) {
@@ -34,12 +43,15 @@ void openItem(
         builder: (_) => EpisodesScreen(session: session, series: item),
       ),
     );
-  } else {
+  } else if (item.kind == ItemKind.movie && page) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => PlayerScreen(session: session, item: item),
+        builder: (_) =>
+            MovieScreen(library: session.library!, movie: item, onPlay: play),
       ),
     );
+  } else {
+    play();
   }
 }
 
@@ -116,9 +128,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       CategoryInfo(id: '', name: l10n.favourites, count: n),
                     ...list,
                   ];
+                  // Movies also get the Premiumize cloud while it is linked (premiumize_screen.dart).
                   final resume = kind == ItemKind.live
                       ? null
-                      : ContinueRow(session: session, kind: kind);
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (kind == ItemKind.movie &&
+                                session.premiumizeToken != null)
+                              PremiumizeRow(session: session),
+                            ContinueRow(session: session, kind: kind),
+                          ],
+                        );
                   // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
                   final header = Align(
                     alignment: AlignmentDirectional.centerEnd,
@@ -213,7 +234,8 @@ class ContinueRow extends StatelessWidget {
                         key: Key('continue.${r.item.key}'),
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
-                          onTap: () => openItem(context, session, r.item),
+                          onTap: () =>
+                              openItem(context, session, r.item, page: false),
                           child: Column(
                             children: [
                               Expanded(
@@ -462,7 +484,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 }
 
-class EpisodesScreen extends StatelessWidget {
+class EpisodesScreen extends StatefulWidget {
   const EpisodesScreen({
     super.key,
     required this.session,
@@ -472,47 +494,79 @@ class EpisodesScreen extends StatelessWidget {
   final ItemInfo series;
 
   @override
+  State<EpisodesScreen> createState() => _EpisodesScreenState();
+}
+
+/// The series' page: its backdrop (with the muted trailer) and details (details_screen.dart), then the episodes.
+class _EpisodesScreenState extends State<EpisodesScreen> {
+  Session get session => widget.session;
+  ItemInfo get series => widget.series;
+  late final Future<ItemDetails?> _details = session.library!
+      .details(key: series.key)
+      .then<ItemDetails?>((d) => d)
+      .catchError((Object _) => null);
+  late final Future<List<ItemInfo>> _episodes = session.library!.episodes(
+    seriesKey: series.key,
+  );
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // The preview runs only while this page is on top (the player covers it after an episode's tap); ModalRoute.of
+    // rebuilds this when that changes.
+    final onTop = ModalRoute.of(context)?.isCurrent ?? true;
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 240,
-            title: Text(series.name),
-            flexibleSpace: FlexibleSpaceBar(
-              background: _Backdrop(item: series),
-            ),
-          ),
-          FutureBuilder<List<ItemInfo>>(
-            future: session.library!.episodes(seriesKey: series.key),
-            builder: (context, snap) {
-              if (snap.hasError) {
-                return SliverFillRemaining(
-                  child: _Message(l10n.syncFailed('${snap.error}')),
-                );
-              }
-              final eps = snap.data;
-              if (eps == null) {
-                return SliverList.builder(
-                  itemCount: 6,
-                  itemBuilder: (_, _) => const SkeletonRow(),
-                );
-              }
-              if (eps.isEmpty) {
-                return SliverFillRemaining(child: _Message(l10n.episodesEmpty));
-              }
-              return SliverList.builder(
-                itemCount: eps.length,
-                itemBuilder: (context, i) => ItemTile(
-                  item: eps[i],
-                  onTap: () => openItem(context, session, eps[i]),
+      body: FutureBuilder<ItemDetails?>(
+        future: _details,
+        builder: (context, details) => CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: 280,
+              title: Text(series.name),
+              flexibleSpace: FlexibleSpaceBar(
+                background: DetailsBackdrop(
+                  item: series,
+                  details: details.data,
+                  active: onTop,
+                  fallback: _Backdrop(item: series),
                 ),
-              );
-            },
-          ),
-        ],
+              ),
+            ),
+            if (details.data != null)
+              SliverToBoxAdapter(
+                child: DetailsInfo(item: series, details: details.data),
+              ),
+            FutureBuilder<List<ItemInfo>>(
+              future: _episodes,
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  return SliverFillRemaining(
+                    child: _Message(l10n.syncFailed('${snap.error}')),
+                  );
+                }
+                final eps = snap.data;
+                if (eps == null) {
+                  return SliverList.builder(
+                    itemCount: 6,
+                    itemBuilder: (_, _) => const SkeletonRow(),
+                  );
+                }
+                if (eps.isEmpty) {
+                  return SliverFillRemaining(
+                    child: _Message(l10n.episodesEmpty),
+                  );
+                }
+                return SliverList.builder(
+                  itemCount: eps.length,
+                  itemBuilder: (context, i) => ItemTile(
+                    item: eps[i],
+                    onTap: () => openItem(context, session, eps[i]),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

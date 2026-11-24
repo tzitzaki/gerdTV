@@ -218,10 +218,26 @@ void main() {
       () => Future<void>.delayed(const Duration(seconds: 2)),
     );
     await tester.pump();
+    final st = session.player.state;
+    final mpv = session.player.platform as NativePlayer;
+    final props = <String>[];
+    for (final p in [
+      'time-pos',
+      'demuxer-cache-time',
+      'paused-for-cache',
+      'cache-buffering-state',
+      'demuxer-cache-idle',
+    ]) {
+      props.add('$p ${await tester.runAsync(() => mpv.getProperty(p))}');
+    }
+    debugPrint('JOURNEY: after leaving: ${props.join(', ')}');
     expect(
-      session.player.state.position,
+      st.position,
       greaterThan(atLeave),
-      reason: 'keeps playing after leaving the player',
+      // The state names the kind of stall when this fails (it was flaky: open work in docs/HANDOVER.md).
+      reason:
+          'keeps playing after leaving the player (playing ${st.playing}, '
+          'buffering ${st.buffering}, cache to ${st.buffer}, completed ${st.completed})',
     );
     await tester.tap(find.byKey(const Key('nowPlaying.bar')));
     await waitFor(tester, find.byKey(const Key('player.back')));

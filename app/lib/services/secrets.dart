@@ -37,4 +37,19 @@ class Secrets {
 
   Future<void> delete(String profileId) =>
       _storage.delete(key: _key(profileId));
+
+  /// A linked service's token for a profile ([service]: "premiumize", "trakt", "simkl"); null when there is none
+  /// or it can't be read. Kept apart from the provider login, so linking or unlinking never touches that.
+  Future<String?> readService(String profileId, String service) async {
+    try {
+      return await _storage.read(key: 'gerdtv.$service.$profileId');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeService(String profileId, String service, String? token) =>
+      token == null
+      ? _storage.delete(key: 'gerdtv.$service.$profileId')
+      : _storage.write(key: 'gerdtv.$service.$profileId', value: token);
 }

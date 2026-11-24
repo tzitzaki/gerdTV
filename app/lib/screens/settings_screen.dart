@@ -6,6 +6,7 @@
 // Debugging: entries are rebuilt from scratch on every session notification (_categories), so a setting that shows a
 // stale value usually means its widget read the value once in initState instead of in build.
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -20,6 +21,9 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'player_screen.dart' show playerGesturesSetting;
+import 'premiumize_screen.dart';
+import 'track_settings.dart';
+import '../services/tracking.dart';
 import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
@@ -76,6 +80,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<SettingsCategory> _categories(AppLocalizations l10n) {
     final lib = session.library;
     final last = session.lastSync;
+    // Account's subcategories: the provider (its name, else "Provider"), then each linked service.
+    final provider = session.profile?.name.isNotEmpty == true
+        ? session.profile!.name
+        : l10n.settingsProvider;
     final all = [
       SettingsCategory(
         id: 'account',
@@ -84,6 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           SettingsEntry(
             id: 'profile',
+            section: provider,
             title: session.profile?.name ?? '',
             keywords: l10n.settingsKeywordsAccount,
             build: (_) => ListTile(
@@ -103,6 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Profiles: switch to another provider account, add one, and whether this one opens without asking.
           SettingsEntry(
             id: 'profiles',
+            section: provider,
             title: l10n.profiles,
             keywords: l10n.settingsKeywordsProfiles,
             build: (context) => StatefulBuilder(
@@ -146,6 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           SettingsEntry(
             id: 'sync',
+            section: provider,
             title: l10n.settingsSyncNow,
             keywords: l10n.settingsKeywordsAccount,
             build: (_) => ListTile(
@@ -160,12 +171,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'userData',
+              section: provider,
               title: l10n.userDataExport,
               keywords: l10n.settingsKeywordsData,
               build: (_) => UserDataSettings(session: session),
             ),
           SettingsEntry(
             id: 'remove',
+            section: provider,
             title: l10n.settingsRemove,
             keywords: l10n.settingsKeywordsRemove,
             build: (context) => ListTile(
@@ -175,6 +188,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _confirmRemove(context),
             ),
           ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'premiumize',
+              section: l10n.premiumize,
+              title: l10n.premiumize,
+              keywords: l10n.settingsKeywordsPremiumize,
+              build: (_) => PremiumizeSettings(session: session),
+            ),
+          if (lib != null)
+            for (final t in trackServices)
+              SettingsEntry(
+                id: t.id,
+                section: t.label,
+                title: t.label,
+                keywords: l10n.settingsKeywordsTracking,
+                build: (_) => TrackSettings(session: session, service: t),
+              ),
         ],
       ),
       SettingsCategory(
@@ -201,6 +231,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       key: playerGesturesSetting,
                       value: on ? 'on' : 'off',
                     );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (defaultTargetPlatform == TargetPlatform.macOS)
+            SettingsEntry(
+              id: 'menuBar',
+              title: l10n.menuBar,
+              keywords: l10n.menuBarHint,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.menuBar'),
+                  title: Text(l10n.menuBar),
+                  subtitle: Text(l10n.menuBarHint),
+                  value: widget.session.menuBar,
+                  onChanged: (on) async {
+                    await widget.session.setMenuBar(on);
                     setState(() {});
                   },
                 ),
@@ -604,11 +652,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         for (final cat in matches) ...[
           _header(context, cat.title),
-          for (final e in cat.entries)
-            KeyedSubtree(
-              key: Key('settings.entry.${e.id}'),
-              child: e.build(context),
-            ),
+          ..._entries(context, cat.entries),
         ],
       ],
     );
@@ -618,6 +662,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
 Widget _header(BuildContext context, String title) => ListTile(
   title: Text(title, style: Theme.of(context).textTheme.titleMedium),
 );
+
+/// A category's entries, with a subcategory heading wherever the section changes.
+List<Widget> _entries(BuildContext context, List<SettingsEntry> entries) {
+  String? section;
+  return [
+    for (final e in entries) ...[
+      if (e.section != null && e.section != section)
+        Padding(
+          key: Key('settings.section.${e.section}'),
+          padding: const EdgeInsets.fromLTRB(
+            Tokens.space * 2,
+            Tokens.space * 2,
+            Tokens.space * 2,
+            Tokens.space / 2,
+          ),
+          child: Text(
+            (section = e.section)!,
+            style: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(color: Theme.of(context).colorScheme.primary),
+          ),
+        ),
+      KeyedSubtree(key: Key('settings.entry.${e.id}'), child: e.build(context)),
+    ],
+  ];
+}
 
 /// One category's entries, scrollable (key `settings.content`, which the integration tests scroll).
 class _CategoryContent extends StatelessWidget {
@@ -630,11 +699,7 @@ class _CategoryContent extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: Tokens.space),
     children: [
       if (header) _header(context, category.title),
-      for (final e in category.entries)
-        KeyedSubtree(
-          key: Key('settings.entry.${e.id}'),
-          child: e.build(context),
-        ),
+      ..._entries(context, category.entries),
     ],
   );
 }

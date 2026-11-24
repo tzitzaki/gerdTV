@@ -347,7 +347,7 @@ class _GuideScreenState extends State<GuideScreen> {
               const SizedBox(width: Tokens.space),
               Expanded(
                 child: Text(
-                  c.number == null ? c.name : '${c.number} ${c.name}',
+                  c.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
