@@ -1,7 +1,7 @@
 //! Opt-in checks against a real Xtream Codes account (`just test-live`; ignored otherwise). Reads GERDTV_XC_SERVER,
 //! GERDTV_XC_USER, GERDTV_XC_PASS. Prints counts and timings only: never names, URLs or credentials (the output
 //! may be pasted into a public PR).
-use gerdtv_core::db::{self, Hit, Kind};
+use gerdtv_core::db::{self, Hit, Kind, Sort};
 use gerdtv_core::xtream::{self, Xtream};
 use std::time::Instant;
 
@@ -112,14 +112,17 @@ async fn live_library_and_one_playback_probe() {
     .unwrap();
     let r = lib.sync().await.expect("sync");
     println!("library sync: {} entries", r.stats.entries);
-    let series_cat = &lib.categories(Kind::Series).unwrap()[0];
-    let series = &lib.items(Kind::Series, &series_cat.id, 1, 0).unwrap()[0];
+    let series_cat = &lib.categories(Kind::Series, Sort::Provider).unwrap()[0];
+    let series = &lib
+        .items(Kind::Series, &series_cat.id, Sort::Provider, 1, 0)
+        .unwrap()[0];
     let eps = lib.episodes(&series.key).await.expect("episodes");
     println!("first series: {} episodes", eps.len());
     let movie = &lib
         .items(
             Kind::Movie,
-            &lib.categories(Kind::Movie).unwrap()[0].id,
+            &lib.categories(Kind::Movie, Sort::Provider).unwrap()[0].id,
+            Sort::Provider,
             1,
             0,
         )
@@ -151,9 +154,9 @@ async fn live_library_and_one_playback_probe() {
         }
     );
     let mut live_keys = vec![];
-    for cat in lib.categories(Kind::Live).unwrap() {
+    for cat in lib.categories(Kind::Live, Sort::Provider).unwrap() {
         live_keys.extend(
-            lib.items(Kind::Live, &cat.id, 10_000, 0)
+            lib.items(Kind::Live, &cat.id, Sort::Provider, 10_000, 0)
                 .unwrap()
                 .into_iter()
                 .map(|h| h.key),
@@ -177,10 +180,13 @@ async fn live_library_and_one_playback_probe() {
     // Catch-up: which URL form this panel answers, for a slot two hours back on up to three archive channels. One
     // request at a time, at most 20 s each; prints status codes and whether TS bytes came back, nothing else.
     let archive: Vec<Hit> = lib
-        .categories(Kind::Live)
+        .categories(Kind::Live, Sort::Provider)
         .unwrap()
         .iter()
-        .flat_map(|c| lib.items(Kind::Live, &c.id, 10_000, 0).unwrap())
+        .flat_map(|c| {
+            lib.items(Kind::Live, &c.id, Sort::Provider, 10_000, 0)
+                .unwrap()
+        })
         .filter(|h| h.archive_days > 0)
         .collect();
     println!("catch-up: {} live channels have an archive", archive.len());
@@ -249,9 +255,11 @@ async fn live_library_and_one_playback_probe() {
 
     // One probe at a time, each at most 20 s (the provider allows few connections). The first channels of a list
     // are often separators or offline placeholders, so try a channel from each of the first groups, TS then HLS.
-    let groups = lib.categories(Kind::Live).unwrap();
+    let groups = lib.categories(Kind::Live, Sort::Provider).unwrap();
     'probe: for (g, cat) in groups.iter().enumerate().skip(1).take(3) {
-        let ch = &lib.items(Kind::Live, &cat.id, 1, 0).unwrap()[0];
+        let ch = &lib
+            .items(Kind::Live, &cat.id, Sort::Provider, 1, 0)
+            .unwrap()[0];
         for hls in [false, true] {
             let url = lib
                 .stream_url(&ch.key, if hls { "m3u8" } else { "ts" })
@@ -287,5 +295,78 @@ async fn live_library_and_one_playback_probe() {
         }
     }
     drop(lib);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// How many live channels show a guide: the provider's alone, then with a community country file added (the
+/// presets in Settings → Guide). Prints counts only, no names or URLs of the provider; no stream is opened.
+#[tokio::test]
+#[ignore = "needs a real account: just test-live"]
+async fn live_guide_gaps() {
+    use gerdtv_core::library::{self, Library, Profile, SourceKind};
+    let dir = std::env::temp_dir().join(format!("gerdtv-live-gaps-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let p = library::save_profile(
+        &dir,
+        Profile {
+            id: String::new(),
+            name: "live".into(),
+            source: SourceKind::Xtream,
+            server: env("GERDTV_XC_SERVER"),
+            user_agent: String::new(),
+            max_connections: None,
+            updated_at: 0,
+        },
+    )
+    .unwrap();
+    let lib = Library::open(
+        &dir,
+        &p.id,
+        vec![env("GERDTV_XC_USER"), env("GERDTV_XC_PASS")],
+    )
+    .unwrap();
+    lib.sync().await.expect("sync");
+    let mut live_keys = vec![];
+    for cat in lib.categories(Kind::Live, Sort::Provider).unwrap() {
+        live_keys.extend(
+            lib.items(Kind::Live, &cat.id, Sort::Provider, 10_000, 0)
+                .unwrap()
+                .into_iter()
+                .map(|h| h.key),
+        );
+    }
+    let report = |label: &str| {
+        let unmatched = lib.unmatched_channels(100_000, 0).unwrap().len();
+        let on_now = lib
+            .now_next(&live_keys)
+            .unwrap()
+            .iter()
+            .filter(|(n, _)| n.is_some())
+            .count();
+        println!(
+            "{label}: {} of {} live channels matched, {} show a programme now",
+            live_keys.len() - unmatched,
+            live_keys.len(),
+            on_now
+        );
+    };
+    lib.refresh_guide(3).await.expect("guide");
+    report("provider guide");
+    lib.add_guide_url("https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz")
+        .unwrap();
+    let t = std::time::Instant::now();
+    let sources = lib.refresh_guide(3).await.expect("guide");
+    println!(
+        "community DE file: {} channels, {} programmes, refresh {:.1} s, status {}",
+        sources[1].channels,
+        sources[1].programmes,
+        t.elapsed().as_secs_f64(),
+        if sources[1].status.is_empty() {
+            "ok"
+        } else {
+            "error"
+        }
+    );
+    report("provider + community DE");
     std::fs::remove_dir_all(&dir).unwrap();
 }

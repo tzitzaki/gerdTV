@@ -258,6 +258,7 @@ fn player_api(req: &Request, data: &Data, sw: &Mutex<Switches>) -> Value {
                     json!({
                         "num": id - 500_000, "name": name, "series_id": id, "cover": "", "plot": "",
                         "cast": "", "genre": "", "releaseDate": "", "rating": "0",
+                        "last_modified": (1_700_000_000 + id).to_string(),
                         "category_id": cat.to_string(), "tmdb": ""
                     })
                 })

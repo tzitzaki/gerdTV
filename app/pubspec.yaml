@@ -2,7 +2,7 @@ name: gerdtv
 description: "gerdTV: a multi-platform IPTV player (Flutter + Rust + libmpv)."
 publish_to: 'none'
 # Set by each wrap-up release: 0.YYMMDD.<PR#>+<PR#> (docs/RELEASING.md).
-version: 0.261123.52+52
+version: 0.261124.54+54
 
 environment:
   sdk: ^3.14.0
@@ -12,7 +12,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  file_selector: 1.1.0 # Settings → Your data: open a file everywhere, save on macOS/Linux (owner decision)
+  cupertino_ui: ^1.1.0 # the iOS page slide with edge swipe-back on phones (material_ui already pulls it in)
+  file_selector: 1.1.0 # Settings → Account → Your data: open a file everywhere, save on macOS/Linux (owner decision)
   flutter_local_notifications: 22.3.3 # reminders; 23.x needs compileSdk 37 (Flutter's default is 36)
   flutter_rust_bridge: 2.13.0
   flutter_secure_storage: ^11.2.0
@@ -24,9 +25,15 @@ dependencies:
   media_kit_libs_video: 1.0.7
   media_kit_video: 2.0.1
   path_provider: ^2.1.6
-  share_plus: 13.3.1 # Settings → Your data: hands the export to iOS's share sheet (owner decision)
+  share_plus: 13.3.1 # Settings → Account → Your data: hands the export to iOS's share sheet (owner decision)
   timezone: 0.11.2 # flutter_local_notifications schedules with TZDateTime (reminders use UTC)
   window_manager: ^0.7.0
+
+# media_kit's video plugin, vendored and patched (owner decision; third_party/README.md): on macOS and iOS it looks
+# up libmpv at run time, so the app can load media_kit's or gerdTV's own. Same version as above.
+dependency_overrides:
+  media_kit_video:
+    path: ../third_party/media_kit_video
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,4 @@
-// Settings → Your data: export the open profile's user data (favourites, recents, reminders, manual guide mapping,
+// Settings → Account → Your data: export the open profile's user data (favourites, recents, reminders, manual guide mapping,
 // settings; no secrets) as one JSON file, and import such a file (merged: newer entries win, nothing is deleted;
 // gerdtv_core::userdata). Where the file goes: macOS/Linux a save dialog, Android the Downloads folder (phone and
 // TV alike; Android TV has no useful share targets), iPhone/iPad the share sheet ("Save to Files"). Import picks

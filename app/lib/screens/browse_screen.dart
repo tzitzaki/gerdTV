@@ -1,9 +1,11 @@
-// Browse one kind (Live TV, Movies, Series): the provider's groups in provider order, then a group's items
-// (paged, 100 at a time, more on scroll) in the section's list mode, live channels with what's on now and next.
-// Series open their episodes; everything else plays. A group's own search field searches the whole group in the
+// Browse one kind (Live TV, Movies, Series): the provider's groups (in the section's group order), then a group's
+// items (paged, 100 at a time, more on scroll, in the section's item order) in the section's list mode, live channels
+// with what's on now and next. Series open their episodes under a blurred backdrop of their poster; everything else
+// plays. Loading shows skeleton rows. A group's own search field searches the whole group in the
 // core (section_search.dart), not just the rows loaded so far.
 
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -41,10 +43,31 @@ void openItem(
   }
 }
 
-class BrowseScreen extends StatelessWidget {
+class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key, required this.session, required this.kind});
   final Session session;
   final ItemKind kind;
+
+  @override
+  State<BrowseScreen> createState() => _BrowseScreenState();
+}
+
+class _BrowseScreenState extends State<BrowseScreen> {
+  Session get session => widget.session;
+  ItemKind get kind => widget.kind;
+
+  /// The groups' order (provider order or by name), remembered per section.
+  late ListSort _sort = parseSort(
+    session.library!.setting(key: sortSetting(kind, groups: true)),
+  );
+
+  void _setSort(ListSort s) {
+    session.library!.setSetting(
+      key: sortSetting(kind, groups: true),
+      value: s.value,
+    );
+    setState(() => _sort = s);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,9 +76,9 @@ class BrowseScreen extends StatelessWidget {
       listenable: session,
       builder: (context, _) {
         final lib = session.library!;
-        final groups = lib.categories(kind: kind);
+        final groups = lib.categories(kind: kind, sort: _sort.value);
         return FutureBuilder<List<CategoryInfo>>(
-          key: ValueKey(session.generation),
+          key: ValueKey((session.generation, _sort)),
           future: groups,
           builder: (context, snap) {
             if (snap.hasError) {
@@ -63,7 +86,9 @@ class BrowseScreen extends StatelessWidget {
             }
             final list = snap.data;
             if (list == null) {
-              return const Center(child: CircularProgressIndicator());
+              return ListView(
+                children: [for (var i = 0; i < 8; i++) const SkeletonRow()],
+              );
             }
             if (list.isEmpty) {
               return _Message(
@@ -78,7 +103,12 @@ class BrowseScreen extends StatelessWidget {
                 session.nowPlaying,
               ]),
               builder: (context, _) => FutureBuilder<List<ItemInfo>>(
-                future: lib.favourites(kinds: sectionKinds(sectionOf(kind))),
+                future: lib.favourites(
+                  kinds: sectionKinds(sectionOf(kind)),
+                  sort:
+                      lib.setting(key: sortSetting(kind, groups: false)) ??
+                      ListSort.provider.value,
+                ),
                 builder: (context, favs) {
                   final n = favs.data?.length ?? 0;
                   final all = [
@@ -89,11 +119,22 @@ class BrowseScreen extends StatelessWidget {
                   final resume = kind == ItemKind.live
                       ? null
                       : ContinueRow(session: session, kind: kind);
+                  // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
+                  final header = Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: SortButton(
+                      value: _sort,
+                      options: sortOptions(kind, groups: true, xtream: false),
+                      onSelected: _setSort,
+                    ),
+                  );
+                  final skip = resume == null ? 1 : 2;
                   return ListView.builder(
-                    itemCount: all.length + (resume == null ? 0 : 1),
+                    itemCount: all.length + skip,
                     itemBuilder: (context, row) {
-                      if (resume != null && row == 0) return resume;
-                      final i = resume == null ? row : row - 1;
+                      if (row == 0) return header;
+                      if (resume != null && row == 1) return resume;
+                      final i = row - skip;
                       return ListTile(
                         key: n > 0 && i == 0
                             ? const Key('browse.favourites')
@@ -179,8 +220,9 @@ class ContinueRow extends StatelessWidget {
                                 child: LayoutBuilder(
                                   builder: (context, c) => Logo(
                                     url: r.item.logo,
-                                    size: c.biggest.shortestSide,
+                                    size: c.maxWidth,
                                     icon: kindIcon(r.item.kind),
+                                    fill: true,
                                   ),
                                 ),
                               ),
@@ -253,6 +295,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
     widget.kind,
   );
 
+  /// The items' order, remembered per section (the Favourites group and zapping follow it).
+  late ListSort _sort = parseSort(
+    widget.session.library!.setting(
+      key: sortSetting(widget.kind, groups: false),
+    ),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -299,15 +348,21 @@ class _ItemsScreenState extends State<ItemsScreen> {
     if (_loading || _done) return;
     setState(() => _loading = true);
     final lib = widget.session.library!;
+    final sort = _sort;
     final next = widget.favourites
-        ? await lib.favourites(kinds: sectionKinds(sectionOf(widget.kind)))
+        ? await lib.favourites(
+            kinds: sectionKinds(sectionOf(widget.kind)),
+            sort: sort.value,
+          )
         : await lib.items(
             kind: widget.kind,
             category: widget.group.id,
+            sort: sort.value,
             limit: page,
             offset: _items.length,
           );
-    if (!mounted) return;
+    // The order changed while this page loaded: _setSort started over, this page belongs to the old order.
+    if (!mounted || sort != _sort) return;
     setState(() {
       _items.addAll(next);
       _done = widget.favourites || next.length < page;
@@ -326,6 +381,21 @@ class _ItemsScreenState extends State<ItemsScreen> {
     setState(() => _mode = m);
   }
 
+  /// The sort button: remembered for this section, and the list starts over in the new order.
+  void _setSort(ListSort s) {
+    widget.session.library!.setSetting(
+      key: sortSetting(widget.kind, groups: false),
+      value: s.value,
+    );
+    setState(() {
+      _sort = s;
+      _items.clear();
+      _done = false;
+      _loading = false;
+    });
+    _more();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -334,6 +404,15 @@ class _ItemsScreenState extends State<ItemsScreen> {
       appBar: AppBar(
         title: Text(widget.group.name),
         actions: [
+          SortButton(
+            value: _sort,
+            options: sortOptions(
+              widget.kind,
+              groups: false,
+              xtream: widget.session.profile?.source == SourceKind.xtream,
+            ),
+            onSelected: _setSort,
+          ),
           IconButton(
             key: const Key('list.mode'),
             tooltip: listModeLabel(l10n, next),
@@ -396,25 +475,98 @@ class EpisodesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(series.name)),
-      body: FutureBuilder<List<ItemInfo>>(
-        future: session.library!.episodes(seriesKey: series.key),
-        builder: (context, snap) {
-          if (snap.hasError) return _Message(l10n.syncFailed('${snap.error}'));
-          final eps = snap.data;
-          if (eps == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (eps.isEmpty) return _Message(l10n.episodesEmpty);
-          return ListView.builder(
-            itemCount: eps.length,
-            itemBuilder: (context, i) => ItemTile(
-              item: eps[i],
-              onTap: () => openItem(context, session, eps[i]),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 240,
+            title: Text(series.name),
+            flexibleSpace: FlexibleSpaceBar(
+              background: _Backdrop(item: series),
             ),
-          );
-        },
+          ),
+          FutureBuilder<List<ItemInfo>>(
+            future: session.library!.episodes(seriesKey: series.key),
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return SliverFillRemaining(
+                  child: _Message(l10n.syncFailed('${snap.error}')),
+                );
+              }
+              final eps = snap.data;
+              if (eps == null) {
+                return SliverList.builder(
+                  itemCount: 6,
+                  itemBuilder: (_, _) => const SkeletonRow(),
+                );
+              }
+              if (eps.isEmpty) {
+                return SliverFillRemaining(child: _Message(l10n.episodesEmpty));
+              }
+              return SliverList.builder(
+                itemCount: eps.length,
+                itemBuilder: (context, i) => ItemTile(
+                  item: eps[i],
+                  onTap: () => openItem(context, session, eps[i]),
+                ),
+              );
+            },
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// A series' header (the cinematic look): its poster blurred and darkened across the whole bar, fading into the
+/// page, with the poster itself in front (flown in from its tile: the Hero tag matches ItemCard's).
+class _Backdrop extends StatelessWidget {
+  const _Backdrop({required this.item});
+  final ItemInfo item;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Logo(
+            url: item.logo,
+            size: 160, // decoded small: it is blurred anyway
+            icon: kindIcon(item.kind),
+            fill: true,
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [surface.withValues(alpha: 0.35), surface],
+            ),
+          ),
+        ),
+        Positioned(
+          left: Tokens.space * 2,
+          bottom: Tokens.space * 2,
+          width: 100,
+          height: 150,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Tokens.radius / 2),
+            child: Hero(
+              tag: 'poster:${item.key}',
+              child: Logo(
+                url: item.logo,
+                size: 100,
+                icon: kindIcon(item.kind),
+                fill: true,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

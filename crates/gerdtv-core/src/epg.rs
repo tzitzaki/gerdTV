@@ -225,6 +225,15 @@ pub fn norm(name: &str) -> String {
         .collect()
 }
 
+/// SQL for a source's rank (`col` holds a source id): the provider's guide first, then extra sources in the order
+/// they were added (owner decision: when sources overlap, the provider's data wins). A source without a row (tests)
+/// ranks by its id after every listed one.
+fn rank(col: &str) -> String {
+    format!(
+        "coalesce((SELECT (1 - builtin) * 1000000000 + id FROM epg_sources WHERE id = {col}), 2000000000 + {col})"
+    )
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ImportStats {
     pub channels: usize,
@@ -262,10 +271,15 @@ pub fn import(
     .map_err(io)?;
     tx.execute("DELETE FROM epg_channels WHERE source = ?1", [source])
         .map_err(io)?;
-    // Channels other sources already fill: this source must not add a second schedule for them.
+    // Channels a higher-ranked source already fills: this source must not add a second schedule for them. (A
+    // lower-ranked source's schedule for a channel this one fills is removed after the import, below.)
     let taken: std::collections::HashSet<String> = {
         let mut st = tx
-            .prepare("SELECT DISTINCT channel FROM programmes WHERE source != ?1")
+            .prepare(&format!(
+                "SELECT DISTINCT channel FROM programmes WHERE {} < {}",
+                rank("source"),
+                rank("?1")
+            ))
             .map_err(io)?;
         st.query_map([source], |r| r.get(0))
             .map_err(io)?
@@ -277,8 +291,16 @@ pub fn import(
     let stats = std::cell::RefCell::new(ImportStats::default());
     let failed: std::cell::RefCell<Option<rusqlite::Error>> = std::cell::RefCell::new(None);
     {
+        // A channel id another source has too belongs to the higher-ranked source (a shared display name names both
+        // channels; rebuild_matches picks).
         let mut ch = tx
-            .prepare("INSERT OR IGNORE INTO epg_channels (id, name, icon, source) VALUES (?1, ?2, ?3, ?4)")
+            .prepare(&format!(
+                "INSERT INTO epg_channels (id, name, icon, source) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (id) DO UPDATE SET name = ?2, icon = ?3, source = ?4
+                 WHERE {} < {}",
+                rank("?4"),
+                rank("epg_channels.source")
+            ))
             .map_err(io)?;
         let mut nm = tx
             .prepare("INSERT OR IGNORE INTO epg_names (norm, channel) VALUES (?1, ?2)")
@@ -358,6 +380,22 @@ pub fn import(
     if let Some(e) = failed.into_inner() {
         return Err(io(e)); // rolled back: the previous guide stays
     }
+    // Lower-ranked sources' schedules for the channels this one now fills go (they come back if this one drops them).
+    let lower = format!(
+        "SELECT id FROM programmes WHERE {} > {} AND channel IN (SELECT DISTINCT channel FROM programmes WHERE source = ?1)",
+        rank("source"),
+        rank("?1")
+    );
+    tx.execute(
+        &format!("DELETE FROM programmes_fts WHERE rowid IN ({lower})"),
+        [source],
+    )
+    .map_err(io)?;
+    tx.execute(
+        &format!("DELETE FROM programmes WHERE id IN ({lower})"),
+        [source],
+    )
+    .map_err(io)?;
     tx.commit().map_err(io)?;
     Ok(stats.into_inner())
 }
@@ -372,8 +410,12 @@ pub fn prune(conn: &Connection, now: i64, days_back: i64) -> Result<usize> {
     conn.execute("DELETE FROM programmes WHERE stop < ?1", [before])
 }
 
-/// Rebuilds which guide channel each live item shows (manual mapping, id, id ignoring case, normalised name).
-/// Returns the number of matched items.
+/// Rebuilds which guide channel each live item shows, in this order: the manual mapping; the item's guide id, exactly
+/// and ignoring case; its normalised name against every display name; and finally a "twin" (an item of the same
+/// normalised name, e.g. "ZDF FHD" next to a matched "DE: ZDF HD"). Only guide channels that have programmes count
+/// for the automatic steps, so a provider guide that lists a channel without programmes doesn't hide an extra source
+/// that has them (where both have programmes, the import gave the channel and its names to the provider).
+/// Returns the number of matched items. Debugging: `SELECT * FROM item_epg WHERE item_key = …` shows the result.
 pub fn rebuild_matches(conn: &mut Connection) -> Result<usize> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM item_epg", [])?;
@@ -381,35 +423,71 @@ pub fn rebuild_matches(conn: &mut Connection) -> Result<usize> {
         "INSERT OR IGNORE INTO item_epg (item_key, channel) SELECT item_key, channel FROM epg_map",
         [],
     )?;
+    const FILLED: &str = "EXISTS (SELECT 1 FROM programmes p WHERE p.channel = c.id)";
     tx.execute(
-        "INSERT OR IGNORE INTO item_epg (item_key, channel)
-         SELECT i.key, c.id FROM items i JOIN epg_channels c ON c.id = i.epg_id WHERE i.kind = 0 AND i.epg_id != ''",
+        &format!(
+            "INSERT OR IGNORE INTO item_epg (item_key, channel)
+             SELECT i.key, c.id FROM items i JOIN epg_channels c ON c.id = i.epg_id
+             WHERE i.kind = 0 AND i.epg_id != '' AND {FILLED}"
+        ),
         [],
     )?;
     tx.execute(
-        "INSERT OR IGNORE INTO item_epg (item_key, channel)
-         SELECT i.key, c.id FROM items i JOIN epg_channels c ON lower(c.id) = lower(i.epg_id)
-         WHERE i.kind = 0 AND i.epg_id != ''",
+        &format!(
+            "INSERT OR IGNORE INTO item_epg (item_key, channel)
+             SELECT i.key, c.id FROM items i JOIN epg_channels c ON lower(c.id) = lower(i.epg_id)
+             WHERE i.kind = 0 AND i.epg_id != '' AND {FILLED}"
+        ),
         [],
     )?;
-    // Names: done in Rust (norm() isn't SQL). Only for the items still without a match.
-    let names: HashMap<String, String> = {
-        let mut st = tx.prepare("SELECT norm, channel FROM epg_names")?;
-        st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<_>>()?
-    };
-    let open: Vec<(String, String)> = {
+    // Names: done in Rust (norm() isn't SQL). Only for the items still without a match. A name several sources share
+    // goes to the highest-ranked source's channel (the first row per name wins).
+    let mut names: HashMap<String, String> = HashMap::new();
+    {
+        let mut st = tx.prepare(&format!(
+            "SELECT n.norm, n.channel FROM epg_names n JOIN epg_channels c ON c.id = n.channel WHERE {FILLED}
+             ORDER BY {}, n.channel",
+            rank("c.source")
+        ))?;
+        let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        for row in rows {
+            let (k, ch) = row?;
+            names.entry(k).or_insert(ch);
+        }
+    }
+    let open = |tx: &rusqlite::Transaction| -> Result<Vec<(String, String)>> {
         let mut st = tx.prepare(
             "SELECT key, name FROM items WHERE kind = 0 AND key NOT IN (SELECT item_key FROM item_epg)",
         )?;
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<_>>()?
+            .collect::<rusqlite::Result<_>>()
     };
     {
         let mut ins =
             tx.prepare("INSERT OR IGNORE INTO item_epg (item_key, channel) VALUES (?1, ?2)")?;
-        for (key, name) in open {
+        for (key, name) in open(&tx)? {
             if let Some(ch) = names.get(&norm(&name)) {
+                ins.execute(params![key, ch])?;
+            }
+        }
+        // Twins: the first matched item of each normalised name lends its channel to the unmatched ones.
+        let mut twins: HashMap<String, String> = HashMap::new();
+        {
+            let mut st = tx.prepare(
+                "SELECT i.name, e.channel FROM item_epg e JOIN items i ON i.key = e.item_key ORDER BY i.position",
+            )?;
+            let rows =
+                st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+            for row in rows {
+                let (name, ch) = row?;
+                let k = norm(&name);
+                if !k.is_empty() {
+                    twins.entry(k).or_insert(ch);
+                }
+            }
+        }
+        for (key, name) in open(&tx)? {
+            if let Some(ch) = twins.get(&norm(&name)) {
                 ins.execute(params![key, ch])?;
             }
         }
@@ -687,8 +765,9 @@ mod tests {
         let now = 1_763_742_000; // 17:20 local: Tagesschau runs
         let stats = import(&mut c, 1, DOC.as_bytes(), now, 2, 7, 0).unwrap();
         assert_eq!((stats.channels, stats.programmes), (2, 2));
-        // Matching: exact id, id ignoring case, normalised display name ("ARD" ← "DE: ARD HD"); not "Unknown".
-        assert_eq!(rebuild_matches(&mut c).unwrap(), 3);
+        // Matching: exact id, normalised display name ("ARD" ← "DE: ARD HD"); not "Unknown", and not Arte: its guide
+        // channel has no programmes (an extra source may fill it).
+        assert_eq!(rebuild_matches(&mut c).unwrap(), 2);
         let keys: Vec<String> = ["live:1", "live:2", "live:3", "live:4"]
             .iter()
             .map(|s| s.to_string())
@@ -728,11 +807,18 @@ mod tests {
         // Manual mapping wins and survives a rebuild; unmatched lists the rest.
         assert_eq!(
             unmatched(&c, 10, 0).unwrap(),
-            [("live:4".to_string(), "Unknown Channel".to_string())]
+            [
+                ("live:2".to_string(), "Arte".to_string()),
+                ("live:4".to_string(), "Unknown Channel".to_string())
+            ]
         );
         assert_eq!(find_channels(&c, "Erste", 5).unwrap()[0].0, "ard.de");
         map_channel(&mut c, "live:4", Some("ard.de"), now).unwrap();
-        assert!(unmatched(&c, 10, 0).unwrap().is_empty());
+        map_channel(&mut c, "live:2", Some("Arte.FR"), now).unwrap();
+        assert!(
+            unmatched(&c, 10, 0).unwrap().is_empty(),
+            "a manual mapping counts, programmes or not"
+        );
         assert!(now_next(&c, &keys[3..], now).unwrap()[0].0.is_some());
     }
 
@@ -762,6 +848,72 @@ mod tests {
             .unwrap();
         assert_eq!(start, 1_763_740_800 + 3600);
         assert_eq!(prune(&c, now + 10 * 86_400, 2).unwrap(), 2);
+    }
+
+    #[test]
+    fn overlapping_sources_give_the_provider_its_channels_and_twins_borrow_a_match() {
+        // Source 1 is the provider's guide, 2 an extra file (both listed, so they rank provider first).
+        let mut c = crate::db::open(Path::new(":memory:")).unwrap();
+        c.execute_batch(
+            "INSERT INTO epg_sources (id, url, builtin, updated_at) VALUES (1, 'builtin', 1, 0), (2, 'x', 0, 0)",
+        )
+        .unwrap();
+        let pl = "#EXTM3U\n\
+            #EXTINF:-1 tvg-id=\"zdf\",DE: ZDF HD\nhttp://h/live/u/p/1.ts\n\
+            #EXTINF:-1,ZDF FHD\nhttp://h/live/u/p/2.ts\n\
+            #EXTINF:-1 tvg-id=\"kika\",KiKA\nhttp://h/live/u/p/3.ts\n\
+            #EXTINF:-1,|DE| 3sat\nhttp://h/live/u/p/4.ts\n";
+        crate::db::import_m3u(&mut c, pl.as_bytes(), &[]).unwrap();
+        let now = 1_763_742_000;
+        let prog = |ch: &str, title: &str| {
+            format!(
+                r#"<programme start="20251121170000 +0100" stop="20251121180000 +0100" channel="{ch}"><title>{title}</title></programme>"#
+            )
+        };
+        // The provider lists ZDF with a schedule, KiKA and 3sat without one; the extra file has all three.
+        let provider = format!(
+            r#"<tv><channel id="zdf"><display-name>ZDF</display-name></channel>
+               <channel id="kika"><display-name>KiKA</display-name></channel>
+               <channel id="3sat.p"><display-name>3sat</display-name></channel>{}</tv>"#,
+            prog("zdf", "Provider news")
+        );
+        let extra = format!(
+            r#"<tv><channel id="zdf"><display-name>ZDF</display-name></channel>
+               <channel id="kika"><display-name>KiKA</display-name></channel>
+               <channel id="3sat.x"><display-name>3sat</display-name></channel>{}{}{}</tv>"#,
+            prog("zdf", "Extra news"),
+            prog("kika", "Extra cartoons"),
+            prog("3sat.x", "Extra culture")
+        );
+        // Twice in refresh order (provider first), as two refreshes would: the second must not flip anything.
+        for _ in 0..2 {
+            import(&mut c, 1, provider.as_bytes(), now, 2, 7, 0).unwrap();
+            import(&mut c, 2, extra.as_bytes(), now, 2, 7, 0).unwrap();
+            rebuild_matches(&mut c).unwrap();
+            let keys: Vec<String> = (1..=4).map(|i| format!("live:{i}")).collect();
+            let titles: Vec<Option<String>> = now_next(&c, &keys, now)
+                .unwrap()
+                .into_iter()
+                .map(|(n, _)| n.map(|p| p.title))
+                .collect();
+            assert_eq!(
+                titles,
+                [
+                    Some("Provider news".into()),  // both have it: the provider's schedule
+                    Some("Provider news".into()), // a twin of "DE: ZDF HD" (no guide id, name "ZDF")
+                    Some("Extra cartoons".into()), // the provider lists KiKA without programmes
+                    Some("Extra culture".into()), // "|DE| 3sat": the provider's 3sat is empty, the extra's isn't
+                ]
+            );
+            let n: i64 = c
+                .query_row(
+                    "SELECT count(*) FROM programmes WHERE channel = 'zdf'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "one schedule per channel");
+        }
     }
 
     #[test]

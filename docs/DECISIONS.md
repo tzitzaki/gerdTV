@@ -6,7 +6,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Stack: Flutter stable (pinned in `app/FLUTTER_VERSION`) + media_kit (libmpv everywhere) + a Rust core through flutter_rust_bridge v2.
 - Standalone apps now, a home hub later: every device runs the full core; user data uses stable content keys and `updated_at` so a hub can sync it later.
 - Crates: `gerdtv-core` (all logic), `gerdtv-api` (bridge surface only; package `gerdtv_api` because Cargokit names the native library after it), `gerdtv-testkit`, `gerdtv-release`.
-- Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform, pinned to exact versions; the pub.dev forks are abandoned and the newer mpv_kit is too young to adopt.
+- Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform, pinned to exact versions; media_kit_video 2.0.1 vendored in `third_party/` and patched (Apple: libmpv looked up at run time), not forked on GitHub.
 - Playback ends only by Stop or by starting another stream; leaving the player keeps it running (now-playing bar, floating mini player, background playback).
 - Floating/background playback: desktop floating always-on-top window, Android system Picture-in-Picture with a foreground service, iPhone/iPad hand-over to AVPlayer Picture-in-Picture (live as .m3u8; .mkv falls back to sound only).
 - Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).
@@ -14,7 +14,11 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
-- Favourites: a Favourites group on top of each section's groups, in provider order; toggled by a star on every row and tile, a long press, or a long OK.
+- Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
+- Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
+- Swipe on phones: from the left edge back, sideways between sections (not on the Guide), and in the player media_kit's seek and volume swipes (the player's volume; switchable).
+- Theme: dark by default, or light or the system's; orange by default among eight accent presets; neutral surfaces by default (tinted on request); pure black on request; app-wide.
+- Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
@@ -26,7 +30,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
-- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Your data), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n) and material_ui (Material moved out of the SDK).
+- Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n), material_ui (Material moved out of the SDK) and cupertino_ui (its Cupertino counterpart, pulled in by material_ui; used for the phones' swipe-back slide).
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
 - Benchmarks compare A/B in one run (origin/main's core, then the branch's), not against a stored baseline.
 - Own libmpv: one self-contained library per platform (mpv + FFmpeg + libplacebo, LGPL), built by our scripts in CI, named libgerdmpv; media_kit's engine stays the default until ours passes the harness, the journeys and the owner's device checks.
@@ -35,7 +39,8 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Native code only as small, commented Swift/Kotlin platform channels; no third-party native libraries.
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
-- Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile.
+- Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
+- Missing guide data: twins (same name, other quality) borrow a match; community guide presets from epgshare01 (a third party; files may go away).
 - Secrets (provider credentials, TMDB key, PIN) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
@@ -46,6 +51,6 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Releases: one per wrap-up from `release.yml`; macOS signed with a stable self-signed certificate; Android with the release keystore; an unsigned iOS IPA; a signed `latest.json` for the in-app updater.
 - No automated installs on the owner's devices; the owner installs every first copy.
 - The logo is drawn in code, the user picks it in Settings, and the pick switches the launcher icon on Android and iOS and the Dock or window icon on macOS and Linux.
-- Screen changes fade in 150 ms on every platform instead of the platforms' 300–500 ms slides.
+- Look: cinematic (edge-to-edge posters, a blurred backdrop for series, tiles lift on focus, skeleton loading, pictures fade in); motion about 220 ms: wide windows fade with a slight zoom, phones slide with swipe-back, none with reduced motion.
 - Android has no cleartext network config: nothing in the app uses Android's HTTP stack (libmpv and the core bring their own).
 - UI strings in English and German via gen-l10n; the UI follows the system language; the name is spelled "gerdTV" everywhere visible.

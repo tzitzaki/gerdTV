@@ -42,6 +42,98 @@ IconData listModeIcon(ListMode m) => switch (m) {
   ListMode.largeTiles => Icons.view_module,
 };
 
+/// The order of a list (owner decision): provider order (the default), by name both ways, channel number (live),
+/// year, recently added and rating (movies and series; added and rating only Xtream Codes sends). Chosen with the
+/// list's sort button, remembered per section for its groups and its items (profile settings
+/// `sort_<kind>_groups` / `sort_<kind>_items`; the core maps the value to a fixed ORDER BY, `db::Sort`).
+/// Favourites, zapping and the guide's channels follow the items' order.
+enum ListSort {
+  provider('provider'),
+  nameAsc('name_asc'),
+  nameDesc('name_desc'),
+  number('number'),
+  yearDesc('year_desc'),
+  yearAsc('year_asc'),
+  added('added'),
+  rating('rating');
+
+  const ListSort(this.value);
+
+  /// The setting's value, as the core parses it.
+  final String value;
+}
+
+String sortSetting(ItemKind kind, {required bool groups}) =>
+    'sort_${kind.name}_${groups ? 'groups' : 'items'}';
+
+ListSort parseSort(String? v) => ListSort.values.firstWhere(
+  (s) => s.value == v,
+  orElse: () => ListSort.provider,
+);
+
+/// The orders that make sense for a list: groups only by name; numbers only for channels; years, dates and ratings
+/// only for movies and series, dates and ratings only where the source sends them (Xtream Codes).
+List<ListSort> sortOptions(
+  ItemKind kind, {
+  required bool groups,
+  required bool xtream,
+}) => [
+  ListSort.provider,
+  ListSort.nameAsc,
+  ListSort.nameDesc,
+  if (!groups && kind == ItemKind.live) ListSort.number,
+  if (!groups && kind != ItemKind.live) ...[
+    ListSort.yearDesc,
+    ListSort.yearAsc,
+    if (xtream) ...[ListSort.added, ListSort.rating],
+  ],
+];
+
+String sortLabel(AppLocalizations l10n, ListSort s) => switch (s) {
+  ListSort.provider => l10n.sortProvider,
+  ListSort.nameAsc => l10n.sortNameAsc,
+  ListSort.nameDesc => l10n.sortNameDesc,
+  ListSort.number => l10n.sortNumber,
+  ListSort.yearDesc => l10n.sortYearDesc,
+  ListSort.yearAsc => l10n.sortYearAsc,
+  ListSort.added => l10n.sortAdded,
+  ListSort.rating => l10n.sortRating,
+};
+
+/// The sort button of a list's top bar: a menu of [options] with the current one checked.
+class SortButton extends StatelessWidget {
+  const SortButton({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+  });
+  final ListSort value;
+  final List<ListSort> options;
+  final ValueChanged<ListSort> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return PopupMenuButton<ListSort>(
+      key: const Key('list.sort'),
+      tooltip: l10n.sortTooltip,
+      icon: const Icon(Icons.sort),
+      initialValue: value,
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        for (final s in options)
+          CheckedPopupMenuItem(
+            key: Key('sort.${s.value}'),
+            value: s,
+            checked: s == value,
+            child: Text(sortLabel(l10n, s)),
+          ),
+      ],
+    );
+  }
+}
+
 IconData kindIcon(ItemKind k) => switch (k) {
   ItemKind.live => Icons.live_tv,
   ItemKind.movie => Icons.movie_outlined,
@@ -95,10 +187,9 @@ class ItemsView extends StatelessWidget {
     final count = items.length + (loading ? 1 : 0);
     Widget cell(BuildContext context, int i) {
       if (i == items.length) {
-        return const Padding(
-          padding: EdgeInsets.all(Tokens.space * 2),
-          child: Center(child: CircularProgressIndicator()),
-        );
+        return mode == ListMode.compact || mode == ListMode.list
+            ? const SkeletonRow()
+            : const Skeleton();
       }
       final it = items[i];
       final nn = nowNext[it.key];
@@ -137,11 +228,11 @@ class ItemsView extends StatelessWidget {
         sliver: SliverGrid.builder(
           gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: mode == ListMode.largeTiles ? 240 : 160,
-            // Posters are portrait (2:3); channel logos sit in a squarer tile with the name below. Search results
-            // add a line for the group.
+            // Posters are portrait (2:3) with their texts on the picture; channel logos sit in a squarer tile
+            // with the name below. Search results add a line for the group.
             childAspectRatio:
                 (items.isNotEmpty && items.first.kind != ItemKind.live
-                    ? 2 / 3.6
+                    ? 2 / 3
                     : 1 / 1.15) *
                 (highlight == null ? 1 : 0.9),
             crossAxisSpacing: Tokens.space,
@@ -347,7 +438,7 @@ class _LongOkState extends State<LongOk> {
 }
 
 /// A tile: the logo or poster, the name, and for live channels what is on now.
-class ItemCard extends StatelessWidget {
+class ItemCard extends StatefulWidget {
   const ItemCard({
     super.key,
     required this.item,
@@ -369,72 +460,249 @@ class ItemCard extends StatelessWidget {
   final String? highlight;
 
   @override
+  State<ItemCard> createState() => _ItemCardState();
+}
+
+/// A tile (owner decision: the cinematic look): movies and series as edge-to-edge posters with the name on a dark
+/// gradient at the bottom; channels as their logo on a plate with the name below. A focused (D-pad, Tab) or hovered
+/// tile lifts: 5 % larger with a shadow (none with reduced motion, where it only gets the focus colour).
+class _ItemCardState extends State<ItemCard> {
+  bool _lifted = false;
+
+  void _lift(bool on) {
+    if (on != _lifted) setState(() => _lifted = on);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final current = nowNext?.now;
-    return Card(
-      key: Key('item.${item.key}'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onFavourite,
-        child: Padding(
-          padding: const EdgeInsets.all(Tokens.space),
-          child: Column(
-            children: [
-              Expanded(
+    final item = widget.item;
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final current = widget.nowNext?.now;
+    final poster = item.kind != ItemKind.live;
+    final still = MediaQuery.disableAnimationsOf(context);
+    final star = widget.onFavourite == null
+        ? null
+        : Positioned(
+            top: 0,
+            right: 0,
+            child: FavouriteStar(
+              item: item,
+              on: widget.favourite,
+              onPressed: widget.onFavourite!,
+            ),
+          );
+    // On a poster the texts are white on the gradient (any picture, either theme); elsewhere the theme's.
+    List<Widget> lines({Color? fg, Color? soft}) => [
+      Text.rich(
+        highlightSpan(item.name, widget.highlight ?? '', null),
+        maxLines: widget.large || poster ? 2 : 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: (widget.large ? text.titleSmall : text.bodyMedium)?.copyWith(
+          color: fg,
+        ),
+      ),
+      if (widget.highlight != null && item.group.isNotEmpty)
+        Text(
+          item.group,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: text.bodySmall?.copyWith(color: soft),
+        ),
+      if (current != null)
+        Text(
+          current.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: text.bodySmall?.copyWith(color: soft),
+        ),
+    ];
+    final Widget content;
+    if (poster) {
+      // The poster fills the tile; the texts sit on a gradient so they read on any picture (white on black).
+      content = Stack(
+        children: [
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, c) => Hero(
+                tag: 'poster:${item.key}',
+                child: Logo(
+                  url: item.logo,
+                  size: c.maxWidth,
+                  icon: kindIcon(item.kind),
+                  fill: true,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0xE6000000)],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.space,
+                  Tokens.space * 3,
+                  Tokens.space,
+                  Tokens.space,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: lines(fg: Colors.white, soft: Colors.white70),
+                ),
+              ),
+            ),
+          ),
+          ?star,
+        ],
+      );
+    } else {
+      content = Padding(
+        padding: const EdgeInsets.all(Tokens.space),
+        child: Column(
+          children: [
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(Tokens.radius / 2),
+                ),
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: LayoutBuilder(
-                        builder: (context, c) => Logo(
-                          url: item.logo,
-                          size: c.biggest.shortestSide,
-                          icon: kindIcon(item.kind),
+                      child: Padding(
+                        padding: const EdgeInsets.all(Tokens.space),
+                        child: LayoutBuilder(
+                          builder: (context, c) => Center(
+                            child: Logo(
+                              url: item.logo,
+                              size: c.biggest.shortestSide,
+                              icon: kindIcon(item.kind),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    if (onFavourite != null)
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: FavouriteStar(
-                          item: item,
-                          on: favourite,
-                          onPressed: onFavourite!,
-                        ),
-                      ),
+                    ?star,
                   ],
                 ),
               ),
-              const SizedBox(height: Tokens.space),
-              Text.rich(
-                highlightSpan(item.name, highlight ?? '', null),
-                maxLines: large ? 2 : 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: large ? text.titleSmall : text.bodyMedium,
-              ),
-              if (highlight != null && item.group.isNotEmpty)
-                Text(
-                  item.group,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: text.bodySmall,
-                ),
-              if (current != null)
-                Text(
-                  current.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: text.bodySmall,
-                ),
-            ],
-          ),
+            ),
+            const SizedBox(height: Tokens.space),
+            ...lines(),
+          ],
+        ),
+      );
+    }
+    return AnimatedScale(
+      scale: _lifted && !still ? 1.05 : 1,
+      duration: still ? Duration.zero : Tokens.motion,
+      curve: Curves.easeOutCubic,
+      child: Card(
+        key: Key('item.${item.key}'),
+        clipBehavior: Clip.antiAlias,
+        elevation: _lifted ? 8 : 1,
+        child: InkWell(
+          onTap: widget.onTap,
+          onLongPress: widget.onFavourite,
+          onFocusChange: _lift,
+          onHover: _lift,
+          child: content,
         ),
       ),
     );
   }
+}
+
+/// A placeholder while something loads (docs/DESIGN.md: loading uses skeletons, not spinners): a rounded block in
+/// the surface colour that slowly pulses; it stands still with reduced motion.
+class Skeleton extends StatefulWidget {
+  const Skeleton({super.key, this.width, this.height});
+  final double? width;
+  final double? height;
+
+  @override
+  State<Skeleton> createState() => _SkeletonState();
+}
+
+class _SkeletonState extends State<Skeleton>
+    with SingleTickerProviderStateMixin {
+  late final _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+    lowerBound: 0.45,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulse.value = 1;
+      _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _pulse,
+    child: Container(
+      width: widget.width,
+      height: widget.height,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(Tokens.radius / 2),
+      ),
+    ),
+  );
+}
+
+/// A list row's skeleton: the logo's square and two text lines.
+class SkeletonRow extends StatelessWidget {
+  const SkeletonRow({super.key});
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.symmetric(
+      horizontal: Tokens.space * 2,
+      vertical: Tokens.space,
+    ),
+    child: Row(
+      children: [
+        Skeleton(width: 48, height: 48),
+        SizedBox(width: Tokens.space * 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Skeleton(height: 14),
+              SizedBox(height: Tokens.space),
+              FractionallySizedBox(
+                widthFactor: 0.6,
+                child: Skeleton(height: 12),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

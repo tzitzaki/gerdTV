@@ -82,8 +82,38 @@ jobs:
           just ci-linux ${{ steps.scope.outputs.rust }} ${{ steps.scope.outputs.flutter }}
           ${{ steps.scope.outputs.linux }} ${{ steps.scope.outputs.rules }}
 
+  # gerdTV's own libmpv for macOS and iOS (scripts/build-libmpv-apple.sh), rebuilt only when the script changes, and
+  # played once natively before it is cached. Also on pushes to main, so release tags can restore it.
+  libmpv-apple:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: scope
+        run: scripts/ci-scope.sh "${{ github.event.pull_request.base.sha }}"
+      - if: steps.scope.outputs.macos == 'true'
+        id: libmpv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-apple/GerdMpv.xcframework
+            build/libmpv-apple/libgerdmpv-apple.txt
+          key: libmpv-apple-${{ hashFiles('scripts/build-libmpv-apple.sh') }}
+      - if: steps.scope.outputs.macos == 'true' && steps.libmpv.outputs.cache-hit != 'true'
+        run: |
+          brew install meson ninja pkgconf
+          scripts/build-libmpv-apple.sh build/libmpv-apple
+          # The macOS slice plays the testkit's clip (scripts/libmpv-smoke.c).
+          fw=build/libmpv-apple/GerdMpv.xcframework/macos-arm64_x86_64
+          clang -Ibuild/libmpv-apple/work-macos-arm64/mpv/include scripts/libmpv-smoke.c -F "$fw" -framework GerdMpv \
+            -Wl,-rpath,"$PWD/$fw" -o "$RUNNER_TEMP/smoke"
+          "$RUNNER_TEMP/smoke" crates/gerdtv-testkit/media/clip.ts
+
   macos:
     if: github.event_name != 'push'
+    needs: libmpv-apple
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -92,6 +122,15 @@ jobs:
           fetch-depth: 0
       - id: scope
         run: scripts/ci-scope.sh "${{ github.event.pull_request.base.sha }}"
+      # The libmpv-apple job's build: the app embeds it (scripts/embed-libmpv-apple.sh).
+      - if: steps.scope.outputs.macos == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-apple/GerdMpv.xcframework
+            build/libmpv-apple/libgerdmpv-apple.txt
+          key: libmpv-apple-${{ hashFiles('scripts/build-libmpv-apple.sh') }}
+          fail-on-cache-miss: true
       - if: steps.scope.outputs.macos == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -143,6 +182,22 @@ jobs:
           restore-keys: android-
       - if: steps.scope.outputs.android == 'true'
         run: sudo apt-get install -y -q just
+      # gerdTV's own libmpv for Android (scripts/build-libmpv-android.sh), rebuilt only when its scripts change.
+      - if: steps.scope.outputs.android == 'true'
+        id: libmpv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-android/*/libgerdmpv.so
+            build/libmpv-android/libgerdmpv-android.txt
+          key: libmpv-android-${{ hashFiles('scripts/build-libmpv-android.sh', 'scripts/build-libmpv-android-container.sh') }}
+      - if: steps.scope.outputs.android == 'true' && steps.libmpv.outputs.cache-hit != 'true'
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" scripts/build-libmpv-android-container.sh build/libmpv-android
+      # A new build plays the synthetic clip on an x86_64 emulator before it is cached (scripts/test-libmpv-android.sh).
+      - if: steps.scope.outputs.android == 'true' && steps.libmpv.outputs.cache-hit != 'true'
+        run: |
+          scripts/ci-android-emulator.sh
+          ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" scripts/test-libmpv-android.sh
       - if: steps.scope.outputs.android == 'true'
         run: scripts/ci-install-flutter.sh
       - if: steps.scope.outputs.android == 'true'
@@ -168,6 +223,17 @@ jobs:
           lookup-only: true
       - if: steps.libmpv.outputs.cache-hit != 'true'
         run: scripts/build-libmpv-container.sh build/libmpv
+      # The Android one (same paths and key as the android job's), for release builds and new branches.
+      - id: libmpv-android
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-android/*/libgerdmpv.so
+            build/libmpv-android/libgerdmpv-android.txt
+          key: libmpv-android-${{ hashFiles('scripts/build-libmpv-android.sh', 'scripts/build-libmpv-android-container.sh') }}
+          lookup-only: true
+      - if: steps.libmpv-android.outputs.cache-hit != 'true'
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" scripts/build-libmpv-android-container.sh build/libmpv-android
       - id: linux
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

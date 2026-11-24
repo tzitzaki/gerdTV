@@ -1,7 +1,7 @@
 //! Bridge surface for profiles and the library (logic: gerdtv_core::library). Errors cross as messages that are
 //! already free of credentials (gerdtv_core redacts at the source).
 
-use gerdtv_core::db::Kind as CoreKind;
+use gerdtv_core::db::{Kind as CoreKind, Sort};
 use gerdtv_core::library as core;
 use std::path::PathBuf;
 
@@ -316,10 +316,11 @@ impl Library {
         })
     }
 
-    pub fn categories(&self, kind: ItemKind) -> Result<Vec<CategoryInfo>, String> {
+    /// `sort`: the list's sort setting ("name_asc", "name_desc"; anything else is provider order).
+    pub fn categories(&self, kind: ItemKind, sort: String) -> Result<Vec<CategoryInfo>, String> {
         Ok(self
             .0
-            .categories(to_core(kind))
+            .categories(to_core(kind), Sort::parse(&sort))
             .map_err(err)?
             .into_iter()
             .map(|c| CategoryInfo {
@@ -334,12 +335,19 @@ impl Library {
         &self,
         kind: ItemKind,
         category: String,
+        sort: String,
         limit: u32,
         offset: u32,
     ) -> Result<Vec<ItemInfo>, String> {
         Ok(self
             .0
-            .items(to_core(kind), &category, limit as usize, offset as usize)
+            .items(
+                to_core(kind),
+                &category,
+                Sort::parse(&sort),
+                limit as usize,
+                offset as usize,
+            )
             .map_err(err)?
             .into_iter()
             .map(Into::into)
@@ -413,12 +421,12 @@ impl Library {
         self.0.set_favourite(&key, favourite).map_err(err)
     }
 
-    /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
-    pub fn favourites(&self, kinds: Vec<ItemKind>) -> Result<Vec<ItemInfo>, String> {
+    /// A section's favourites (`kinds`; empty = all) in the section's item `sort`: the Favourites group.
+    pub fn favourites(&self, kinds: Vec<ItemKind>, sort: String) -> Result<Vec<ItemInfo>, String> {
         let kinds: Vec<_> = kinds.into_iter().map(to_core).collect();
         Ok(self
             .0
-            .favourites(&kinds)
+            .favourites(&kinds, Sort::parse(&sort))
             .map_err(err)?
             .into_iter()
             .map(Into::into)
@@ -467,7 +475,7 @@ impl Library {
     pub fn all_groups(&self, kind: ItemKind) -> Result<Vec<GroupVisibility>, String> {
         Ok(self
             .0
-            .all_categories(to_core(kind))
+            .all_categories(to_core(kind), Sort::Provider)
             .map_err(err)?
             .into_iter()
             .map(|(c, hidden)| GroupVisibility {
@@ -522,7 +530,7 @@ impl Library {
             .map_err(err)
     }
 
-    /// The newest stream_health rows (Settings → Stream health).
+    /// The newest stream_health rows (Settings → Playback → Stream health).
     pub fn health(&self, limit: u32) -> Result<Vec<HealthInfo>, String> {
         Ok(self
             .0

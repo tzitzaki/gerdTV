@@ -8,11 +8,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'l10n/gen/app_localizations.dart';
 import 'licences.dart';
+import 'platform/engine.dart';
 import 'platform/sandbox_migration.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
@@ -42,8 +42,9 @@ Future<void> main() async {
     );
     if (copied > 0) debugPrint('sandbox-migration: copied $copied files');
   }
-  // The player engine (Settings → Playback) was applied before this process loaded anything: linux/runner/main.cc.
-  MediaKit.ensureInitialized();
+  // The player engine (Settings → Playback): on Linux applied before this process loaded anything
+  // (linux/runner/main.cc), on Android here (engine.dart).
+  startEngine((await getApplicationSupportDirectory()).path);
   final session = Session();
   // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
   session.reminders = Reminders(
@@ -69,6 +70,14 @@ class GerdTvApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The look the user picked (Settings → Appearance → Theme) applies at once.
+    return ValueListenableBuilder<ThemePrefs>(
+      valueListenable: session.theme,
+      builder: (context, prefs, _) => _app(prefs),
+    );
+  }
+
+  Widget _app(ThemePrefs prefs) {
     return MaterialApp(
       navigatorKey: session.navigatorKey,
       // The now-playing bar below every screen (playback continues until Stop or another stream), and one focus
@@ -91,9 +100,9 @@ class GerdTvApp extends StatelessWidget {
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: gerdTheme(Brightness.light),
-      darkTheme: gerdTheme(Brightness.dark),
-      themeMode: ThemeMode.dark,
+      theme: gerdTheme(Brightness.light, prefs),
+      darkTheme: gerdTheme(Brightness.dark, prefs),
+      themeMode: prefs.mode,
       home: ListenableBuilder(
         listenable: session,
         builder: (context, _) => switch (session.state) {

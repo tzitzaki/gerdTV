@@ -1,7 +1,8 @@
 // The app shell (docs/DESIGN.md): a sidebar on wide windows (desktop, tablet), a bottom bar on phones. Sections:
 // Live TV, Guide, Movies, Series, Settings; the first four have their own search on top (section_search.dart), whose
 // query the shell keeps while another section is shown. While a sync runs, a thin bar shows at the top; a failed sync
-// says so with a retry, over the cached catalogue.
+// says so with a retry, over the cached catalogue. On phones a horizontal fling switches to the neighbouring section
+// (not on the Guide, whose grid scrolls sideways).
 
 import 'package:material_ui/material_ui.dart';
 
@@ -127,7 +128,20 @@ class _ShellState extends State<Shell> {
             return const SizedBox(height: 2);
           },
         ),
-        Expanded(child: page),
+        // A new section fades in (only the new one is built: the old one is gone at once, so finders and focus never
+        // see two sections).
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            key: ValueKey(_index),
+            tween: Tween(begin: 0, end: 1),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : Tokens.motion,
+            curve: Curves.easeOut,
+            builder: (context, t, child) => Opacity(opacity: t, child: child),
+            child: page,
+          ),
+        ),
       ],
     );
     // Typing in a section searches it; `/` and Ctrl/Cmd+F focus its field (in Settings: the settings search).
@@ -172,8 +186,21 @@ class _ShellState extends State<Shell> {
                 ),
               );
             }
+            // Phones: a horizontal fling moves to the neighbouring section (owner decision), except on the Guide,
+            // where a horizontal drag scrolls time.
             return Scaffold(
-              body: SafeArea(child: body),
+              body: SafeArea(
+                child: SectionSwipe(
+                  enabled: _index != 1,
+                  onPrevious: _index > 0
+                      ? () => setState(() => _index--)
+                      : null,
+                  onNext: _index < destinations.length - 1
+                      ? () => setState(() => _index++)
+                      : null,
+                  child: body,
+                ),
+              ),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _index,
                 onDestinationSelected: (i) => setState(() => _index = i),
@@ -186,6 +213,40 @@ class _ShellState extends State<Shell> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// A horizontal fling over [child] calls [onNext] (fling left) or [onPrevious] (fling right). Slow drags do nothing,
+/// and horizontal lists inside (continue watching) keep their own drags: the gesture arena gives them to the
+/// innermost scrollable first. Debugging: a swipe that does nothing usually lost the arena to such a list.
+class SectionSwipe extends StatelessWidget {
+  const SectionSwipe({
+    super.key,
+    required this.child,
+    this.enabled = true,
+    this.onPrevious,
+    this.onNext,
+  });
+  final Widget child;
+  final bool enabled;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  /// How fast a fling must be (logical px per second) to count.
+  static const minVelocity = 600.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (v <= -minVelocity) onNext?.call();
+        if (v >= minVelocity) onPrevious?.call();
+      },
+      child: child,
     );
   }
 }

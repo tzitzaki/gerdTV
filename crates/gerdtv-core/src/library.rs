@@ -10,7 +10,7 @@
 //! log for "list came back empty"; a profile missing from the list: profiles.json is rewritten atomically
 //! (write to .tmp, rename), so a crash mid-save leaves the previous file.
 
-use crate::db::{self, Hit, ImportStats, Kind};
+use crate::db::{self, Hit, ImportStats, Kind, Sort};
 use crate::epg;
 use crate::xtream::{self, Account, XcError, Xtream};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -318,10 +318,11 @@ impl Library {
         }
     }
 
-    /// Categories of a kind in provider order, with their item counts (empty ones and the ones the user hid left out).
-    pub fn categories(&self, kind: Kind) -> Result<Vec<Category>> {
+    /// Categories of a kind in `sort` order (provider order or by name), with their item counts (empty ones and the
+    /// ones the user hid left out).
+    pub fn categories(&self, kind: Kind, sort: Sort) -> Result<Vec<Category>> {
         Ok(self
-            .all_categories(kind)?
+            .all_categories(kind, sort)?
             .into_iter()
             .filter(|(_, hidden)| !hidden)
             .map(|(c, _)| c)
@@ -329,15 +330,16 @@ impl Library {
     }
 
     /// Every non-empty category of a kind with whether the user hid it (Settings → Hidden groups).
-    pub fn all_categories(&self, kind: Kind) -> Result<Vec<(Category, bool)>> {
+    pub fn all_categories(&self, kind: Kind, sort: Sort) -> Result<Vec<(Category, bool)>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare_cached(
+        let mut stmt = conn.prepare_cached(&format!(
             "SELECT c.id, c.name, count(i.key),
                     EXISTS (SELECT 1 FROM hidden_groups h WHERE h.kind = c.kind AND h.category = c.id)
              FROM categories c
              JOIN items i ON i.kind = c.kind AND i.category = c.id
-             WHERE c.kind = ?1 GROUP BY c.id ORDER BY c.position",
-        )?;
+             WHERE c.kind = ?1 GROUP BY c.id ORDER BY {}",
+            sort.groups_sql()
+        ))?;
         let rows = stmt.query_map([kind as i64], |r| {
             Ok((
                 Category {
@@ -385,19 +387,21 @@ impl Library {
             .optional()?)
     }
 
-    /// One page of a category's items in provider order.
+    /// One page of a category's items in `sort` order (provider order by default).
     pub fn items(
         &self,
         kind: Kind,
         category: &str,
+        sort: Sort,
         limit: usize,
         offset: usize,
     ) -> Result<Vec<Hit>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare_cached(
+        let mut stmt = conn.prepare_cached(&format!(
             "SELECT key, kind, name, category, logo, number, archive_days FROM items
-             WHERE kind = ?1 AND category = ?2 ORDER BY position LIMIT ?3 OFFSET ?4",
-        )?;
+             WHERE kind = ?1 AND category = ?2 ORDER BY {} LIMIT ?3 OFFSET ?4",
+            sort.items_sql("")
+        ))?;
         let rows = stmt.query_map(
             params![kind as i64, category, limit as i64, offset as i64],
             |r| {
@@ -453,8 +457,8 @@ impl Library {
         Ok(db::set_favourite(&self.conn.lock().unwrap(), key, on)?)
     }
 
-    pub fn favourites(&self, kinds: &[Kind]) -> Result<Vec<Hit>> {
-        Ok(db::favourites(&self.conn.lock().unwrap(), kinds)?)
+    pub fn favourites(&self, kinds: &[Kind], sort: Sort) -> Result<Vec<Hit>> {
+        Ok(db::favourites(&self.conn.lock().unwrap(), kinds, sort)?)
     }
 
     pub fn save_progress(&self, key: &str, position: u32, duration: u32) -> Result<()> {
@@ -916,7 +920,7 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The profile's user data as JSON (Settings → Your data; crate::userdata).
+    /// The profile's user data as JSON (Settings → Account → Your data; crate::userdata).
     pub fn export_user_data(&self) -> Result<String> {
         Ok(crate::userdata::export(&self.conn.lock().unwrap())?)
     }
@@ -1128,9 +1132,11 @@ mod tests {
         let r = lib.sync().await.unwrap();
         assert_eq!(r.account.unwrap().max_connections, 2);
 
-        let cats = lib.categories(Kind::Live).unwrap();
+        let cats = lib.categories(Kind::Live, Sort::Provider).unwrap();
         assert!(!cats.is_empty() && cats.iter().all(|c| c.count > 0));
-        let page = lib.items(Kind::Live, &cats[0].id, 5, 0).unwrap();
+        let page = lib
+            .items(Kind::Live, &cats[0].id, Sort::Provider, 5, 0)
+            .unwrap();
         assert_eq!(page.len(), 5.min(cats[0].count));
         let (hits, counts, _) = lib.search("munchen", &[], None, 10, 0).unwrap();
         assert!(!hits.is_empty() && !counts.is_empty());
@@ -1196,7 +1202,7 @@ mod tests {
         );
         assert!(lib.guide_age().unwrap().unwrap() < 60);
         let live: Vec<String> = lib
-            .items(Kind::Live, &cats[0].id, 50, 0)
+            .items(Kind::Live, &cats[0].id, Sort::Provider, 50, 0)
             .unwrap()
             .into_iter()
             .map(|h| h.key)
@@ -1239,7 +1245,10 @@ mod tests {
         let t = now();
         let all_live: Vec<Hit> = cats
             .iter()
-            .flat_map(|c| lib.items(Kind::Live, &c.id, 500, 0).unwrap())
+            .flat_map(|c| {
+                lib.items(Kind::Live, &c.id, Sort::Provider, 500, 0)
+                    .unwrap()
+            })
             .collect();
         let archive = all_live
             .iter()
@@ -1291,7 +1300,7 @@ mod tests {
         // Cache-first: reopening without network shows the catalogue at once.
         drop(lib);
         let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
-        assert_eq!(lib.categories(Kind::Live).unwrap(), cats);
+        assert_eq!(lib.categories(Kind::Live, Sort::Provider).unwrap(), cats);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

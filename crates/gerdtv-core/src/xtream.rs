@@ -69,6 +69,16 @@ fn num(v: &Value) -> Option<u64> {
     }
 }
 
+/// A rating the panel may send as a number or a string; None for empty, garbage, 0 and anything outside 0–10.
+fn rating(v: &Value) -> Option<f64> {
+    let r = match v {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }?;
+    (r > 0.0 && r <= 10.0).then_some(r)
+}
+
 fn text(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
@@ -210,6 +220,20 @@ impl Xtream {
                         None
                     },
                     year,
+                    // Movies send `added`, series `last_modified` (unix seconds as strings); live channels don't
+                    // sort by either. Ratings come as "7.5", 7.5, "" or "0"; 0 means "not rated".
+                    added: if kind == Kind::Live {
+                        None
+                    } else {
+                        num(&s["added"])
+                            .or_else(|| num(&s["last_modified"]))
+                            .map(|t| t as i64)
+                    },
+                    rating: if kind == Kind::Live {
+                        None
+                    } else {
+                        rating(&s["rating"])
+                    },
                     name,
                     ..NewItem::default()
                 })
@@ -441,6 +465,38 @@ mod tests {
             })
             .unwrap();
         assert!(year.is_some_and(|y| (1960..2030).contains(&y)));
+        // "Recently added" and "rating": movies send `added`, series `last_modified`; "" and "0" are no rating.
+        let (added, rated, unrated): (i64, i64, i64) = conn
+            .query_row(
+                "SELECT count(added), count(rating), sum(rating IS NULL) FROM items WHERE kind = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(added, 1000);
+        assert!(rated > 0 && unrated > 0, "{rated} rated, {unrated} without");
+        let (series_added, series_rated): (i64, i64) = conn
+            .query_row(
+                "SELECT count(added), count(rating) FROM items WHERE kind = 3",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(
+            series_added > 0 && series_rated == 0,
+            "series: last_modified, rating \"0\""
+        );
+        for (raw, want) in [
+            (serde_json::json!("7.5"), Some(7.5)),
+            (serde_json::json!(8), Some(8.0)),
+            (serde_json::json!(""), None),
+            (serde_json::json!("0"), None),
+            (serde_json::json!("n/a"), None),
+            (serde_json::json!("55"), None),
+            (serde_json::json!(null), None),
+        ] {
+            assert_eq!(rating(&raw), want, "{raw}");
+        }
         assert!(
             !db::search(&conn, "munchen", &[], None, 5, 0)
                 .unwrap()

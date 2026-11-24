@@ -1,5 +1,5 @@
-// Settings, in categories: Account, Playback, TV guide, Appearance, Updates, Stream health,
-// About (docs/SPEC.md, "Settings").
+// Settings, in five categories (owner decision): Account (with Your data), Playback (with Stream health), TV guide,
+// Appearance, About (with Updates) (docs/SPEC.md, "Settings").
 // Wide windows (desktop, TV) show the categories on the left and the chosen one on the right; phones show the
 // categories as a list that opens a page. A search field on top filters every entry of every category as you type
 // (settings_model.dart) and shows the matches grouped by category.
@@ -19,6 +19,7 @@ import 'app_logo.dart';
 import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
+import 'player_screen.dart' show playerGesturesSetting;
 import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
@@ -155,6 +156,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: session.sync,
             ),
           ),
+          // Your data: export and import the profile's user data (one JSON file).
+          if (lib != null)
+            SettingsEntry(
+              id: 'userData',
+              title: l10n.userDataExport,
+              keywords: l10n.settingsKeywordsData,
+              build: (_) => UserDataSettings(session: session),
+            ),
           SettingsEntry(
             id: 'remove',
             title: l10n.settingsRemove,
@@ -175,6 +184,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           if (lib != null) ..._playbackEntries(l10n, lib),
           if (ownLibmpv() != null) _engineEntry(l10n),
+          // Touch screens only: desktop and TV have no swipes.
+          if (lib != null && !isDesktop)
+            SettingsEntry(
+              id: 'gestures',
+              title: l10n.playerGestures,
+              keywords: l10n.settingsKeywordsGestures,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.gestures'),
+                  title: Text(l10n.playerGestures),
+                  subtitle: Text(l10n.playerGesturesHint),
+                  value: lib.setting(key: playerGesturesSetting) != 'off',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: playerGesturesSetting,
+                      value: on ? 'on' : 'off',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          SettingsEntry(
+            id: 'health',
+            title: l10n.settingsHealth,
+            keywords: l10n.settingsKeywordsHealth,
+            build: (_) => _HealthList(library: lib),
+          ),
         ],
       ),
       SettingsCategory(
@@ -215,6 +252,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: l10n.settingsAppearance,
         entries: [
           SettingsEntry(
+            id: 'theme',
+            title: l10n.settingsTheme,
+            keywords: l10n.settingsKeywordsTheme,
+            build: (_) => _ThemeSettings(session: session),
+          ),
+          SettingsEntry(
             id: 'logo',
             title: l10n.settingsLogo,
             keywords: l10n.settingsKeywordsLogo,
@@ -247,46 +290,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       SettingsCategory(
-        id: 'data',
-        icon: Icons.import_export,
-        title: l10n.settingsData,
-        entries: [
-          if (lib != null)
-            SettingsEntry(
-              id: 'userData',
-              title: l10n.userDataExport,
-              keywords: l10n.settingsKeywordsData,
-              build: (_) => UserDataSettings(session: session),
-            ),
-        ],
-      ),
-      SettingsCategory(
-        id: 'updates',
-        icon: Icons.system_update_outlined,
-        title: l10n.settingsUpdates,
-        entries: [
-          SettingsEntry(
-            id: 'updates',
-            title: l10n.updateCheck,
-            keywords: l10n.settingsKeywordsUpdates,
-            build: (_) => const UpdateSettings(),
-          ),
-        ],
-      ),
-      SettingsCategory(
-        id: 'health',
-        icon: Icons.monitor_heart_outlined,
-        title: l10n.settingsHealth,
-        entries: [
-          SettingsEntry(
-            id: 'health',
-            title: l10n.settingsHealth,
-            keywords: l10n.settingsKeywordsHealth,
-            build: (_) => _HealthList(library: lib),
-          ),
-        ],
-      ),
-      SettingsCategory(
         id: 'about',
         icon: Icons.info_outline,
         title: l10n.settingsAbout,
@@ -298,6 +301,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: AppLogoMark(logo: session.logo, size: 32),
               title: Text(l10n.aboutVersion(coreVersion())),
             ),
+          ),
+          SettingsEntry(
+            id: 'updates',
+            title: l10n.updateCheck,
+            keywords: l10n.settingsKeywordsUpdates,
+            build: (_) => const UpdateSettings(),
           ),
           SettingsEntry(
             id: 'licences',
@@ -630,7 +639,7 @@ class _CategoryContent extends StatelessWidget {
   );
 }
 
-/// Settings → Stream health: the last 50 recoveries the watchdog made or gave up on.
+/// Settings → Playback → Stream health: the last 50 recoveries the watchdog made or gave up on.
 class _HealthList extends StatelessWidget {
   const _HealthList({required this.library});
   final Library? library;
@@ -668,6 +677,154 @@ class _HealthList extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Settings → Appearance → Theme (owner decision): light, dark or the system's; the accent from [Tokens.accents];
+/// neutral or accent-tinted surfaces; pure black for OLED screens (dark only). App-wide, applied at once.
+class _ThemeSettings extends StatelessWidget {
+  const _ThemeSettings({required this.session});
+  final Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final names = [
+      l10n.accentOrange,
+      l10n.accentRed,
+      l10n.accentPink,
+      l10n.accentViolet,
+      l10n.accentBlue,
+      l10n.accentTeal,
+      l10n.accentGreen,
+      l10n.accentGold,
+    ];
+    return ValueListenableBuilder<ThemePrefs>(
+      valueListenable: session.theme,
+      builder: (context, t, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            title: Text(
+              l10n.settingsTheme,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
+            child: SegmentedButton<ThemeMode>(
+              key: const Key('settings.themeMode'),
+              segments: [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  label: Text(l10n.themeSystem),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  label: Text(l10n.themeDark),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  label: Text(l10n.themeLight),
+                ),
+              ],
+              selected: {t.mode},
+              onSelectionChanged: (m) =>
+                  session.setTheme(t.copyWith(mode: m.first)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(Tokens.space * 2),
+            child: Wrap(
+              spacing: Tokens.space,
+              runSpacing: Tokens.space,
+              children: [
+                for (var i = 0; i < Tokens.accents.length; i++)
+                  _Swatch(
+                    key: Key('settings.accent.$i'),
+                    colour: Tokens.accents[i],
+                    name: names[i],
+                    selected: t.accent == i,
+                    onTap: () => session.setTheme(t.copyWith(accent: i)),
+                  ),
+              ],
+            ),
+          ),
+          SwitchListTile(
+            key: const Key('settings.tinted'),
+            title: Text(l10n.themeTinted),
+            subtitle: Text(l10n.themeTintedHint),
+            value: t.tinted,
+            onChanged: (v) => session.setTheme(t.copyWith(tinted: v)),
+          ),
+          SwitchListTile(
+            key: const Key('settings.black'),
+            title: Text(l10n.themeBlack),
+            subtitle: Text(l10n.themeBlackHint),
+            value: t.black,
+            onChanged: t.mode == ThemeMode.light
+                ? null
+                : (v) => session.setTheme(t.copyWith(black: v)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One accent colour to pick: a 40 px circle, ticked when chosen, reachable by keyboard and D-pad.
+class _Swatch extends StatelessWidget {
+  const _Swatch({
+    super.key,
+    required this.colour,
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+  final Color colour;
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = Theme.of(context).colorScheme.onSurface;
+    return Tooltip(
+      message: name,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: name,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 26,
+          child: AnimatedContainer(
+            duration: Tokens.motion,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colour,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? ring : Colors.transparent,
+                width: 3,
+              ),
+            ),
+            child: selected
+                ? Icon(
+                    Icons.check,
+                    size: 20,
+                    color:
+                        ThemeData.estimateBrightnessForColor(colour) ==
+                            Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  )
+                : null,
+          ),
+        ),
+      ),
     );
   }
 }

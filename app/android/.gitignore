@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# gerdTV's own libmpv, copied in by `just build-android` from build/libmpv-android (scripts/build-libmpv-android.sh).
+/app/src/main/jniLibs/

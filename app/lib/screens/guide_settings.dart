@@ -1,6 +1,8 @@
 // Settings → Guide: the guide sources (the provider's own first, then extra XMLTV URLs) with their last import,
 // adding and removing extra URLs, the profile's time offset, "Refresh now", and the channels without a guide, which
-// can be mapped to a guide channel by hand. Logic and storage are in the core (gerdtv_core::epg, library.rs).
+// can be mapped to a guide channel by hand; community guide presets add a country's XMLTV file in one tap. Several
+// sources work at once; where they overlap, the provider's guide wins (rebuild_matches in gerdtv_core::epg). Logic
+// and storage are in the core (gerdtv_core::epg, library.rs).
 // Debugging: a source's status line is the core's error text (already free of credentials).
 
 import 'package:intl/intl.dart';
@@ -13,6 +15,125 @@ import '../theme.dart';
 
 /// The profile setting with the guide's time offset in whole hours (gerdtv_core SETTING_GUIDE_OFFSET).
 const settingGuideOffset = 'guide_offset_hours';
+
+/// Community guides (owner decision): epgshare01 rebuilds one XMLTV file per country every day (about 4 days ahead,
+/// gzip). A third party's server: files can move or go away, and the source's status line then shows the error.
+/// The codes are the project's file names (`DE1` = Germany, `IN2` = India's second file), taken from its listing.
+const communityGuideBase = 'https://epgshare01.online/epgshare01/epg_ripper_';
+const communityGuides = [
+  'AE1',
+  'AL1',
+  'AR1',
+  'AT1',
+  'AU1',
+  'BA1',
+  'BB1',
+  'BE2',
+  'BG1',
+  'BR1',
+  'BR2',
+  'CA2',
+  'CH1',
+  'CL1',
+  'CO1',
+  'CR1',
+  'CY1',
+  'CZ1',
+  'DE1',
+  'DK1',
+  'DO1',
+  'EC1',
+  'ES1',
+  'FI1',
+  'FR1',
+  'GR1',
+  'HK1',
+  'HR1',
+  'HU1',
+  'ID1',
+  'IE1',
+  'IL1',
+  'IN1',
+  'IN2',
+  'IN4',
+  'IT1',
+  'JM1',
+  'JP1',
+  'JP2',
+  'KE1',
+  'KR1',
+  'KZ1',
+  'LT1',
+  'LU1',
+  'LV1',
+  'MN1',
+  'MT1',
+  'MX1',
+  'MY1',
+  'NG1',
+  'NL1',
+  'NO1',
+  'NZ1',
+  'PA1',
+  'PE1',
+  'PH2',
+  'PL1',
+  'PT1',
+  'RO1',
+  'RO2',
+  'RS1',
+  'SA2',
+  'SE1',
+  'SG1',
+  'SK1',
+  'SV1',
+  'TH1',
+  'TR1',
+  'TR3',
+  'UA1',
+  'UK1',
+  'US2',
+  'UY1',
+  'VN1',
+  'ZA1',
+];
+
+String communityGuideUrl(String code) => '$communityGuideBase$code.xml.gz';
+
+/// "DE", or "IN 2" for a country's second file.
+String communityGuideLabel(String code) {
+  final n = code.substring(2);
+  return n == '1' ? code.substring(0, 2) : '${code.substring(0, 2)} $n';
+}
+
+/// Picks a community guide: a sheet with every country file; [onPick] gets its URL.
+Future<void> pickCommunityGuide(
+  BuildContext context,
+  ValueChanged<String> onPick,
+) => showModalBottomSheet<void>(
+  context: context,
+  showDragHandle: true,
+  builder: (context) {
+    final l10n = AppLocalizations.of(context);
+    return ListView(
+      children: [
+        ListTile(
+          title: Text(l10n.guideCommunity),
+          subtitle: Text(l10n.guideCommunityHint),
+        ),
+        for (final code in communityGuides)
+          ListTile(
+            key: Key('guide.community.$code'),
+            title: Text(communityGuideLabel(code)),
+            onTap: () {
+              Navigator.of(context).pop();
+              onPick(communityGuideUrl(code));
+            },
+          ),
+      ],
+    );
+  },
+);
 
 /// The guide sources with their last import, and the field that adds an extra XMLTV URL. Rebuilt by the settings
 /// screen's ListenableBuilder on the session, so a finished refresh shows its new status.
@@ -117,6 +238,18 @@ class _GuideSourcesState extends State<GuideSources> {
                 child: Text(l10n.add),
               ),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Tokens.space),
+          child: TextButton.icon(
+            key: const Key('guide.community'),
+            icon: const Icon(Icons.public),
+            label: Text(l10n.guideCommunityAdd),
+            onPressed: () => pickCommunityGuide(context, (url) async {
+              await _lib.addGuideUrl(url: url);
+              await widget.session.refreshGuide(force: true);
+            }),
           ),
         ),
       ],

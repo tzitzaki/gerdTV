@@ -3,6 +3,7 @@
 // that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
 // app-wide.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/theme.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/settings_model.dart';
@@ -98,11 +99,12 @@ void main() {
       tester,
     ) async {
       await pump(tester, const Size(1280, 800));
-      for (final id in ['account', 'health', 'about']) {
+      // Five categories (owner decision): Your data sits in Account, Stream health in Playback, Updates in About.
+      for (final id in ['account', 'playback', 'about']) {
         expect(find.byKey(Key('settings.cat.$id')), findsOneWidget);
       }
-      // Profile categories need an open library (none here).
-      for (final id in ['playback', 'data']) {
+      // The guide needs an open library (none here); the merged categories are gone.
+      for (final id in ['guide', 'data', 'updates', 'health']) {
         expect(find.byKey(Key('settings.cat.$id')), findsNothing);
       }
       // The first category shows; another one replaces it.
@@ -111,6 +113,7 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('settings.remove')), findsNothing);
       expect(find.text('Licences'), findsOneWidget);
+      expect(find.text('Check for updates'), findsOneWidget);
 
       // Search across categories: only the matching entry, under its category.
       await tester.enterText(
@@ -172,5 +175,38 @@ void main() {
       expect(session.logo, AppLogo.signal);
       expect(core.appSettings[Session.settingAppLogo], 'signal');
     });
+
+    testWidgets(
+      'Appearance: the theme applies at once and is stored app-wide',
+      (tester) async {
+        final core = useFakeCore();
+        final session = await pump(tester, const Size(1280, 800));
+        await tester.tap(find.byKey(const Key('settings.cat.appearance')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('settings.accent.4')));
+        await tester.pump();
+        await tester.tap(find.text('Light'));
+        await tester.pump();
+        expect(session.theme.value.accent, 4);
+        expect(session.theme.value.mode, ThemeMode.light);
+        expect(core.appSettings[Session.settingThemeAccent], '4');
+        expect(core.appSettings[Session.settingThemeMode], 'light');
+        // Pure black is for the dark theme only.
+        final black = tester.widget<SwitchListTile>(
+          find.byKey(const Key('settings.black')),
+        );
+        expect(black.onChanged, isNull);
+        // Stored values come back; unknown ones keep the defaults.
+        expect(
+          ThemePrefs.parse(mode: 'light', accent: '4', tinted: 'true').tinted,
+          isTrue,
+        );
+        final odd = ThemePrefs.parse(mode: 'neon', accent: '99');
+        expect(
+          (odd.mode, odd.accent),
+          (ThemeMode.dark, Tokens.accents.length - 1),
+        );
+      },
+    );
   });
 }

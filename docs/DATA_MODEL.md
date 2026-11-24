@@ -1,6 +1,6 @@
 # Data model
 
-App-wide settings (`app_logo`) in `app.json` in the app-support folder, a flat string map rewritten atomically (`app_setting` in `crates/gerdtv-core/src/library.rs`).
+App-wide settings (`app_logo`, `theme_mode`, `theme_accent`, `theme_tinted`, `theme_black`) in `app.json` in the app-support folder, a flat string map rewritten atomically (`app_setting` in `crates/gerdtv-core/src/library.rs`).
 
 Profiles: their non-secret settings (name, source kind, server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
 
@@ -11,14 +11,14 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 |---|---|---|
 | `meta` | schema version and similar settings | `key` |
 | `categories` | provider groups in provider order (`kind`, provider id or M3U group name, name, position) | `kind, id` |
-| `items` | the catalogue: live channels, movies, episodes, series; name, category (for Xtream Codes episodes: their series key), logo, EPG id, channel number, credential-free URL (M3U only), season/episode/year, container extension (Xtream Codes movies/episodes), catch-up days (live channels; 0 = none), provider position, sync generation | `key` |
+| `items` | the catalogue: live channels, movies, episodes, series; name, category (for Xtream Codes episodes: their series key), logo, EPG id, channel number, credential-free URL (M3U only), season/episode/year, date added and rating (Xtream Codes movies and series; NULL otherwise), container extension (Xtream Codes movies/episodes), catch-up days (live channels; 0 = none), provider position, sync generation | `key` |
 | `items_fts`, `items_vocab` | search: contentless FTS5 index over `name` and `alt` (the cleaned name plus tvg-name), `unicode61 remove_diacritics 2`, rowids match `items`; its vocabulary for typo matching. `items.folded` holds `alt` lower-case without accents for mid-word matches (a scan, no extra index: every index costs at each sync) | rowid |
 | `search_history` | user data: a section's searches whose result was opened (section, query, `updated_at`); the newest 20 per section are kept | `section, query` |
 | `favourites`, `recents` | user data: item key + `updated_at` (recents: written whenever something starts playing) | `key` |
 | `hidden_groups` | user data: groups the user hid (kind, provider category id, `updated_at`); an Xtream Codes episode is hidden with its series' group | `kind, category` |
 | `resume` | user data: where a movie or episode was left (position and duration in seconds, `updated_at`); kept from 2 min, removed from 95 % | `key` |
 | `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
-| `epg_channels`, `epg_names` | guide channels per source (id, first display name, icon) and every display name normalised for matching | `id` / `norm` |
+| `epg_channels`, `epg_names` | guide channels (id, first display name, icon, the highest-ranked source listing it) and every display name normalised for matching, per channel | `id` / `norm, channel` |
 | `programmes`, `programmes_fts` | guide programmes (channel, start/stop UTC, title, sub-title, description, category, episode, icon, source) with an FTS index over title, sub-title and description; kept 2 days back to 7 ahead | `id` |
 | `epg_sources` | the provider's built-in guide (its URL is built when needed) and extra XMLTV URLs (credentials templated out), each with last import, status and counts | `id` |
 | `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
@@ -35,7 +35,7 @@ Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never re
 - User data refers to items only by key, so a re-sync never orphans favourites or recents (sync-ready for a later hub).
 
 ## Export and import
-Settings → Your data writes the open profile's user data as one JSON file (`crates/gerdtv-core/src/userdata.rs`, format `gerdtv-user-data`, version 1): favourites, recents, `resume`, `hidden_groups`, `search_history` (kept at the newest 20 per section after an import), `epg_map`, reminders, settings (without the derived `xc_time_offset` and `m3u_tvg_url`), per-channel buffer choices and the extra guide URLs (with their `{secretN}` placeholders). Import merges row by row in one transaction: a row is taken when it is new or its `updated_at` is newer, nothing is deleted; a foreign file or a newer format is refused unchanged.
+Settings → Account → Your data writes the open profile's user data as one JSON file (`crates/gerdtv-core/src/userdata.rs`, format `gerdtv-user-data`, version 1): favourites, recents, `resume`, `hidden_groups`, `search_history` (kept at the newest 20 per section after an import), `epg_map`, reminders, settings (without the derived `xc_time_offset` and `m3u_tvg_url`), per-channel buffer choices and the extra guide URLs (with their `{secretN}` placeholders). Import merges row by row in one transaction: a row is taken when it is new or its `updated_at` is newer, nothing is deleted; a foreign file or a newer format is refused unchanged.
 
 ## No credentials on disk
 M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `{secret1}` …; the player gets the real URL at play time. Xtream Codes URLs are not stored at all; they are built from the profile's credentials when playing.
@@ -45,5 +45,5 @@ M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `
 - Rows not seen in a sync are removed, except: when a source list comes back empty while the catalogue has rows of that kind, those rows are kept (panels answer `[]` now and then under load).
 
 ## Migrations
-Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`; version 6 added `items.folded` (filled from the stored names; the next sync adds the tvg-names), the vocabulary view and `search_history`; version 7 added `resume`; version 8 added `hidden_groups`.
+Forward-only (`MIGRATIONS` in `crates/gerdtv-core/src/db.rs`), tested on a fixture database, and preceded by a copy of the database to `*.db.bak-<timestamp>`. Version 2 added `items.ext`; version 3 added `settings` and the buffer and bitrate columns of `stream_prefs`; version 4 added the guide tables; version 5 added `items.archive_days` and `reminders`; version 6 added `items.folded` (filled from the stored names; the next sync adds the tvg-names), the vocabulary view and `search_history`; version 7 added `resume`; version 8 added `hidden_groups`; version 9 added `items.added` and `items.rating` (the next sync fills them) and keyed `epg_names` by name and channel.
 - Xtream Codes episodes are fetched when a series opens and kept until the next full sync.

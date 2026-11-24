@@ -60,7 +60,11 @@ abstract class Library implements RustOpaqueInterface {
     required PlatformInt64 stop,
   });
 
-  Future<List<CategoryInfo>> categories({required ItemKind kind});
+  /// `sort`: the list's sort setting ("name_asc", "name_desc"; anything else is provider order).
+  Future<List<CategoryInfo>> categories({
+    required ItemKind kind,
+    required String sort,
+  });
 
   /// The continue-watching row of a section: started, unfinished items, last watched first.
   Future<List<ResumeItem>> continueWatching({
@@ -78,8 +82,11 @@ abstract class Library implements RustOpaqueInterface {
   /// Every favourite's key, for the stars in the lists.
   List<String> favouriteKeys();
 
-  /// A section's favourites (`kinds`; empty = all) in provider order: the Favourites group.
-  Future<List<ItemInfo>> favourites({required List<ItemKind> kinds});
+  /// A section's favourites (`kinds`; empty = all) in the section's item `sort`: the Favourites group.
+  Future<List<ItemInfo>> favourites({
+    required List<ItemKind> kinds,
+    required String sort,
+  });
 
   /// Guide channels whose name or id contains the query.
   Future<List<ChannelRef>> findGuideChannels({
@@ -103,7 +110,7 @@ abstract class Library implements RustOpaqueInterface {
   /// Whether the item has its own buffer (else it follows the profile's preset).
   bool hasChannelBuffer({required String key});
 
-  /// The newest stream_health rows (Settings → Stream health).
+  /// The newest stream_health rows (Settings → Playback → Stream health).
   Future<List<HealthInfo>> health({required int limit});
 
   /// Merges an exported file; returns how many entries were new or newer. The error says why a file is refused.
@@ -115,6 +122,7 @@ abstract class Library implements RustOpaqueInterface {
   Future<List<ItemInfo>> items({
     required ItemKind kind,
     required String category,
+    required String sort,
     required int limit,
     required int offset,
   });

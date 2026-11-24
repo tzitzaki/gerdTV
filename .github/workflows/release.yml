@@ -20,6 +20,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # gerdTV's own libmpv for macOS and iOS: main's cache (CI's libmpv-apple job), built here when it misses.
+      - id: libmpv
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-apple/GerdMpv.xcframework
+            build/libmpv-apple/libgerdmpv-apple.txt
+          key: libmpv-apple-${{ hashFiles('scripts/build-libmpv-apple.sh') }}
+      - if: steps.libmpv.outputs.cache-hit != 'true'
+        run: |
+          brew install meson ninja pkgconf
+          scripts/build-libmpv-apple.sh build/libmpv-apple
       - run: scripts/ci-install-flutter.sh
       - name: Import the code-signing certificate into a temporary keychain
         env:
@@ -85,6 +97,16 @@ jobs:
             ~/.gradle/caches
           key: android-${{ hashFiles('app/FLUTTER_VERSION', 'Cargo.lock', 'app/pubspec.lock', 'rust-toolchain.toml') }}
           restore-keys: android-
+      # gerdTV's own libmpv for Android: main's cache (warm-caches job), built here when it misses.
+      - id: libmpv
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build/libmpv-android/*/libgerdmpv.so
+            build/libmpv-android/libgerdmpv-android.txt
+          key: libmpv-android-${{ hashFiles('scripts/build-libmpv-android.sh', 'scripts/build-libmpv-android-container.sh') }}
+      - if: steps.libmpv.outputs.cache-hit != 'true'
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" scripts/build-libmpv-android-container.sh build/libmpv-android arm64-v8a
       - run: scripts/ci-install-flutter.sh
       - name: Release APK (arm64-v8a, release keystore)
         env:
@@ -98,7 +120,9 @@ jobs:
           # Read by app/android/app/build.gradle.kts; never committed (app/android/.gitignore).
           printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > app/android/key.properties
-          cd app && flutter build apk --release --target-platform android-arm64
+          define="$(scripts/bundle-libmpv-android.sh arm64-v8a)"
+          [[ -n "$define" ]] || { echo "no own libmpv for Android"; exit 1; }
+          cd app && flutter build apk --release --target-platform android-arm64 $define
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
           "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -i 'certificate DN'
           mkdir -p ../dist && cp build/app/outputs/flutter-apk/app-release.apk "../dist/gerdTV-android-$version.apk"

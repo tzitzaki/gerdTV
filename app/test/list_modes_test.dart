@@ -132,4 +132,135 @@ void main() {
       expect(starred.last, 'live:1');
     },
   );
+
+  // Sort: each list offers only the orders that make sense for it, and the menu reports the pick.
+  test('sort options per list', () {
+    const p = ListSort.provider, a = ListSort.nameAsc, z = ListSort.nameDesc;
+    for (final (kind, groups, xtream, want) in [
+      (ItemKind.live, true, true, [p, a, z]),
+      (ItemKind.live, false, true, [p, a, z, ListSort.number]),
+      (ItemKind.movie, true, true, [p, a, z]),
+      (
+        ItemKind.movie,
+        false,
+        true,
+        [
+          p,
+          a,
+          z,
+          ListSort.yearDesc,
+          ListSort.yearAsc,
+          ListSort.added,
+          ListSort.rating,
+        ],
+      ),
+      (
+        ItemKind.series,
+        false,
+        false,
+        [p, a, z, ListSort.yearDesc, ListSort.yearAsc],
+      ),
+    ]) {
+      expect(
+        sortOptions(kind, groups: groups, xtream: xtream),
+        want,
+        reason: '$kind groups=$groups xtream=$xtream',
+      );
+    }
+    expect(parseSort('rating'), ListSort.rating);
+    expect(parseSort(null), ListSort.provider);
+    expect(parseSort('gone'), ListSort.provider);
+  });
+
+  testWidgets('the sort menu checks the current order and reports the pick', (
+    tester,
+  ) async {
+    final picked = <ListSort>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          appBar: AppBar(
+            actions: [
+              SortButton(
+                value: ListSort.provider,
+                options: sortOptions(
+                  ItemKind.live,
+                  groups: false,
+                  xtream: false,
+                ),
+                onSelected: picked.add,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('list.sort')));
+    await tester.pumpAndSettle();
+    expect(find.text('Channel number'), findsOneWidget);
+    expect(find.text('Rating'), findsNothing);
+    await tester.tap(find.byKey(const Key('sort.number')));
+    await tester.pumpAndSettle();
+    expect(picked, [ListSort.number]);
+  });
+
+  // The cinematic tiles: a focused or hovered tile lifts (5 % larger), never with reduced motion; a poster's name sits
+  // on the picture in white, a channel's below its logo.
+  for (final still in [false, true]) {
+    testWidgets(
+      'a focused tile lifts${still ? ', not with reduced motion' : ''}',
+      (tester) async {
+        final movie = ItemInfo(
+          key: 'movie:1',
+          kind: ItemKind.movie,
+          name: 'A film',
+          category: 'g',
+          logo: '',
+          number: null,
+          archiveDays: 0,
+          group: '',
+        );
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(disableAnimations: still),
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: Scaffold(
+                body: ItemsView(
+                  mode: ListMode.tiles,
+                  items: [movie, channel(2)],
+                  nowNext: const {},
+                  now: now,
+                  onTap: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        double scaleOf(String key) => tester
+            .widget<AnimatedScale>(
+              find.ancestor(
+                of: find.byKey(Key(key)),
+                matching: find.byType(AnimatedScale),
+              ),
+            )
+            .scale;
+        expect(scaleOf('item.movie:1'), 1.0);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+        expect(scaleOf('item.movie:1'), still ? 1.0 : 1.05);
+        expect(scaleOf('item.live:2'), 1.0);
+        final name = tester.widget<RichText>(
+          find
+              .descendant(
+                of: find.byKey(const Key('item.movie:1')),
+                matching: find.byType(RichText),
+              )
+              .last,
+        );
+        expect(name.text.style?.color, Colors.white, reason: 'on the poster');
+      },
+    );
+  }
 }
