@@ -2,7 +2,7 @@
 # gerdTV's own libmpv for macOS and iOS (owner decision, docs/DECISIONS.md): the Linux pins (scripts/build-libmpv.sh)
 # built for every Apple slice the app ships, each as ONE dynamic library with FFmpeg, libplacebo and the subtitle
 # stack (FreeType, FriBidi, HarfBuzz, libass) linked in statically, LGPL configuration, packed as
-# GerdMpv.xcframework (macOS universal arm64 + x86_64, iOS arm64, iOS simulator arm64). It only needs Apple's system
+# GerdMpv.xcframework (macOS arm64, iOS arm64, iOS simulator arm64; no Intel Macs). It only needs Apple's system
 # frameworks; TLS comes from Apple's Secure Transport, decoding from VideoToolbox.
 # The app embeds it next to media_kit's Mpv.xcframework (scripts/bundle-libmpv-apple.sh) and loads one of the two
 # at start (Settings → Player engine, app/lib/platform/engine.dart); the vendored media_kit_video plugin finds the
@@ -28,8 +28,8 @@ HARFBUZZ_VERSION=15.2.0
 HARFBUZZ_SHA256=e2ec49090744383cdbe7df808c1cedaafba06a97be8dc4211fe546ba585f12cb
 LIBASS_VERSION=0.17.5
 LIBASS_SHA256=2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
-MACOS_MIN=12.0 # the release manifest's minimum (release.yml)
-IOS_MIN=15.0
+MACOS_MIN=26.0 # the release manifest's minimums (release.yml) and the Xcode projects' deployment targets
+IOS_MIN=26.0
 
 out="$(mkdir -p "$1" && cd "$1" && pwd)"
 jobs="$(sysctl -n hw.ncpu)"
@@ -119,7 +119,7 @@ EOF
   stage libass-build ninja -C "$work/libass-build" install
 
   # FFmpeg: static, LGPL (no --enable-gpl, no --enable-nonfree), autodetection off: VideoToolbox decoding, Secure
-  # Transport for https, the SDK's zlib. No x86 assembly (it would need nasm; Intel Macs decode in hardware anyway).
+  # Transport for https, the SDK's zlib. No x86 assembly (only Apple Silicon slices).
   local ffmpeg_flags=(
     --prefix="$prefix" --enable-static --disable-shared --enable-pic
     --enable-cross-compile --target-os=darwin --arch="$arch" --cc="$cc" --sysroot="$sysroot"
@@ -156,7 +156,7 @@ EOF
   )
   if [[ "$sdk" == macosx ]]; then
     # mpv's Cocoa layer (needed by gl-cocoa, whose VideoToolbox interop keeps decoding in hardware) is partly Swift;
-    # swiftc gets the slice's target like clang (the Swift runtime is part of macOS 12), and libplacebo's generated
+    # swiftc gets the slice's target like clang (the Swift runtime is part of macOS), and libplacebo's generated
     # config.h, which mpv's Swift rule doesn't pass (it only names libplacebo's source include folder).
     mpv_flags+=(-Dcocoa=enabled -Dswift-build=enabled
       "-Dswift-flags=-target $target -I$work/mpv-build/subprojects/libplacebo/src/include" -Dcoreaudio=enabled
@@ -180,7 +180,6 @@ EOF
 }
 
 build_slice macos-arm64 macosx arm64 "arm64-apple-macos$MACOS_MIN" aarch64
-build_slice macos-x86_64 macosx x86_64 "x86_64-apple-macos$MACOS_MIN" x86_64
 build_slice ios-arm64 iphoneos arm64 "arm64-apple-ios$IOS_MIN" aarch64
 build_slice iossim-arm64 iphonesimulator arm64 "arm64-apple-ios$IOS_MIN-simulator" aarch64
 
@@ -204,8 +203,7 @@ EOF
 fw="$out/frameworks"
 rm -rf "$fw" "$out/GerdMpv.xcframework"
 mkdir -p "$fw/macos/GerdMpv.framework/Versions/A/Resources"
-lipo -create "$out/work-macos-arm64/GerdMpv" "$out/work-macos-x86_64/GerdMpv" \
-  -output "$fw/macos/GerdMpv.framework/Versions/A/GerdMpv"
+cp "$out/work-macos-arm64/GerdMpv" "$fw/macos/GerdMpv.framework/Versions/A/GerdMpv"
 install_name_tool -id @rpath/GerdMpv.framework/Versions/A/GerdMpv "$fw/macos/GerdMpv.framework/Versions/A/GerdMpv"
 plist MacOSX LSMinimumSystemVersion "$MACOS_MIN" >"$fw/macos/GerdMpv.framework/Versions/A/Resources/Info.plist"
 ln -s A "$fw/macos/GerdMpv.framework/Versions/Current"

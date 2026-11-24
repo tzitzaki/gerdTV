@@ -181,8 +181,8 @@ jobs:
           scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
           # Minimum OS per platform: macOS/iOS deployment targets of the Xcode projects, Android minSdk (API level).
           cargo run -q --release -p gerdtv-release -- manifest --version "$v" --notes "$RUNNER_TEMP/notes.md" \
-            --asset macos "dist/gerdTV-macos-$v.zip" "macOS 12.0" \
-            --asset ios "dist/gerdTV-ios-unsigned-$v.ipa" "iOS 15.0" \
+            --asset macos "dist/gerdTV-macos-$v.zip" "macOS 26.0" \
+            --asset ios "dist/gerdTV-ios-unsigned-$v.ipa" "iOS 26.0" \
             --asset android "dist/gerdTV-android-$v.apk" "Android API 24" \
             --asset linux "dist/gerdTV-linux-x64-$v.tar.gz" "x64, glibc 2.39" > dist/latest.json
           cargo run -q --release -p gerdtv-release -- sign dist/latest.json

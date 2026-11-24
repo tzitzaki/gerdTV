@@ -3,6 +3,7 @@
 Standing owner decisions not visible in code; one line each. Superseded lines are replaced.
 
 - Targets in priority order: macOS (Apple Silicon), Android TV, iPhone/iPad; Linux desktop is the dev/test platform and supported; Android phone ships with Android; no Windows, no tvOS.
+- Apple minimums: iOS/iPadOS 26.0 and macOS 26.0 on Apple Silicon only (no Intel build); 27 once `macos-latest` runs macOS 27.
 - Stack: Flutter stable (pinned in `app/FLUTTER_VERSION`) + media_kit (libmpv everywhere) + a Rust core through flutter_rust_bridge v2.
 - Standalone apps now, a home hub later: every device runs the full core; user data uses stable content keys and `updated_at` so a hub can sync it later.
 - Crates: `gerdtv-core` (all logic), `gerdtv-api` (bridge surface only; package `gerdtv_api` because Cargokit names the native library after it), `gerdtv-testkit`, `gerdtv-release`.
