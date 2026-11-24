@@ -485,6 +485,7 @@ class Session extends ChangeNotifier {
     );
     if (nowPlaying.value?.key == item.key) return true;
     await _useMpv();
+    _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = channel.key;
     final choice = lib.bufferFor(key: channel.key);
@@ -503,34 +504,53 @@ class Session extends ChangeNotifier {
     return true;
   }
 
-  /// Picture-in-Picture on Apple platforms. A live channel in AVPlayer floats as it is. Otherwise (iOS, mpv) mpv
-  /// stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP ends, mpv resumes the item.
+  /// Picture-in-Picture on Apple platforms: a live channel in AVPlayer floats as it is; on iOS, mpv's picture floats
+  /// from its own frames (no hand-over, so nothing reconnects).
   Future<void> startApplePip() async {
     if (onAvPlayer.value) {
       await _avEngine.startPip();
-      return;
+    } else {
+      await platform.startApplePip();
     }
-    final item = nowPlaying.value;
-    final lib = library;
-    if (item == null || lib == null) return;
-    final url = lib.streamUrl(
-      key: item.key,
-      preferHls: item.kind == ItemKind.live,
-    );
-    await _adapter?.stop();
-    await _player?.stop();
-    platform.onApplePipEnded = (_) => _resume(item);
-    if (!await platform.startApplePip(url)) await _resume(item);
   }
 
-  /// Plays [item] again even though it is still nowPlaying (after Apple PiP handed the stream back).
-  Future<void> _resume(ItemInfo item) async {
-    final lib = library;
-    if (lib == null || nowPlaying.value?.key != item.key) {
-      return; // stopped or replaced meanwhile
-    }
-    await _start(item, lib);
+  /// iOS, while mpv plays: its frames feed the PiP layer, and the PiP window's play/pause, skip and seek range follow
+  /// the player (once a second).
+  void _mpvPip(bool on) {
+    if (!isApple) return;
+    _pipTimer?.cancel();
+    _pipTimer = null;
+    unawaited(platform.preparePip(on));
+    if (!on) return;
+    platform.onPipCommand ??= (action, secs) {
+      switch (action) {
+        case 'play':
+          unawaited(adapter.resume());
+        case 'pause':
+          unawaited(adapter.pause());
+        case 'skip':
+          unawaited(
+            player.seek(
+              player.state.position +
+                  Duration(milliseconds: (secs * 1000).round()),
+            ),
+          );
+      }
+    };
+    _pipTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final st = player.state;
+      unawaited(
+        platform.pipState(
+          playing: st.playing,
+          position: st.position.inMilliseconds / 1000,
+          duration: st.duration.inMilliseconds / 1000,
+          live: nowPlaying.value?.kind == ItemKind.live,
+        ),
+      );
+    });
   }
+
+  Timer? _pipTimer;
 
   /// Opens [item] with its buffer (own override, else the profile's preset), measured bitrate, adaptive mode, and for
   /// live channels the timeshift back buffer (pause/rewind) from settings.
@@ -541,6 +561,7 @@ class Session extends ChangeNotifier {
       return;
     }
     await _useMpv();
+    _mpvPip(true);
     final choice = lib.bufferFor(key: item.key);
     final bitrate = lib.bitrate(key: item.key).toInt();
     final shift =
@@ -576,6 +597,7 @@ class Session extends ChangeNotifier {
   /// (one provider connection; drops and stalls are reconnected there, so AVPlayer only sees a discontinuity).
   /// A provider that sends HLS itself is played directly (rewinding only inside its own window).
   Future<void> _startAv(ItemInfo item, Library lib) async {
+    _mpvPip(false);
     await _adapter?.stop();
     await _player?.stop();
     await _stopAv();
@@ -684,6 +706,7 @@ class Session extends ChangeNotifier {
     nowPlaying.value = null;
     timeshiftWindow.value = 0;
     await _useMpv();
+    _mpvPip(false);
     await _adapter?.stop();
     await _player?.stop();
   }
@@ -691,6 +714,7 @@ class Session extends ChangeNotifier {
   @override
   void dispose() {
     _progressTimer?.cancel();
+    _pipTimer?.cancel();
     _hlsPoll?.cancel();
     _hls?.stop();
     unawaited(_avErrors?.cancel());
@@ -706,7 +730,7 @@ const settingBuffer = 'buffer_preset';
 const settingAdaptive = 'adaptive_buffer';
 const settingTimeshift = 'timeshift_secs';
 
-/// True on iPhone/iPad (Apple Picture-in-Picture hand-over).
+/// True on iPhone/iPad (Apple Picture-in-Picture of mpv's picture).
 bool get isApple => !kIsWeb && Platform.isIOS;
 
 /// True on desktop platforms (window-sized layouts, keyboard first).

@@ -3,19 +3,21 @@ import AVKit
 import Flutter
 import UIKit
 import UserNotifications
+import media_kit_video
 
 // iPhone/iPad side of "playback keeps going" (docs/ARCHITECTURE.md, "Platform channels"):
 // - Background sound: the audio session's category is .playback and UIBackgroundModes has "audio", so mpv keeps
 //   playing sound with the screen locked or in another app.
-// - Picture-in-Picture: Apple's PiP only works with AVPlayer, not with mpv. On the player's PiP button Dart stops mpv
-//   (the provider allows few connections) and calls startPip(url); AVPlayer takes the same stream (live as .m3u8) and
-//   PiP starts as soon as it is possible. When PiP ends (or AVPlayer can't play the stream, e.g. .mkv), Dart is told
-//   "pipEnded" and resumes mpv.
+// - Picture-in-Picture of mpv's picture (movies, episodes, and channels AVPlayer can't play; live channels normally
+//   play in AVPlayer, app/packages/gerdtv_avplayer, with its own PiP): media_kit hands every frame mpv draws to an
+//   AVSampleBufferDisplayLayer behind the Flutter view (TextureHW.pipSink), so PiP shows mpv's own picture: no
+//   hand-over, nothing reconnects. Swiping to Home floats it by itself; in the background mpv renders it in software
+//   at PiP size (TextureHW.useSoftware). The PiP window's play/pause and skip come back to Dart as "pipCommand".
 // - The app icon: setLogo(name) picks the alternate icon "AppIcon-<name>" (asset catalog sets rendered by
 //   `just logos`, listed in ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES); the default logo is the primary icon.
 // Code lives in this file because new Swift files would have to be added to the Xcode project by hand.
-// Debug hints: PiP needs the player layer in the window hierarchy (a tiny host view here) and a real device;
-// the simulator supports PiP on recent Xcode versions.
+// Debug hints: PiP needs the layer in the window hierarchy and a real device (the simulator renders mpv in
+// software, which media_kit doesn't feed to PiP); "GerdtvPlatform:" lines in the device log.
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -40,34 +42,52 @@ import UserNotifications
   }
 }
 
-/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), startPip(url) → Bool, stopPip, setLogo(name);
-/// → pipEnded.
-final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
+/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), pipState(playing, position,
+/// duration, live), startPip → Bool, stopPip, setLogo(name); → pipCommand(action "play"/"pause"/"skip", secs).
+final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
+  AVPictureInPictureSampleBufferPlaybackDelegate
+{
   private let channel: FlutterMethodChannel
-  private var player: AVPlayer?
   private var host: UIView?
+  private let display = AVSampleBufferDisplayLayer()
   private var pip: AVPictureInPictureController?
-  private var observations: [NSKeyValueObservation] = []
+  private var format: CMVideoFormatDescription?
+  // What the PiP window shows, from Dart's pipState (once a second).
+  private var playing = false
+  private var duration = 0.0
+  private var live = false
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "gerdtv/platform", binaryMessenger: messenger)
     super.init()
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
+      let args = call.arguments as? [String: Any] ?? [:]
       switch call.method {
       case "setPlaying":
-        let playing = (call.arguments as? [String: Any])?["playing"] as? Bool ?? false
+        let playing = args["playing"] as? Bool ?? false
         try? AVAudioSession.sharedInstance().setActive(playing)
         result(nil)
+      case "preparePip":
+        self.prepare(args["on"] as? Bool ?? false)
+        result(nil)
+      case "pipState":
+        let wasPlaying = self.playing
+        self.playing = args["playing"] as? Bool ?? false
+        self.duration = args["duration"] as? Double ?? 0
+        self.live = args["live"] as? Bool ?? false
+        if wasPlaying != self.playing { self.pip?.invalidatePlaybackState() }
+        result(nil)
       case "startPip":
-        guard let url = (call.arguments as? [String: Any])?["url"] as? String, let u = URL(string: url) else {
+        guard let pip = self.pip, pip.isPictureInPicturePossible else {
           result(false)
           return
         }
-        result(self.startPip(u))
+        pip.startPictureInPicture()
+        result(true)
       case "setLogo":
         // iOS shows its own "You have changed the icon" alert; that can't be turned off.
-        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "gtv"
+        let name = args["name"] as? String ?? "gtv"
         guard UIApplication.shared.supportsAlternateIcons else {
           result(nil)
           return
@@ -82,46 +102,108 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
     }
   }
 
-  private func startPip(_ url: URL) -> Bool {
-    guard AVPictureInPictureController.isPictureInPictureSupported(),
-      let window = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first
-    else { return false }
-    cleanUp()
-    // A tiny host view: the player layer has to be in the window hierarchy for PiP to start.
-    let host = UIView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
-    window.addSubview(host)
-    let player = AVPlayer(url: url)
-    let layer = AVPlayerLayer(player: player)
-    layer.frame = host.bounds
-    host.layer.addSublayer(layer)
-    guard let pip = AVPictureInPictureController(playerLayer: layer) else {
-      host.removeFromSuperview()
-      return false
+  /// mpv plays (on): its frames go to the PiP layer, and Home floats it. Off: AVPlayer or nothing plays.
+  private func prepare(_ on: Bool) {
+    if on && host == nil {
+      guard
+        let window = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first
+      else { return }
+      // Behind the Flutter view, at window size: iOS starts PiP on its own only from a layer that counts as shown.
+      let host = UIView(frame: window.bounds)
+      host.isUserInteractionEnabled = false
+      host.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      display.frame = host.bounds
+      display.videoGravity = .resizeAspect
+      host.layer.addSublayer(display)
+      window.insertSubview(host, at: 0)
+      self.host = host
+      let pip = AVPictureInPictureController(
+        contentSource: .init(sampleBufferDisplayLayer: display, playbackDelegate: self))
+      pip.delegate = self
+      self.pip = pip
     }
-    pip.delegate = self
-    self.host = host
-    self.player = player
-    self.pip = pip
-    // Start PiP as soon as it is possible; give up (back to mpv) if AVPlayer can't play this stream.
-    observations.append(pip.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { pip, _ in
-      if pip.isPictureInPicturePossible && !pip.isPictureInPictureActive { pip.startPictureInPicture() }
-    })
-    observations.append(player.observe(\.currentItem?.status, options: [.new]) { [weak self] player, _ in
-      if player.currentItem?.status == .failed { DispatchQueue.main.async { self?.finish(failed: true) } }
-    })
-    player.play()
-    return true
+    pip?.canStartPictureInPictureAutomaticallyFromInline = on
+    TextureHW.pipSink = on ? { [weak self] buffer in self?.enqueue(buffer) } : nil
+    if !on {
+      pip?.stopPictureInPicture()
+      display.sampleBufferRenderer.flush(removingDisplayedImage: true, completionHandler: nil)
+    }
+  }
+
+  /// One of mpv's frames into the PiP layer, shown at once (called on media_kit's render thread).
+  private func enqueue(_ buffer: CVPixelBuffer) {
+    if format == nil || !CMVideoFormatDescriptionMatchesImageBuffer(format!, imageBuffer: buffer) {
+      format = nil
+      CMVideoFormatDescriptionCreateForImageBuffer(
+        allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format)
+    }
+    guard let format else { return }
+    var timing = CMSampleTimingInfo(
+      duration: .invalid, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()), decodeTimeStamp: .invalid)
+    var sample: CMSampleBuffer?
+    CMSampleBufferCreateReadyWithImageBuffer(
+      allocator: nil, imageBuffer: buffer, formatDescription: format, sampleTiming: &timing,
+      sampleBufferOut: &sample)
+    guard let sample else { return }
+    if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true),
+      CFArrayGetCount(attachments) > 0
+    {
+      let dict = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
+      CFDictionarySetValue(
+        dict, Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
+        Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
+    }
+    let renderer = display.sampleBufferRenderer
+    if renderer.status == .failed {
+      renderer.flush()
+    }
+    renderer.enqueue(sample)
+  }
+
+  // MARK: AVPictureInPictureSampleBufferPlaybackDelegate: the PiP window's buttons and seek range.
+
+  func pictureInPictureController(_ controller: AVPictureInPictureController, setPlaying playing: Bool) {
+    self.playing = playing
+    channel.invokeMethod("pipCommand", arguments: ["action": playing ? "play" : "pause"])
+  }
+
+  func pictureInPictureControllerTimeRangeForPlayback(_ controller: AVPictureInPictureController) -> CMTimeRange {
+    live || duration <= 0
+      ? CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+      : CMTimeRange(start: .zero, duration: CMTime(seconds: duration, preferredTimescale: 1000))
+  }
+
+  func pictureInPictureControllerIsPlaybackPaused(_ controller: AVPictureInPictureController) -> Bool {
+    !playing
+  }
+
+  func pictureInPictureController(
+    _ controller: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions
+  ) {}
+
+  func pictureInPictureController(
+    _ controller: AVPictureInPictureController, skipByInterval skipInterval: CMTime,
+    completion completionHandler: @escaping () -> Void
+  ) {
+    channel.invokeMethod("pipCommand", arguments: ["action": "skip", "secs": skipInterval.seconds])
+    completionHandler()
+  }
+
+  // MARK: AVPictureInPictureControllerDelegate
+
+  func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+    TextureHW.pipActive = true
   }
 
   func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-    finish(failed: false)
+    TextureHW.pipActive = false
   }
 
   func pictureInPictureController(
     _ controller: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
-    finish(failed: true)
+    NSLog("GerdtvPlatform: PiP failed: \(error.localizedDescription)")
   }
 
   func pictureInPictureController(
@@ -129,19 +211,5 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
   ) {
     completionHandler(true)
-  }
-
-  private func finish(failed: Bool) {
-    cleanUp()
-    channel.invokeMethod("pipEnded", arguments: ["failed": failed])
-  }
-
-  private func cleanUp() {
-    observations.removeAll()
-    player?.pause()
-    player = nil
-    pip = nil
-    host?.removeFromSuperview()
-    host = nil
   }
 }

@@ -66,18 +66,28 @@ public class VideoOutput: NSObject {
       self._init()
     }
     #if canImport(UIKit)
-      // gerdTV patch: no GL work while iOS has the app in the background (it kills apps that do it); mpv's frames
-      // are dropped meanwhile (TextureHW.render), so sound plays on and the picture is back at once on return.
-      // Debugging: "skipRendering" in the log on each change.
-      for (name, skip) in [
+      // gerdTV patch: no GL work while iOS has the app in the background (it kills apps that do it). Without PiP,
+      // mpv's frames are dropped meanwhile (TextureHW.render), so sound plays on and the picture is back at once on
+      // return. With mpv's picture in PiP, mpv switches to its software renderer at PiP size; that switch still
+      // frees the GL renderer, which iOS allows during this notification, hence the wait (Worker.sync).
+      // Debugging: "VideoOutput: background" in the log on each change.
+      for (name, background) in [
         (UIApplication.didEnterBackgroundNotification, true),
         (UIApplication.willEnterForegroundNotification, false),
       ] {
         observers.append(
-          NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
-            self?.worker.enqueue {
-              NSLog("VideoOutput: skipRendering \(skip)")
-              self?.texture?.skipRendering = skip
+          NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            NSLog("VideoOutput: background \(background), PiP \(TextureHW.pipActive)")
+            if background && TextureHW.pipActive {
+              self.worker.sync { self.texture?.useSoftware(true) }
+            } else if background {
+              self.worker.enqueue { self.texture?.skipRendering = true }
+            } else {
+              self.worker.enqueue {
+                self.texture?.useSoftware(false)
+                self.texture?.skipRendering = false
+              }
             }
           })
       }

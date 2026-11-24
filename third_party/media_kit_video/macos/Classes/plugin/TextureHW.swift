@@ -153,8 +153,10 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     textureContexts.reinit(objects: [], skipCheckArgs: true)
   }
 
-  /// gerdTV patch: see ResizableTextureProtocol.
+  /// gerdTV patch: see ResizableTextureProtocol (iOS only; macOS renders with GL in the background too).
   public var skipRendering = false
+
+  public func useSoftware(_ on: Bool) {}
   private var needsDraw = false
 
   /// gerdTV patch: returns whether a new picture was drawn. mpv's update callback also fires for work that has no

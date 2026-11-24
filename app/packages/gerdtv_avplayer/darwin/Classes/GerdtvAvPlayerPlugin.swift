@@ -153,6 +153,10 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
       textureId = textures.register(self)
     }
     attachLayer(player)
+    #if os(iOS)
+      // Only while AVPlayer plays: mpv's picture has a PiP of its own (app/ios/Runner/AppDelegate.swift).
+      pip?.canStartPictureInPictureAutomaticallyFromInline = true
+    #endif
     frameTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
       self?.pullFrame()
     }
@@ -172,6 +176,9 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
     if pip?.isPictureInPictureActive == true {
       pip?.stopPictureInPicture()
     }
+    #if os(iOS)
+      pip?.canStartPictureInPictureAutomaticallyFromInline = false
+    #endif
     player?.pause()
     player?.replaceCurrentItem(with: nil)
     player = nil
@@ -298,9 +305,6 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
       return
     }
     pip.delegate = self
-    #if os(iOS)
-      pip.canStartPictureInPictureAutomaticallyFromInline = true
-    #endif
     self.pip = pip
   }
 

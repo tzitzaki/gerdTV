@@ -26,6 +26,16 @@ class Worker {
     semaphore.signal()
   }
 
+  /// gerdTV patch: runs [job] on the worker and waits for it (at most 2 s, so a busy worker can't hang the caller).
+  public func sync(_ job: @escaping Job) {
+    let done = DispatchSemaphore(value: 0)
+    enqueue {
+      job()
+      done.signal()
+    }
+    _ = done.wait(timeout: .now() + 2)
+  }
+
   private func loop() {
     while true {
       semaphore.wait()

@@ -17,5 +17,8 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   nothing is drawn while the app is in the background (no GL there).
 - `media_kit_video` 2.0.1: `VideoController(create: …)` takes the video output of a player that isn't mpv (gerdTV's
   AVPlayer engine, `app/lib/player/av_player.dart`).
+- `media_kit_video` 2.0.1, iOS Picture-in-Picture of mpv's picture: `TextureHW.pipSink` receives every drawn frame
+  (the app feeds its PiP layer); in the background with PiP showing (`TextureHW.pipActive`) mpv renders in software at
+  PiP size (`useSoftware`, the track re-selected on the new renderer); `Worker.sync`; `MPV.get/setPropertyString`.
 
 Updating it: copy the new release over the folder in one commit, then re-apply the patches (see git log).

@@ -29,6 +29,10 @@ public class SafeResizableTexture:
     }
   }
 
+  public func useSoftware(_ on: Bool) {
+    locked { child.useSoftware(on) }
+  }
+
   public var skipRendering: Bool {
     get { locked { child.skipRendering } }
     set { locked { child.skipRendering = newValue } }

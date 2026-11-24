@@ -61,24 +61,47 @@ void main() {
     },
   );
 
-  test(
-    'iOS pipEnded reaches the resume callback with the failure flag',
-    () async {
-      final bridge = PlatformBridge(pictureMode: ValueNotifier(false))
-        ..attach();
-      bool? failed;
-      bridge.onApplePipEnded = (f) => failed = f;
+  test('iOS PiP: the floating window\'s buttons arrive as commands, and mpv\'s PiP calls carry no stream URL', () async {
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+          calls.add(call);
+          return call.method == 'startPip' ? true : null;
+        });
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final bridge = PlatformBridge(pictureMode: ValueNotifier(false))..attach();
+    final got = <(String, double)>[];
+    bridge.onPipCommand = (a, s) => got.add((a, s));
+    for (final c in [
+      {'action': 'pause'},
+      {'action': 'skip', 'secs': -15.0},
+    ]) {
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
             PlatformBridge.channel.name,
             PlatformBridge.channel.codec.encodeMethodCall(
-              const MethodCall('pipEnded', {'failed': true}),
+              MethodCall('pipCommand', c),
             ),
             (_) {},
           );
-      expect(failed, isTrue);
-    },
-  );
+    }
+    expect(got, [('pause', 0.0), ('skip', -15.0)]);
+    await bridge.preparePip(true);
+    await bridge.pipState(
+      playing: true,
+      position: 12,
+      duration: 3600,
+      live: false,
+    );
+    expect(await bridge.startApplePip(), isTrue);
+    expect(calls.map((c) => c.method), ['preparePip', 'pipState', 'startPip']);
+    expect(calls.last.arguments, isNull, reason: 'no hand-over URL');
+    // Other platforms send nothing.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await bridge.preparePip(false);
+    expect(calls, hasLength(3));
+  });
 
   test('setLogo sends the name and, on Linux, a PNG of the logo', () async {
     final calls = <MethodCall>[];

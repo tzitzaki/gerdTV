@@ -102,6 +102,8 @@ public class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
   /// gerdTV patch: see ResizableTextureProtocol (software rendering makes no GL calls, so it never skips).
   public var skipRendering = false
 
+  public func useSoftware(_ on: Bool) {}  // renders in software already
+
   public func render(_ size: CGSize) -> Bool {
     let textureContext = textureContexts.nextAvailable()
     if textureContext == nil {
