@@ -230,7 +230,8 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
       "duration": item.duration.isIndefinite ? 0.0 : finite(item.duration.seconds),
       "seekStart": finite(range?.start.seconds ?? 0),
       "seekEnd": finite(range.map { CMTimeRangeGetEnd($0).seconds } ?? 0),
-      "playing": player.timeControlStatus == .playing,
+      // media_kit's "playing" means not paused (mpv stays playing while it buffers); buffering is separate.
+      "playing": player.timeControlStatus != .paused,
       "buffering": player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
       "width": Double(item.presentationSize.width),
       "height": Double(item.presentationSize.height),
