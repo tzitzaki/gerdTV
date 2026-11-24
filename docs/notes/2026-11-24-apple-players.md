@@ -22,3 +22,9 @@ Started 10:40. One branch (feat/apple-27-pip), one PR, one release at the end.
 
 ## Progress
 - 10:40 step 1 started.
+- 10:43 targets: 26.0 instead of 27 (owner: macos-latest is macOS 26 with Xcode 26.6); step 1 done 10:44.
+- 10:44 step 2: the cause was the watchdog's wake rule (every return reloaded live); done 10:50.
+- 10:50 step 3: report_swap left out (it only adds waits: Flutter presents asynchronously); video-out-params per
+  frame kept (one property read, not measurable). Background: nothing is drawn (mpv's skip mode still makes GL
+  calls on reconfig). Done 10:56.
+- 10:56 step 4: local HLS; real libmpv plays it through a provider drop. Done 11:03.
