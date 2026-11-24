@@ -6,8 +6,8 @@
 // - Picture: AVPlayerItemVideoOutput hands BGRA pixel buffers to a Flutter texture (pulled 60 times a second while
 //   the app is in the foreground), so the player, the now-playing bar and the Mac's mini window show it like mpv's.
 // - Picture-in-Picture: an AVPlayerLayer on the same AVPlayer. iOS: behind the Flutter view at window size, with
-//   canStartPictureInPictureAutomaticallyFromInline, so swiping to Home floats the channel by itself. macOS: a tiny
-//   layer in a corner (a subview would draw over Flutter), started from the player's PiP button.
+//   canStartPictureInPictureAutomaticallyFromInline, so swiping to Home floats the channel by itself. macOS: below
+//   the Flutter view at its size too, started from the player's PiP button.
 // - Background (iOS): with PiP not active, the layer lets go of the player, or iOS would pause it (QA1668); sound
 //   plays on. Closing the PiP window keeps the sound too (owner rule: playback ends only by Stop).
 //
@@ -290,10 +290,13 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
       layer.frame = host.bounds
       host.layer.addSublayer(layer)
     #else
-      guard let view = NSApp.windows.first?.contentView else { return }
-      let host = NSView(frame: NSRect(x: 0, y: 0, width: 2, height: 2))
+      // Beside the Flutter view, below it, at its size (a subview of it would draw over Flutter; a 2×2 layer never
+      // made PiP possible).
+      guard let view = NSApp.windows.first?.contentView, let frame = view.superview else { return }
+      let host = NSView(frame: view.frame)
       host.wantsLayer = true
-      view.addSubview(host)
+      host.autoresizingMask = [.width, .height]
+      frame.addSubview(host, positioned: .below, relativeTo: view)
       layer.frame = host.bounds
       host.layer?.addSublayer(layer)
     #endif
