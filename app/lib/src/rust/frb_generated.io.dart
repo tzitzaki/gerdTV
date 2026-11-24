@@ -6,6 +6,7 @@
 import 'api/library.dart';
 import 'api/logos.dart';
 import 'api/playback.dart';
+import 'api/premiumize.dart';
 import 'api/simple.dart';
 import 'api/update.dart';
 
@@ -196,6 +197,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NowNext> dco_decode_list_now_next(dynamic raw);
 
   @protected
+  List<PmEntry> dco_decode_list_pm_entry(dynamic raw);
+
+  @protected
+  List<PmTransfer> dco_decode_list_pm_transfer(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -248,6 +255,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   UpdateInfo? dco_decode_opt_box_autoadd_update_info(dynamic raw);
+
+  @protected
+  PmDeviceCode dco_decode_pm_device_code(dynamic raw);
+
+  @protected
+  PmEntry dco_decode_pm_entry(dynamic raw);
+
+  @protected
+  PmPoll dco_decode_pm_poll(dynamic raw);
+
+  @protected
+  PmTransfer dco_decode_pm_transfer(dynamic raw);
 
   @protected
   ProfileInfo dco_decode_profile_info(dynamic raw);
@@ -469,6 +488,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NowNext> sse_decode_list_now_next(SseDeserializer deserializer);
 
   @protected
+  List<PmEntry> sse_decode_list_pm_entry(SseDeserializer deserializer);
+
+  @protected
+  List<PmTransfer> sse_decode_list_pm_transfer(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -535,6 +560,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   UpdateInfo? sse_decode_opt_box_autoadd_update_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  PmDeviceCode sse_decode_pm_device_code(SseDeserializer deserializer);
+
+  @protected
+  PmEntry sse_decode_pm_entry(SseDeserializer deserializer);
+
+  @protected
+  PmPoll sse_decode_pm_poll(SseDeserializer deserializer);
+
+  @protected
+  PmTransfer sse_decode_pm_transfer(SseDeserializer deserializer);
 
   @protected
   ProfileInfo sse_decode_profile_info(SseDeserializer deserializer);
@@ -798,6 +835,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_now_next(List<NowNext> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_pm_entry(List<PmEntry> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_pm_transfer(
+    List<PmTransfer> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -886,6 +932,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     UpdateInfo? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_pm_device_code(PmDeviceCode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pm_entry(PmEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pm_poll(PmPoll self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pm_transfer(PmTransfer self, SseSerializer serializer);
 
   @protected
   void sse_encode_profile_info(ProfileInfo self, SseSerializer serializer);

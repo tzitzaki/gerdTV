@@ -6,6 +6,7 @@
 import 'api/library.dart';
 import 'api/logos.dart';
 import 'api/playback.dart';
+import 'api/premiumize.dart';
 import 'api/simple.dart';
 import 'api/update.dart';
 
@@ -73,7 +74,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1492533363;
+  int get rustContentHash => -1229920240;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -447,6 +448,26 @@ abstract class RustLibApi extends BaseApi {
   Future<String?> crateApiLogosLogoFile({required String url});
 
   BufferChoice crateApiPlaybackParseBuffer({required String key});
+
+  Future<void> crateApiPremiumizePmCheck({required String token});
+
+  Future<PmPoll> crateApiPremiumizePmDevicePoll({
+    required String clientId,
+    required String deviceCode,
+  });
+
+  Future<PmDeviceCode> crateApiPremiumizePmDeviceStart({
+    required String clientId,
+  });
+
+  Future<List<PmEntry>> crateApiPremiumizePmFolder({
+    required String token,
+    String? id,
+  });
+
+  Future<List<PmTransfer>> crateApiPremiumizePmTransfers({
+    required String token,
+  });
 
   String crateApiUpdateReleasePage();
 
@@ -3013,12 +3034,167 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "parse_buffer", argNames: ["key"]);
 
   @override
+  Future<void> crateApiPremiumizePmCheck({required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 74,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPremiumizePmCheckConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPremiumizePmCheckConstMeta =>
+      const TaskConstMeta(debugName: "pm_check", argNames: ["token"]);
+
+  @override
+  Future<PmPoll> crateApiPremiumizePmDevicePoll({
+    required String clientId,
+    required String deviceCode,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(clientId, serializer);
+          sse_encode_String(deviceCode, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 75,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pm_poll,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPremiumizePmDevicePollConstMeta,
+        argValues: [clientId, deviceCode],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPremiumizePmDevicePollConstMeta =>
+      const TaskConstMeta(
+        debugName: "pm_device_poll",
+        argNames: ["clientId", "deviceCode"],
+      );
+
+  @override
+  Future<PmDeviceCode> crateApiPremiumizePmDeviceStart({
+    required String clientId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(clientId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 76,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pm_device_code,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPremiumizePmDeviceStartConstMeta,
+        argValues: [clientId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPremiumizePmDeviceStartConstMeta =>
+      const TaskConstMeta(debugName: "pm_device_start", argNames: ["clientId"]);
+
+  @override
+  Future<List<PmEntry>> crateApiPremiumizePmFolder({
+    required String token,
+    String? id,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          sse_encode_opt_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 77,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_pm_entry,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPremiumizePmFolderConstMeta,
+        argValues: [token, id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPremiumizePmFolderConstMeta =>
+      const TaskConstMeta(debugName: "pm_folder", argNames: ["token", "id"]);
+
+  @override
+  Future<List<PmTransfer>> crateApiPremiumizePmTransfers({
+    required String token,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 78,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_pm_transfer,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPremiumizePmTransfersConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPremiumizePmTransfersConstMeta =>
+      const TaskConstMeta(debugName: "pm_transfers", argNames: ["token"]);
+
+  @override
   String crateApiUpdateReleasePage() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 74)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 79)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -3048,7 +3224,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 75,
+            funcId: 80,
             port: port_,
           );
         },
@@ -3081,7 +3257,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(dir, serializer);
           sse_encode_String(key, serializer);
           sse_encode_String(value, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 76)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 81)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -3115,7 +3291,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_box_autoadd_u_64(bitrateBps, serializer);
           sse_encode_u_64(freeDiskBytes, serializer);
           sse_encode_String(cacheDir, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 77)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 82)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_mpv_option,
@@ -3546,6 +3722,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<PmEntry> dco_decode_list_pm_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_pm_entry).toList();
+  }
+
+  @protected
+  List<PmTransfer> dco_decode_list_pm_transfer(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_pm_transfer).toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
@@ -3663,6 +3851,67 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   UpdateInfo? dco_decode_opt_box_autoadd_update_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_update_info(raw);
+  }
+
+  @protected
+  PmDeviceCode dco_decode_pm_device_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PmDeviceCode(
+      deviceCode: dco_decode_String(arr[0]),
+      userCode: dco_decode_String(arr[1]),
+      verificationUri: dco_decode_String(arr[2]),
+      interval: dco_decode_u_32(arr[3]),
+      expiresIn: dco_decode_u_32(arr[4]),
+    );
+  }
+
+  @protected
+  PmEntry dco_decode_pm_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return PmEntry(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      folder: dco_decode_bool(arr[2]),
+      size: dco_decode_u_64(arr[3]),
+      playable: dco_decode_bool(arr[4]),
+      link: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  PmPoll dco_decode_pm_poll(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return PmPoll(
+      token: dco_decode_opt_String(arr[0]),
+      failed: dco_decode_opt_String(arr[1]),
+      slowDown: dco_decode_bool(arr[2]),
+    );
+  }
+
+  @protected
+  PmTransfer dco_decode_pm_transfer(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return PmTransfer(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      status: dco_decode_String(arr[2]),
+      progress: dco_decode_f_64(arr[3]),
+      message: dco_decode_String(arr[4]),
+      folderId: dco_decode_String(arr[5]),
+      fileId: dco_decode_String(arr[6]),
+    );
   }
 
   @protected
@@ -4347,6 +4596,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<PmEntry> sse_decode_list_pm_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PmEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pm_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PmTransfer> sse_decode_list_pm_transfer(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PmTransfer>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pm_transfer(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -4552,6 +4825,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  PmDeviceCode sse_decode_pm_device_code(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_deviceCode = sse_decode_String(deserializer);
+    var var_userCode = sse_decode_String(deserializer);
+    var var_verificationUri = sse_decode_String(deserializer);
+    var var_interval = sse_decode_u_32(deserializer);
+    var var_expiresIn = sse_decode_u_32(deserializer);
+    return PmDeviceCode(
+      deviceCode: var_deviceCode,
+      userCode: var_userCode,
+      verificationUri: var_verificationUri,
+      interval: var_interval,
+      expiresIn: var_expiresIn,
+    );
+  }
+
+  @protected
+  PmEntry sse_decode_pm_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_folder = sse_decode_bool(deserializer);
+    var var_size = sse_decode_u_64(deserializer);
+    var var_playable = sse_decode_bool(deserializer);
+    var var_link = sse_decode_String(deserializer);
+    return PmEntry(
+      id: var_id,
+      name: var_name,
+      folder: var_folder,
+      size: var_size,
+      playable: var_playable,
+      link: var_link,
+    );
+  }
+
+  @protected
+  PmPoll sse_decode_pm_poll(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_token = sse_decode_opt_String(deserializer);
+    var var_failed = sse_decode_opt_String(deserializer);
+    var var_slowDown = sse_decode_bool(deserializer);
+    return PmPoll(token: var_token, failed: var_failed, slowDown: var_slowDown);
+  }
+
+  @protected
+  PmTransfer sse_decode_pm_transfer(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_progress = sse_decode_f_64(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_folderId = sse_decode_String(deserializer);
+    var var_fileId = sse_decode_String(deserializer);
+    return PmTransfer(
+      id: var_id,
+      name: var_name,
+      status: var_status,
+      progress: var_progress,
+      message: var_message,
+      folderId: var_folderId,
+      fileId: var_fileId,
+    );
   }
 
   @protected
@@ -5212,6 +5551,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_pm_entry(List<PmEntry> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pm_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pm_transfer(
+    List<PmTransfer> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pm_transfer(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -5410,6 +5770,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_box_autoadd_update_info(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_pm_device_code(PmDeviceCode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.deviceCode, serializer);
+    sse_encode_String(self.userCode, serializer);
+    sse_encode_String(self.verificationUri, serializer);
+    sse_encode_u_32(self.interval, serializer);
+    sse_encode_u_32(self.expiresIn, serializer);
+  }
+
+  @protected
+  void sse_encode_pm_entry(PmEntry self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_bool(self.folder, serializer);
+    sse_encode_u_64(self.size, serializer);
+    sse_encode_bool(self.playable, serializer);
+    sse_encode_String(self.link, serializer);
+  }
+
+  @protected
+  void sse_encode_pm_poll(PmPoll self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.token, serializer);
+    sse_encode_opt_String(self.failed, serializer);
+    sse_encode_bool(self.slowDown, serializer);
+  }
+
+  @protected
+  void sse_encode_pm_transfer(PmTransfer self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_f_64(self.progress, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_String(self.folderId, serializer);
+    sse_encode_String(self.fileId, serializer);
   }
 
   @protected

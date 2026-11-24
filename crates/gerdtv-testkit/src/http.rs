@@ -1,5 +1,6 @@
 //! A tiny HTTP/1.1 server for the test kit's mock servers (fault stream server, mock Xtream Codes, mock TMDB,
-//! mock release server). Deliberately minimal: GET/HEAD only, one request per connection (`Connection: close`),
+//! mock release server, mock Premiumize). Deliberately minimal: GET/HEAD, plus POST with a form body (Premiumize's
+//! token endpoint), one request per connection (`Connection: close`),
 //! no TLS. That is all the clients under test (reqwest, libmpv/FFmpeg) need, and it keeps the fault behaviour
 //! (stalls, drops, throttling) fully under the test's control, which a full server framework would hide.
 //!
@@ -19,6 +20,7 @@ pub struct Request {
     pub method: String,
     /// The path without the query string, percent-decoding not applied (tests use plain ASCII paths).
     pub path: String,
+    /// The query string's pairs, then a form body's (POST, `application/x-www-form-urlencoded`), not decoded.
     pub query: Vec<(String, String)>,
     pub headers: Vec<(String, String)>,
 }
@@ -81,7 +83,7 @@ impl Drop for Server {
     }
 }
 
-/// Reads the request head (up to the blank line). Bodies are never needed: every mock is GET-only.
+/// Reads the request head (up to the blank line), and a form body when Content-Length announces one.
 async fn read_request(stream: &mut TcpStream) -> Option<Request> {
     let mut buf = Vec::with_capacity(1024);
     let mut chunk = [0u8; 1024];
@@ -92,7 +94,25 @@ async fn read_request(stream: &mut TcpStream) -> Option<Request> {
         }
         buf.extend_from_slice(&chunk[..n]);
     }
-    let head = String::from_utf8_lossy(&buf);
+    let end = buf.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
+    let head = String::from_utf8_lossy(&buf[..end]).to_string();
+    let length: usize = head
+        .lines()
+        .find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            k.eq_ignore_ascii_case("content-length")
+                .then(|| v.trim().parse().ok())?
+        })
+        .unwrap_or(0);
+    let mut body = buf[end..].to_vec();
+    while body.len() < length.min(64 * 1024) {
+        let n = stream.read(&mut chunk).await.ok()?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&chunk[..n]);
+    }
+    let body = String::from_utf8_lossy(&body).to_string();
     let mut lines = head.split("\r\n");
     let mut first = lines.next()?.split(' ');
     let method = first.next()?.to_string();
@@ -100,6 +120,7 @@ async fn read_request(stream: &mut TcpStream) -> Option<Request> {
     let (path, query) = target.split_once('?').unwrap_or((&target, ""));
     let query = query
         .split('&')
+        .chain(body.split('&'))
         .filter(|p| !p.is_empty())
         .map(|p| {
             let (k, v) = p.split_once('=').unwrap_or((p, ""));

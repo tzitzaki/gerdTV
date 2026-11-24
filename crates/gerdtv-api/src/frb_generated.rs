@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1492533363;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1229920240;
 
 // Section: executor
 
@@ -3546,6 +3546,192 @@ fn wire__crate__api__playback__parse_buffer_impl(
         },
     )
 }
+fn wire__crate__api__premiumize__pm_check_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pm_check",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::premiumize::pm_check(api_token).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__premiumize__pm_device_poll_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pm_device_poll",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client_id = <String>::sse_decode(&mut deserializer);
+            let api_device_code = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::premiumize::pm_device_poll(api_client_id, api_device_code)
+                                .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__premiumize__pm_device_start_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pm_device_start",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::premiumize::pm_device_start(api_client_id).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__premiumize__pm_folder_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pm_folder",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            let api_id = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::premiumize::pm_folder(api_token, api_id).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__premiumize__pm_transfers_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "pm_transfers",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::premiumize::pm_transfers(api_token).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__update__release_page_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -4156,6 +4342,32 @@ impl SseDecode for Vec<crate::api::library::NowNext> {
     }
 }
 
+impl SseDecode for Vec<crate::api::premiumize::PmEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::premiumize::PmEntry>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::premiumize::PmTransfer> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::premiumize::PmTransfer>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4372,6 +4584,80 @@ impl SseDecode for Option<crate::api::update::UpdateInfo> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for crate::api::premiumize::PmDeviceCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_deviceCode = <String>::sse_decode(deserializer);
+        let mut var_userCode = <String>::sse_decode(deserializer);
+        let mut var_verificationUri = <String>::sse_decode(deserializer);
+        let mut var_interval = <u32>::sse_decode(deserializer);
+        let mut var_expiresIn = <u32>::sse_decode(deserializer);
+        return crate::api::premiumize::PmDeviceCode {
+            device_code: var_deviceCode,
+            user_code: var_userCode,
+            verification_uri: var_verificationUri,
+            interval: var_interval,
+            expires_in: var_expiresIn,
+        };
+    }
+}
+
+impl SseDecode for crate::api::premiumize::PmEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_folder = <bool>::sse_decode(deserializer);
+        let mut var_size = <u64>::sse_decode(deserializer);
+        let mut var_playable = <bool>::sse_decode(deserializer);
+        let mut var_link = <String>::sse_decode(deserializer);
+        return crate::api::premiumize::PmEntry {
+            id: var_id,
+            name: var_name,
+            folder: var_folder,
+            size: var_size,
+            playable: var_playable,
+            link: var_link,
+        };
+    }
+}
+
+impl SseDecode for crate::api::premiumize::PmPoll {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_token = <Option<String>>::sse_decode(deserializer);
+        let mut var_failed = <Option<String>>::sse_decode(deserializer);
+        let mut var_slowDown = <bool>::sse_decode(deserializer);
+        return crate::api::premiumize::PmPoll {
+            token: var_token,
+            failed: var_failed,
+            slow_down: var_slowDown,
+        };
+    }
+}
+
+impl SseDecode for crate::api::premiumize::PmTransfer {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_status = <String>::sse_decode(deserializer);
+        let mut var_progress = <f64>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        let mut var_folderId = <String>::sse_decode(deserializer);
+        let mut var_fileId = <String>::sse_decode(deserializer);
+        return crate::api::premiumize::PmTransfer {
+            id: var_id,
+            name: var_name,
+            status: var_status,
+            progress: var_progress,
+            message: var_message,
+            folder_id: var_folderId,
+            file_id: var_fileId,
+        };
     }
 }
 
@@ -4688,7 +4974,12 @@ fn pde_ffi_dispatcher_primary_impl(
         69 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
         71 => wire__crate__api__library__list_profiles_impl(port, ptr, rust_vec_len, data_len),
         72 => wire__crate__api__logos__logo_file_impl(port, ptr, rust_vec_len, data_len),
-        75 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
+        74 => wire__crate__api__premiumize__pm_check_impl(port, ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__premiumize__pm_device_poll_impl(port, ptr, rust_vec_len, data_len),
+        76 => wire__crate__api__premiumize__pm_device_start_impl(port, ptr, rust_vec_len, data_len),
+        77 => wire__crate__api__premiumize__pm_folder_impl(port, ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__premiumize__pm_transfers_impl(port, ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4748,9 +5039,9 @@ fn pde_ffi_dispatcher_sync_impl(
         68 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
         70 => wire__crate__api__logos__init_logo_cache_impl(ptr, rust_vec_len, data_len),
         73 => wire__crate__api__playback__parse_buffer_impl(ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
-        76 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
-        77 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
+        81 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
+        82 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5137,6 +5428,103 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::library::NowNext>
     for crate::api::library::NowNext
 {
     fn into_into_dart(self) -> crate::api::library::NowNext {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::premiumize::PmDeviceCode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.device_code.into_into_dart().into_dart(),
+            self.user_code.into_into_dart().into_dart(),
+            self.verification_uri.into_into_dart().into_dart(),
+            self.interval.into_into_dart().into_dart(),
+            self.expires_in.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::premiumize::PmDeviceCode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::premiumize::PmDeviceCode>
+    for crate::api::premiumize::PmDeviceCode
+{
+    fn into_into_dart(self) -> crate::api::premiumize::PmDeviceCode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::premiumize::PmEntry {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.folder.into_into_dart().into_dart(),
+            self.size.into_into_dart().into_dart(),
+            self.playable.into_into_dart().into_dart(),
+            self.link.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::premiumize::PmEntry
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::premiumize::PmEntry>
+    for crate::api::premiumize::PmEntry
+{
+    fn into_into_dart(self) -> crate::api::premiumize::PmEntry {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::premiumize::PmPoll {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.token.into_into_dart().into_dart(),
+            self.failed.into_into_dart().into_dart(),
+            self.slow_down.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::premiumize::PmPoll
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::premiumize::PmPoll>
+    for crate::api::premiumize::PmPoll
+{
+    fn into_into_dart(self) -> crate::api::premiumize::PmPoll {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::premiumize::PmTransfer {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.status.into_into_dart().into_dart(),
+            self.progress.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+            self.folder_id.into_into_dart().into_dart(),
+            self.file_id.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::premiumize::PmTransfer
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::premiumize::PmTransfer>
+    for crate::api::premiumize::PmTransfer
+{
+    fn into_into_dart(self) -> crate::api::premiumize::PmTransfer {
         self
     }
 }
@@ -5752,6 +6140,26 @@ impl SseEncode for Vec<crate::api::library::NowNext> {
     }
 }
 
+impl SseEncode for Vec<crate::api::premiumize::PmEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::premiumize::PmEntry>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::premiumize::PmTransfer> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::premiumize::PmTransfer>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5925,6 +6333,51 @@ impl SseEncode for Option<crate::api::update::UpdateInfo> {
         if let Some(value) = self {
             <crate::api::update::UpdateInfo>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::premiumize::PmDeviceCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.device_code, serializer);
+        <String>::sse_encode(self.user_code, serializer);
+        <String>::sse_encode(self.verification_uri, serializer);
+        <u32>::sse_encode(self.interval, serializer);
+        <u32>::sse_encode(self.expires_in, serializer);
+    }
+}
+
+impl SseEncode for crate::api::premiumize::PmEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <bool>::sse_encode(self.folder, serializer);
+        <u64>::sse_encode(self.size, serializer);
+        <bool>::sse_encode(self.playable, serializer);
+        <String>::sse_encode(self.link, serializer);
+    }
+}
+
+impl SseEncode for crate::api::premiumize::PmPoll {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<String>>::sse_encode(self.token, serializer);
+        <Option<String>>::sse_encode(self.failed, serializer);
+        <bool>::sse_encode(self.slow_down, serializer);
+    }
+}
+
+impl SseEncode for crate::api::premiumize::PmTransfer {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.status, serializer);
+        <f64>::sse_encode(self.progress, serializer);
+        <String>::sse_encode(self.message, serializer);
+        <String>::sse_encode(self.folder_id, serializer);
+        <String>::sse_encode(self.file_id, serializer);
     }
 }
 
