@@ -23,6 +23,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
 - Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or, in builds with gerdTV's client id, a device code; no torrent search.
+- Watch tracking: Trakt and Simkl by scrobbling (start, pause, stop with progress), linked by device code; no secret in the repository or the app: public client ids from repository variables, Trakt with the user's own app.
 - Trailers: the panel's YouTube trailer in YouTube's embed (webview_flutter), muted behind a movie's or series' title after 2 s, with sound from the Trailer button; movies open a page before playing (Continue watching plays at once).
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.

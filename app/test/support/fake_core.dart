@@ -2,6 +2,7 @@
 // class, so widget tests run without building or loading libgerdtv_api. Add an override per API call a test needs;
 // calls that aren't overridden throw (noSuchMethod), which points straight at the missing fake.
 import 'package:gerdtv/src/rust/api/library.dart';
+import 'package:gerdtv/src/rust/api/tracking.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 
 class FakeCore implements RustLibApi {
@@ -43,6 +44,24 @@ class FakeCore implements RustLibApi {
   @override
   Future<void> crateApiPremiumizePmCheck({required String token}) async {
     if (token == 'bad') throw 'Premiumize: authentication_failed';
+  }
+
+  /// Trakt/Simkl scrobbles as "service action progress"; [scrobbleRefresh] is returned as a refreshed token.
+  final scrobbles = <String>[];
+  String? scrobbleRefresh;
+
+  @override
+  Future<String?> crateApiTrackingTrackScrobble({
+    required String service,
+    required String clientId,
+    required String clientSecret,
+    required String token,
+    required String action,
+    required TrackItem item,
+    required double progress,
+  }) async {
+    scrobbles.add('$service $action ${progress.round()}');
+    return scrobbleRefresh;
   }
 
   @override

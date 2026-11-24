@@ -21,6 +21,7 @@ import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'reminders.dart';
 import 'secrets.dart';
+import 'tracking.dart';
 
 /// `choosing`: more than one profile and none set to open by itself: the start picker shows.
 enum SessionState { loading, needsSetup, choosing, ready }
@@ -241,7 +242,7 @@ class Session extends ChangeNotifier {
     unawaited(applyMenuBar(menuBar));
     platform.onMenuBar = (action) async {
       if (action == 'stop') return stopPlayback();
-      player.state.playing ? await adapter.pause() : await adapter.resume();
+      await userPause(player.state.playing);
     };
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
@@ -310,6 +311,7 @@ class Session extends ChangeNotifier {
       );
       profile = p;
       premiumizeToken = await secrets.readService(p.id, 'premiumize');
+      await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
       unawaited(
@@ -427,6 +429,7 @@ class Session extends ChangeNotifier {
       return; // reopening the player for the running stream: keep it going
     }
     _saveProgress(); // the one playing until now
+    _track('stop');
     _progressTimer ??= Timer.periodic(
       const Duration(seconds: 10),
       (_) => _saveProgress(),
@@ -435,10 +438,34 @@ class Session extends ChangeNotifier {
     nowPlaying.value = item;
     _playingKey = item.key;
     await _start(item, lib);
+    _track('start', item: item);
   }
 
   /// The services a profile can link (their tokens live in [secrets], one per profile and service).
-  static const linkedServices = ['premiumize', 'trakt', 'simkl'];
+  static const linkedServices = ['premiumize', 'trakt', 'trakt-app', 'simkl'];
+
+  /// Trakt and Simkl for the open profile (services/tracking.dart).
+  late final tracking = Tracking(secrets);
+
+  /// Tells Trakt and Simkl what the running movie or episode does ([action]: start, pause, stop), with how far it
+  /// got; nothing for anything else.
+  void _track(String action, {ItemInfo? item}) {
+    final it = item ?? nowPlaying.value;
+    final lib = library;
+    if (it == null || lib == null) return;
+    final dur = player.state.duration.inSeconds;
+    final progress = dur > 0
+        ? player.state.position.inSeconds * 100 / dur
+        : 0.0;
+    unawaited(tracking.scrobble(lib, it.key, action, progress.toDouble()));
+  }
+
+  /// A pause or resume by the user (the player's button or Space, the macOS menu bar): the watchdog's own pause,
+  /// and the tracking services hear of it.
+  Future<void> userPause(bool pause) async {
+    _track(pause ? 'pause' : 'start');
+    pause ? await adapter.pause() : await adapter.resume();
+  }
 
   /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
   String? premiumizeToken;
@@ -613,6 +640,7 @@ class Session extends ChangeNotifier {
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
     _saveProgress();
+    _track('stop');
     _playingKey = null;
     nowPlaying.value = null;
     timeshiftWindow.value = 0;

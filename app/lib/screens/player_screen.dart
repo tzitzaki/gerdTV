@@ -423,11 +423,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePause() async {
-    final a = widget.session.adapter;
     if (!_paused && _shiftable) {
       _liveEdge.detach(); // paused: live moves on without us
     }
-    _paused ? await a.resume() : await a.pause();
+    await widget.session.userPause(!_paused);
     setState(() => _paused = !_paused);
   }
 

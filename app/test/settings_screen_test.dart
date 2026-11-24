@@ -1,5 +1,5 @@
 // New, because nothing owns the shape of Settings: the search filter (every word must match an entry's title,
-// keywords or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
+// keywords, subcategory or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
 // that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
 // app-wide.
 import 'package:flutter_test/flutter_test.dart';
@@ -13,13 +13,18 @@ import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_core.dart';
 
-SettingsEntry entry(String id, String title, [String keywords = '']) =>
-    SettingsEntry(
-      id: id,
-      title: title,
-      keywords: keywords,
-      build: (_) => const SizedBox(),
-    );
+SettingsEntry entry(
+  String id,
+  String title, [
+  String keywords = '',
+  String? section,
+]) => SettingsEntry(
+  id: id,
+  title: title,
+  keywords: keywords,
+  section: section,
+  build: (_) => Text('entry $id'),
+);
 
 void main() {
   final categories = [
@@ -38,6 +43,16 @@ void main() {
       title: 'Über',
       entries: [entry('licences', 'Lizenzen')],
     ),
+    SettingsCategory(
+      id: 'account',
+      icon: Icons.abc,
+      title: 'Konto',
+      entries: [
+        entry('sync', 'Jetzt aktualisieren', '', 'Mein Anbieter'),
+        entry('remove', 'Entfernen', '', 'Mein Anbieter'),
+        entry('trakt', 'Verbinden', '', 'Trakt'),
+      ],
+    ),
   ];
 
   test('filterSettings keeps matching entries under their category', () {
@@ -46,8 +61,15 @@ void main() {
         '${c.id}:${c.entries.map((e) => e.id).join(',')}',
     ].join(' ');
     for (final (query, want) in [
-      ('', 'playback:buffer,timeshift about:licences'), // nothing typed: all
-      ('  ', 'playback:buffer,timeshift about:licences'),
+      (
+        '',
+        'playback:buffer,timeshift about:licences account:sync,remove,trakt',
+      ), // nothing typed: all
+      (
+        '  ',
+        'playback:buffer,timeshift about:licences account:sync,remove,trakt',
+      ),
+      ('trakt', 'account:trakt'), // the subcategory's heading
       ('puff', 'playback:buffer'), // title, any case
       ('CACHE', 'playback:buffer'), // keyword
       ('verzogerung', 'playback:buffer'), // umlaut folded
@@ -107,8 +129,13 @@ void main() {
       for (final id in ['guide', 'data', 'updates', 'health']) {
         expect(find.byKey(Key('settings.cat.$id')), findsNothing);
       }
-      // The first category shows; another one replaces it.
+      // The first category shows; another one replaces it. Account's entries sit under their subcategory: the
+      // provider's (its name, "Provider" without one) once, however many entries it has.
       expect(find.byKey(const Key('settings.remove')), findsOneWidget);
+      expect(
+        find.byKey(const Key('settings.section.Provider')),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('settings.cat.about')));
       await tester.pump();
       expect(find.byKey(const Key('settings.remove')), findsNothing);

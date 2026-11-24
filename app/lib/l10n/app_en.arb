@@ -141,6 +141,7 @@
   },
   "hiddenGroups": "Hidden groups",
   "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
+  "linkCodeHint": "Open this address on another device and enter the code:",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
@@ -207,7 +208,6 @@
   "premiumize": "Premiumize",
   "premiumizeCloud": "Premiumize cloud",
   "premiumizeCode": "Sign in with a code",
-  "premiumizeCodeHint": "Open this address on another device and enter the code:",
   "premiumizeEmpty": "Nothing here yet.",
   "premiumizeKey": "Premiumize API key",
   "premiumizeKeyHint": "On premiumize.me under Account → API key.",
@@ -310,6 +310,7 @@
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",
   "settingsKeywordsTimeshift": "pause rewind live",
+  "settingsKeywordsTracking": "trakt simkl tracking scrobble watched history",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
   "settingsLastSync": "{entries} entries in {categories} groups",
@@ -329,6 +330,7 @@
   "settingsLogoHint": "Also changes the app icon.",
   "settingsNoMatch": "No settings match.",
   "settingsPlayback": "Playback",
+  "settingsProvider": "Provider",
   "settingsRemove": "Remove this account",
   "settingsRemoveConfirm": "Remove the account and its catalogue from this device? You'll need to enter the login again.",
   "settingsSearchHint": "Search settings",
@@ -390,6 +392,27 @@
     }
   },
   "timeshiftOff": "Off",
+  "trackClientId": "Client ID",
+  "trackClientSecret": "Client secret",
+  "trackHint": "Movies and episodes you watch are reported as you watch them; from 80 % they count as watched.",
+  "trackLink": "Link {service}",
+  "@trackLink": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "trackLinked": "{service} is linked",
+  "@trackLinked": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "trackOwnAppHint": "Trakt needs your own Trakt app (no secret ships with gerdTV): on trakt.tv under Settings → Your API Apps → New Application, with the redirect URI urn:ietf:wg:oauth:2.0:oob; enter its client ID and secret here.",
+  "trackUnavailable": "Not in this build: it needs gerdTV's registration with the service.",
   "trailer": "Trailer",
   "trailerOnYouTube": "Watch on YouTube",
   "updateAvailable": "Version {version} is available",

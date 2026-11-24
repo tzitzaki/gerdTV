@@ -8,8 +8,10 @@
 //! sent for live TV, catch-up or Premiumize files.
 //!
 //! Tokens: an access token with a refresh token and its expiry, kept by the app in its secure storage as JSON
-//! ([Token::to_json]); refreshed here a minute before it runs out. gerdTV's client ids (and Trakt's secret, which a
-//! device app can't keep secret anyway) come from the build (`--dart-define`), never from the repository.
+//! ([Token::to_json]); refreshed here a minute before it runs out. No secret ships with gerdTV (owner decision: the
+//! repository is public and a secret inside an app can be extracted): Simkl needs only gerdTV's client id, a public
+//! identifier the release build gets as a define; Trakt needs a secret too, so each user links their own Trakt app,
+//! whose id and secret the app passes in from the device's secure storage.
 //!
 //! APIs: Trakt v2 (https://api.trakt.tv, headers trakt-api-version 2 and trakt-api-key), Simkl's OAuth 2 device flow
 //! (https://api.simkl.com/oauth2/device, every call with client_id, app-name, app-version and a User-Agent).

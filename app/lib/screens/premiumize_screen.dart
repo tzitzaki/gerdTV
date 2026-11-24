@@ -3,8 +3,8 @@
 // progress (a finished one opens its folder). The core talks to Premiumize (gerdtv_core::premiumize); the token is
 // in the secure storage (Session.linkPremiumize).
 // Linking: the account's API key (premiumize.me/account) works for everyone; the code login (premiumize.me/device)
-// shows only when the build has gerdTV's registered client id (--dart-define=GERDTV_PREMIUMIZE_CLIENT_ID=…, from
-// a CI secret).
+// shows only when the build has gerdTV's registered client id (--dart-define=GERDTV_PREMIUMIZE_CLIENT_ID=…, a
+// public identifier from a repository variable; no secret ships in the app).
 // Debugging: "authentication_failed" in an error line means Premiumize no longer accepts the key or token: link it
 // again.
 
@@ -18,7 +18,7 @@ import '../src/rust/api/library.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'player_screen.dart';
-import 'update_settings.dart' show openOrShow;
+import 'link_dialog.dart';
 
 /// gerdTV's client id at Premiumize, given to release builds; empty: only the API key links.
 const premiumizeClientId = String.fromEnvironment(
@@ -302,57 +302,23 @@ class _PremiumizeSettingsState extends State<PremiumizeSettings> {
   }
 }
 
-/// The code login: shows the code and premiumize.me/device, polls until confirmed; the token, or null if the
-/// user closed the dialog. A refused or expired code throws its reason.
+/// The code login at premiumize.me/device (link_dialog.dart).
 Future<String?> _deviceLogin(BuildContext context) async {
   final code = await pmDeviceStart(clientId: premiumizeClientId);
   if (!context.mounted) return null;
-  var open = true;
-  final l10n = AppLocalizations.of(context);
-  final dialog = showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(l10n.premiumizeCode),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(l10n.premiumizeCodeHint),
-          const SizedBox(height: Tokens.space),
-          SelectableText(
-            code.userCode,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          TextButton(
-            onPressed: () => openOrShow(context, code.verificationUri),
-            child: Text(code.verificationUri),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.close),
-        ),
-      ],
-    ),
-  ).whenComplete(() => open = false);
-  var wait = Duration(seconds: code.interval);
-  final end = DateTime.now().add(Duration(seconds: code.expiresIn));
-  try {
-    while (open && DateTime.now().isBefore(end)) {
-      await Future<void>.delayed(wait);
-      if (!open) return null;
+  return deviceCodeLogin(
+    context,
+    title: AppLocalizations.of(context).premiumizeCode,
+    userCode: code.userCode,
+    uri: code.verificationUri,
+    interval: code.interval,
+    expiresIn: code.expiresIn,
+    poll: () async {
       final p = await pmDevicePoll(
         clientId: premiumizeClientId,
         deviceCode: code.deviceCode,
       );
-      if (p.token != null) return p.token;
-      if (p.failed != null) throw p.failed!;
-      if (p.slowDown) wait += const Duration(seconds: 5);
-    }
-    return null;
-  } finally {
-    if (open && context.mounted) Navigator.of(context).pop();
-    await dialog;
-  }
+      return (token: p.token, failed: p.failed, slowDown: p.slowDown);
+    },
+  );
 }

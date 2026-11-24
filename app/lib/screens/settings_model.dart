@@ -11,6 +11,7 @@ class SettingsEntry {
     required this.id,
     required this.title,
     this.keywords = '',
+    this.section,
     required this.build,
   });
 
@@ -22,6 +23,10 @@ class SettingsEntry {
 
   /// Extra words the search matches (localized, space-separated), e.g. "cache" for the buffer.
   final String keywords;
+
+  /// The subcategory heading it sits under (Account: the provider, Premiumize, Trakt, Simkl); consecutive entries
+  /// with the same one share it. The search matches it too.
+  final String? section;
   final WidgetBuilder build;
 }
 
@@ -70,7 +75,9 @@ List<SettingsCategory> filterSettings(
     final entries = [
       for (final e in c.entries)
         if (words.every(
-          foldForSearch('${e.title} ${e.keywords} ${c.title}').contains,
+          foldForSearch(
+            '${e.title} ${e.keywords} ${e.section ?? ''} ${c.title}',
+          ).contains,
         ))
           e,
     ];

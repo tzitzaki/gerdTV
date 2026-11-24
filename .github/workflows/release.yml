@@ -12,6 +12,11 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # gerdTV's public client ids at Premiumize and Simkl (OAuth identifiers, not secrets; no secret ships in the app:
+  # docs/RELEASING.md). Repository variables, so nothing is in the repository; empty: that login is hidden.
+  GERDTV_DEFINES: >-
+    --dart-define=GERDTV_PREMIUMIZE_CLIENT_ID=${{ vars.GERDTV_PREMIUMIZE_CLIENT_ID }}
+    --dart-define=GERDTV_SIMKL_CLIENT_ID=${{ vars.GERDTV_SIMKL_CLIENT_ID }}
 
 jobs:
   apple:
@@ -53,7 +58,7 @@ jobs:
       - name: macOS app (signed; zip for the updater, DMG for the first install)
         run: |
           version="${GITHUB_REF_NAME#v}"
-          cd app && flutter build macos --release
+          cd app && flutter build macos --release $GERDTV_DEFINES
           app=build/macos/Build/Products/Release/gerdTV.app
           # Re-sign the whole bundle with the stable certificate (Flutter signs ad hoc), keeping the entitlements.
           codesign --force --deep --timestamp=none --preserve-metadata=entitlements \
@@ -65,7 +70,7 @@ jobs:
       - name: iOS IPA (unsigned, for a re-signing service)
         run: |
           version="${GITHUB_REF_NAME#v}"
-          cd app && flutter build ios --release --no-codesign
+          cd app && flutter build ios --release --no-codesign $GERDTV_DEFINES
           rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa/Payload"
           cp -R build/ios/iphoneos/Runner.app "$RUNNER_TEMP/ipa/Payload/"
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/gerdTV-ios-unsigned-$version.ipa" Payload)
@@ -122,7 +127,7 @@ jobs:
             "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > app/android/key.properties
           define="$(scripts/bundle-libmpv-android.sh arm64-v8a)"
           [[ -n "$define" ]] || { echo "no own libmpv for Android"; exit 1; }
-          cd app && flutter build apk --release --target-platform android-arm64 $define
+          cd app && flutter build apk --release --target-platform android-arm64 $define $GERDTV_DEFINES
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
           "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -i 'certificate DN'
           mkdir -p ../dist && cp build/app/outputs/flutter-apk/app-release.apk "../dist/gerdTV-android-$version.apk"
@@ -148,7 +153,7 @@ jobs:
       - name: Linux bundle (tar.gz)
         run: |
           version="${GITHUB_REF_NAME#v}"
-          cd app && flutter build linux --release
+          cd app && flutter build linux --release $GERDTV_DEFINES
           rm -rf "$RUNNER_TEMP/gerdTV" && cp -R build/linux/x64/release/bundle "$RUNNER_TEMP/gerdTV"
           mkdir -p ../dist && tar -C "$RUNNER_TEMP" -czf "../dist/gerdTV-linux-x64-$version.tar.gz" gerdTV
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
