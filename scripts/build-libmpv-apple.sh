@@ -153,8 +153,10 @@ EOF
   )
   if [[ "$sdk" == macosx ]]; then
     # mpv's Cocoa layer (needed by gl-cocoa, whose VideoToolbox interop keeps decoding in hardware) is partly Swift;
-    # swiftc gets the slice's target like clang (the Swift runtime is part of macOS 12).
-    mpv_flags+=(-Dcocoa=enabled -Dswift-build=enabled "-Dswift-flags=-target $target" -Dcoreaudio=enabled
+    # swiftc gets the slice's target like clang (the Swift runtime is part of macOS 12), and libplacebo's generated
+    # config.h, which mpv's Swift rule doesn't pass (it only names libplacebo's source include folder).
+    mpv_flags+=(-Dcocoa=enabled -Dswift-build=enabled
+      "-Dswift-flags=-target $target -I$work/mpv-build/subprojects/libplacebo/src/include" -Dcoreaudio=enabled
       -Dgl-cocoa=enabled -Dvideotoolbox-gl=enabled)
   else
     mpv_flags+=(-Dswift-build=disabled -Daudiounit=enabled -Dios-gl=enabled)
