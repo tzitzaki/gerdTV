@@ -154,11 +154,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// The edge of the running channel (reset when the channel changed: zapping keeps this screen).
+  /// The edge of the running channel (reset when the channel or the engine changed: zapping keeps this screen, and
+  /// AVPlayer starts a moment after the channel is chosen).
   LiveEdge get _liveEdge {
-    if (_edgeKey != _current.key) {
+    final av = widget.session.onAvPlayer.value;
+    if (_edgeKey != _current.key || _edge.seekableEndIsLive != av) {
       _edgeKey = _current.key;
-      _edge = LiveEdge();
+      _edge = LiveEdge(seekableEndIsLive: av);
     }
     return _edge;
   }
