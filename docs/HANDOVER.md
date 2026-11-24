@@ -36,7 +36,7 @@
 - Player gestures use media_kit's own: no seek swipe on live channels (timeshift keeps its bar); the volume swipe sets mpv's volume, not the system's.
 - The community guide presets point at epgshare01, a third party: a file that moves shows as the source's error in Settings → Guide.
 - About 1000 provider channels are listed without programmes; they now count as "without guide" and can take a community guide or a mapping.
-- GerdMpv on Apple: CI only compiles iOS and plays the macOS slice headless; picture, hwdec and PiP are device checks.
+- Own engines in CI: Android and macOS play the testkit clip headless (smoke: ok); iOS only compiles; picture, hwdec and PiP are device checks.
 - GerdMpv has no x86_64 iOS simulator slice: an Intel Mac's simulator build would fail to embed it.
 - Both libmpvs may be in one Apple process (media_kit links Mpv); the plugin calls only the chosen one, and mpv's ObjC class names may warn twice.
 - Linux CI hang: the app blocks at player start in the system libmpv while its Lua scripts start; CI runs integration on the own engine.
