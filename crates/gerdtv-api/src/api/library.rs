@@ -116,6 +116,21 @@ pub struct CategoryInfo {
     pub count: u32,
 }
 
+/// A movie's or series' page details (gerdtv_core::xtream::Details); empty strings and None where the panel has
+/// nothing.
+pub struct ItemDetails {
+    pub plot: String,
+    pub genre: String,
+    pub cast: String,
+    pub director: String,
+    pub release: String,
+    pub duration_secs: Option<u32>,
+    pub rating: Option<f64>,
+    pub backdrop: String,
+    /// The trailer's YouTube video id, "" when there is none.
+    pub trailer: String,
+}
+
 pub struct ItemInfo {
     pub key: String,
     pub kind: ItemKind,
@@ -364,6 +379,22 @@ impl Library {
             .into_iter()
             .map(Into::into)
             .collect())
+    }
+
+    /// A movie's or series' details, from the panel when the page opens.
+    pub async fn details(&self, key: String) -> Result<ItemDetails, String> {
+        let d = self.0.details(&key).await.map_err(err)?;
+        Ok(ItemDetails {
+            plot: d.plot,
+            genre: d.genre,
+            cast: d.cast,
+            director: d.director,
+            release: d.release,
+            duration_secs: d.duration_secs,
+            rating: d.rating,
+            backdrop: d.backdrop,
+            trailer: d.trailer,
+        })
     }
 
     /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).

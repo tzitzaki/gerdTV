@@ -269,6 +269,8 @@ fn player_api(req: &Request, data: &Data, sw: &Mutex<Switches>) -> Value {
             match of_kind(Kind::Movie).find(|e| e.id == id) {
                 Some(e) => json!({
                     "info": { "name": e.name, "plot": "A synthetic film.", "duration_secs": 5400,
+                              "youtube_trailer": "https://www.youtube.com/watch?v=synthTrail1",
+                              "backdrop_path": ["https://example.invalid/backdrop.jpg"],
                               "releasedate": e.year.map(|y| format!("{y}-01-01")).unwrap_or_default(),
                               "tmdb_id": if e.id % 4 == 0 { json!((e.id % 900_000).to_string()) } else { json!("") } },
                     "movie_data": { "stream_id": e.id, "name": e.name, "container_extension": "mkv" }
@@ -292,7 +294,8 @@ fn player_api(req: &Request, data: &Data, sw: &Mutex<Switches>) -> Value {
                     }));
                 }
             }
-            json!({ "info": { "name": name }, "episodes": seasons })
+            json!({ "info": { "name": name, "plot": "A synthetic show.", "youtube_trailer": "synthTrail2" },
+                    "episodes": seasons })
         }
         Some(_) => json!([]),
     }

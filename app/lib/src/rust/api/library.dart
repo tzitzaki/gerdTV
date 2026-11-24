@@ -72,6 +72,9 @@ abstract class Library implements RustOpaqueInterface {
     required int limit,
   });
 
+  /// A movie's or series' details, from the panel when the page opens.
+  Future<ItemDetails> details({required String key});
+
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
 
@@ -445,6 +448,61 @@ class HealthInfo {
           attempts == other.attempts &&
           recovered == other.recovered &&
           secs == other.secs;
+}
+
+/// A movie's or series' page details (gerdtv_core::xtream::Details); empty strings and None where the panel has
+/// nothing.
+class ItemDetails {
+  final String plot;
+  final String genre;
+  final String cast;
+  final String director;
+  final String release;
+  final int? durationSecs;
+  final double? rating;
+  final String backdrop;
+
+  /// The trailer's YouTube video id, "" when there is none.
+  final String trailer;
+
+  const ItemDetails({
+    required this.plot,
+    required this.genre,
+    required this.cast,
+    required this.director,
+    required this.release,
+    this.durationSecs,
+    this.rating,
+    required this.backdrop,
+    required this.trailer,
+  });
+
+  @override
+  int get hashCode =>
+      plot.hashCode ^
+      genre.hashCode ^
+      cast.hashCode ^
+      director.hashCode ^
+      release.hashCode ^
+      durationSecs.hashCode ^
+      rating.hashCode ^
+      backdrop.hashCode ^
+      trailer.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ItemDetails &&
+          runtimeType == other.runtimeType &&
+          plot == other.plot &&
+          genre == other.genre &&
+          cast == other.cast &&
+          director == other.director &&
+          release == other.release &&
+          durationSecs == other.durationSecs &&
+          rating == other.rating &&
+          backdrop == other.backdrop &&
+          trailer == other.trailer;
 }
 
 class ItemInfo {

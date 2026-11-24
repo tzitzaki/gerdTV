@@ -530,6 +530,20 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
+    /// for other kinds and for M3U sources, which have none.
+    pub async fn details(&self, key: &str) -> Result<xtream::Details> {
+        let Some(xc) = &self.xc else {
+            return Ok(xtream::Details::default());
+        };
+        let id = |prefix| key.strip_prefix(prefix).and_then(|i| i.parse::<u64>().ok());
+        Ok(match (id("movie:"), id("series:")) {
+            (Some(id), _) => xc.vod_details(id).await?,
+            (_, Some(id)) => xc.series_details(id).await?,
+            _ => xtream::Details::default(),
+        })
+    }
+
     /// The URL to play an item (live: `.ts` by default, `m3u8` when the watchdog asks; VOD: its container).
     /// The catch-up URL for a programme of a live channel (from `start` to `stop`, UTC seconds), or None: no
     /// archive on this channel, the programme lies beyond its reach or hasn't started, or the provider isn't Xtream
