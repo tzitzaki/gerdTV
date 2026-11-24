@@ -57,6 +57,8 @@
   "dayToday": "Today",
   "dayTomorrow": "Tomorrow",
   "dayYesterday": "Yesterday",
+  "detailsMinutes": "min",
+  "detailsPlay": "Play",
   "episodesEmpty": "This series has no episodes.",
   "favouriteAdd": "Add to favourites",
   "favouriteRemove": "Remove from favourites",
@@ -376,6 +378,8 @@
     }
   },
   "timeshiftOff": "Off",
+  "trailer": "Trailer",
+  "trailerOnYouTube": "Watch on YouTube",
   "updateAvailable": "Version {version} is available",
   "@updateAvailable": {
     "placeholders": {
