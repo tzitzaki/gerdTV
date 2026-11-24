@@ -4,6 +4,7 @@
 # come from the runner's Android SDK manager.
 # Debugging: the emulator's output is in $RUNNER_TEMP/emulator.log.
 set -euo pipefail
+export PATH="$ANDROID_HOME/platform-tools:$PATH" # adb (the runner has the SDK, not adb on PATH)
 echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules >/dev/null
 sudo udevadm control --reload-rules
 sudo udevadm trigger --name-match=kvm

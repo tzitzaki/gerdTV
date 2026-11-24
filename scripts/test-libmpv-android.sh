@@ -5,6 +5,7 @@
 # anything that isn't an emulator (CLAUDE.md: no automated installs on the owner's devices).
 # Usage: scripts/test-libmpv-android.sh        (after build-libmpv-android.sh with x86_64; CI starts the emulator)
 set -euo pipefail
+export PATH="${ANDROID_HOME:-$HOME/sdk/android}/platform-tools:$PATH" # adb
 cd "$(dirname "$0")/.."
 ndk="${ANDROID_NDK_HOME:-$(ls -d "$HOME"/sdk/android/ndk/* | sort -V | tail -n 1)}"
 cc="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
