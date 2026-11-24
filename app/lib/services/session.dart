@@ -747,6 +747,8 @@ class Session extends ChangeNotifier {
     timeshiftWindow.value = window;
     _switch!.switchTo(av);
     onAvPlayer.value = true;
+    adapter.target.value =
+        choice.seconds; // the player's "Buffer x / target" readout
     await av.openUrl(url, bufferSecs: choice.seconds);
     // The core's view of the provider connection, shown like the watchdog's (reconnecting n, or why it stopped).
     _hlsPoll = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -786,9 +788,14 @@ class Session extends ChangeNotifier {
   }
 
   /// The player's buffer button: the running stream's buffer, in whichever engine plays it.
-  Future<void> applyBuffer(BufferPreset preset, int seconds) => onAvPlayer.value
-      ? _avEngine.setBuffer(seconds)
-      : adapter.applyBuffer(preset, seconds);
+  Future<void> applyBuffer(BufferPreset preset, int seconds) async {
+    if (onAvPlayer.value) {
+      adapter.target.value = seconds;
+      await _avEngine.setBuffer(seconds);
+    } else {
+      await adapter.applyBuffer(preset, seconds);
+    }
+  }
 
   Future<String> _timeshiftDir() async {
     final dir = Directory('${(await getTemporaryDirectory()).path}/timeshift');

@@ -124,15 +124,17 @@ void main() {
       );
       await tester.pump();
     }
-    // The profile's Fast zap reached mpv; the channel's own buffer applies at once and shows in the readout.
-    Future<double> pauseWait() async => double.parse(
-      await tester.runAsync(
-            () => (session.mpvPlayer.platform as NativePlayer).getProperty(
-              'cache-pause-wait',
-            ),
-          ) ??
-          '0',
-    );
+    // The profile's Fast zap reached the engine (mpv's cache-pause-wait; for a live channel in AVPlayer on the Mac,
+    // its forward buffer, which the readout's target follows); the channel's own buffer applies at once.
+    Future<double> pauseWait() async => session.onAvPlayer.value
+        ? session.adapter.target.value.toDouble()
+        : double.parse(
+            await tester.runAsync(
+                  () => (session.mpvPlayer.platform as NativePlayer)
+                      .getProperty('cache-pause-wait'),
+                ) ??
+                '0',
+          );
     expect(await pauseWait(), 2);
     await tester.tap(find.byKey(const Key('player.buffer')));
     await tapReady(tester, find.byKey(const Key('buffer.smooth')));
