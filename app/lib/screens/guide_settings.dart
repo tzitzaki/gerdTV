@@ -5,6 +5,7 @@
 // and storage are in the core (gerdtv_core::epg, library.rs).
 // Debugging: a source's status line is the core's error text (already free of credentials).
 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -106,6 +107,39 @@ String communityGuideLabel(String code) {
   return n == '1' ? code.substring(0, 2) : '${code.substring(0, 2)} $n';
 }
 
+/// A guide source's name in the list: "DE" for a community guide's file, the URL itself for any other.
+String guideSourceLabel(String url) {
+  final code = url.startsWith(communityGuideBase) && url.endsWith('.xml.gz')
+      ? url.substring(communityGuideBase.length, url.length - 7)
+      : null;
+  return code != null && communityGuides.contains(code)
+      ? communityGuideLabel(code)
+      : url;
+}
+
+/// The source's full URL, selectable and with Copy (the list shows community guides by their short name).
+Future<void> showGuideSourceUrl(BuildContext context, String url) {
+  final l10n = AppLocalizations.of(context);
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(guideSourceLabel(url)),
+      content: SelectableText(url),
+      actions: [
+        TextButton(
+          onPressed: () => Clipboard.setData(ClipboardData(text: url)),
+          child: Text(l10n.copy),
+        ),
+        TextButton(
+          key: const Key('guide.source.close'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.close),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Picks a community guide: a sheet with every country file; [onPick] gets its URL.
 Future<void> pickCommunityGuide(
   BuildContext context,
@@ -196,11 +230,16 @@ class _GuideSourcesState extends State<GuideSources> {
                         : Icons.calendar_view_day_outlined,
                   ),
                   title: Text(
-                    src.builtin ? l10n.guideProvider : src.url,
+                    src.builtin
+                        ? l10n.guideProvider
+                        : guideSourceLabel(src.url),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(_status(l10n, src)),
+                  onTap: src.builtin
+                      ? null
+                      : () => showGuideSourceUrl(context, src.url),
                   trailing: src.builtin
                       ? null
                       : IconButton(
