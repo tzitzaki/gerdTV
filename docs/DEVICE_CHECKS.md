@@ -13,7 +13,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
-- Live in Apple's player: Up/Down zap; Space, a minute later −1:00 and Live; the seek bar drags back; the PiP button floats it in Apple's window.
+- Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
 - Updates: Settings → About → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.

@@ -67,6 +67,28 @@ void writeEngine(String supportDir, PlayerEngine engine) {
   }
 }
 
+/// Settings → Playback → Live channels play in (iPhone, iPad, Mac; owner decision): gerdTV's player (mpv, the
+/// default: every format, the PiP from its own frames, no hand-over) or Apple's AVPlayer over the core's local HLS.
+/// App-wide like the engine, a marker file in the support folder, read once at start (Session), so a change applies
+/// after closing and reopening gerdTV.
+enum LivePlayer { gerdtv, apple }
+
+const livePlayerMarker = 'live-player-apple';
+
+LivePlayer readLivePlayer(String supportDir) =>
+    File('$supportDir/$livePlayerMarker').existsSync()
+    ? LivePlayer.apple
+    : LivePlayer.gerdtv;
+
+void writeLivePlayer(String supportDir, LivePlayer player) {
+  final marker = File('$supportDir/$livePlayerMarker');
+  if (player == LivePlayer.apple) {
+    marker.writeAsStringSync('');
+  } else if (marker.existsSync()) {
+    marker.deleteSync();
+  }
+}
+
 /// Starts media_kit with the chosen engine. On Linux the runner already chose (see above); on Android and Apple
 /// media_kit is told which library to open. Android: FFmpeg inside the own build gets the JavaVM that media_kit's
 /// helper holds (media_kit only hands it to its own libmpv). Apple: the video plugin learns the library from
