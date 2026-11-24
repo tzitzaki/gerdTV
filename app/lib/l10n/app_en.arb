@@ -153,6 +153,7 @@
   "navMovies": "Movies",
   "navSeries": "Series",
   "navSettings": "Settings",
+  "playerAudio": "Audio",
   "playerChannels": "Channels",
   "playerEngine": "Player engine",
   "playerEngineGerdtv": "gerdTV build (newer mpv and FFmpeg)",
@@ -176,6 +177,17 @@
       }
     }
   },
+  "playerSubtitles": "Subtitles",
+  "playerSubtitlesOff": "Off",
+  "playerTrack": "Track {n}",
+  "@playerTrack": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "playerTracks": "Audio and subtitles",
   "playerZapHint": "↑ ↓ channels · OK channel list",
   "profileAdd": "Add a provider",
   "profileAlways": "Always open this one",

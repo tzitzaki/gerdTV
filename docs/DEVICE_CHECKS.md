@@ -6,7 +6,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own engine: Settings → Playback → Player engine gerdTV, restart; a channel and a movie play with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
 - Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
-- Movies and series: a movie plays, a series opens its episodes; a movie stopped after 5 min shows under Continue watching and continues there.
+- Movies and series: a movie plays (several languages: the subtitles button switches); a movie stopped after 5 min continues there.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".

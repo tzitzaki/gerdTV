@@ -17,6 +17,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:media_kit/media_kit.dart' show Tracks;
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:window_manager/window_manager.dart' show DragToMoveArea;
@@ -30,6 +31,7 @@ import '../theme.dart';
 import '../player/live_edge.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
+import 'track_sheet.dart';
 
 /// The profile setting for the player gestures: on unless "off" (Settings → Playback).
 const playerGesturesSetting = 'player_gestures';
@@ -515,6 +517,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
+                              // Audio and subtitles, when the stream has a choice (track_sheet.dart).
+                              StreamBuilder<Tracks>(
+                                stream: widget.session.player.stream.tracks,
+                                initialData: widget.session.player.state.tracks,
+                                builder: (context, snap) {
+                                  final p = widget.session.player;
+                                  if (!hasTrackChoice(snap.data!)) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: Tokens.space,
+                                    ),
+                                    child: IconButton.filledTonal(
+                                      key: const Key('player.tracks'),
+                                      tooltip: l10n.playerTracks,
+                                      icon: const Icon(
+                                        Icons.subtitles_outlined,
+                                      ),
+                                      onPressed: () => showTrackSheet(
+                                        context,
+                                        tracks: p.state.tracks,
+                                        current: p.state.track,
+                                        onAudio: p.setAudioTrack,
+                                        onSubtitle: p.setSubtitleTrack,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                               IconButton.filledTonal(
                                 key: const Key('player.buffer'),
                                 tooltip: l10n.bufferThisChannel,
