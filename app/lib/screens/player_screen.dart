@@ -176,21 +176,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
       e.earliest(widget.session.timeshiftWindow.value, now),
       live,
     );
-    live - to < liveSlack ? e.attach() : e.detach();
+    live - to < _slack ? e.attach() : e.detach();
     await widget.session.player.seek(
       Duration(milliseconds: (to * 1000).round()),
     );
     if (mounted) setState(() {});
   }
 
-  /// Back to live: just short of the cache's end, playing (exactly at it, mpv has nothing left to play and waits for
-  /// new data; half the live slack still counts as live).
+  /// The buffer's `cache-pause-wait` (the channel's or profile's preset) decides how close to the edge is "live".
+  int get _pauseWait => widget.session.adapter.target.value;
+  double get _slack => liveSlackFor(_pauseWait);
+
+  /// Back to live: short of the cache's end by [goLiveMargin] for the buffer, playing (closer, mpv runs dry and
+  /// pauses for cache right after Live); that still counts as live ([liveSlackFor]).
   Future<void> _goLive() async {
     final live = _liveEdge.live(DateTime.now());
     if (live == null) return;
     // Never past what is cached: on a slow connection the projected live edge runs ahead of the data (macOS CI).
     final cached = widget.session.player.state.buffer.inMilliseconds / 1000;
-    await _seekTo((cached < live ? cached : live) - liveSlack / 2);
+    await _seekTo((cached < live ? cached : live) - goLiveMargin(_pauseWait));
     if (_paused) await _togglePause();
   }
 
@@ -694,7 +698,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// While behind live: how far ("−5:12") and Go live (reachable with the D-pad).
   List<Widget> _behindLive(AppLocalizations l10n) {
-    final behind = _shiftable ? _liveEdge.behind(_position, DateTime.now()) : 0;
+    final behind = _shiftable
+        ? _liveEdge.behind(_position, DateTime.now(), slack: _slack)
+        : 0;
     if (behind == 0) return const [];
     return [
       Text(

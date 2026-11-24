@@ -81,11 +81,14 @@ class _TrailerViewState extends State<TrailerView> {
         : const PlatformWebViewControllerCreationParams();
     final web = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
       ..addJavaScriptChannel(
         'Trailer',
         onMessageReceived: (m) => widget.onError?.call(m.message),
       );
+    // macOS's web view has no background colour ("opaque is not implemented on macOS"); the page itself is black.
+    if (defaultTargetPlatform != TargetPlatform.macOS) {
+      web.setBackgroundColor(Colors.black);
+    }
     final android = web.platform;
     if (android is AndroidWebViewController) {
       android.setMediaPlaybackRequiresUserGesture(false);

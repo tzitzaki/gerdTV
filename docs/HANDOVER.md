@@ -2,7 +2,7 @@
 
 ## State
 - Version 0.261124.56: movie and series pages with trailers, a track picker, a brightness swipe, Premiumize, Trakt and Simkl, a macOS menu bar mode.
-- Also in .56: Account in subcategories, no channel numbers, guide short names, unmatched-channel search, a Release page link, iOS PiP fixes.
+- Also in .56: Account subcategories, no channel numbers, guide short names, unmatched search, Release page link, iOS PiP fixes, no stall after Live.
 - In .55: the own engine no longer crashes on macOS and iOS (a library mix-up in the video plugin), and iOS keeps playing when locked.
 - In .54: own libmpv on Android and macOS/iOS besides Linux (media_kit's stays default), sort everywhere, Settings in five categories.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
@@ -25,7 +25,6 @@
 
 ## Open work
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- Flaky journey: playback sometimes stalls after leaving the player (app_test.dart "keeps playing"); fix by cause, failing test first.
 - A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.

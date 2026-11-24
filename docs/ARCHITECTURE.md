@@ -42,7 +42,7 @@
 
 | Preset setting | mpv option | Value |
 |---|---|---|
-| target buffer | `cache-secs`, `demuxer-readahead-secs`, `cache-pause-wait` | the preset's seconds (2 / 8 / 30 / 90 / 1–300) |
+| target buffer | `cache-pause-wait`; `cache-secs`, `demuxer-readahead-secs` | the preset's seconds (2 / 8 / 30 / 90 / 1–300); reading ahead 5 s further, else mpv waits for data the demuxer stopped fetching |
 | start and resume only with a full buffer | `cache`, `cache-pause`, `cache-pause-initial` | `yes` |
 | demuxer size | `demuxer-max-bytes` | target × bitrate × 1.5, at least 32 MiB (bitrate estimate 8 Mbit/s until known) |
 | large buffers on disk | `cache-on-disk` | `yes` from 30 s |
