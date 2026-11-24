@@ -11,6 +11,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/menu_bar.dart';
 import '../platform/platform_bridge.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
@@ -212,6 +213,19 @@ class Session extends ChangeNotifier {
     theme.value = t;
   }
 
+  /// macOS: whether closing keeps gerdTV in the menu bar (Settings → Playback; app-wide).
+  bool menuBar = true;
+
+  Future<void> setMenuBar(bool on) async {
+    setAppSetting(
+      dir: await _dir(),
+      key: settingMenuBar,
+      value: on ? 'on' : 'off',
+    );
+    menuBar = on;
+    await applyMenuBar(on);
+  }
+
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
@@ -222,6 +236,12 @@ class Session extends ChangeNotifier {
       tinted: appSetting(dir: dir, key: settingThemeTinted),
       black: appSetting(dir: dir, key: settingThemeBlack),
     );
+    menuBar = menuBarOn(appSetting(dir: dir, key: settingMenuBar));
+    unawaited(applyMenuBar(menuBar));
+    platform.onMenuBar = (action) async {
+      if (action == 'stop') return stopPlayback();
+      player.state.playing ? await adapter.pause() : await adapter.resume();
+    };
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
     profiles = await listProfiles(dir: dir);

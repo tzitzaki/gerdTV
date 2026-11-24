@@ -27,6 +27,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Search ranking: tiers (word starts, group name, mid-word, typos from 4 letters), favourites and recents first within each tier; a tier is searched only when the better ones don't fill the page, so a search stays as fast as a plain word search (bench gate); typing anywhere starts the search.
 - Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
 - macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
+- macOS menu bar mode, on by default and switchable: closing or quitting from the Dock hides gerdTV into the menu bar; built natively in Swift (no tray_manager).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).

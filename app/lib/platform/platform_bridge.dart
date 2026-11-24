@@ -22,6 +22,9 @@ class PlatformBridge {
 
   static const channel = MethodChannel('gerdtv/platform');
 
+  /// macOS menu bar: its menu's "toggle" (play/pause) or "stop" (platform/menu_bar.dart).
+  void Function(String action)? onMenuBar;
+
   /// Set while the system's Picture-in-Picture window shows the app.
   final ValueNotifier<bool> pictureMode;
 
@@ -30,6 +33,8 @@ class PlatformBridge {
     channel.setMethodCallHandler((call) async {
       if (call.method == 'pictureMode') {
         pictureMode.value = call.arguments == true;
+      } else if (call.method == 'menuBar') {
+        onMenuBar?.call(call.arguments as String);
       } else if (call.method == 'pipEnded') {
         onApplePipEnded?.call((call.arguments as Map?)?['failure'] as String?);
       }

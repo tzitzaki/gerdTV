@@ -8,7 +8,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
 - Movies and series: a movie plays (several languages: the subtitles button switches); a movie stopped after 5 min continues there.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
-- Keep playing: Esc from the player keeps the channel running in the bottom bar; clicking the bar reopens it; Stop ends it.
+- Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.

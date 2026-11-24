@@ -6,6 +6,7 @@
 // Debugging: entries are rebuilt from scratch on every session notification (_categories), so a setting that shows a
 // stale value usually means its widget read the value once in initState instead of in build.
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -201,6 +202,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       key: playerGesturesSetting,
                       value: on ? 'on' : 'off',
                     );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (defaultTargetPlatform == TargetPlatform.macOS)
+            SettingsEntry(
+              id: 'menuBar',
+              title: l10n.menuBar,
+              keywords: l10n.menuBarHint,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.menuBar'),
+                  title: Text(l10n.menuBar),
+                  subtitle: Text(l10n.menuBarHint),
+                  value: widget.session.menuBar,
+                  onChanged: (on) async {
+                    await widget.session.setMenuBar(on);
                     setState(() {});
                   },
                 ),
