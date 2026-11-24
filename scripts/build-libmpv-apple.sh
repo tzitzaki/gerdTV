@@ -144,6 +144,9 @@ EOF
   # iOS: OpenGL ES), VideoToolbox interop, CoreAudio (macOS) or AudioUnit (iOS), libass subtitles.
   mkdir -p "$work/mpv/subprojects"
   ln -sfn "$out/dl/libplacebo" "$work/mpv/subprojects/libplacebo"
+  # mpv 0.42 bug: with Cocoa but without Vulkan, view.swift names MetalLayer, which only the Vulkan build compiles.
+  # Its base class CAMetalLayer has the same isOpaque (the check never matches here: libmpv draws no mpv window).
+  sed -i '' 's/layer as? MetalLayer {/layer as? CAMetalLayer {/' "$work/mpv/video/out/mac/view.swift"
   local mpv_flags=(
     --cross-file "$work/cross.ini" --buildtype=release --default-library=shared --auto-features=disabled
     --force-fallback-for=libplacebo
