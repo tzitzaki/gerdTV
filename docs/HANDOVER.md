@@ -1,10 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261124.57: live on iPhone, iPad and Mac plays in AVPlayer from the core's local HLS: the whole timeshift, provider drops unseen.
-- Also in .57: PiP without a hand-over (Home floats it on iOS), no reload after background sound, a leaner mpv frame path, Apple 26.0+.
-- In .56: movie and series pages with trailers, a track picker, a brightness swipe, Premiumize, Trakt and Simkl, a macOS menu bar mode.
-- Also in .56: Account subcategories, no channel numbers, guide short names, unmatched search, Release page link, iOS PiP fixes, no stall after Live.
+- Version 0.261124.58: channels with DVB sound (MP2 first, AC-3) play in AVPlayer; whatever AVPlayer doesn't play goes to mpv within 15 s.
+- In .57: live on iPhone, iPad and Mac plays in AVPlayer from the core's local HLS: the whole timeshift, provider drops unseen.
+- Also .57: PiP without a hand-over (Home floats it on iOS), no reload after background sound, a leaner mpv frame path, Apple 26.0+.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -44,6 +43,7 @@
 - Own engines in CI: Android and macOS play the testkit clip headless (smoke: ok); iOS only compiles; picture, hwdec and PiP are device checks.
 - AVPlayer gets a channel once its local HLS has three segments (~6 s), so zapping on Apple is slower than mpv's Fast zap.
 - Background PiP of mpv's picture switches mpv to software rendering at PiP size: a short picture hiccup on leaving and returning.
+- German public channels send no IDR frames (open GOP): AVPlayer segments start on recovery-point I-frames; if a device shows none, see DEVICE_CHECKS.
 - Both libmpvs may be in one Apple process (media_kit links Mpv); the plugin calls only the chosen one, and mpv's ObjC class names may warn twice.
 - Linux CI hang: the app blocks at player start in the system libmpv while its Lua scripts start; CI runs integration on the own engine.
 - The own Linux libmpv is built in an Ubuntu 24.04 container and must need at most glibc 2.39; the build fails otherwise.
