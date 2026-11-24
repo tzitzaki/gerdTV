@@ -23,6 +23,8 @@ pub struct Request {
     /// The query string's pairs, then a form body's (POST, `application/x-www-form-urlencoded`), not decoded.
     pub query: Vec<(String, String)>,
     pub headers: Vec<(String, String)>,
+    /// The body as sent (a JSON body stays here; a form body is also split into `query`).
+    pub body: String,
 }
 
 impl Request {
@@ -118,9 +120,14 @@ async fn read_request(stream: &mut TcpStream) -> Option<Request> {
     let method = first.next()?.to_string();
     let target = first.next()?.to_string();
     let (path, query) = target.split_once('?').unwrap_or((&target, ""));
+    let form = if body.trim_start().starts_with('{') {
+        ""
+    } else {
+        body.as_str()
+    };
     let query = query
         .split('&')
-        .chain(body.split('&'))
+        .chain(form.split('&'))
         .filter(|p| !p.is_empty())
         .map(|p| {
             let (k, v) = p.split_once('=').unwrap_or((p, ""));
@@ -139,6 +146,7 @@ async fn read_request(stream: &mut TcpStream) -> Option<Request> {
         path: path.to_string(),
         query,
         headers,
+        body,
     })
 }
 

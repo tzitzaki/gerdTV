@@ -102,7 +102,7 @@ fn network(e: reqwest::Error) -> PmError {
 
 /// A form body (reqwest's `form` needs a feature the workspace doesn't enable for two calls); everything but
 /// letters, digits and `-._~` is percent-encoded.
-fn form(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn form(pairs: &[(&str, &str)]) -> String {
     let enc = |s: &str| {
         s.bytes()
             .map(|b| match b {
