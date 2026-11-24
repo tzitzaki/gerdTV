@@ -38,6 +38,7 @@ enum MPV {
   private typealias RenderContextRender = @convention(c) (
     OpaquePointer?, UnsafeMutablePointer<mpv_render_param>?
   ) -> CInt
+  private typealias RenderContextUpdate = @convention(c) (OpaquePointer?) -> UInt64
   private typealias FreeNodeContents = @convention(c) (UnsafeMutablePointer<mpv_node>?) -> Void
   private typealias ErrorString = @convention(c) (CInt) -> UnsafePointer<CChar>?
   private typealias GetProperty = @convention(c) (
@@ -49,6 +50,7 @@ enum MPV {
     "mpv_render_context_set_update_callback", RenderContextSetUpdateCallback.self)
   private static let renderContextFreeFn = symbol("mpv_render_context_free", RenderContextFree.self)
   private static let renderContextRenderFn = symbol("mpv_render_context_render", RenderContextRender.self)
+  private static let renderContextUpdateFn = symbol("mpv_render_context_update", RenderContextUpdate.self)
   private static let freeNodeContentsFn = symbol("mpv_free_node_contents", FreeNodeContents.self)
   private static let errorStringFn = symbol("mpv_error_string", ErrorString.self)
   private static let getPropertyFn = symbol("mpv_get_property", GetProperty.self)
@@ -67,6 +69,8 @@ enum MPV {
   static func renderContextRender(
     _ ctx: OpaquePointer?, _ params: UnsafeMutablePointer<mpv_render_param>?
   ) -> CInt { renderContextRenderFn(ctx, params) }
+
+  static func renderContextUpdate(_ ctx: OpaquePointer?) -> UInt64 { renderContextUpdateFn(ctx) }
 
   static func freeNodeContents(_ node: UnsafeMutablePointer<mpv_node>?) { freeNodeContentsFn(node) }
 

@@ -6,5 +6,8 @@
 
 public protocol ResizableTextureProtocol: NSObject, FlutterTexture {
   func resize(_ size: CGSize)
-  func render(_ size: CGSize)
+  /// gerdTV patch: draws mpv's next frame; false when nothing new was drawn (no frame, or skipped).
+  func render(_ size: CGSize) -> Bool
+  /// gerdTV patch: set while iOS has the app in the background, where GL calls get the app killed.
+  var skipRendering: Bool { get set }
 }

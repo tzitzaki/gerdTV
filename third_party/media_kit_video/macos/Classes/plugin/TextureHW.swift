@@ -92,10 +92,10 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     MPV.renderContextSetUpdateCallback(
       renderContext,
       { (ctx) in
+        // gerdTV patch: straight to VideoOutput's worker (it only enqueues), not through the main thread first:
+        // a busy UI thread no longer delays every video frame.
         let that = unsafeBitCast(ctx, to: TextureHW.self)
-        DispatchQueue.main.async {
-          that.updateCallback()
-        }
+        that.updateCallback()
       },
       UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
     )
@@ -119,6 +119,9 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
 
     NSLog("TextureGL: resize: \(size.width)x\(size.height)")
     createPixelBuffer(size)
+    // gerdTV patch: frees the old buffers' cached textures now, not when the cache goes.
+    CVOpenGLTextureCacheFlush(textureCache, 0)
+    needsDraw = true  // the new buffers are empty: draw even without a new frame (e.g. paused, rotated)
   }
 
   private func createPixelBuffer(_ size: CGSize) {
@@ -150,10 +153,17 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     textureContexts.reinit(objects: [], skipCheckArgs: true)
   }
 
-  public func render(_ size: CGSize) {
-    let textureContext = textureContexts.nextAvailable()
-    if textureContext == nil {
-      return
+  /// gerdTV patch: see ResizableTextureProtocol.
+  public var skipRendering = false
+  private var needsDraw = false
+
+  /// gerdTV patch: returns whether a new picture was drawn. mpv's update callback also fires for work that has no
+  /// new frame; drawing then repeated the last frame for nothing. While [skipRendering] is set nothing is called at
+  /// all: even mpv's skip-rendering mode reconfigures its GL renderer on a new stream. mpv then drops each frame after
+  /// 200 ms (log: "mpv_render_context_render() not being called"); sound plays on, decoding continues.
+  public func render(_ size: CGSize) -> Bool {
+    if skipRendering {
+      return false
     }
 
     CGLSetCurrentContext(context)
@@ -161,6 +171,18 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       OpenGLHelpers.checkError("render")
       CGLSetCurrentContext(nil)
     }
+
+    // mpv_render_context_update runs mpv's pending render-thread work (which may use GL, hence after making the
+    // context current) and says whether a new frame waits.
+    if MPV.renderContextUpdate(renderContext) & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) == 0 && !needsDraw {
+      return false
+    }
+
+    let textureContext = textureContexts.nextAvailable()
+    if textureContext == nil {
+      return false
+    }
+    needsDraw = false
 
     glBindFramebuffer(GLenum(GL_FRAMEBUFFER), textureContext!.frameBuffer)
     defer {
@@ -173,17 +195,19 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       h: Int32(size.height),
       internal_format: 0
     )
-    let fboPtr = withUnsafeMutablePointer(to: &fbo) { $0 }
-
-    var params: [mpv_render_param] = [
-      mpv_render_param(type: MPV_RENDER_PARAM_OPENGL_FBO, data: fboPtr),
-      mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil),
-    ]
-    MPV.renderContextRender(renderContext, &params)
+    // gerdTV patch: the pointer is used inside the closure only (it escaped it before: undefined behaviour).
+    withUnsafeMutablePointer(to: &fbo) { fboPtr in
+      var params: [mpv_render_param] = [
+        mpv_render_param(type: MPV_RENDER_PARAM_OPENGL_FBO, data: fboPtr),
+        mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil),
+      ]
+      _ = MPV.renderContextRender(renderContext, &params)
+    }
 
     glFlush()
 
     textureContexts.pushAsReady(textureContext!)
+    return true
   }
 
   static private func getProcAddress(

@@ -59,10 +59,10 @@ public class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
     MPV.renderContextSetUpdateCallback(
       renderContext,
       { (ctx) in
+        // gerdTV patch: straight to VideoOutput's worker (it only enqueues), not through the main thread first:
+        // a busy UI thread no longer delays every video frame.
         let that = unsafeBitCast(ctx, to: TextureSW.self)
-        DispatchQueue.main.async {
-          that.updateCallback()
-        }
+        that.updateCallback()
       },
       UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
     )
@@ -99,10 +99,13 @@ public class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
     textureContexts.reinit(objects: [], skipCheckArgs: true)
   }
 
-  public func render(_ size: CGSize) {
+  /// gerdTV patch: see ResizableTextureProtocol (software rendering makes no GL calls, so it never skips).
+  public var skipRendering = false
+
+  public func render(_ size: CGSize) -> Bool {
     let textureContext = textureContexts.nextAvailable()
     if textureContext == nil {
-      return
+      return false
     }
 
     CVPixelBufferLockBaseAddress(
@@ -142,5 +145,6 @@ public class TextureSW: NSObject, FlutterTexture, ResizableTextureProtocol {
     MPV.renderContextRender(renderContext, &params)
 
     textureContexts.pushAsReady(textureContext!)
+    return true
   }
 }

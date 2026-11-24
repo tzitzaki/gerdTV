@@ -3,6 +3,11 @@
 #elseif canImport(FlutterMacOS)
   import FlutterMacOS
 #endif
+#if canImport(UIKit)
+  import UIKit
+#else
+  import AppKit
+#endif
 
 // This class creates and manipulates the different types of FlutterTexture,
 // handles resizing, rendering calls, and notify Flutter when a new frame is
@@ -35,6 +40,9 @@ public class VideoOutput: NSObject {
   private var textureId: Int64 = -1
   private var currentSize: CGSize = CGSize.zero
   private var disposed: Bool = false
+  /// gerdTV patch: the largest picture worth rendering, the screen's own pixels (long side, short side). A 4K
+  /// stream on a phone was rendered and colour-converted at 4K every frame, then scaled down again by Flutter.
+  private let maxPixels: CGSize = VideoOutput.screenPixels()
 
   init(
     handle: Int64,
@@ -57,9 +65,42 @@ public class VideoOutput: NSObject {
     worker.enqueue {
       self._init()
     }
+    #if canImport(UIKit)
+      // gerdTV patch: no GL work while iOS has the app in the background (it kills apps that do it); mpv's frames
+      // are dropped meanwhile (TextureHW.render), so sound plays on and the picture is back at once on return.
+      // Debugging: "skipRendering" in the log on each change.
+      for (name, skip) in [
+        (UIApplication.didEnterBackgroundNotification, true),
+        (UIApplication.willEnterForegroundNotification, false),
+      ] {
+        observers.append(
+          NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+            self?.worker.enqueue {
+              NSLog("VideoOutput: skipRendering \(skip)")
+              self?.texture?.skipRendering = skip
+            }
+          })
+      }
+    #endif
+  }
+
+  private var observers: [NSObjectProtocol] = []
+
+  /// The screen's size in pixels as (long side, short side); read once on the main thread (the plugin creates
+  /// VideoOutput there).
+  private static func screenPixels() -> CGSize {
+    #if canImport(UIKit)
+      let screen = UIScreen.main.nativeBounds.size
+    #else
+      let frame = NSScreen.main?.frame.size ?? CGSize(width: 3840, height: 2160)
+      let scale = NSScreen.main?.backingScaleFactor ?? 1
+      let screen = CGSize(width: frame.width * scale, height: frame.height * scale)
+    #endif
+    return CGSize(width: max(screen.width, screen.height), height: min(screen.width, screen.height))
   }
 
   deinit {
+    observers.forEach { NotificationCenter.default.removeObserver($0) }
     worker.cancel()
 
     disposed = true
@@ -158,7 +199,8 @@ public class VideoOutput: NSObject {
       currentSize = size
 
       texture.resize(size)
-      DispatchQueue.main.sync { [weak self] in
+      // gerdTV patch: async (sync blocked the worker on the main thread on every resize).
+      DispatchQueue.main.async { [weak self] in
         guard let that = self else { return }
         // textureUpdateCallback must run on the main thread
         that.textureUpdateCallback(that.textureId, size)
@@ -169,11 +211,16 @@ public class VideoOutput: NSObject {
       return
     }
 
-    texture.render(size)
-    DispatchQueue.main.sync { [weak self] in
-      guard let that = self else { return }
+    // gerdTV patch: Flutter hears only about frames that were drawn, and asynchronously: the worker blocked on the
+    // main thread for every frame before.
+    if !texture.render(size) {
+      return
+    }
+    let textureId = self.textureId
+    DispatchQueue.main.async { [weak self] in
+      guard let that = self, textureId >= 0 else { return }
       // Textures must be marked as available from the main thread
-      that.registry.textureFrameAvailable(that.textureId)
+      that.registry.textureFrameAvailable(textureId)
     }
   }
 
@@ -187,13 +234,22 @@ public class VideoOutput: NSObject {
         }
         
         let params = MPVHelpers.getVideoOutParams(handle)
-        return CGSize(
+        return capped(CGSize(
             width: Double(width ?? (params.rotate == 0 || params.rotate == 180
                                     ? params.dw
                                     : params.dh)),
             height: Double(height ?? (params.rotate == 0 || params.rotate == 180
                                       ? params.dh
                                       : params.dw))
-        )
+        ))
+  }
+
+  /// gerdTV patch: [size] scaled down, aspect kept, so it fits [maxPixels] in either orientation.
+  private func capped(_ size: CGSize) -> CGSize {
+    let long = max(size.width, size.height), short = min(size.width, size.height)
+    let scale = min(1, maxPixels.width / max(long, 1), maxPixels.height / max(short, 1))
+    if scale >= 1 { return size }
+    // Even sizes: video surfaces dislike odd ones.
+    return CGSize(width: (size.width * scale / 2).rounded() * 2, height: (size.height * scale / 2).rounded() * 2)
   }
 }

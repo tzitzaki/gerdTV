@@ -112,8 +112,19 @@ class Session extends ChangeNotifier {
   VideoController? _video;
   WatchdogAdapter? _adapter;
 
-  Player get player =>
-      _player ??= Player(configuration: WatchdogAdapter.playerConfiguration);
+  Player get player => _player ??= _newPlayer();
+
+  Player _newPlayer() {
+    final p = Player(configuration: WatchdogAdapter.playerConfiguration);
+    // iPhone/iPad: mpv's built-in "fast" profile (bilinear scaling, no dithering or HDR peak detection): less GPU
+    // and battery for a slightly softer picture when scaled (owner decision). An mpv without the profile only logs.
+    if (!kIsWeb && Platform.isIOS) {
+      (p.platform as NativePlayer)
+          .command(['apply-profile', 'fast'])
+          .catchError((Object e) => debugPrint('apply-profile fast: $e'));
+    }
+    return p;
+  }
 
   /// Software video rendering, only for CI: GitHub's macOS runners are VMs without a usable GPU, and the hardware
   /// texture stalled there (`just mac-check` sets GERDTV_SOFTWARE_VIDEO). Real devices use hardware rendering.
