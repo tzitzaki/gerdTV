@@ -169,6 +169,14 @@
       }
     }
   },
+  "playerPipFailed": "Picture-in-Picture didn’t start ({reason}).",
+  "@playerPipFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "playerReconnecting": "Reconnecting ({attempt})…",
   "@playerReconnecting": {
     "placeholders": {

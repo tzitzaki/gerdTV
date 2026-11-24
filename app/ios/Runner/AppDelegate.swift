@@ -10,7 +10,7 @@ import UserNotifications
 // - Picture-in-Picture: Apple's PiP only works with AVPlayer, not with mpv. On the player's PiP button Dart stops mpv
 //   (the provider allows few connections) and calls startPip(url); AVPlayer takes the same stream (live as .m3u8) and
 //   PiP starts as soon as it is possible. When PiP ends (or AVPlayer can't play the stream, e.g. .mkv), Dart is told
-//   "pipEnded" and resumes mpv.
+//   "pipEnded" (with the failure's reason, shown in the player) and resumes mpv.
 // - The app icon: setLogo(name) picks the alternate icon "AppIcon-<name>" (asset catalog sets rendered by
 //   `just logos`, listed in ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES); the default logo is the primary icon.
 // Code lives in this file because new Swift files would have to be added to the Xcode project by hand.
@@ -117,9 +117,11 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
       let window = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first
     else { return false }
     cleanUp()
-    // A tiny host view: the player layer has to be in the window hierarchy for PiP to start.
-    let host = UIView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
-    window.addSubview(host)
+    // The player layer has to be in the window hierarchy, at a real size, for PiP to become possible (a 2×2 layer
+    // never did): full size, under Flutter's view, so nothing of it shows.
+    let host = UIView(frame: window.bounds)
+    host.isUserInteractionEnabled = false
+    window.insertSubview(host, at: 0)
     let player = AVPlayer(url: url)
     let layer = AVPlayerLayer(player: player)
     layer.frame = host.bounds
@@ -137,21 +139,24 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
       if pip.isPictureInPicturePossible && !pip.isPictureInPictureActive { pip.startPictureInPicture() }
     })
     observations.append(player.observe(\.currentItem?.status, options: [.new]) { [weak self] player, _ in
-      if player.currentItem?.status == .failed { DispatchQueue.main.async { self?.finish(failed: true) } }
+      if player.currentItem?.status == .failed {
+        let reason = player.currentItem?.error?.localizedDescription ?? "unknown"
+        DispatchQueue.main.async { self?.finish(failure: "AVPlayer: \(reason)") }
+      }
     })
     player.play()
     return true
   }
 
   func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
-    finish(failed: false)
+    finish(failure: nil)
   }
 
   func pictureInPictureController(
     _ controller: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
-    finish(failed: true)
+    finish(failure: "PiP: \(error.localizedDescription)")
   }
 
   func pictureInPictureController(
@@ -161,9 +166,11 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate {
     completionHandler(true)
   }
 
-  private func finish(failed: Bool) {
+  /// [failure] is shown in the player (nil: PiP ended normally), so a device report can name the reason.
+  private func finish(failure: String?) {
+    NSLog("gerdTV PiP ended: \(failure ?? "ok")")
     cleanUp()
-    channel.invokeMethod("pipEnded", arguments: ["failed": failed])
+    channel.invokeMethod("pipEnded", arguments: ["failure": failure as Any])
   }
 
   private func cleanUp() {

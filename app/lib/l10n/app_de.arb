@@ -87,6 +87,7 @@
   "playerGestures": "Gesten im Player",
   "playerGesturesHint": "In Filmen und Folgen seitlich wischen oder doppelt tippen zum Spulen; rechts nach oben oder unten wischen für die Lautstärke.",
   "playerNext": "Danach: {title}",
+  "playerPipFailed": "Bild-in-Bild ging nicht ({reason}).",
   "playerReconnecting": "Verbinde neu ({attempt})…",
   "playerSubtitles": "Untertitel",
   "playerSubtitlesOff": "Aus",

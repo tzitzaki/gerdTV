@@ -449,6 +449,9 @@ class Session extends ChangeNotifier {
     return true;
   }
 
+  /// Why the last iOS Picture-in-Picture didn't work (the player shows it once), null when it did.
+  final pipFailure = ValueNotifier<String?>(null);
+
   /// iOS Picture-in-Picture: mpv stops (one provider connection), AVPlayer takes the same stream in PiP; when PiP
   /// ends, mpv resumes the same item. Live channels go as .m3u8 (AVPlayer can't play raw TS).
   Future<void> startApplePip() async {
@@ -461,8 +464,15 @@ class Session extends ChangeNotifier {
     );
     await _adapter?.stop();
     await _player?.stop();
-    platform.onApplePipEnded = (_) => _resume(item);
-    if (!await platform.startApplePip(url)) await _resume(item);
+    pipFailure.value = null;
+    platform.onApplePipEnded = (failure) {
+      pipFailure.value = failure;
+      _resume(item);
+    };
+    if (!await platform.startApplePip(url)) {
+      pipFailure.value = 'PiP: not available';
+      await _resume(item);
+    }
   }
 
   /// Plays [item] again even though it is still nowPlaying (after Apple PiP handed the stream back).

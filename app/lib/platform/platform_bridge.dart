@@ -16,8 +16,9 @@ import '../screens/app_logo.dart';
 class PlatformBridge {
   PlatformBridge({required this.pictureMode});
 
-  /// iOS: Apple's Picture-in-Picture ended (or AVPlayer couldn't play the stream: failed = true).
-  void Function(bool failed)? onApplePipEnded;
+  /// iOS: Apple's Picture-in-Picture ended; [failure] is the reason it couldn't start or play (null: it ended
+  /// normally), e.g. "AVPlayer: …" for a stream AVPlayer can't play.
+  void Function(String? failure)? onApplePipEnded;
 
   static const channel = MethodChannel('gerdtv/platform');
 
@@ -30,7 +31,7 @@ class PlatformBridge {
       if (call.method == 'pictureMode') {
         pictureMode.value = call.arguments == true;
       } else if (call.method == 'pipEnded') {
-        onApplePipEnded?.call((call.arguments as Map?)?['failed'] == true);
+        onApplePipEnded?.call((call.arguments as Map?)?['failure'] as String?);
       }
     });
   }

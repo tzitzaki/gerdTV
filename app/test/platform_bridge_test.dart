@@ -87,21 +87,21 @@ void main() {
   );
 
   test(
-    'iOS pipEnded reaches the resume callback with the failure flag',
+    'iOS pipEnded reaches the resume callback with the failure reason',
     () async {
       final bridge = PlatformBridge(pictureMode: ValueNotifier(false))
         ..attach();
-      bool? failed;
-      bridge.onApplePipEnded = (f) => failed = f;
+      String? failure;
+      bridge.onApplePipEnded = (f) => failure = f;
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
             PlatformBridge.channel.name,
             PlatformBridge.channel.codec.encodeMethodCall(
-              const MethodCall('pipEnded', {'failed': true}),
+              const MethodCall('pipEnded', {'failure': 'AVPlayer: x'}),
             ),
             (_) {},
           );
-      expect(failed, isTrue);
+      expect(failure, 'AVPlayer: x');
     },
   );
 

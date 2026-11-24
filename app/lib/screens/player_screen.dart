@@ -129,6 +129,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
+    session.pipFailure.addListener(_showPipFailure);
     PlatformBridge.brightness().then((b) {
       if (b != null && mounted) setState(() => _brightness = b);
     });
@@ -139,6 +140,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   bool get _shiftable => widget.session.timeshiftWindow.value > 0;
+
+  /// iOS: why Picture-in-Picture didn't work, so a device report can name it (the stream plays on here).
+  void _showPipFailure() {
+    final failure = widget.session.pipFailure.value;
+    if (failure == null || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).playerPipFailed(failure)),
+      ),
+    );
+  }
 
   /// The edge of the running channel (reset when the channel changed: zapping keeps this screen).
   LiveEdge get _liveEdge {
@@ -251,6 +263,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    widget.session.pipFailure.removeListener(_showPipFailure);
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
     _positionSub?.cancel();
