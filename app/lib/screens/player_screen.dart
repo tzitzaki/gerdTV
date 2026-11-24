@@ -55,6 +55,20 @@ MaterialVideoControlsThemeData withGestures(
   onVolumeChanged: onVolume,
 );
 
+/// Every video view of the one stream (player, picture mode, now-playing bar). media_kit pauses the player when the
+/// app goes to the background unless told otherwise; gerdTV keeps playing (owner decision: playback ends only by
+/// Stop), so the phone's lock screen, another app or iOS's hand-over to AVPlayer Picture-in-Picture don't pause it.
+/// Debugging: sound stopping on lock with this in place points at the audio session (ios/Runner/AppDelegate.swift).
+Video playerVideo(
+  VideoController controller, {
+  required VideoControlsBuilder? controls,
+}) => Video(
+  controller: controller,
+  controls: controls,
+  pauseUponEnteringBackgroundMode: false,
+  resumeUponEnteringForegroundMode: false,
+);
+
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key, required this.session, required this.item});
   final Session session;
@@ -444,8 +458,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           child: MaterialDesktopVideoControlsTheme(
                             normal: _desktopControls,
                             fullscreen: _desktopControls,
-                            child: Video(
-                              controller: widget.session.video,
+                            child: playerVideo(
+                              widget.session.video,
                               controls: AdaptiveVideoControls,
                             ),
                           ),
@@ -641,8 +655,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// Picture mode: only the video, with Restore and Stop; the whole picture drags the floating window (desktop).
   Widget _pictureOnly(AppLocalizations l10n) {
-    final video = Video(
-      controller: widget.session.video,
+    final video = playerVideo(
+      widget.session.video,
       controls: NoVideoControls,
     );
     return Scaffold(

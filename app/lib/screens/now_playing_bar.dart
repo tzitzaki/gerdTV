@@ -41,8 +41,8 @@ class NowPlayingBar extends StatelessWidget {
                   // The same video controller renders here and in the player: one stream, two views.
                   SizedBox(
                     width: 128,
-                    child: Video(
-                      controller: session.video,
+                    child: playerVideo(
+                      session.video,
                       controls: NoVideoControls,
                     ),
                   ),
