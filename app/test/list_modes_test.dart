@@ -1,5 +1,5 @@
 // New, because nothing owns how the list modes render: every mode at phone and desktop width lays out without
-// overflow (stars included), shows the name, and shows what's on now where the mode has room for it (list and tiles,
+// overflow (stars included), shows the name (without the channel number), and shows what's on now where the mode has room for it (list and tiles,
 // not compact). Favourites: the star, a long press and a long OK toggle one; a short OK opens.
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,7 +79,8 @@ void main() {
           ),
         );
         expect(tester.takeException(), isNull, reason: 'no overflow');
-        expect(find.textContaining('Channel 1 with'), findsOneWidget);
+        // The name alone: no channel number in front (owner decision), though channel(1) has number 1.
+        expect(find.text('Channel 1 with a rather long name HD'), findsOneWidget);
         expect(
           find.text('News at eight'),
           showsNow ? findsOneWidget : findsNothing,

@@ -722,9 +722,7 @@ class _NowNextBanner extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              channel.number == null
-                  ? channel.name
-                  : '${channel.number}  ${channel.name}',
+              channel.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: text.titleMedium,
@@ -822,7 +820,7 @@ class _ChannelPanelState extends State<_ChannelPanel> {
                   autofocus: c.key == current.key,
                   selected: c.key == current.key,
                   title: Text(
-                    c.number == null ? c.name : '${c.number}  ${c.name}',
+                    c.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
