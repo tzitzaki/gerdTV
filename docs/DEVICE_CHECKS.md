@@ -25,7 +25,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## iPhone and iPad
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
-- Live TV and a movie play in full screen with logos in the lists; Back keeps the channel running in the bottom bar; Stop ends it.
+- Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
 - Home: swiping to Home while a channel or a movie plays floats it by itself; tapping the window shows play/pause and skip, which work.
 - Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.

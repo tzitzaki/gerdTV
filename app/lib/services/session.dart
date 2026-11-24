@@ -137,6 +137,7 @@ class Session extends ChangeNotifier {
   VideoController? _avVideo;
   LocalHlsStream? _hls;
   Timer? _hlsPoll;
+  Timer? _avProgress;
   StreamSubscription<String>? _avErrors;
 
   /// Channels AVPlayer couldn't play this run (a codec it lacks): they play in mpv.
@@ -750,6 +751,18 @@ class Session extends ChangeNotifier {
     adapter.target.value =
         choice.seconds; // the player's "Buffer x / target" readout
     await av.openUrl(url, bufferSecs: choice.seconds);
+    // The safety net: AVPlayer waits silently (no error) on a stream it can't decode. Not playing 15 s after the
+    // start, unpaused, the channel goes to mpv for this run.
+    final from = av.state.position;
+    _avProgress = Timer(const Duration(seconds: 15), () {
+      final st = av.state;
+      if (onAvPlayer.value &&
+          nowPlaying.value?.key == item.key &&
+          st.playing &&
+          st.position - from < const Duration(seconds: 1)) {
+        _onAvError('no picture 15 s after the start');
+      }
+    });
     // The core's view of the provider connection, shown like the watchdog's (reconnecting n, or why it stopped).
     _hlsPoll = Timer.periodic(const Duration(seconds: 1), (_) {
       final s = _hls?.status();
@@ -778,6 +791,7 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> _stopAv() async {
+    _avProgress?.cancel();
     _hlsPoll?.cancel();
     _hlsPoll = null;
     _hls?.stop();
@@ -843,6 +857,7 @@ class Session extends ChangeNotifier {
   void dispose() {
     _progressTimer?.cancel();
     _pipTimer?.cancel();
+    _avProgress?.cancel();
     _hlsPoll?.cancel();
     _hls?.stop();
     unawaited(_avErrors?.cancel());

@@ -51,6 +51,10 @@ pub struct Segmenter {
     pmt: Option<Vec<u8>>,
     /// The PID whose PES timestamps time the segments (the video, else the first stream), and its stream type.
     clock: Option<(u16, u8)>,
+    /// The PIDs passed on to AVPlayer (the PAT, the PMT, the kept streams and the PCR); the rest is left out.
+    keep: Vec<u16>,
+    /// Set when the channel has no video or no audio AVPlayer can play ("video", "audio"): it plays in mpv.
+    pub unsupported: Option<&'static str>,
     current: Vec<u8>,
     start_pts: Option<u64>,
     last_pts: Option<u64>,
@@ -113,10 +117,21 @@ impl Segmenter {
             self.pat = Some(p.to_vec());
         } else if start
             && Some(pid) == self.pmt_pid
-            && let Some(clock) = pmt_clock(payload)
+            && let Some(pmt) = parse_pmt(payload)
         {
-            self.clock = Some(clock);
-            self.pmt = Some(p.to_vec());
+            self.clock = Some(pmt.clock);
+            self.unsupported = pmt.unsupported;
+            // A PMT too long for one packet stays as it is (all streams pass then).
+            match pmt_packet(p, &pmt.section) {
+                Some(rewritten) => {
+                    self.keep = [vec![0, pid, pmt.pcr], pmt.keep].concat();
+                    self.pmt = Some(rewritten);
+                }
+                None => {
+                    self.keep.clear();
+                    self.pmt = Some(p.to_vec());
+                }
+            }
         }
 
         let mut cut = None;
@@ -127,7 +142,13 @@ impl Segmenter {
             cut = self.on_pes(pts, stream_type, random_access, payload);
         }
         if self.start_pts.is_some() {
-            self.current.extend_from_slice(p);
+            if Some(pid) == self.pmt_pid
+                && let Some(pmt) = &self.pmt
+            {
+                self.current.extend_from_slice(pmt); // the rewritten one
+            } else if self.keep.is_empty() || self.keep.contains(&pid) {
+                self.current.extend_from_slice(p);
+            }
         }
         cut
     }
@@ -209,23 +230,127 @@ fn pat_pmt_pid(payload: &[u8]) -> Option<u16> {
         .map(|e| ((e[2] as u16 & 0x1f) << 8) | e[3] as u16)
 }
 
-/// The clock stream from a PMT section: the first video stream, else the first stream.
-fn pmt_clock(payload: &[u8]) -> Option<(u16, u8)> {
+/// A PMT, read and rewritten for AVPlayer.
+#[derive(Debug)]
+struct Pmt {
+    /// The stream whose timestamps time the segments: the first video stream, else the first stream.
+    clock: (u16, u8),
+    /// The PCR's PID (kept even when its stream isn't: players take the clock from it).
+    pcr: u16,
+    /// The elementary streams kept.
+    keep: Vec<u16>,
+    /// The rewritten section (CRC included).
+    section: Vec<u8>,
+    /// "video" or "audio" when AVPlayer has nothing it can play of that kind.
+    unsupported: Option<&'static str>,
+}
+
+/// The stream type AVPlayer plays this as in HLS (Apple's HLS authoring spec: H.264, HEVC; AAC, AC-3, E-AC-3), or
+/// None. DVB marks AC-3 and E-AC-3 as private data (0x06) with a descriptor (0x6a, 0x7a); Apple wants 0x81 and 0x87.
+/// MP2 (0x03/0x04, most DVB channels' first audio), teletext, subtitles and data are left out.
+fn apple_type(kind: u8, descriptors: &[u8]) -> Option<u8> {
+    match kind {
+        0x1b | 0x24 | 0x0f | 0x81 | 0x87 => Some(kind),
+        0x06 => {
+            let mut d = descriptors;
+            while d.len() >= 2 {
+                match d[0] {
+                    0x6a => return Some(0x81),
+                    0x7a => return Some(0x87),
+                    _ => d = d.get(2 + d[1] as usize..).unwrap_or(&[]),
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// Reads a PMT (the packet payload: pointer field, then the section) and rewrites it with only what AVPlayer plays.
+fn parse_pmt(payload: &[u8]) -> Option<Pmt> {
     let s = payload.get(1 + *payload.first()? as usize..)?;
     let len = (((*s.get(1)? as usize) & 0x0f) << 8) | *s.get(2)? as usize;
+    let pcr = ((*s.get(8)? as u16 & 0x1f) << 8) | *s.get(9)? as u16;
     let info = (((*s.get(10)? as usize) & 0x0f) << 8) | *s.get(11)? as usize;
+    let head = s.get(..12 + info)?;
     let mut rest = s.get(12 + info..(3 + len).saturating_sub(4))?;
-    let mut first = None;
+    let (mut clock, mut first) = (None, None);
+    let (mut keep, mut es) = (Vec::new(), Vec::new());
+    let (mut video, mut audio, mut video_kept, mut audio_kept) = (false, false, false, false);
     while rest.len() >= 5 {
         let (kind, pid) = (rest[0], ((rest[1] as u16 & 0x1f) << 8) | rest[2] as u16);
-        if matches!(kind, 0x01 | 0x02 | 0x1b | 0x24) {
-            return Some((pid, kind));
+        let info_len = (((rest[3] as usize) & 0x0f) << 8) | rest[4] as usize;
+        let desc = rest.get(5..5 + info_len)?;
+        let is_video = matches!(kind, 0x01 | 0x02 | 0x1b | 0x24);
+        let new_type = apple_type(kind, desc);
+        if is_video {
+            video = true;
+            clock.get_or_insert((pid, kind));
+        } else if matches!(kind, 0x03 | 0x04 | 0x0f | 0x11 | 0x81 | 0x87) || new_type.is_some() {
+            audio = true;
         }
         first.get_or_insert((pid, kind));
-        let es = (((rest[3] as usize) & 0x0f) << 8) | rest[4] as usize;
-        rest = rest.get(5 + es..)?;
+        if let Some(t) = new_type {
+            video_kept |= is_video;
+            audio_kept |= !is_video;
+            keep.push(pid);
+            es.extend([t, rest[1], rest[2], rest[3], rest[4]]);
+            es.extend_from_slice(desc);
+        }
+        rest = rest.get(5 + info_len..)?;
     }
-    first
+    let mut section = head.to_vec();
+    let new_len = section.len() - 3 + es.len() + 4;
+    section[1] = (section[1] & 0xf0) | (new_len >> 8) as u8;
+    section[2] = new_len as u8;
+    section.extend(es);
+    let crc = crc32_mpeg2(&section);
+    section.extend(crc.to_be_bytes());
+    let unsupported = if video && !video_kept {
+        Some("video")
+    } else if audio && !audio_kept {
+        Some("audio")
+    } else {
+        None
+    };
+    Some(Pmt {
+        clock: clock.or(first)?,
+        pcr,
+        keep,
+        section,
+        unsupported,
+    })
+}
+
+/// MPEG-2's CRC-32 (PSI sections); over a section with its CRC it gives 0.
+fn crc32_mpeg2(data: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for &b in data {
+        crc ^= (b as u32) << 24;
+        for _ in 0..8 {
+            crc = if crc & 0x8000_0000 != 0 {
+                (crc << 1) ^ 0x04c1_1db7
+            } else {
+                crc << 1
+            };
+        }
+    }
+    crc
+}
+
+/// A PMT packet carrying [section], in place of [orig] (same PID and continuity counter); None when it doesn't fit.
+fn pmt_packet(orig: &[u8; TS], section: &[u8]) -> Option<Vec<u8>> {
+    if section.len() > TS - 5 {
+        return None;
+    }
+    let mut p = vec![0xff; TS];
+    p[0] = 0x47;
+    p[1] = orig[1];
+    p[2] = orig[2];
+    p[3] = 0x10 | (orig[3] & 0x0f); // payload only
+    p[4] = 0; // pointer field
+    p[5..5 + section.len()].copy_from_slice(section);
+    Some(p)
 }
 
 /// A PES header's PTS (90 kHz).
@@ -387,6 +512,8 @@ pub struct Status {
     pub reconnecting: bool,
     /// The provider refused the stream (HTTP status); retrying stopped.
     pub refused: Option<u16>,
+    /// The channel has no video or no audio AVPlayer can play ("video", "audio"); reading stopped (mpv plays it).
+    pub unsupported: Option<&'static str>,
 }
 
 /// The message the player shows when the provider refused the stream (the watchdog's wording for mpv).
@@ -457,6 +584,11 @@ impl LocalHls {
             if let Some(code) = s.refused {
                 return Err(io::Error::other(refusal_message(code)));
             }
+            if let Some(what) = s.unsupported {
+                return Err(io::Error::other(format!(
+                    "Apple's player can't play this channel's {what}."
+                )));
+            }
             if self.segments() >= MIN_SEGMENTS {
                 return Ok(());
             }
@@ -510,13 +642,19 @@ async fn fetch(upstream: String, client: reqwest::Client, shared: Arc<Mutex<Shar
     let mut seg = Segmenter::new();
     let mut failures: u32 = 0;
     loop {
-        let refused = read_once(&upstream, &client, &shared, &mut seg, &mut failures).await;
+        let end = read_once(&upstream, &client, &shared, &mut seg, &mut failures).await;
         {
             let mut s = shared.lock().unwrap();
-            if let Some(code) = refused {
+            if let End::Refused(code) = end {
                 tracing::warn!("local HLS: the provider refused the stream (HTTP {code})");
                 s.status.refused = Some(code);
                 s.status.reconnecting = false;
+                return;
+            }
+            if let End::Unsupported(what) = end {
+                // Stop reading: the account may allow one connection, and mpv needs it now.
+                tracing::info!("local HLS: no {what} AVPlayer can play");
+                s.status.unsupported = Some(what);
                 return;
             }
             s.status.reconnecting = true;
@@ -530,28 +668,41 @@ async fn fetch(upstream: String, client: reqwest::Client, shared: Arc<Mutex<Shar
     }
 }
 
-/// One connection: reads until it ends, stalls or fails. Returns the status code when the provider refused it.
+/// How a connection ended.
+enum End {
+    /// Dropped, stalled, ended or a server error: reconnect.
+    Retry,
+    /// 401/403/404: retrying won't help.
+    Refused(u16),
+    /// Nothing AVPlayer can play of this kind ("video", "audio").
+    Unsupported(&'static str),
+}
+
+/// One connection: reads until it ends, stalls or fails.
 async fn read_once(
     upstream: &str,
     client: &reqwest::Client,
     shared: &Mutex<Shared>,
     seg: &mut Segmenter,
     failures: &mut u32,
-) -> Option<u16> {
+) -> End {
     let stall = Duration::from_secs(STALL_SECS);
     let mut resp = match tokio::time::timeout(stall, client.get(upstream).send()).await {
         Ok(Ok(r)) => r,
-        _ => return None,
+        _ => return End::Retry,
     };
     let code = resp.status().as_u16();
     if matches!(code, 401 | 403 | 404) {
-        return Some(code);
+        return End::Refused(code);
     }
     if !resp.status().is_success() {
-        return None;
+        return End::Retry;
     }
     while let Ok(Ok(Some(chunk))) = tokio::time::timeout(stall, resp.chunk()).await {
         let done = seg.push(&chunk);
+        if let Some(what) = seg.unsupported {
+            return End::Unsupported(what);
+        }
         if done.is_empty() {
             continue;
         }
@@ -565,7 +716,7 @@ async fn read_once(
         s.status.reconnecting = false;
         *failures = 0;
     }
-    None
+    End::Retry
 }
 
 /// Answers AVPlayer: GET /<token>/index.m3u8 and /<token>/<n>.ts, one request per connection.
@@ -807,6 +958,70 @@ mod tests {
         assert_eq!(hls.status().refused, Some(403));
         tokio::time::sleep(Duration::from_secs(2)).await;
         assert_eq!(server.stats().faulted, 1, "no retries");
+    }
+
+    /// A PMT section (with CRC) for programme 1, PCR on `pcr`, with these (stream type, PID, ES descriptors).
+    fn pmt_section(pcr: u16, entries: &[(u8, u16, &[u8])]) -> Vec<u8> {
+        let mut es = Vec::new();
+        for (kind, pid, desc) in entries {
+            es.extend([*kind, 0xe0 | (pid >> 8) as u8, *pid as u8]);
+            es.extend([0xf0 | (desc.len() >> 8) as u8, desc.len() as u8]);
+            es.extend_from_slice(desc);
+        }
+        let len = 9 + es.len() + 4;
+        let mut s = vec![0x02, 0xb0 | (len >> 8) as u8, len as u8, 0, 1, 0xc1, 0, 0];
+        s.extend([0xe0 | (pcr >> 8) as u8, pcr as u8, 0xf0, 0]);
+        s.extend(es);
+        let crc = crc32_mpeg2(&s);
+        s.extend(crc.to_be_bytes());
+        s
+    }
+
+    /// AVPlayer plays H.264/HEVC with AAC, AC-3 or E-AC-3 only (it waits forever on a DVB channel whose audio is
+    /// MP2, seen on a real channel: H.264 + three MP2 tracks + AC-3 + teletext + subtitles). The rewritten PMT keeps
+    /// what it plays (DVB's AC-3, private data with an AC-3 descriptor, renamed to the type Apple expects); a
+    /// channel without such video or audio is not for AVPlayer.
+    #[test]
+    fn pmt_keeps_what_avplayer_plays() {
+        let ac3 = [0x6a, 1, 0];
+        let teletext = [0x56, 5, b'd', b'e', b'u', 0x09, 0];
+        let full = pmt_section(
+            0x100,
+            &[
+                (0x1b, 0x100, &[]),
+                (0x03, 0x101, &[]),
+                (0x06, 0x102, &ac3),
+                (0x06, 0x103, &teletext),
+            ],
+        );
+        let mut payload = vec![0];
+        payload.extend(&full);
+        let pmt = parse_pmt(&payload).unwrap();
+        assert_eq!(pmt.clock, (0x100, 0x1b));
+        assert_eq!(pmt.unsupported, None);
+        assert_eq!(pmt.keep, vec![0x100, 0x102]);
+        assert_eq!(crc32_mpeg2(&pmt.section), 0, "a valid CRC");
+        // The rewritten entries: (stream type, PID) after the 12-byte header, 5 bytes plus descriptors each.
+        let mut entries = vec![];
+        let mut rest = &pmt.section[12..pmt.section.len() - 4];
+        while rest.len() >= 5 {
+            entries.push((rest[0], ((rest[1] as u16 & 0x1f) << 8) | rest[2] as u16));
+            rest = &rest[5 + rest[4] as usize..];
+        }
+        assert_eq!(
+            entries,
+            vec![(0x1b, 0x100), (0x81, 0x102)],
+            "AC-3 named as Apple expects"
+        );
+
+        let mp2_only = pmt_section(0x100, &[(0x1b, 0x100, &[]), (0x03, 0x101, &[])]);
+        let mut payload = vec![0];
+        payload.extend(&mp2_only);
+        assert_eq!(parse_pmt(&payload).unwrap().unsupported, Some("audio"));
+        let mpeg2_video = pmt_section(0x100, &[(0x02, 0x100, &[]), (0x81, 0x101, &[])]);
+        let mut payload = vec![0];
+        payload.extend(&mpeg2_video);
+        assert_eq!(parse_pmt(&payload).unwrap().unsupported, Some("video"));
     }
 
     fn packet_pid(p: &[u8]) -> u16 {
