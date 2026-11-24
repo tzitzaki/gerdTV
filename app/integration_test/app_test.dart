@@ -43,7 +43,10 @@ void main() {
     await tester.runAsync(() async {
       await session.start();
       // Headless: no audio device; a null audio output keeps mpv from ending the file.
-      await (session.player.platform as NativePlayer).setProperty('ao', 'null');
+      await (session.mpvPlayer.platform as NativePlayer).setProperty(
+        'ao',
+        'null',
+      );
     });
     await tester.pumpWidget(GerdTvApp(session: session));
     await tester.pumpAndSettle();
@@ -124,7 +127,7 @@ void main() {
     // The profile's Fast zap reached mpv; the channel's own buffer applies at once and shows in the readout.
     Future<double> pauseWait() async => double.parse(
       await tester.runAsync(
-            () => (session.player.platform as NativePlayer).getProperty(
+            () => (session.mpvPlayer.platform as NativePlayer).getProperty(
               'cache-pause-wait',
             ),
           ) ??
@@ -219,7 +222,7 @@ void main() {
     );
     await tester.pump();
     final st = session.player.state;
-    final mpv = session.player.platform as NativePlayer;
+    final mpv = session.mpvPlayer.platform as NativePlayer;
     final props = <String>[];
     for (final p in [
       'time-pos',

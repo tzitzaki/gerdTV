@@ -127,6 +127,10 @@ class Session extends ChangeNotifier {
 
   Player get _mpv => _player ??= _newPlayer();
 
+  /// mpv's own player, for tests that set or read mpv properties ([player] may be AVPlayer's front).
+  @visibleForTesting
+  Player get mpvPlayer => _mpv;
+
   // Live channels on iOS and macOS: AVPlayer over the core's local HLS (owner decision; lib/player/av_player.dart).
   AvPlatformPlayer? _av;
   Player? _avPlayer;
