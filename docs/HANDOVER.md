@@ -1,7 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261124.54: sort for every list, Settings in five categories, swipe on phones, guide gaps, theme options and a cinematic look.
+- Version 0.261124.55: the own engine no longer crashes on macOS and iOS, and iOS keeps playing with the screen locked.
+- Session 6 continues (docs/notes/2026-11-24-session-6.md): track picker, brightness, Premiumize, Trakt/Simkl, trailers, menu bar.
+- In .54: sort for every list, Settings in five categories, swipe on phones, guide gaps, theme options and a cinematic look.
 - Also in .54: gerdTV's own libmpv on Android (libgerdmpv.so) and macOS/iOS (GerdMpv.framework) besides Linux; media_kit's engine stays default.
 - Before (0.261123.52): updates install in place, a DMG, Your data, search everywhere, favourites, continue watching, hidden groups, profiles, timeshift.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
@@ -9,12 +11,9 @@
 - Live guide check (counts only): with the provider guide 2066 channels show a programme now (2042 before), 2087 with the community DE file.
 
 ## Owner decisions
-- All questions of session 5 are answered; the standing decisions are in docs/DECISIONS.md.
-- Open: which gTV logo is the default? The wordmark is, until you pick one in Settings → Appearance (the pick also changes the icon).
+- Session 6's questions are answered (Premiumize cloud, Trakt and Simkl, embedded trailers); standing decisions are in docs/DECISIONS.md.
 - Open: the TV layout's focus polish needs your feedback from the Shield (what feels wrong with the D-pad).
 - Open: start mpv with load-scripts=no in the vendored media_kit (fixes the Linux CI hang for the standard engine)?
-- Open: should the Licences screen read the libgerdmpv build files (written by the builds) instead of the hand-written native.txt?
-- Open: a brightness swipe on the left half of the player, next to the volume swipe?
 - Open: device checks were full: have you done the Mac's install, setup, profiles, keychain and live TV checks? Then they stay deleted.
 
 ## Owner one-off jobs
