@@ -1,8 +1,12 @@
 // New, because nothing owns the shape of Settings: the search filter (every word must match an entry's title,
 // keywords, subcategory or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
 // that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
-// app-wide.
+// app-wide; on Apple platforms the live player choice is stored for the next start and says so.
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/platform/engine.dart';
 import 'package:gerdtv/theme.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/app_logo.dart';
@@ -91,8 +95,9 @@ void main() {
       WidgetTester tester,
       Size size, {
       double beside = 0,
+      String appDir = 'unused-by-the-fake',
     }) async {
-      final session = Session(appDir: 'unused-by-the-fake');
+      final session = Session(appDir: appDir);
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -202,6 +207,30 @@ void main() {
       expect(session.logo, AppLogo.signal);
       expect(core.appSettings[Session.settingAppLogo], 'signal');
     });
+
+    testWidgets(
+      'Apple: live channels play in gerdTV\'s player unless chosen; a change says to restart',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        final dir = Directory.systemTemp.createTempSync('gerdtv-settings');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        await pump(tester, const Size(1280, 800), appDir: dir.path);
+        await tester.tap(find.byKey(const Key('settings.cat.playback')));
+        await tester.pump();
+        expect(
+          readLivePlayer(dir.path),
+          LivePlayer.gerdtv,
+          reason: 'the default',
+        );
+        await tester.tap(find.byKey(const Key('settings.livePlayer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text("Apple's player (AVPlayer)").last);
+        await tester.pumpAndSettle();
+        expect(readLivePlayer(dir.path), LivePlayer.apple);
+        expect(find.byKey(const Key('settings.restartNotice')), findsOneWidget);
+      },
+    );
 
     testWidgets(
       'Appearance: the theme applies at once and is stored app-wide',

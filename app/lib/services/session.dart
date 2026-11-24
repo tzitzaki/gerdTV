@@ -12,6 +12,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../platform/menu_bar.dart';
+import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/switch_player.dart';
@@ -137,6 +138,7 @@ class Session extends ChangeNotifier {
   VideoController? _avVideo;
   LocalHlsStream? _hls;
   Timer? _hlsPoll;
+  Timer? _avProgress;
   StreamSubscription<String>? _avErrors;
 
   /// Channels AVPlayer couldn't play this run (a codec it lacks): they play in mpv.
@@ -145,11 +147,14 @@ class Session extends ChangeNotifier {
   /// True while AVPlayer plays (the player and the now-playing bar show its picture then).
   final ValueNotifier<bool> onAvPlayer = ValueNotifier(false);
 
-  /// Live channels play in AVPlayer on Apple platforms.
-  static bool get _avForLive =>
+  /// Live channels play in AVPlayer on Apple platforms when Settings → Playback says so (gerdTV's player by
+  /// default). Read once, at the first live channel: a change applies after closing and reopening gerdTV.
+  late final bool _avForLive =
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS);
+          defaultTargetPlatform == TargetPlatform.macOS) &&
+      appDir != null &&
+      readLivePlayer(appDir!) == LivePlayer.apple;
 
   AvPlatformPlayer get _avEngine {
     if (_av == null) {
@@ -750,6 +755,18 @@ class Session extends ChangeNotifier {
     adapter.target.value =
         choice.seconds; // the player's "Buffer x / target" readout
     await av.openUrl(url, bufferSecs: choice.seconds);
+    // The safety net: AVPlayer waits silently (no error) on a stream it can't decode. Not playing 15 s after the
+    // start, unpaused, the channel goes to mpv for this run.
+    final from = av.state.position;
+    _avProgress = Timer(const Duration(seconds: 15), () {
+      final st = av.state;
+      if (onAvPlayer.value &&
+          nowPlaying.value?.key == item.key &&
+          st.playing &&
+          st.position - from < const Duration(seconds: 1)) {
+        _onAvError('no picture 15 s after the start');
+      }
+    });
     // The core's view of the provider connection, shown like the watchdog's (reconnecting n, or why it stopped).
     _hlsPoll = Timer.periodic(const Duration(seconds: 1), (_) {
       final s = _hls?.status();
@@ -778,6 +795,7 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> _stopAv() async {
+    _avProgress?.cancel();
     _hlsPoll?.cancel();
     _hlsPoll = null;
     _hls?.stop();
@@ -843,6 +861,7 @@ class Session extends ChangeNotifier {
   void dispose() {
     _progressTimer?.cancel();
     _pipTimer?.cancel();
+    _avProgress?.cancel();
     _hlsPoll?.cancel();
     _hls?.stop();
     unawaited(_avErrors?.cancel());

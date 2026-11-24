@@ -214,6 +214,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           if (lib != null) ..._playbackEntries(l10n, lib),
           if (ownLibmpv() != null) _engineEntry(l10n),
+          if (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS)
+            _livePlayerEntry(l10n),
           // Touch screens only: desktop and TV have no swipes.
           if (lib != null && !isDesktop)
             SettingsEntry(
@@ -490,13 +493,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Text(l10n.playerEngineGerdtv),
               ),
             ],
-            onChanged: (v) =>
-                setState(() => writeEngine(dir, v ?? PlayerEngine.standard)),
+            onChanged: (v) {
+              setState(() => writeEngine(dir, v ?? PlayerEngine.standard));
+              _restartNotice(context, l10n);
+            },
           ),
         );
       },
     ),
   );
+
+  /// Settings → Playback → Live channels play in (iPhone, iPad, Mac; platform/engine.dart): gerdTV's player or
+  /// Apple's; the choice applies at the next start.
+  SettingsEntry _livePlayerEntry(AppLocalizations l10n) => SettingsEntry(
+    id: 'livePlayer',
+    title: l10n.livePlayer,
+    keywords: l10n.settingsKeywordsLivePlayer,
+    build: (_) => StatefulBuilder(
+      builder: (context, setState) {
+        final dir = session.appDir!;
+        return ListTile(
+          title: Text(l10n.livePlayer),
+          subtitle: Text(l10n.livePlayerHint),
+          trailing: DropdownButton<LivePlayer>(
+            key: const Key('settings.livePlayer'),
+            value: readLivePlayer(dir),
+            items: [
+              DropdownMenuItem(
+                value: LivePlayer.gerdtv,
+                child: Text(l10n.livePlayerGerdtv),
+              ),
+              DropdownMenuItem(
+                value: LivePlayer.apple,
+                child: Text(l10n.livePlayerApple),
+              ),
+            ],
+            onChanged: (v) {
+              setState(() => writeLivePlayer(dir, v ?? LivePlayer.gerdtv));
+              _restartNotice(context, l10n);
+            },
+          ),
+        );
+      },
+    ),
+  );
+
+  /// An engine setting changed: it applies only after gerdTV starts again (owner request: say so at once).
+  void _restartNotice(BuildContext context, AppLocalizations l10n) =>
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('settings.restartNotice'),
+          content: Text(l10n.restartToApply),
+          duration: const Duration(seconds: 8),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
