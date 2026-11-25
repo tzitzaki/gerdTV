@@ -1,5 +1,5 @@
-// New, because nothing owns what follows an episode: the countdown plays the next one once, Cancel keeps it away, and
-// Play now doesn't play it a second time when the countdown would have ended.
+// New, because nothing owns what follows an episode: only a file that got to its end counts, the countdown plays the
+// next one once, Cancel keeps it away, and Play now doesn't play it a second time when the countdown would have ended.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/player/next_up.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -15,6 +15,18 @@ const next = ItemInfo(
 );
 
 void main() {
+  test('a file ran to its end from 95 %, by the millisecond', () {
+    const ms = Duration.new;
+    for (final (pos, dur, want) in [
+      (ms(milliseconds: 9991), ms(milliseconds: 10005), true),
+      (ms(minutes: 43), ms(minutes: 45), true),
+      (ms(minutes: 40), ms(minutes: 45), false), // the connection was lost
+      (ms(seconds: 5), Duration.zero, false), // no length known
+    ]) {
+      expect(ranToTheEnd(pos, dur), want, reason: '$pos of $dur');
+    }
+  });
+
   for (final (name, act, want) in [
     ('left alone, it plays', (NextUp n) {}, 1),
     ('Cancel', (NextUp n) => n.cancel(), 0),

@@ -158,9 +158,8 @@ class Session extends ChangeNotifier {
     _saveProgress(); // the 10 s timer may have missed the last seconds
     if (it == null || lib == null || it.kind != ItemKind.episode) return;
     if (lib.setting(key: settingAutoplayNext) == '0') return;
-    final s = player.state;
-    // A connection lost for good also ends the file: only a real end counts (the share the core calls finished).
-    if (s.position.inSeconds < s.duration.inSeconds * 0.95) return;
+    // A connection lost for good also ends the file: only a real end counts.
+    if (!ranToTheEnd(player.state.position, player.state.duration)) return;
     try {
       final next = await lib.nextEpisode(key: it.key);
       if (next != null && nowPlaying.value?.key == it.key) nextUp.start(next);

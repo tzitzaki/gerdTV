@@ -9,6 +9,12 @@ import 'package:flutter/foundation.dart';
 
 import '../src/rust/api/library.dart';
 
+/// Whether a file that ended got to the share the core calls finished (95 %). In milliseconds: whole seconds said
+/// 9 of 10 for a file that stopped 14 ms short of 10.005 s, and nothing followed (seen in the journey test).
+bool ranToTheEnd(Duration position, Duration duration) =>
+    duration > Duration.zero &&
+    position.inMilliseconds >= duration.inMilliseconds * 0.95;
+
 typedef NextUpState = ({ItemInfo item, int seconds});
 
 class NextUp extends ValueNotifier<NextUpState?> {
