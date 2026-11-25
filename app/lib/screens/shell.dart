@@ -1,8 +1,9 @@
 // The app shell (docs/DESIGN.md): a sidebar on wide windows (desktop, tablet), a bottom bar on phones. Sections:
-// Live TV, Guide, Movies, Series, Settings; the first four have their own search on top (section_search.dart), whose
+// TV (the channel lists or the guide grid, switched beside its search field and remembered), Movies, Series, Premiumize
+// while an account is linked, Settings. TV, Movies and Series have their own search on top (section_search.dart), whose
 // query the shell keeps while another section is shown. While a sync runs, a thin bar shows at the top; a failed sync
 // says so with a retry, over the cached catalogue. On phones a horizontal fling switches to the neighbouring section
-// (not on the Guide, whose grid scrolls sideways).
+// (not on the guide, whose grid scrolls sideways).
 
 import 'package:material_ui/material_ui.dart';
 
@@ -13,8 +14,21 @@ import '../theme.dart';
 import 'app_logo.dart';
 import 'browse_screen.dart';
 import 'guide_screen.dart';
+import 'premiumize_screen.dart';
 import 'section_search.dart';
 import 'settings_screen.dart';
+
+/// A section of the navigation.
+enum ShellPage { tv, movies, series, premiumize, settings }
+
+/// Profile setting: TV shows the guide grid ("guide") or the channel lists (default).
+const tvViewSetting = 'tv_view';
+
+/// The sections shown: Premiumize only while an account is linked.
+List<ShellPage> shellPages({required bool premiumize}) => [
+  for (final p in ShellPage.values)
+    if (p != ShellPage.premiumize || premiumize) p,
+];
 
 class Shell extends StatefulWidget {
   const Shell({super.key, required this.session});
@@ -25,15 +39,18 @@ class Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<Shell> {
-  int _index = 0;
+  /// By name, not by index: linking or unlinking Premiumize (in Settings) moves the indexes.
+  ShellPage _page = ShellPage.tv;
+  late bool _guide =
+      widget.session.library?.setting(key: tvViewSetting) == 'guide';
 
-  /// Navigation index → section (Settings, index 4, has its own settings search).
-  static const _sections = [
-    SearchSection.live,
-    SearchSection.guide,
-    SearchSection.movies,
-    SearchSection.series,
-  ];
+  /// The search of the section shown (Settings has its own, Premiumize none).
+  SearchSection? get _section => switch (_page) {
+    ShellPage.tv => _guide ? SearchSection.guide : SearchSection.live,
+    ShellPage.movies => SearchSection.movies,
+    ShellPage.series => SearchSection.series,
+    ShellPage.premiumize || ShellPage.settings => null,
+  };
   final _queries = {
     for (final s in SearchSection.values) s: TextEditingController(),
   };
@@ -58,7 +75,22 @@ class _ShellState extends State<Shell> {
       text: query,
       selection: TextSelection.collapsed(offset: query.length),
     );
-    setState(() => _index = _sections.indexOf(to));
+    setState(() {
+      _guide = to == SearchSection.guide;
+      _page = switch (to) {
+        SearchSection.live || SearchSection.guide => ShellPage.tv,
+        SearchSection.movies => ShellPage.movies,
+        SearchSection.series => ShellPage.series,
+      };
+    });
+  }
+
+  void _showGuide(bool guide) {
+    widget.session.library?.setSetting(
+      key: tvViewSetting,
+      value: guide ? 'guide' : 'list',
+    );
+    setState(() => _guide = guide);
   }
 
   Widget _search(SearchSection s, Widget child) => SectionSearch(
@@ -68,49 +100,74 @@ class _ShellState extends State<Shell> {
     controller: _queries[s]!,
     focus: _focus[s],
     onJump: _jump,
+    action: _page == ShellPage.tv ? _tvView() : null,
     child: child,
   );
+
+  /// TV: the channel lists or the guide.
+  Widget _tvView() {
+    final l10n = AppLocalizations.of(context);
+    return SegmentedButton<bool>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: false,
+          tooltip: l10n.tvList,
+          icon: Icon(
+            Icons.view_list,
+            key: const Key('tv.list'),
+            semanticLabel: l10n.tvList,
+          ),
+        ),
+        ButtonSegment(
+          value: true,
+          tooltip: l10n.navGuide,
+          icon: Icon(
+            Icons.calendar_view_week,
+            key: const Key('tv.guide'),
+            semanticLabel: l10n.navGuide,
+          ),
+        ),
+      ],
+      selected: {_guide},
+      onSelectionChanged: (v) => _showGuide(v.single),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final s = widget.session;
+    final pages = shellPages(premiumize: s.premiumizeToken != null);
+    // Unlinked while shown (another profile): back to TV.
+    if (!pages.contains(_page)) _page = ShellPage.tv;
+    final index = pages.indexOf(_page);
+    void go(int i) => setState(() => _page = pages[i]);
     final destinations = [
-      (Icons.live_tv, l10n.navLive),
-      (Icons.calendar_view_week, l10n.navGuide),
-      (Icons.movie_outlined, l10n.navMovies),
-      (Icons.video_library_outlined, l10n.navSeries),
-      (Icons.settings_outlined, l10n.navSettings),
+      for (final p in pages)
+        switch (p) {
+          ShellPage.tv => (Icons.live_tv, l10n.navLive),
+          ShellPage.movies => (Icons.movie_outlined, l10n.navMovies),
+          ShellPage.series => (Icons.video_library_outlined, l10n.navSeries),
+          ShellPage.premiumize => (Icons.cloud_outlined, l10n.premiumize),
+          ShellPage.settings => (Icons.settings_outlined, l10n.navSettings),
+        },
     ];
-    final page = switch (_index) {
-      0 => _search(
-        SearchSection.live,
-        BrowseScreen(
-          key: const ValueKey('live'),
-          session: s,
-          kind: ItemKind.live,
-        ),
-      ),
-      1 => _search(SearchSection.guide, GuideScreen(session: s)),
-      2 => _search(
-        SearchSection.movies,
-        BrowseScreen(
-          key: const ValueKey('movies'),
-          session: s,
-          kind: ItemKind.movie,
-        ),
-      ),
-      3 => _search(
-        SearchSection.series,
-        BrowseScreen(
-          key: const ValueKey('series'),
-          session: s,
-          kind: ItemKind.series,
-        ),
-      ),
-      _ => SettingsScreen(session: s, focus: _settingsFocus),
+    Widget browse(SearchSection section, ItemKind kind) => _search(
+      section,
+      BrowseScreen(key: ValueKey(section), session: s, kind: kind),
+    );
+    final page = switch (_page) {
+      ShellPage.tv =>
+        _guide
+            ? _search(SearchSection.guide, GuideScreen(session: s))
+            : browse(SearchSection.live, ItemKind.live),
+      ShellPage.movies => browse(SearchSection.movies, ItemKind.movie),
+      ShellPage.series => browse(SearchSection.series, ItemKind.series),
+      ShellPage.premiumize => PremiumizeScreen(session: s),
+      ShellPage.settings => SettingsScreen(session: s, focus: _settingsFocus),
     };
-    final section = _index < _sections.length ? _sections[_index] : null;
+    final section = _section;
     final body = Column(
       children: [
         ListenableBuilder(
@@ -132,7 +189,7 @@ class _ShellState extends State<Shell> {
         // see two sections).
         Expanded(
           child: TweenAnimationBuilder<double>(
-            key: ValueKey(_index),
+            key: ValueKey((_page, _guide)),
             tween: Tween(begin: 0, end: 1),
             duration: MediaQuery.disableAnimationsOf(context)
                 ? Duration.zero
@@ -158,7 +215,7 @@ class _ShellState extends State<Shell> {
                   child: Row(
                     children: [
                       NavigationRail(
-                        selectedIndex: _index,
+                        selectedIndex: index,
                         labelType: NavigationRailLabelType.all,
                         leading: ListenableBuilder(
                           listenable: s,
@@ -169,8 +226,7 @@ class _ShellState extends State<Shell> {
                             child: AppLogoMark(logo: s.logo, size: 40),
                           ),
                         ),
-                        onDestinationSelected: (i) =>
-                            setState(() => _index = i),
+                        onDestinationSelected: go,
                         destinations: [
                           for (final d in destinations)
                             NavigationRailDestination(
@@ -186,24 +242,22 @@ class _ShellState extends State<Shell> {
                 ),
               );
             }
-            // Phones: a horizontal fling moves to the neighbouring section (owner decision), except on the Guide,
+            // Phones: a horizontal fling moves to the neighbouring section (owner decision), except on the guide,
             // where a horizontal drag scrolls time.
             return Scaffold(
               body: SafeArea(
                 child: SectionSwipe(
-                  enabled: _index != 1,
-                  onPrevious: _index > 0
-                      ? () => setState(() => _index--)
-                      : null,
-                  onNext: _index < destinations.length - 1
-                      ? () => setState(() => _index++)
+                  enabled: section != SearchSection.guide,
+                  onPrevious: index > 0 ? () => go(index - 1) : null,
+                  onNext: index < destinations.length - 1
+                      ? () => go(index + 1)
                       : null,
                   child: body,
                 ),
               ),
               bottomNavigationBar: NavigationBar(
-                selectedIndex: _index,
-                onDestinationSelected: (i) => setState(() => _index = i),
+                selectedIndex: index,
+                onDestinationSelected: go,
                 destinations: [
                   for (final d in destinations)
                     NavigationDestination(icon: Icon(d.$1), label: d.$2),

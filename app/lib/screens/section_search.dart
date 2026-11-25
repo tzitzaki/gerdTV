@@ -60,6 +60,7 @@ class SectionSearch extends StatefulWidget {
     this.focus,
     this.group,
     this.onJump,
+    this.action,
   });
   final Session session;
   final SearchSection section;
@@ -73,6 +74,9 @@ class SectionSearch extends StatefulWidget {
 
   /// The "Also in" line: switch to another section with this query. Null: no line (inside a group).
   final void Function(SearchSection section, String query)? onJump;
+
+  /// Beside the field (TV's switch between lists and guide).
+  final Widget? action;
   final Widget child;
 
   @override
@@ -350,7 +354,21 @@ class _SectionSearchState extends State<SectionSearch> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        field,
+        Row(
+          children: [
+            Expanded(child: field),
+            if (widget.action case final action?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  0,
+                  Tokens.space,
+                  Tokens.space,
+                  0,
+                ),
+                child: action,
+              ),
+          ],
+        ),
         Expanded(
           child: q.isEmpty
               ? (_recent.isEmpty ? widget.child : _recentList(l10n))

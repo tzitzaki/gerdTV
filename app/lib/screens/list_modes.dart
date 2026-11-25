@@ -2,6 +2,7 @@
 // progress, what's next), tiles, large tiles. Chosen per section in Settings → Lists, switched with the list bar's
 // toggle; stored as the profile setting `list_mode_<kind>`. These widgets take plain data, so tests need no core.
 // Favourites: a star on every row and tile, a long press, or a long OK on the remote (LongOk) toggles one.
+// On a channel the long press or long OK opens its menu instead (showChannelMenu).
 
 import 'dart:async';
 
@@ -194,6 +195,15 @@ class ItemsView extends StatelessWidget {
       final it = items[i];
       final nn = nowNext[it.key];
       final fav = onFavourite == null ? null : () => onFavourite!(it);
+      final hold = fav == null || it.kind != ItemKind.live
+          ? fav
+          : () => showChannelMenu(
+              context,
+              it,
+              favourite: favourites.contains(it.key),
+              onWatch: () => onTap(it),
+              onFavourite: fav,
+            );
       final cellWidget = switch (mode) {
         ListMode.compact || ListMode.list => ItemRow(
           item: it,
@@ -204,6 +214,7 @@ class ItemsView extends StatelessWidget {
           highlight: highlight,
           favourite: favourites.contains(it.key),
           onFavourite: fav,
+          onHold: hold,
         ),
         _ => ItemCard(
           item: it,
@@ -213,11 +224,12 @@ class ItemsView extends StatelessWidget {
           highlight: highlight,
           favourite: favourites.contains(it.key),
           onFavourite: fav,
+          onHold: hold,
         ),
       };
-      return fav == null
+      return hold == null
           ? cellWidget
-          : LongOk(onTap: () => onTap(it), onLong: fav, child: cellWidget);
+          : LongOk(onTap: () => onTap(it), onLong: hold, child: cellWidget);
     }
 
     final body = switch (mode) {
@@ -266,12 +278,16 @@ class ItemRow extends StatelessWidget {
     this.highlight,
     this.favourite = false,
     this.onFavourite,
+    this.onHold,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool compact;
   final bool favourite;
   final VoidCallback? onFavourite;
+
+  /// A long press.
+  final VoidCallback? onHold;
   final DateTime now;
   final VoidCallback onTap;
 
@@ -343,10 +359,59 @@ class ItemRow extends StatelessWidget {
           ? null
           : FavouriteStar(item: item, on: favourite, onPressed: onFavourite!),
       onTap: onTap,
-      onLongPress: onFavourite,
+      onLongPress: onHold,
     );
   }
 }
+
+/// A channel's menu (long press or long OK; in the guide also a tap on the channel): watch it, or add it to or remove
+/// it from the favourites. Nothing has the focus at first: an OK still held would press it.
+Future<void> showChannelMenu(
+  BuildContext context,
+  ItemInfo channel, {
+  required bool favourite,
+  required VoidCallback onWatch,
+  required VoidCallback onFavourite,
+}) => showModalBottomSheet<void>(
+  context: context,
+  builder: (context) {
+    final l10n = AppLocalizations.of(context);
+    Widget entry(String key, IconData icon, String label, VoidCallback run) =>
+        ListTile(
+          key: Key('channel.$key'),
+          leading: Icon(icon),
+          title: Text(label),
+          onTap: () {
+            Navigator.of(context).pop();
+            run();
+          },
+        );
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                channel.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            entry('watch', Icons.play_arrow, l10n.guideWatch, onWatch),
+            entry(
+              'favourite',
+              favourite ? Icons.star : Icons.star_border,
+              favourite ? l10n.favouriteRemove : l10n.favouriteAdd,
+              onFavourite,
+            ),
+          ],
+        ),
+      ),
+    );
+  },
+);
 
 /// The star on a row or tile: filled for a favourite.
 class FavouriteStar extends StatelessWidget {
@@ -447,12 +512,16 @@ class ItemCard extends StatefulWidget {
     this.highlight,
     this.favourite = false,
     this.onFavourite,
+    this.onHold,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool large;
   final bool favourite;
   final VoidCallback? onFavourite;
+
+  /// A long press.
+  final VoidCallback? onHold;
   final VoidCallback onTap;
 
   /// A search result: the query to bold; the group's name shows too.
@@ -614,7 +683,7 @@ class _ItemCardState extends State<ItemCard> {
         elevation: _lifted ? 8 : 1,
         child: InkWell(
           onTap: widget.onTap,
-          onLongPress: widget.onFavourite,
+          onLongPress: widget.onHold,
           onFocusChange: _lift,
           onHover: _lift,
           child: content,

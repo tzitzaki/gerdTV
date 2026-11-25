@@ -87,11 +87,11 @@ void main() {
     await tester.pump();
     expect(session.logo, AppLogo.signal);
     expect(appSetting(dir: dir.path, key: Session.settingAppLogo), 'signal');
-    // The rail's Live TV (Appearance lists the sections by name too).
+    // The rail's TV (Appearance lists the sections by name too).
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
+        matching: find.text('TV'),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));
@@ -519,7 +519,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
+        matching: find.text('TV'),
       ),
     );
     await waitFor(tester, liveField);
@@ -576,25 +576,15 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     // The guide's field lists programmes instead of the grid.
-    await tapReady(
-      tester,
-      find.descendant(
-        of: find.byType(NavigationRail),
-        matching: find.text('Guide'),
-      ),
-    );
+    await tapReady(tester, find.byKey(const Key('tv.guide')));
     final guideField = find.byKey(const Key('search.guide'));
     await waitFor(tester, guideField.hitTestable());
     await tester.enterText(guideField, 'sport');
     await waitFor(tester, programmeHit);
     await tester.tap(find.byKey(const Key('search.clear')));
     await tester.pump();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
-      ),
-    );
+    expect(lib.setting(key: 'tv_view'), 'guide', reason: 'remembered');
+    await tapReady(tester, find.byKey(const Key('tv.list')));
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search in sections, groups and the guide');
@@ -650,7 +640,7 @@ void main() {
 
     debugPrint('JOURNEY: a reminder was set and cleared');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
-    await tapReady(tester, find.text('Guide'));
+    await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));
     // The sort button: the order is Live TV's too; back to the provider's.
     for (final order in ['name_desc', 'provider']) {

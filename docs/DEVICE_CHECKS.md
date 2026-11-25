@@ -5,9 +5,9 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## Mac
 - Own engine: Settings → Playback → Player engine gerdTV, restart; a movie plays with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
-- Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
+- Search: typing in TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
-- Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
+- Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
 - Mini player: P floats the picture on top on every Space; with another app in front hover or a click shows Mute, Restore, Stop; drag; M.
@@ -40,7 +40,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
-- Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
+- Voice search: the mic in TV's search field opens Google's speech prompt; the spoken words become the search.
 - Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Shield
