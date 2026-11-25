@@ -15,7 +15,7 @@
 use crate::m3u;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub type Result<T> = rusqlite::Result<T>;
 
@@ -233,19 +233,76 @@ pub fn open(path: &Path) -> Result<Connection> {
         std::fs::copy(path, &backup)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     }
-    let from = current;
     while current < SCHEMA_VERSION {
-        conn.execute_batch(MIGRATIONS[(current - 1) as usize])?;
+        migrate_step(&conn, current, MIGRATIONS[(current - 1) as usize])?;
         current += 1;
     }
-    if from < 6 {
-        reindex(&conn)?; // migration 6 added empty search indexes
+    if path != Path::new(":memory:") {
+        prune_backups(&conn, path);
     }
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
-        [current.to_string()],
-    )?;
     Ok(conn)
+}
+
+/// One migration step with its version number, all or nothing: after a crash or an error halfway the next start finds
+/// the version it left, not a half-changed schema whose ALTERs would fail a second time.
+fn migrate_step(conn: &Connection, from: i64, sql: &str) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(sql)?;
+    if from == 5 {
+        reindex(&tx)?; // step 5 → 6 added empty search indexes
+    }
+    tx.execute(
+        "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
+        [(from + 1).to_string()],
+    )?;
+    tx.commit()
+}
+
+/// The backups of the database at `path` (`<name>.db.bak-<unix seconds>`, nothing else), oldest first.
+pub fn backups(path: &Path) -> Vec<PathBuf> {
+    let Some(prefix) = path
+        .file_name()
+        .map(|n| format!("{}.bak-", n.to_string_lossy()))
+    else {
+        return Vec::new();
+    };
+    let mut found: Vec<(u64, PathBuf)> = path
+        .parent()
+        .and_then(|dir| std::fs::read_dir(dir).ok())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let at = name.strip_prefix(&prefix)?;
+            // Digits only: parse() alone would also take "+5".
+            let digits = at.bytes().all(|b| b.is_ascii_digit());
+            Some((at.parse().ok().filter(|_| digits)?, e.path()))
+        })
+        .collect();
+    found.sort();
+    found.into_iter().map(|(_, p)| p).collect()
+}
+
+/// Deletes all but the newest backup (owner decision), and only while the opened database is sound: a damaged one may
+/// need an older copy. Nothing to prune costs one directory listing; the check runs only before a deletion.
+fn prune_backups(conn: &Connection, path: &Path) {
+    let all = backups(path);
+    let Some((_newest, old)) = all.split_last().filter(|(_, old)| !old.is_empty()) else {
+        return;
+    };
+    let sound = conn
+        .query_row("PRAGMA quick_check(1)", [], |r| r.get::<_, String>(0))
+        .is_ok_and(|r| r == "ok");
+    if !sound {
+        tracing::warn!("database check failed, all backups kept");
+        return;
+    }
+    for p in old {
+        if let Err(e) = std::fs::remove_file(p) {
+            tracing::warn!("old database backup not deleted: {e}"); // tried again at the next start
+        }
+    }
 }
 
 /// Fills `folded` from the stored names (after migration 6); the tvg-names follow with the next sync.
@@ -1772,8 +1829,21 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             .count();
         assert_eq!(backups, 1);
         drop(c);
-        // Opening again migrates nothing and makes no new backup.
+        // Opening again migrates nothing, makes no new backup, and clears the profile's older ones (earlier
+        // migrations'), but nothing that isn't exactly one of its backups.
+        for other in [
+            "p.db.bak-100",
+            "p.db.bak-99",
+            "q.db.bak-100",
+            "p.db.bak-mine",
+        ] {
+            std::fs::write(dir.join(other), "x").unwrap();
+        }
         drop(open(&path).unwrap());
+        assert!(!dir.join("p.db.bak-100").exists() && !dir.join("p.db.bak-99").exists());
+        assert!(dir.join("q.db.bak-100").exists() && dir.join("p.db.bak-mine").exists());
+        std::fs::remove_file(dir.join("q.db.bak-100")).unwrap();
+        std::fs::remove_file(dir.join("p.db.bak-mine")).unwrap();
         let backups = std::fs::read_dir(&dir)
             .unwrap()
             .filter(|e| {
@@ -1786,6 +1856,32 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             .count();
         assert_eq!(backups, 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A migration that fails halfway leaves the version and tables as they were, so the next start runs it again.
+    #[test]
+    fn a_failed_migration_changes_nothing() {
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch(SCHEMA).unwrap();
+        c.execute("INSERT INTO meta VALUES ('schema', '1')", [])
+            .unwrap();
+        assert!(
+            migrate_step(
+                &c,
+                1,
+                "CREATE TABLE half (a); ALTER TABLE missing ADD COLUMN b;"
+            )
+            .is_err()
+        );
+        let (tables, version): (i64, String) = c
+            .query_row(
+                "SELECT (SELECT count(*) FROM sqlite_master WHERE name = 'half'),
+                    (SELECT value FROM meta WHERE key = 'schema')",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((tables, version.as_str()), (0, "1"));
     }
 
     #[test]

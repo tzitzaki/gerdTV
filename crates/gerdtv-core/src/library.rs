@@ -138,13 +138,16 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
     Ok(p)
 }
 
-/// Removes a profile and its database (inside the app's own folder; the app confirms first).
+/// Removes a profile, its database and the database's backups (inside the app's own folder; the app confirms first).
 pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     let mut all = load_profiles(dir)?;
     all.retain(|p| p.id != id);
     store_profiles(dir, &all)?;
     for suffix in ["", "-wal", "-shm"] {
         let _ = std::fs::remove_file(db_path(dir, id).with_extension(format!("db{suffix}")));
+    }
+    for backup in db::backups(&db_path(dir, id)) {
+        let _ = std::fs::remove_file(backup);
     }
     Ok(())
 }
@@ -1261,7 +1264,12 @@ mod tests {
             all.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
             ["Renamed", "Test"]
         );
+        std::fs::create_dir_all(dir.join("profiles")).unwrap();
+        let backup = |id: &str| dir.join("profiles").join(format!("{id}.db.bak-100"));
+        std::fs::write(backup(&a.id), "x").unwrap();
+        std::fs::write(backup(&b.id), "x").unwrap();
         delete_profile(&dir, &b.id).unwrap();
+        assert!(backup(&a.id).exists() && !backup(&b.id).exists());
         assert_eq!(load_profiles(&dir).unwrap().len(), 1);
         assert!(
             !std::fs::read_to_string(dir.join("profiles.json"))
