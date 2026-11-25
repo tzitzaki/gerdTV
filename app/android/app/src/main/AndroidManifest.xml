@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Updates: hand the downloaded APK to the system's installer (MainActivity.installApk). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android TV's home screen: Play Next and the row of recent channels (TvHome.kt). -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <!-- Android TV (e.g. Nvidia Shield): no touchscreen needed; leanback optional, so phones install it too. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />

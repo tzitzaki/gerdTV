@@ -51,6 +51,9 @@ class PlatformBridge {
         pip.value = call.arguments == true;
       } else if (call.method == 'pipRestore') {
         onPipRestore?.call();
+      } else if (call.method == 'openItem') {
+        final m = call.arguments as Map;
+        onOpenItem?.call(m['profile'] as String, m['key'] as String);
       } else if (call.method == 'mediaCommand') {
         onMediaCommand?.call(call.arguments as String);
       } else if (call.method == 'menuBar') {
@@ -77,6 +80,38 @@ class PlatformBridge {
     'duration': duration,
     'live': live,
   }, mac: true);
+
+  /// An entry of the Android TV home screen was picked while gerdTV runs (services/tv_home.dart).
+  static void Function(String profile, String key)? onOpenItem;
+
+  static Future<T?> _android<T>(String method, [Object? args]) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return null;
+    try {
+      return await channel.invokeMethod<T>(method, args);
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  static Future<bool> isTv() async => await _android<bool>('isTv') ?? false;
+
+  /// The home screen entry that started gerdTV, once.
+  static Future<({String profile, String key})?> takeOpenItem() async {
+    final m = await _android<Map<Object?, Object?>>('takeOpenItem');
+    return m == null
+        ? null
+        : (profile: m['profile']! as String, key: m['key']! as String);
+  }
+
+  static Future<void> updateTvHome({
+    required String profile,
+    required List<Map<String, Object?>> resume,
+    required List<Map<String, Object?>> channels,
+  }) => _android<void>('tvHome', {
+    'profile': profile,
+    'resume': resume,
+    'channels': channels,
+  });
 
   /// Android TV: the display's modes, the current one first; empty elsewhere.
   static Future<List<DisplayMode>> displayModes() async {

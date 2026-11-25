@@ -1323,6 +1323,29 @@ pub fn touch_recent(conn: &Connection, key: &str) -> Result<()> {
     Ok(())
 }
 
+/// The live channels played last, newest first (hidden groups left out), for the Android TV home screen.
+pub fn recent_channels(conn: &Connection, limit: usize) -> Result<Vec<Hit>> {
+    let mut st = conn.prepare_cached(&format!(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
+         FROM recents r JOIN items i ON i.key = r.key
+         WHERE i.kind = 0 {} ORDER BY r.updated_at DESC, r.rowid DESC LIMIT ?1",
+        visible_and(conn, "i")?
+    ))?;
+    let rows = st.query_map([limit as i64], |r| {
+        Ok(Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: String::new(),
+        })
+    })?;
+    rows.collect()
+}
+
 /// Every favourite's key (the lists' stars).
 pub fn favourite_keys(conn: &Connection) -> Result<Vec<String>> {
     let mut st = conn.prepare_cached("SELECT key FROM favourites")?;
@@ -1775,7 +1798,16 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         Sync::add_items(&mut c, Kind::Episode, &[ep]).unwrap();
         set_favourite(&c, "live:102", true).unwrap();
         assert_eq!(search(&c, "maus", &[], None, 10, 0).unwrap().len(), 2);
+        for key in ["live:101", "live:102", "movie:201"] {
+            touch_recent(&c, key).unwrap();
+        }
+        let recent = |c: &Connection| -> Vec<String> {
+            let hits = recent_channels(c, 10).unwrap();
+            hits.into_iter().map(|h| h.key).collect()
+        };
+        assert_eq!(recent(&c), ["live:102", "live:101"], "channels only");
         set_group_hidden(&c, Kind::Live, "DE | Regional", true).unwrap();
+        assert_eq!(recent(&c), ["live:101"]);
         set_group_hidden(&c, Kind::Series, "k", true).unwrap();
         assert!(
             search(&c, "munchen", &[], None, 10, 0).unwrap().is_empty(),

@@ -72,6 +72,19 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    "isTv" -> result.success(isTv())
+                    "takeOpenItem" -> {
+                        result.success(openItem(intent))
+                        intent.removeExtra(TvHome.EXTRA_ITEM)
+                    }
+                    "tvHome" -> {
+                        val profile = call.argument<String>("profile") ?: ""
+                        val resume = call.argument<List<Map<String, Any?>>>("resume") ?: emptyList()
+                        val channels = call.argument<List<Map<String, Any?>>>("channels") ?: emptyList()
+                        // The launcher's database, off the UI thread and one update at a time.
+                        tvHomeThread.execute { TvHome.update(applicationContext, profile, resume, channels) }
+                        result.success(null)
+                    }
                     // TV only: the display's modes, the current one first (app/lib/player/frame_rate.dart).
                     "displayModes" -> result.success(
                         if (isTv()) {
@@ -224,6 +237,19 @@ class MainActivity : FlutterActivity() {
         } else null
         listening?.success(text)
         listening = null
+    }
+
+    private val tvHomeThread = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /// What a home screen entry asks for (TvHome), or null for a plain start.
+    private fun openItem(intent: Intent): Map<String, String>? {
+        val key = intent.getStringExtra(TvHome.EXTRA_ITEM) ?: return null
+        return mapOf("profile" to (intent.getStringExtra(TvHome.EXTRA_PROFILE) ?: ""), "key" to key)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openItem(intent)?.let { channel?.invokeMethod("openItem", it) }
     }
 
     private fun isTv() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)

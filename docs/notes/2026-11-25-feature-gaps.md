@@ -22,7 +22,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 7. macOS media keys (started 22:48) (iOS and Android came with #62)
 8. Auto frame rate (Android TV): started 22:50
 9. Android TV home row: started 22:56
-10. Custom groups, names, order (extends #62's long-hold menu)
+10. Custom groups, names, order: started 23:12 (extends #62's long-hold menu)
 11. TMDB
 12. Simkl import, ids for Simkl and Trakt
 13. OpenSubtitles (read its docs first: key and login model, quotas, terms; the Download page needs the Api-Key header always, the login names whose quota)
@@ -31,5 +31,5 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–8 done 22:56 (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: step 9. Open questions: none blocking.
+Steps 0–9 done 23:12 (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 10. Open questions: none blocking.

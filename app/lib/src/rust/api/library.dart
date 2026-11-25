@@ -162,6 +162,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Adaptive mode: one step more buffer for this item; returns the new choice.
   BufferChoice raiseBuffer({required String key});
 
+  /// The live channels played last, newest first (the Android TV home screen).
+  Future<List<ItemInfo>> recentChannels({required int limit});
+
   /// The section's newest searches, newest first (the field's suggestions while empty).
   List<String> recentSearches({required String section, required int limit});
 

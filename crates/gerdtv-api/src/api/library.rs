@@ -546,6 +546,17 @@ impl Library {
             .collect())
     }
 
+    /// The live channels played last, newest first (the Android TV home screen).
+    pub fn recent_channels(&self, limit: u32) -> Result<Vec<ItemInfo>, String> {
+        Ok(self
+            .0
+            .recent_channels(limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
     /// Something started playing: search ranks recently watched items first.
     #[flutter_rust_bridge::frb(sync)]
     pub fn touch_recent(&self, key: String) -> Result<(), String> {

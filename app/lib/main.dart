@@ -20,6 +20,7 @@ import 'screens/profile_picker.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
 import 'services/reminders.dart';
+import 'services/tv_home.dart';
 import 'services/session.dart';
 import 'src/rust/api/logos.dart';
 import 'src/rust/frb_generated.dart';
@@ -47,17 +48,18 @@ Future<void> main() async {
   startEngine((await getApplicationSupportDirectory()).path);
   final session = Session();
   // A tapped reminder plays its channel (it may have left the catalogue since: then nothing happens).
-  session.reminders = Reminders(
-    onOpen: (key) async {
-      final item = await session.library?.item(key: key);
-      if (item == null) return;
-      await session.navigatorKey.currentState?.push(
-        MaterialPageRoute<void>(
-          builder: (_) => PlayerScreen(session: session, item: item),
-        ),
-      );
-    },
-  );
+  Future<void> openKey(String key) async {
+    final item = await session.library?.item(key: key);
+    if (item == null) return;
+    await session.navigatorKey.currentState?.push(
+      MaterialPageRoute<void>(
+        builder: (_) => PlayerScreen(session: session, item: item),
+      ),
+    );
+  }
+
+  session.reminders = Reminders(onOpen: openKey);
+  unawaited(TvHome(session, onOpen: openKey).init());
   session.onPipRestore = () => reopenPlayer(session);
   unawaited(session.reminders!.init());
   unawaited(session.start());

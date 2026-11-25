@@ -572,6 +572,10 @@ impl Library {
         Ok(db::touch_recent(&self.conn.lock().unwrap(), key)?)
     }
 
+    pub fn recent_channels(&self, limit: usize) -> Result<Vec<Hit>> {
+        Ok(db::recent_channels(&self.conn.lock().unwrap(), limit)?)
+    }
+
     pub fn favourite_keys(&self) -> Result<Vec<String>> {
         Ok(db::favourite_keys(&self.conn.lock().unwrap())?)
     }
