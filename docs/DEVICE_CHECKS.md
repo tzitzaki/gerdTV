@@ -12,7 +12,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
-- Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
+- Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
 - Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.

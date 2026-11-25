@@ -557,8 +557,10 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
       appBar: AppBar(
         title: Text(l10n.guideUnmatched),
         actions: [
-          TextButton(
+          IconButton(
             key: const Key('guide.mapped'),
+            tooltip: l10n.guideMapped,
+            icon: const Icon(Icons.link),
             onPressed: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -568,7 +570,6 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
               // An undone mapping may be back in this list.
               if (mounted) _searchFor(_query);
             },
-            child: Text(l10n.guideMapped),
           ),
         ],
       ),
