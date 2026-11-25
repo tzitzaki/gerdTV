@@ -146,10 +146,11 @@
   "listModeLargeTiles": "Large tiles",
   "listModeList": "List",
   "listModeTiles": "Tiles",
-  "livePlayer": "Live channels play in",
-  "livePlayerApple": "Apple's player (AVPlayer)",
-  "livePlayerGerdtv": "gerdTV's player (mpv)",
-  "livePlayerHint": "gerdTV's player plays every format and switches channels faster; Apple's uses less battery. Takes effect after restarting gerdTV",
+  "livePlayer": "Live TV player",
+  "livePlayerApple": "Apple player",
+  "livePlayerAppleHint": "Uses less battery, switches channels more slowly. Movies, series and channels it can't play use the gerdTV player.",
+  "livePlayerGerdtv": "gerdTV player",
+  "livePlayerGerdtvHint": "Plays every format and switches channels fast.",
   "logoGtv": "Wordmark",
   "logoMonogram": "Monogram",
   "logoScreen": "TV screen",
@@ -167,10 +168,11 @@
   "navSettings": "Settings",
   "playerAudio": "Audio",
   "playerChannels": "Channels",
-  "playerEngine": "Player engine",
-  "playerEngineGerdtv": "gerdTV build (newer mpv and FFmpeg)",
-  "playerEngineHint": "Takes effect after restarting gerdTV",
+  "playerEngine": "gerdTV player version",
+  "playerEngineGerdtv": "Newer",
+  "playerEngineGerdtvHint": "gerdTV's own build with newer mpv and FFmpeg.",
   "playerEngineStandard": "Standard",
+  "playerEngineStandardHint": "The proven version.",
   "playerGestures": "Player gestures",
   "playerGesturesHint": "Swipe sideways or double-tap to seek in movies and episodes; swipe up or down on the right to change the volume.",
   "playerNext": "Next: {title}",
@@ -236,6 +238,14 @@
   "programmeNow": "Now",
   "programmeRemind": "Remind me",
   "programmeReminded": "Reminder set",
+  "recommended": "{name} (recommended)",
+  "@recommended": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "remove": "Remove",
   "restartToApply": "Close gerdTV and open it again to apply the change.",
   "restore": "Full size",

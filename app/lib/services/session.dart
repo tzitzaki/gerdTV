@@ -150,13 +150,19 @@ class Session extends ChangeNotifier {
   final ValueNotifier<bool> onAvPlayer = ValueNotifier(false);
 
   /// Live channels play in AVPlayer on Apple platforms when Settings → Playback says so (gerdTV's player by
-  /// default). Read once, at the first live channel: a change applies after closing and reopening gerdTV.
-  late final bool _avForLive =
+  /// default). Read once, at start: a change applies after closing and reopening gerdTV.
+  bool get _avForLive =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) &&
       appDir != null &&
-      readLivePlayer(appDir!) == LivePlayer.apple;
+      runningPlayers.live == LivePlayer.apple;
+
+  /// The players this run uses, as stored when it started (Settings changes apply to the next one).
+  late final ({PlayerEngine engine, LivePlayer live}) runningPlayers = (
+    engine: readEngine(appDir!),
+    live: readLivePlayer(appDir!),
+  );
 
   AvPlatformPlayer get _avEngine {
     if (_av == null) {
@@ -295,6 +301,7 @@ class Session extends ChangeNotifier {
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
+    runningPlayers; // captured now, before Settings can change them
     logo = parseAppLogo(appSetting(dir: dir, key: settingAppLogo));
     theme.value = ThemePrefs.parse(
       mode: appSetting(dir: dir, key: settingThemeMode),

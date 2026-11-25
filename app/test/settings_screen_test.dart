@@ -1,7 +1,8 @@
 // New, because nothing owns the shape of Settings: the search filter (every word must match an entry's title,
 // keywords, subcategory or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
 // that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
-// app-wide; on Apple platforms the live player choice is stored for the next start and says so.
+// app-wide; the player choices are stored for the next start, and say so only for a real
+// change.
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import 'package:gerdtv/platform/engine.dart';
 import 'package:gerdtv/theme.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/app_logo.dart';
+import 'package:gerdtv/screens/player_settings.dart';
 import 'package:gerdtv/screens/settings_model.dart';
 import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/session.dart';
@@ -208,29 +210,73 @@ void main() {
       expect(core.appSettings[Session.settingAppLogo], 'signal');
     });
 
+    // [own]: gerdTV's own libmpv is installed (a 320 px phone: nothing may overflow).
+    Future<String> pumpPlayers(WidgetTester tester, {bool own = true}) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final dir = Directory.systemTemp.createTempSync('gerdtv-settings');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('de'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PlayerSettings(
+              session: Session(appDir: dir.path),
+              hasOwnEngine: own,
+            ),
+          ),
+        ),
+      );
+      return dir.path;
+    }
+
+    Future<void> pick(WidgetTester tester, String key) async {
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    final newer = find.byKey(const Key('settings.engine.gerdtv'));
+    final notice = find.byKey(const Key('settings.restartNotice'));
+
     testWidgets(
-      'Apple: live channels play in gerdTV\'s player unless chosen; a change says to restart',
+      'Player: the version shows only with gerdTV\'s player and stays stored',
       (tester) async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
-        final dir = Directory.systemTemp.createTempSync('gerdtv-settings');
-        addTearDown(() => dir.deleteSync(recursive: true));
-        await pump(tester, const Size(1280, 800), appDir: dir.path);
-        await tester.tap(find.byKey(const Key('settings.cat.playback')));
-        await tester.pump();
+        final dir = await pumpPlayers(tester);
+        expect(readLivePlayer(dir), LivePlayer.gerdtv, reason: 'the default');
+        await pick(tester, 'settings.engine.gerdtv');
+        await pick(tester, 'settings.live.apple');
+        expect(newer, findsNothing);
+        expect(readLivePlayer(dir), LivePlayer.apple);
         expect(
-          readLivePlayer(dir.path),
-          LivePlayer.gerdtv,
-          reason: 'the default',
+          readEngine(dir),
+          PlayerEngine.gerdtv,
+          reason: 'movies still use it',
         );
-        await tester.tap(find.byKey(const Key('settings.livePlayer')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text("Apple's player (AVPlayer)").last);
-        await tester.pumpAndSettle();
-        expect(readLivePlayer(dir.path), LivePlayer.apple);
-        expect(find.byKey(const Key('settings.restartNotice')), findsOneWidget);
+        await pick(tester, 'settings.live.gerdtv');
+        expect(newer, findsOneWidget);
+        debugDefaultTargetPlatformOverride = null;
       },
     );
+
+    testWidgets('Player: the restart notice shows only for a real change', (
+      tester,
+    ) async {
+      await pumpPlayers(tester);
+      await pick(tester, 'settings.live.gerdtv'); // what it is already
+      expect(notice, findsNothing);
+      await pick(tester, 'settings.live.apple');
+      expect(notice, findsOneWidget);
+      await pick(tester, 'settings.live.gerdtv'); // back to what runs
+      expect(notice, findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
 
     testWidgets(
       'Appearance: the theme applies at once and is stored app-wide',
