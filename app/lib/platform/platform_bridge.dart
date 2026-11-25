@@ -58,7 +58,7 @@ class PlatformBridge {
     });
   }
 
-  /// Android and iOS: the Now Playing card (lib/services/media_card.dart). [artwork] is a local file; seconds.
+  /// Android, iOS and macOS: the Now Playing card (lib/services/media_card.dart). [artwork] is a local file; seconds.
   Future<void> nowPlaying({
     required String title,
     required String subtitle,
@@ -75,15 +75,21 @@ class PlatformBridge {
     'position': position,
     'duration': duration,
     'live': live,
-  });
+  }, mac: true);
 
   /// Stop: the card goes.
-  Future<void> clearNowPlaying() => _mobile('clearNowPlaying', const {});
+  Future<void> clearNowPlaying() =>
+      _mobile('clearNowPlaying', const {}, mac: true);
 
-  Future<void> _mobile(String method, Map<String, Object?> args) async {
+  Future<void> _mobile(
+    String method,
+    Map<String, Object?> args, {
+    bool mac = false,
+  }) async {
     if (kIsWeb ||
         !(defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS)) {
+            defaultTargetPlatform == TargetPlatform.iOS ||
+            (mac && defaultTargetPlatform == TargetPlatform.macOS))) {
       return;
     }
     try {

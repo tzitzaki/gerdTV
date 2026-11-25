@@ -20,7 +20,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 5. Picture (aspect, deinterlacing): started 22:11
 6. Last channel, CH keys: started 22:21
 7. macOS media keys (started 22:48) (iOS and Android came with #62)
-8. Auto frame rate (Android TV)
+8. Auto frame rate (Android TV): started 22:50
 9. Android TV home row
 10. Custom groups, names, order (extends #62's long-hold menu)
 11. TMDB
@@ -31,5 +31,5 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–6 done 22:48 (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: step 7. Open questions: none blocking.
+Steps 0–7 done 22:50 (step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 8. Open questions: none blocking.
