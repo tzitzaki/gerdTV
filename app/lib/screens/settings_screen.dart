@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/engine.dart';
+import '../player/frame_rate.dart';
 import '../player/picture.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
@@ -318,6 +319,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (on) {
                     lib.setSetting(
                       key: Session.settingAutoplayNext,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          // Works on TVs only (phones report no modes), which the hint says.
+          if (lib != null && defaultTargetPlatform == TargetPlatform.android)
+            SettingsEntry(
+              id: 'matchFrameRate',
+              title: l10n.matchFrameRate,
+              keywords: l10n.settingsKeywordsFrameRate,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.matchFrameRate'),
+                  title: Text(l10n.matchFrameRate),
+                  subtitle: Text(l10n.matchFrameRateHint),
+                  value: lib.setting(key: settingMatchFrameRate) == '1',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: settingMatchFrameRate,
                       value: on ? '1' : '0',
                     );
                     setState(() {});

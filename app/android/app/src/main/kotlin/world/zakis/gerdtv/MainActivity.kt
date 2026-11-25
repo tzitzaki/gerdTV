@@ -72,6 +72,25 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    // TV only: the display's modes, the current one first (app/lib/player/frame_rate.dart).
+                    "displayModes" -> result.success(
+                        if (isTv()) {
+                            val current = display().mode
+                            (listOf(current) + display().supportedModes.filter { m -> m.modeId != current.modeId }).map { m ->
+                                mapOf(
+                                    "id" to m.modeId, "width" to m.physicalWidth, "height" to m.physicalHeight,
+                                    "rate" to m.refreshRate.toDouble(),
+                                )
+                            }
+                        } else emptyList()
+                    )
+                    // 0: the system's own choice again.
+                    "setDisplayMode" -> {
+                        window.attributes = window.attributes.apply {
+                            preferredDisplayModeId = call.argument<Int>("id") ?: 0
+                        }
+                        result.success(null)
+                    }
                     "clearNowPlaying" -> {
                         PlaybackService.show(null)
                         result.success(null)
@@ -206,6 +225,11 @@ class MainActivity : FlutterActivity() {
         listening?.success(text)
         listening = null
     }
+
+    private fun isTv() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+    @Suppress("DEPRECATION") // Activity.getDisplay needs Android 11
+    private fun display() = windowManager.defaultDisplay
 
     private fun startForegroundServiceCompat(intent: Intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)

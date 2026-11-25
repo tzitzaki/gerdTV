@@ -16,6 +16,7 @@ import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/floating.dart';
+import '../player/frame_rate.dart';
 import '../player/next_up.dart';
 import '../player/picture.dart';
 import '../player/switch_player.dart';
@@ -645,6 +646,7 @@ class Session extends ChangeNotifier {
     _loadPictureFormat();
     await _start(item, lib);
     _track('start', item: item);
+    unawaited(_matchFrameRate(item));
   }
 
   /// Trakt and Simkl for the open profile (services/tracking.dart).
@@ -720,6 +722,36 @@ class Session extends ChangeNotifier {
       audio: lib?.setting(key: settingAudioLanguage),
       subtitle: lib?.setting(key: settingSubtitleLanguage),
     );
+  }
+
+  int _displayMode = 0;
+
+  /// Android TV, when switched on: the display's refresh rate follows the stream, once mpv knows its frame rate.
+  Future<void> _matchFrameRate(ItemInfo item) async {
+    if (defaultTargetPlatform != TargetPlatform.android ||
+        library?.setting(key: settingMatchFrameRate) != '1') {
+      return;
+    }
+    final modes = await PlatformBridge.displayModes();
+    if (modes.isEmpty) return;
+    // Up to 30 s: a slow channel with a big buffer takes a while to its first frame.
+    for (var i = 0; i < 60; i++) {
+      if (nowPlaying.value?.key != item.key) return;
+      final fps =
+          double.tryParse(
+            await (_mpv.platform as NativePlayer).getProperty('container-fps'),
+          ) ??
+          0;
+      if (fps > 0 && player.state.position > Duration.zero) {
+        final mode = displayModeFor(fps, modes, modes.first);
+        if (mode != null) {
+          _displayMode = mode.id;
+          await platform.setDisplayMode(mode.id);
+        }
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
   }
 
   /// Deinterlacing for the next start. Nothing is touched until it was on once; from then on, off restores the
@@ -1112,6 +1144,10 @@ class Session extends ChangeNotifier {
     _saveProgress();
     _track('stop');
     _playingKey = null;
+    if (_displayMode != 0) {
+      _displayMode = 0;
+      unawaited(platform.setDisplayMode(0));
+    }
     nowPlaying.value = null;
     timeshiftWindow.value = 0;
     await _useMpv();

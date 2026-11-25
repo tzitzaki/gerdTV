@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../player/frame_rate.dart';
 import '../screens/app_logo.dart';
 
 class PlatformBridge {
@@ -76,6 +77,30 @@ class PlatformBridge {
     'duration': duration,
     'live': live,
   }, mac: true);
+
+  /// Android TV: the display's modes, the current one first; empty elsewhere.
+  static Future<List<DisplayMode>> displayModes() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return const [];
+    try {
+      final modes = await channel.invokeListMethod<Map<Object?, Object?>>(
+        'displayModes',
+      );
+      return [
+        for (final m in modes ?? const <Map<Object?, Object?>>[])
+          (
+            id: m['id']! as int,
+            width: m['width']! as int,
+            height: m['height']! as int,
+            rate: m['rate']! as double,
+          ),
+      ];
+    } on MissingPluginException {
+      return const [];
+    }
+  }
+
+  /// Android TV: asks for a display mode; 0 is the system's own choice.
+  Future<void> setDisplayMode(int id) => _mobile('setDisplayMode', {'id': id});
 
   /// Stop: the card goes.
   Future<void> clearNowPlaying() =>
