@@ -274,7 +274,7 @@ pub fn country(name: &str) -> Option<String> {
     split_country(name).1
 }
 
-/// The country of a community guide file, from its URL (epgshare01, free-epg); None for any other.
+/// The country of a community guide file, from its URL (the app's presets); None for any other.
 pub fn source_country(url: &str) -> Option<String> {
     let file = url.rsplit('/').next()?.split('.').next()?;
     if let Some(f) = file.strip_prefix("epg_ripper_") {
@@ -285,7 +285,34 @@ pub fn source_country(url: &str) -> Option<String> {
             code(f.get(..2)?)
         };
     }
-    url.contains("free-epg.de/api/epg/")
+    if let Some(f) = file.strip_prefix("rytec") {
+        return code(f.get(..2)?);
+    }
+    if url.contains("open-epg.com/files/") {
+        // Names countries in full; a file per part ("germany3").
+        let name = file.trim_end_matches(|c: char| c.is_ascii_digit());
+        let cc = match name {
+            "albania" => "AL",
+            "austria" => "AT",
+            "bosnia" => "BA",
+            "croatia" => "HR",
+            "germany" => "DE",
+            "italy" => "IT",
+            "macedonia" => "MK",
+            "montenegro" => "ME",
+            "serbia" => "RS",
+            "slovenia" => "SI",
+            "switzerland" => "CH",
+            "turkey" => "TR",
+            "unitedkingdom" => "UK",
+            _ => return None,
+        };
+        return Some(cc.into());
+    }
+    let two_letters = ["free-epg.de/api/epg/", "i.mjh.nz/"];
+    two_letters
+        .iter()
+        .any(|h| url.contains(h))
         .then(|| code(file))
         .flatten()
 }
@@ -1271,6 +1298,12 @@ mod tests {
             ("https://h.invalid/epg_ripper_AT1.xml.gz", Some("AT")),
             ("https://h.invalid/epg_ripper_BEIN1.xml.gz", Some("QA")),
             ("https://free-epg.de/api/epg/gb.xml.gz", Some("UK")),
+            ("http://www.xmltvepg.nl/rytecDE_Basic.xz", Some("DE")),
+            ("https://i.mjh.nz/PlutoTV/it.xml.gz", Some("IT")),
+            (
+                "https://www.open-epg.com/files/unitedkingdom2.xml.gz",
+                Some("UK"),
+            ),
             ("https://h.invalid/guide.xml", None),
         ] {
             assert_eq!(source_country(url).as_deref(), want, "{url}");

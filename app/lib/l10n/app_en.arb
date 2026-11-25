@@ -67,7 +67,9 @@
   "guideAddUrl": "Extra XMLTV URL",
   "guideCommunity": "Community guides",
   "guideCommunityAdd": "Add a community guide",
-  "guideCommunityHint": "Free XMLTV files per country from the epgshare01 project, rebuilt daily, about 4 days ahead. Where they overlap with your provider's guide, the provider's wins.",
+  "guideCommunityHint": "Free XMLTV files from several projects, most rebuilt daily and some days ahead. Where they overlap with your provider's guide, the provider's wins. Guides you added aren't listed.",
+  "guideCommunityNone": "No more guides to add.",
+  "guideCommunitySearch": "Search country or project",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
   "@guideFailed": {
