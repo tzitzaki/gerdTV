@@ -46,7 +46,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
-- Missing guide data: twins (same name, other quality) borrow a match; community guide presets from epgshare01 (a third party; files may go away).
+- Missing guide data: community presets (epgshare01, free-epg, Rytec over plain HTTP as the one exception, Pluto TV, Samsung TV Plus, open-epg; third parties), none added by default; names match within a country (DE/AT/CH share), no automatic fuzzy matching, suggestions need a tap; programmes only for channels the profile has.
 - Secrets (provider credentials, TMDB key, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.

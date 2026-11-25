@@ -109,11 +109,8 @@ class Session extends ChangeNotifier {
   /// Bumped after each guide import so now/next and the grid reload.
   int guideGeneration = 0;
 
-  /// Checks hourly whether the guide is older than [guideMaxAge] (the app may stay open for days).
+  /// Checks hourly whether a guide source is due (the app may stay open for days).
   Timer? _guideTimer;
-
-  /// The guide is refreshed when its oldest source is older than this (and once a profile is open without one).
-  static const guideMaxAge = Duration(hours: 12);
 
   /// Days of guide kept ahead: a week on desktop, 3 days on phones and TVs (smaller storage, slower imports).
   static int get guideDaysAhead => isDesktop ? 7 : 3;
@@ -476,7 +473,7 @@ class Session extends ChangeNotifier {
     await refreshGuide();
   }
 
-  /// Refreshes the guide when it is missing or older than [guideMaxAge] (or always with [force]: "Refresh now").
+  /// Refreshes the guide sources that are missing or too old (12 h; 6 h for a few; or all, always, with [force]: "Refresh now").
   /// Failures are kept per source (Settings → Guide shows them); the previous guide stays meanwhile.
   Future<void> refreshGuide({bool force = false}) async {
     final lib = library;
@@ -490,12 +487,11 @@ class Session extends ChangeNotifier {
       _guideAgain |= force;
       return;
     }
-    final age = await lib.guideAge();
-    if (!force && age != null && age < guideMaxAge.inSeconds) return;
+    if (!force && !await lib.guideDue()) return;
     guideRefreshing = true;
     notifyListeners();
     try {
-      await lib.refreshGuide(daysAhead: guideDaysAhead);
+      await lib.refreshGuide(daysAhead: guideDaysAhead, force: force);
       guideGeneration++;
     } catch (e) {
       debugPrint(

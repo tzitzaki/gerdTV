@@ -35,15 +35,20 @@ void main() {
     expect(guideSourceLabel(own), own);
   });
 
-  testWidgets('a source row shows its URL on tap', (tester) async {
+  testWidgets('a source row shows its URL and offset on tap', (tester) async {
+    final offsets = <int>[];
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
-              onPressed: () =>
-                  showGuideSourceUrl(context, '${_share}UK1.xml.gz'),
+              onPressed: () => showGuideSourceUrl(
+                context,
+                '${_share}UK1.xml.gz',
+                offsetHours: 1,
+                onOffset: offsets.add,
+              ),
               child: const Text('open'),
             ),
           ),
@@ -54,6 +59,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('UK · epgshare01'), findsOneWidget);
     expect(find.text('${_share}UK1.xml.gz'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('guide.source.offset')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('+2 h').last);
+    await tester.pumpAndSettle();
+    expect(offsets, [2]);
     await tester.tap(find.byKey(const Key('guide.source.close')));
     await tester.pumpAndSettle();
     expect(find.text('UK · epgshare01'), findsNothing);

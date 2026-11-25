@@ -80,9 +80,12 @@
     }
   },
   "guideFindHint": "Search guide channels",
+  "guideMapped": "Mapped by hand",
+  "guideMappedNone": "No channel is mapped by hand.",
+  "guideMappedUndo": "Undo",
   "guideNever": "Not loaded yet",
   "guideOffset": "Time offset",
-  "guideOffsetHint": "For providers whose guide times are off by whole hours.",
+  "guideOffsetHint": "For a provider whose guide times are off by whole hours. Added guides have their own: tap one.",
   "guideOffsetHours": "{hours} h",
   "@guideOffsetHours": {
     "placeholders": {
@@ -102,9 +105,12 @@
   "guideProvider": "Provider guide",
   "guideRefresh": "Refresh the guide now",
   "guideRefreshing": "Loading the guide…",
-  "guideSourceStatus": "{channels} channels, {programmes} programmes · updated {time}",
+  "guideSourceStatus": "{matched} of your channels · {channels} in the guide, {programmes} programmes stored · updated {time}",
   "@guideSourceStatus": {
     "placeholders": {
+      "matched": {
+        "type": "int"
+      },
       "channels": {
         "type": "int"
       },

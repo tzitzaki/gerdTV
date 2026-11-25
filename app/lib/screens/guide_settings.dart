@@ -109,13 +109,33 @@ String guideSourceLabel(String url) {
 }
 
 /// The source's full URL, selectable and with Copy (the list shows community guides by their short name).
-Future<void> showGuideSourceUrl(BuildContext context, String url) {
+Future<void> showGuideSourceUrl(
+  BuildContext context,
+  String url, {
+  int offsetHours = 0,
+  ValueChanged<int>? onOffset,
+}) {
   final l10n = AppLocalizations.of(context);
   return showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(guideSourceLabel(url)),
-      content: SelectableText(url),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(url),
+          if (onOffset != null) ...[
+            const SizedBox(height: Tokens.space * 2),
+            Text(l10n.guideOffset),
+            OffsetPicker(
+              key: const Key('guide.source.offset'),
+              value: offsetHours,
+              onChanged: onOffset,
+            ),
+          ],
+        ],
+      ),
       actions: [
         TextButton(
           onPressed: () => Clipboard.setData(ClipboardData(text: url)),
@@ -247,6 +267,7 @@ class _GuideSourcesState extends State<GuideSources> {
     final at = DateTime.fromMillisecondsSinceEpoch(s.lastFetch * 1000);
     final locale = Localizations.localeOf(context).toLanguageTag();
     return l10n.guideSourceStatus(
+      s.matched,
       s.channels,
       s.programmes,
       '${DateFormat.E(locale).format(at)} ${DateFormat.Hm(locale).format(at)}',
@@ -283,7 +304,16 @@ class _GuideSourcesState extends State<GuideSources> {
                   subtitle: Text(_status(l10n, src)),
                   onTap: src.builtin
                       ? null
-                      : () => showGuideSourceUrl(context, src.url),
+                      : () => showGuideSourceUrl(
+                          context,
+                          src.url,
+                          offsetHours: src.offsetHours,
+                          onOffset: (h) async {
+                            await _lib.setGuideOffset(id: src.id, hours: h);
+                            // Stored times carry the offset: re-import.
+                            await widget.session.refreshGuide(force: true);
+                          },
+                        ),
                   trailing: src.builtin
                       ? null
                       : IconButton(
@@ -347,7 +377,41 @@ class _GuideSourcesState extends State<GuideSources> {
   }
 }
 
-/// The profile's guide time offset in whole hours; changing it re-imports (stored times carry the offset).
+/// Whole hours from −12 to +12; keeps the picked value itself (its dialog isn't rebuilt by the session).
+class OffsetPicker extends StatefulWidget {
+  const OffsetPicker({super.key, required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<OffsetPicker> createState() => _OffsetPickerState();
+}
+
+class _OffsetPickerState extends State<OffsetPicker> {
+  late int _value = widget.value.clamp(-12, 12);
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DropdownButton<int>(
+      value: _value,
+      items: [
+        for (var h = -12; h <= 12; h++)
+          DropdownMenuItem(
+            value: h,
+            child: Text(l10n.guideOffsetHours(h > 0 ? '+$h' : '$h')),
+          ),
+      ],
+      onChanged: (h) {
+        if (h == null) return;
+        setState(() => _value = h);
+        widget.onChanged(h);
+      },
+    );
+  }
+}
+
+/// The provider guide's time offset in whole hours; changing it re-imports (stored times carry the offset).
 class GuideOffset extends StatefulWidget {
   const GuideOffset({super.key, required this.session});
   final Session session;
@@ -366,19 +430,11 @@ class _GuideOffsetState extends State<GuideOffset> {
     return ListTile(
       title: Text(l10n.guideOffset),
       subtitle: Text(l10n.guideOffsetHint),
-      trailing: DropdownButton<int>(
+      trailing: OffsetPicker(
         key: const Key('guide.offset'),
-        value: offset.clamp(-12, 12),
-        items: [
-          for (var h = -12; h <= 12; h++)
-            DropdownMenuItem(
-              value: h,
-              child: Text(l10n.guideOffsetHours(h > 0 ? '+$h' : '$h')),
-            ),
-        ],
+        value: offset,
         onChanged: (h) async {
-          lib.setSetting(key: settingGuideOffset, value: '${h ?? 0}');
-          setState(() {});
+          lib.setSetting(key: settingGuideOffset, value: '$h');
           await widget.session.refreshGuide(
             force: true,
           ); // stored times carry the offset: re-import
@@ -498,7 +554,24 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.guideUnmatched)),
+      appBar: AppBar(
+        title: Text(l10n.guideUnmatched),
+        actions: [
+          TextButton(
+            key: const Key('guide.mapped'),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => MappedChannelsScreen(library: widget.library),
+                ),
+              );
+              // An undone mapping may be back in this list.
+              if (mounted) _searchFor(_query);
+            },
+            child: Text(l10n.guideMapped),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -566,6 +639,55 @@ class _UnmatchedChannelsScreenState extends State<UnmatchedChannelsScreen> {
   }
 }
 
+/// The channels mapped by hand; Undo goes back to the automatic match.
+class MappedChannelsScreen extends StatefulWidget {
+  const MappedChannelsScreen({super.key, required this.library});
+  final Library library;
+
+  @override
+  State<MappedChannelsScreen> createState() => _MappedChannelsScreenState();
+}
+
+class _MappedChannelsScreenState extends State<MappedChannelsScreen> {
+  late Future<List<MappedChannel>> _mapped = widget.library.mappedChannels();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.guideMapped)),
+      body: FutureBuilder<List<MappedChannel>>(
+        future: _mapped,
+        builder: (context, snap) {
+          final rows = snap.data;
+          if (rows == null) return const SizedBox.shrink();
+          if (rows.isEmpty) return Center(child: Text(l10n.guideMappedNone));
+          return ListView(
+            children: [
+              for (final m in rows)
+                ListTile(
+                  title: Text(m.name),
+                  subtitle: Text(m.guide),
+                  trailing: TextButton(
+                    key: Key('guide.unmap.${m.id}'),
+                    onPressed: () async {
+                      await widget.library.mapChannel(itemKey: m.id);
+                      if (!mounted) return;
+                      setState(() {
+                        _mapped = widget.library.mappedChannels();
+                      });
+                    },
+                    child: Text(l10n.guideMappedUndo),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// Searches the guide's channels by name or id (empty: all, by name); tapping one maps [item] to it (pops with true).
 class PickGuideChannelScreen extends StatefulWidget {
   const PickGuideChannelScreen({
@@ -584,6 +706,21 @@ class _PickGuideChannelScreenState extends State<PickGuideChannelScreen> {
   // Starts empty: the provider's channel name rarely matches the guide's spelling, and empty lists every channel.
   final _query = TextEditingController();
   late Future<List<ChannelRef>> _found = _find();
+  late final _suggested = widget.library.suggestGuideChannels(
+    itemKey: widget.item.id,
+    limit: 3,
+  );
+
+  Widget _row(ChannelRef c, {bool suggested = false}) => ListTile(
+    key: suggested ? Key('guide.suggested.${c.id}') : null,
+    leading: suggested ? const Icon(Icons.auto_awesome) : null,
+    title: Text(c.name),
+    subtitle: Text(c.id),
+    onTap: () async {
+      await widget.library.mapChannel(itemKey: widget.item.id, channel: c.id);
+      if (mounted) Navigator.of(context).pop(true);
+    },
+  );
 
   Future<List<ChannelRef>> _find() =>
       widget.library.findGuideChannels(query: _query.text.trim(), limit: 100);
@@ -611,7 +748,9 @@ class _PickGuideChannelScreenState extends State<PickGuideChannelScreen> {
                 prefixIcon: const Icon(Icons.search),
                 hintText: l10n.guideFindHint,
               ),
-              onChanged: (_) => setState(() => _found = _find()),
+              onChanged: (_) => setState(() {
+                _found = _find();
+              }),
             ),
           ),
           Expanded(
@@ -619,18 +758,18 @@ class _PickGuideChannelScreenState extends State<PickGuideChannelScreen> {
               future: _found,
               builder: (context, snap) => ListView(
                 children: [
-                  for (final c in snap.data ?? const <ChannelRef>[])
-                    ListTile(
-                      title: Text(c.name),
-                      subtitle: Text(c.id),
-                      onTap: () async {
-                        await widget.library.mapChannel(
-                          itemKey: widget.item.id,
-                          channel: c.id,
-                        );
-                        if (context.mounted) Navigator.of(context).pop(true);
-                      },
+                  // Likely ones first (the core's guess, confirmed by the tap); typing is a search of one's own.
+                  if (_query.text.isEmpty)
+                    FutureBuilder<List<ChannelRef>>(
+                      future: _suggested,
+                      builder: (context, snap) => Column(
+                        children: [
+                          for (final c in snap.data ?? const <ChannelRef>[])
+                            _row(c, suggested: true),
+                        ],
+                      ),
                     ),
+                  for (final c in snap.data ?? const <ChannelRef>[]) _row(c),
                 ],
               ),
             ),

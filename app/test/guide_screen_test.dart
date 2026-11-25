@@ -40,10 +40,13 @@ class _Library implements Library {
   }
 
   @override
-  Future<int?> guideAge() async => null;
+  Future<bool> guideDue() async => true;
 
   @override
-  Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead}) {
+  Future<List<GuideSourceInfo>> refreshGuide({
+    required int daysAhead,
+    required bool force,
+  }) {
     refreshes.add(Completer());
     return refreshes.last.future;
   }
