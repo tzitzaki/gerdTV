@@ -365,11 +365,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
       bottomButtonBar: _shiftable
           ? [
               _pauseButton(desktop: true),
+              _stopButton(),
               Expanded(child: _timeshiftBar()),
               const MaterialDesktopVolumeButton(),
               const MaterialDesktopFullscreenButton(),
             ]
-          : kDefaultMaterialDesktopVideoControlsThemeData.bottomButtonBar,
+          // media_kit's default bar plus Stop.
+          : [
+              const MaterialDesktopSkipPreviousButton(),
+              const MaterialDesktopPlayOrPauseButton(),
+              _stopButton(),
+              const MaterialDesktopSkipNextButton(),
+              const MaterialDesktopVolumeButton(),
+              const MaterialDesktopPositionIndicator(),
+              const Spacer(),
+              const MaterialDesktopFullscreenButton(),
+            ],
       keyboardShortcuts: {
         // Ours, not media_kit's playOrPause: only a pause by the user moves timeshift off live (media_kit reports
         // "not playing" at every stream start too), and the watchdog must know a pause isn't a stall.
@@ -451,6 +462,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
             onPressed: _togglePause,
           );
   }
+
+  /// Desktop: Stop beside play/pause in media_kit's bar. In its fullscreen (a route above this one) that route goes
+  /// first, else the pop in [_stop] would only leave fullscreen and keep the player open without a stream.
+  Widget _stopButton() => Builder(
+    builder: (context) => Tooltip(
+      message: AppLocalizations.of(context).stop,
+      child: MaterialDesktopCustomButton(
+        key: const Key('player.stop'),
+        icon: const Icon(Icons.stop),
+        onPressed: () async {
+          if (isFullscreen(context)) await exitFullscreen(context);
+          await _stop();
+        },
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -588,25 +615,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
-                              IconButton.filledTonal(
-                                key: const Key('player.stop'),
-                                tooltip: l10n.stop,
-                                icon: const Icon(Icons.stop),
-                                onPressed: _stop,
-                              ),
+                              // Phone and TV: here, where it never hides (a D-pad can't bring media_kit's bar up).
+                              // Desktop: in the bar ([_stopButton]).
+                              if (!isDesktop)
+                                IconButton.filledTonal(
+                                  key: const Key('player.stop'),
+                                  tooltip: l10n.stop,
+                                  icon: const Icon(Icons.stop),
+                                  onPressed: _stop,
+                                ),
                             ],
                           ),
                         ),
                       ),
                       if (_banner && !_panel)
                         Positioned(
-                          top: 72,
+                          // Above the controls and the buffer readout, so all can show at once.
+                          bottom:
+                              _controlsHeight +
+                              Tokens.space * 3 +
+                              MediaQuery.paddingOf(context).bottom,
                           left: Tokens.space * 2,
                           right: Tokens.space * 2,
-                          child: _NowNextBanner(
-                            channel: _current,
-                            nowNext: _nowNext[_current.key],
-                            showHint: _channels.length > 1,
+                          child: ValueListenableBuilder<int>(
+                            valueListenable: widget.session.overlayTranslucency,
+                            builder: (context, percent, _) => NowNextBanner(
+                              channel: _current,
+                              nowNext: _nowNext[_current.key],
+                              showHint: _channels.length > 1,
+                              translucency: percent,
+                            ),
                           ),
                         ),
                       if (_panel)
@@ -625,12 +663,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             },
                           ),
                         ),
-                      // Buffered seconds vs. the target (bottom left): the stream's cushion right now. Hidden under the
+                      // Buffered seconds vs. the target (above the controls: on them it took Stop's clicks). Hidden under the
                       // channel list, which reaches that corner on a phone (the screen check found them overlapping).
                       if (!_panel)
                         Positioned(
                           left: Tokens.space * 2,
-                          bottom: Tokens.space * 2,
+                          bottom:
+                              _controlsHeight +
+                              MediaQuery.paddingOf(context).bottom,
                           child: StreamBuilder<Duration>(
                             stream: widget.session.player.stream.buffer,
                             builder: (context, snap) {
@@ -653,8 +693,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             },
                           ),
                         ),
+                      // Centred: the banner is at the bottom (both show when a channel fails right after zapping).
                       Align(
-                        alignment: Alignment.bottomCenter,
                         child: Padding(
                           padding: const EdgeInsets.all(Tokens.space * 4),
                           child: ListenableBuilder(
@@ -767,25 +807,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 }
 
-/// What's on now (with progress) and next on the playing channel.
-class _NowNextBanner extends StatelessWidget {
-  const _NowNextBanner({
+/// Room for media_kit's bottom bar (56) and the seek bar above it.
+const _controlsHeight = 96.0;
+
+/// What's on now (with progress) and next on the playing channel: white on black in both themes, because the
+/// picture shows through by [translucency] percent (Settings → Appearance → Player banner).
+class NowNextBanner extends StatelessWidget {
+  const NowNextBanner({
+    super.key,
     required this.channel,
     required this.nowNext,
     required this.showHint,
+    required this.translucency,
   });
   final ItemInfo channel;
   final NowNext? nowNext;
   final bool showHint;
+  final int translucency;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final text = Theme.of(context).textTheme;
+    final text = Theme.of(context).textTheme
+        .apply(bodyColor: Colors.white, displayColor: Colors.white);
     final now = nowNext?.now;
     final next = nowNext?.next;
     return Card(
       key: const Key('player.banner'),
+      elevation: 0, // a shadow would darken what shows through
+      color: Colors.black.withValues(alpha: 1 - translucency / 100),
       child: Padding(
         padding: const EdgeInsets.all(Tokens.space * 2),
         child: Column(
@@ -800,7 +850,12 @@ class _NowNextBanner extends StatelessWidget {
             ),
             if (now != null) ...[
               const SizedBox(height: Tokens.space / 2),
-              Text(now.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                now.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodyMedium,
+              ),
               const SizedBox(height: Tokens.space / 2),
               LinearProgressIndicator(
                 value: progressOf(now, DateTime.now()),

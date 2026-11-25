@@ -1,6 +1,9 @@
 // Shared by the integration tests: the mock panel's address, in-memory secrets, and waiting in real time.
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/services/secrets.dart';
+import 'package:material_ui/material_ui.dart';
 
 const mockXc = String.fromEnvironment('GERDTV_MOCK_XC');
 
@@ -37,4 +40,14 @@ Future<void> waitFor(
 Future<void> tapReady(WidgetTester tester, Finder found) async {
   await waitFor(tester, found.hitTestable());
   await tester.tap(found.hitTestable().first);
+}
+
+/// Desktop: Stop sits in media_kit's bar, which shows while the mouse moves over the picture.
+Future<void> tapStop(WidgetTester tester) async {
+  final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+  final centre = tester.getCenter(find.byType(Scaffold).last);
+  await mouse.addPointer(location: centre);
+  await mouse.moveTo(centre + const Offset(5, 5));
+  await tapReady(tester, find.byKey(const Key('player.stop')));
+  await mouse.removePointer();
 }

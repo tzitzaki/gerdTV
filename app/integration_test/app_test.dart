@@ -334,7 +334,7 @@ void main() {
     // The programme's sheet: the top hit is running, Watch plays its channel live.
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     // Back in search for real (the field also exists underneath an open player).
     await waitFor(tester, liveField.hitTestable());
     expect(session.nowPlaying.value, isNull);
@@ -403,7 +403,7 @@ void main() {
       );
       await tester.pump();
     }
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     // Back in search for real (the field also exists underneath the closing player).
     await waitFor(tester, liveField.hitTestable());
 
@@ -628,7 +628,7 @@ void main() {
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     await waitFor(tester, find.byKey(const Key('player.back')));
     expect(session.nowPlaying.value, isNotNull);
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     await waitFor(tester, find.byKey(const Key('guide.now')).hitTestable());
     expect(session.nowPlaying.value, isNull);
 

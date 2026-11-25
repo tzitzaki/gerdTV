@@ -285,6 +285,29 @@ class Session extends ChangeNotifier {
     theme.value = t;
   }
 
+  /// How much of the picture shows through the player's banner, in percent (app-wide, Settings → Appearance).
+  final overlayTranslucency = ValueNotifier(defaultOverlayTranslucency);
+  static const settingOverlayTranslucency = 'overlay_translucency';
+
+  /// White on black at 40 % stays readable (5.7:1) even over a white picture; the slider ends at [maxOverlayTranslucency].
+  static const defaultOverlayTranslucency = 40, maxOverlayTranslucency = 80;
+
+  /// The stored value; anything unknown is the default.
+  static int parseOverlayTranslucency(String? v) =>
+      (int.tryParse(v ?? '') ?? defaultOverlayTranslucency).clamp(
+        0,
+        maxOverlayTranslucency,
+      );
+
+  Future<void> setOverlayTranslucency(int percent) async {
+    overlayTranslucency.value = percent;
+    setAppSetting(
+      dir: await _dir(),
+      key: settingOverlayTranslucency,
+      value: '$percent',
+    );
+  }
+
   /// macOS: whether closing keeps gerdTV in the menu bar (Settings → Playback; app-wide).
   bool menuBar = true;
 
@@ -308,6 +331,9 @@ class Session extends ChangeNotifier {
       accent: appSetting(dir: dir, key: settingThemeAccent),
       tinted: appSetting(dir: dir, key: settingThemeTinted),
       black: appSetting(dir: dir, key: settingThemeBlack),
+    );
+    overlayTranslucency.value = parseOverlayTranslucency(
+      appSetting(dir: dir, key: settingOverlayTranslucency),
     );
     menuBar = menuBarOn(appSetting(dir: dir, key: settingMenuBar));
     unawaited(applyMenuBar(menuBar));

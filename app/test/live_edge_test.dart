@@ -25,17 +25,17 @@ void main() {
     },
   );
 
-  test(
-    'AVPlayer: its seekable end is live even while paused or rewound (it lags the clock by a segment or two)',
-    () {
-      final e = LiveEdge(seekableEndIsLive: true)..position(100);
-      e.cache(130, at(0));
-      e.detach(); // paused at 129
-      e.cache(150, at(30)); // the playlist grew in steps, a little behind the clock
-      expect(e.live(at(30)), 150, reason: 'not 130 + 30 s');
-      expect(e.behind(145, at(30)), 5);
-    },
-  );
+  test('AVPlayer: its seekable end is live even while paused or rewound (it lags the clock by a segment or two)', () {
+    final e = LiveEdge(seekableEndIsLive: true)..position(100);
+    e.cache(130, at(0));
+    e.detach(); // paused at 129
+    e.cache(
+      150,
+      at(30),
+    ); // the playlist grew in steps, a little behind the clock
+    expect(e.live(at(30)), 150, reason: 'not 130 + 30 s');
+    expect(e.behind(145, at(30)), 5);
+  });
 
   test(
     'the seek range is the window back from live, never before the start',

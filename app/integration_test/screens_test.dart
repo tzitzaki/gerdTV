@@ -236,7 +236,7 @@ void main() {
       await waitFor(tester, find.byKey(const Key('player.panel')));
       await checkScreen(tester, form, 'player-channels', size);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tapReady(tester, find.byKey(const Key('player.stop')));
+      await tapStop(tester);
       await waitFor(tester, find.byType(ItemRow).hitTestable());
       await settle(
         tester,
