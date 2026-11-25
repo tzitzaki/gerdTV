@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
+import 'package:gerdtv/platform/mac_keychain.dart';
 import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
@@ -31,6 +32,33 @@ void main() {
     await RustLib.init();
     MediaKit.ensureInitialized();
   });
+
+  // The real security tool against a keychain of its own, never the user's (test/secrets_test.dart has the rules,
+  // against a fake one): the command line, the exit code for "not found" and the base64 round trip.
+  test('macOS: a secret round-trips through the security tool', () async {
+    final dir = await Directory.systemTemp.createTemp('gerdtv-keychain');
+    final file = '${dir.path}/test.keychain-db';
+    Future<void> security(List<String> args) async {
+      final r = await Process.run('/usr/bin/security', args);
+      expect(r.exitCode, 0, reason: '${args.first}: ${r.stderr}');
+    }
+
+    await security(['create-keychain', '-p', 'test', file]);
+    addTearDown(() async {
+      await security(['delete-keychain', file]);
+      await dir.delete(recursive: true);
+    });
+    final keychain = MacKeychain(keychain: file);
+    expect(await keychain.read('k'), isNull);
+    await keychain.delete('k'); // a missing item is fine
+    await keychain.write('k', 'p"ä\\ss');
+    expect(await keychain.read('k'), 'p"ä\\ss');
+    // Replaces, close to the tool's line limit.
+    await keychain.write('k', 'x' * 2900);
+    expect(await keychain.read('k'), 'x' * 2900);
+    await keychain.delete('k');
+    expect(await keychain.read('k'), isNull);
+  }, skip: !Platform.isMacOS);
 
   testWidgets('set up an account, browse, play, search, remove', (
     tester,

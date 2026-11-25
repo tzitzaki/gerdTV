@@ -14,7 +14,9 @@
 - Last job: `latest.json` (version, notes, per platform: asset, size, SHA-256, minimum OS) signed with the ed25519 update key into `latest.json.sig` (`gerdtv-release`), then `gh release create` with every asset. Notes: the merged PR titles since the previous published release, each with its commit subjects when it has several (without the version commit; `scripts/release-notes.sh`) (a tag whose release run failed has no release and is skipped) plus install hints linking `docs/INSTALL.md`. Any failed platform job means no release (no half releases). Tags with a `-` (e.g. a test tag) are published as pre-releases.
 
 ## Why a stable self-signed certificate on macOS
-An ad-hoc signature changes with every build, so the Keychain would ask again (or refuse) for stored credentials after each update. A stable certificate keeps the Keychain's access rules valid across updates.
+The updater accepts only a build that meets the installed app's code signing requirement (`app/lib/platform/mac_install.dart`); an ad-hoc signature changes with every build, so no update would pass.
+
+The certificate is not enough for the Keychain: macOS also checks an item's partition list, where an app without an Apple-issued certificate counts as the hash of that exact build, so every update would ask for the keychain password. So the app stores its secrets through `/usr/bin/security`, whose partition doesn't change with our builds (`app/lib/platform/mac_keychain.dart`). A Developer ID certificate would make the Keychain API usable (partition = team ID) and allow notarization; the updater would then have to accept the new certificate from a build signed with the old one.
 
 ## Secrets (GitHub environment `release`, usable only by `v*` tags)
 | Secret | What |
