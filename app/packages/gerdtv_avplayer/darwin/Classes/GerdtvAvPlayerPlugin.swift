@@ -14,7 +14,7 @@
 // Channel "gerdtv/avplayer": open(url, bufferSecs) → texture id, play, pause, seek(secs), setVolume(volume 0…1),
 // setRate(rate), setBuffer(secs), setFloating(on), selectTrack(kind "audio"/"subtitle", index, -1 = off), startPip → Bool, stopPip,
 // stop. → "state" every 0.25 s (position, duration, seekStart, seekEnd, playing, buffering, width, height, pip,
-// audio, audioIndex, subtitles, subtitleIndex, error).
+// audio, audioIndex, subtitles, subtitleIndex, error); "pipRestore" (the window's restore button).
 // Debugging: "GerdtvAvPlayer:" lines in the device log; item errors arrive in Dart as the player's error.
 
 #if os(iOS)
@@ -340,6 +340,7 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
     _ controller: AVPictureInPictureController,
     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
   ) {
+    channel.invokeMethod("pipRestore", arguments: nil)
     completionHandler(true)
   }
 

@@ -155,6 +155,25 @@ void main() {
           );
     }
     expect(got, [('pause', 0.0), ('skip', -15.0)]);
+    // The window itself: shown or not (the app shows no second picture), and its restore button.
+    final shown = <bool>[];
+    bridge.pip.addListener(() => shown.add(bridge.pip.value));
+    var restored = 0;
+    bridge.onPipRestore = () => restored++;
+    for (final c in const [
+      MethodCall('pip', true),
+      MethodCall('pipRestore'),
+      MethodCall('pip', false),
+    ]) {
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            PlatformBridge.channel.name,
+            PlatformBridge.channel.codec.encodeMethodCall(c),
+            (_) {},
+          );
+    }
+    expect(shown, [true, false]);
+    expect(restored, 1);
     await bridge.preparePip(true);
     await bridge.pipState(
       playing: true,

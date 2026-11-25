@@ -12,7 +12,8 @@ Started 16:10. Branch feat/floating-players. One commit per step.
 7. iOS button: one picture (player closes, bar shows the logo)
 8. Lock screen card (iOS Now Playing, Android media session)
 9. Owner request 16:12: the debrid account becomes a main section after Series while one is linked
-10. Wrap-up and release
+10. Owner 16:16: Live TV and Guide become one section 'TV' (List/Guide switch, remembered); long hold on a channel opens a menu (Watch, favourite)
+11. Wrap-up and release
 
 ## Decisions
 - Buttons by tap or hover, 3 s; double-click does nothing; Now Playing card with play/pause only, no Live Activity.

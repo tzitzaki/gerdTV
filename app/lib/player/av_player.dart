@@ -51,6 +51,11 @@ class AvPlatformPlayer extends PlatformPlayer {
   Future<bool> startPip() async =>
       await _channel.invokeMethod<bool>('startPip') ?? false;
 
+  Future<void> stopPip() => _channel.invokeMethod('stopPip');
+
+  /// The PiP window's restore button.
+  void Function()? onPipRestore;
+
   @override
   Future<void> open(Playable playable, {bool play = true}) async {
     if (playable is Media) await openUrl(playable.uri, bufferSecs: 8);
@@ -107,6 +112,7 @@ class AvPlatformPlayer extends PlatformPlayer {
   }
 
   Future<void> _onCall(MethodCall call) async {
+    if (call.method == 'pipRestore') onPipRestore?.call();
     if (call.method != 'state') return;
     final m = Map<String, Object?>.from(call.arguments as Map);
     Duration secs(String k) =>

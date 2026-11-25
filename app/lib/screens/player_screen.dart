@@ -134,6 +134,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
     session.pipFailure.addListener(_showPipFailure);
+    // Opened while it floats (the window's restore, the bar): the picture is here again.
+    if (session.floating.value) unawaited(session.stopApplePip());
+    session.floating.addListener(_onFloating);
     PlatformBridge.brightness().then((b) {
       if (b != null && mounted) setState(() => _brightness = b);
     });
@@ -144,6 +147,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   bool get _shiftable => widget.session.timeshiftWindow.value > 0;
+
+  /// The PiP button was pressed: once the window floats, the player closes (the picture would show twice). Not when
+  /// leaving the app floats it: the player is still open on return.
+  bool _pipAsked = false;
+  void _startPip() {
+    _pipAsked = true;
+    unawaited(
+      widget.session.startApplePip().then((_) {
+        if (widget.session.pipFailure.value != null) _pipAsked = false;
+      }),
+    );
+  }
+
+  void _onFloating() {
+    if (!widget.session.floating.value || !_pipAsked || !mounted) return;
+    _pipAsked = false;
+    Navigator.of(context).maybePop();
+  }
 
   /// iOS: why Picture-in-Picture didn't work, so a device report can name it (the stream plays on here).
   void _showPipFailure() {
@@ -297,6 +318,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     widget.session.pipFailure.removeListener(_showPipFailure);
+    widget.session.floating.removeListener(_onFloating);
     _rootFocus.dispose();
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
@@ -655,7 +677,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                   icon: const Icon(
                                     Icons.picture_in_picture_alt,
                                   ),
-                                  onPressed: widget.session.startApplePip,
+                                  onPressed: _startPip,
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],

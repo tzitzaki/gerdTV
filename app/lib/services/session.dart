@@ -39,6 +39,8 @@ class Session extends ChangeNotifier {
       unawaited(platform.setPlaying(nowPlaying.value?.name));
       _updateFloating();
     });
+    platform.pip.addListener(_updatePip);
+    platform.onPipRestore = () => onPipRestore?.call();
   }
 
   final Secrets secrets;
@@ -167,6 +169,8 @@ class Session extends ChangeNotifier {
       _av = AvPlatformPlayer();
       _avPlayer = Player(platformPlayer: _av);
       _avErrors = _av!.stream.error.listen(_onAvError);
+      _av!.pip.addListener(_updatePip);
+      _av!.onPipRestore = () => onPipRestore?.call();
     }
     return _av!;
   }
@@ -665,6 +669,17 @@ class Session extends ChangeNotifier {
       pipFailure.value = 'PiP: not possible right now';
     }
   }
+
+  /// True while Apple's floating window shows the stream, whichever engine plays: the app then shows no second one.
+  final ValueNotifier<bool> floating = ValueNotifier(false);
+  void _updatePip() =>
+      floating.value = platform.pip.value || (_av?.pip.value ?? false);
+
+  /// The floating window's restore button (main: reopens the player).
+  void Function()? onPipRestore;
+
+  Future<void> stopApplePip() =>
+      onAvPlayer.value ? _avEngine.stopPip() : platform.stopApplePip();
 
   /// iOS, while mpv plays: its frames feed the PiP layer, and the PiP window's play/pause, skip and seek range follow
   /// the player (once a second).

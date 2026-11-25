@@ -246,6 +246,12 @@ void main() {
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    // While Apple's window floats the stream, the bar shows the logo, not a second picture.
+    session.floating.value = true;
+    await waitFor(tester, find.byKey(const Key('nowPlaying.floating')));
+    session.floating.value = false;
+    await tester.pump();
+    expect(find.byKey(const Key('nowPlaying.floating')), findsNothing);
     final atLeave = session.player.state.position;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(seconds: 2)),

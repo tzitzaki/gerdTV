@@ -135,6 +135,18 @@ void main() {
     expect(calls.map((c) => c.method), ['stop', 'open', 'setVolume']);
     expect(calls.last.arguments, {'volume': 0.5});
 
+    var restored = 0;
+    av.onPipRestore = () => restored++;
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+          avPlayerChannel,
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('pipRestore'),
+          ),
+          (_) {},
+        );
+    expect(restored, 1);
+
     await native({'position': 0.0, 'error': 'Cannot decode'});
     await pumpEventQueue();
     expect(errors, ['Cannot decode']);

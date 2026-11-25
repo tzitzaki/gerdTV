@@ -44,7 +44,7 @@ import media_kit_video
 
 /// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), setFloating(on), pipState(playing, position,
 /// duration, live), startPip → Bool, stopPip, setLogo(name), openUrl(url) → Bool, brightness → Double,
-/// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs).
+/// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs), pip(Bool: the window shows), pipRestore.
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   AVPictureInPictureSampleBufferPlaybackDelegate
 {
@@ -171,6 +171,7 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       pip = nil
       playing = false
       TextureHW.pipActive = false  // the released controller no longer reports the end
+      channel.invokeMethod("pip", arguments: false)
       display.sampleBufferRenderer.flush(removingDisplayedImage: true, completionHandler: nil)
       display.removeFromSuperlayer()
       host?.removeFromSuperview()
@@ -244,8 +245,13 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     TextureHW.pipActive = true
   }
 
+  func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+    channel.invokeMethod("pip", arguments: true)
+  }
+
   func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
     TextureHW.pipActive = false
+    channel.invokeMethod("pip", arguments: false)
   }
 
   func pictureInPictureController(
@@ -260,6 +266,7 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     _ controller: AVPictureInPictureController,
     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
   ) {
+    channel.invokeMethod("pipRestore", arguments: nil)
     completionHandler(true)
   }
 }

@@ -25,6 +25,10 @@ class PlatformBridge {
   /// macOS menu bar: its menu's "toggle" (play/pause) or "stop" (platform/menu_bar.dart).
   void Function(String action)? onMenuBar;
 
+  /// iOS: set while the PiP window shows mpv's picture; [onPipRestore]: its restore button.
+  final ValueNotifier<bool> pip = ValueNotifier(false);
+  void Function()? onPipRestore;
+
   /// Set while the system's Picture-in-Picture window shows the app.
   final ValueNotifier<bool> pictureMode;
 
@@ -39,6 +43,10 @@ class PlatformBridge {
           m['action'] as String,
           (m['secs'] as num?)?.toDouble() ?? 0,
         );
+      } else if (call.method == 'pip') {
+        pip.value = call.arguments == true;
+      } else if (call.method == 'pipRestore') {
+        onPipRestore?.call();
       } else if (call.method == 'menuBar') {
         onMenuBar?.call(call.arguments as String);
       }
@@ -141,6 +149,9 @@ class PlatformBridge {
       return false;
     }
   }
+
+  /// iOS: closes the PiP window of mpv's picture.
+  Future<void> stopApplePip() => _ios('stopPip', const {});
 
   /// iOS: mpv plays (true) or stopped or handed over to AVPlayer (false). While true, mpv's frames feed the PiP
   /// layer and swiping to Home floats the picture by itself.
