@@ -46,6 +46,16 @@ struct File {
     hidden_groups: Vec<HiddenGroup>,
     #[serde(default)]
     search_history: Vec<Search>,
+    #[serde(default)]
+    watched: Vec<Watched>,
+}
+
+/// A movie or episode marked as watched, or unmarked again.
+#[derive(Debug, Serialize, Deserialize)]
+struct Watched {
+    key: String,
+    watched: bool,
+    updated_at: i64,
 }
 
 /// Where a movie or episode was left (seconds).
@@ -131,6 +141,7 @@ pub struct ImportCounts {
     pub resume: usize,
     pub hidden_groups: usize,
     pub search_history: usize,
+    pub watched: usize,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -266,6 +277,17 @@ pub fn export(conn: &Connection) -> rusqlite::Result<String> {
                 })
             },
         )?,
+        watched: rows(
+            conn,
+            "SELECT key, watched, updated_at FROM watched ORDER BY key",
+            |r| {
+                Ok(Watched {
+                    key: r.get(0)?,
+                    watched: r.get(1)?,
+                    updated_at: r.get(2)?,
+                })
+            },
+        )?,
     };
     Ok(serde_json::to_string_pretty(&file).expect("plain data serialises"))
 }
@@ -358,6 +380,13 @@ pub fn import(conn: &mut Connection, json: &str) -> Result<ImportCounts, UserDat
             params![h.section, h.query, h.updated_at],
         )?;
     }
+    for w in &file.watched {
+        n.watched += tx.execute(
+            "INSERT INTO watched (key, watched, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET watched = ?2, updated_at = ?3 WHERE ?3 > updated_at",
+            params![w.key, w.watched, w.updated_at],
+        )?;
+    }
     // The app keeps the newest 20 searches per section (db::record_search); an import must not grow past that.
     tx.execute(
         "DELETE FROM search_history WHERE rowid NOT IN (SELECT rowid FROM (SELECT rowid, row_number() OVER
@@ -389,7 +418,8 @@ mod tests {
                 ('builtin', 1, 110);
              INSERT INTO resume VALUES ('movie:7', 1200, 5400, 170);
              INSERT INTO hidden_groups VALUES (0, '12', 180);
-             INSERT INTO search_history VALUES ('live', 'sport', 190);",
+             INSERT INTO search_history VALUES ('live', 'sport', 190);
+             INSERT INTO watched VALUES ('movie:7', 1, 200), ('movie:8', 0, 210);",
         )
         .unwrap();
     }
@@ -418,6 +448,7 @@ mod tests {
             resume: 1,
             hidden_groups: 1,
             search_history: 1,
+            watched: 2,
         };
         assert_eq!(n, want);
         assert_eq!(export(&b).unwrap(), json, "a round trip is lossless");

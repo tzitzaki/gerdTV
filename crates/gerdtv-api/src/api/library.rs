@@ -498,6 +498,28 @@ impl Library {
         self.0.save_progress(&key, position, duration).map_err(err)
     }
 
+    /// Marks a movie or episode as watched or not.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_watched(&self, key: String, watched: bool) -> Result<(), String> {
+        self.0.set_watched(&key, watched).map_err(err)
+    }
+
+    /// Every watched movie's and episode's key, for the lists' check marks.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn watched_keys(&self) -> Result<Vec<String>, String> {
+        self.0.watched_keys().map_err(err)
+    }
+
+    /// The episode after this one in its series; None after the last.
+    pub async fn next_episode(&self, key: String) -> Result<Option<ItemInfo>, String> {
+        Ok(self
+            .0
+            .next_episode(&key)
+            .await
+            .map_err(err)?
+            .map(Into::into))
+    }
+
     /// Where to resume an item (seconds), if it was left part-way.
     #[flutter_rust_bridge::frb(sync)]
     pub fn resume_position(&self, key: String) -> Result<Option<u32>, String> {
@@ -930,7 +952,8 @@ impl Library {
             + n.guide_urls
             + n.resume
             + n.hidden_groups
-            + n.search_history)
+            + n.search_history
+            + n.watched)
     }
 
     pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {

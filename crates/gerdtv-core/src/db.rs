@@ -177,6 +177,9 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE epg_channels ADD COLUMN filled INTEGER NOT NULL DEFAULT 0;
      UPDATE epg_sources SET offset_hours = coalesce((SELECT CAST(value AS INTEGER) FROM settings
         WHERE key = 'guide_offset_hours'), 0) WHERE builtin = 0;",
+    // 10 → 11: movies and episodes seen to the end (user data). An unmark is stored too (watched = 0), so it wins
+    // over an older mark from an import or from Simkl.
+    "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -1203,10 +1206,11 @@ pub const RESUME_FROM_SECS: u32 = 120;
 pub const FINISHED_AT: f64 = 0.95;
 
 /// Remembers how far a movie or episode played. Under 2 min nothing is kept (zapping through isn't "started"), from
-/// 95 % it counts as finished and leaves continue watching.
+/// 95 % it counts as finished: it leaves continue watching and is marked as watched.
 pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32) -> Result<()> {
     if duration > 0 && position as f64 >= duration as f64 * FINISHED_AT {
         conn.execute("DELETE FROM resume WHERE key = ?1", [key])?;
+        set_watched(conn, key, true)?;
     } else if position >= RESUME_FROM_SECS {
         conn.execute(
             "INSERT INTO resume (key, position, duration, updated_at) VALUES (?1, ?2, ?3, ?4)
@@ -1215,6 +1219,58 @@ pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32)
         )?;
     }
     Ok(())
+}
+
+/// Marks a movie or episode as watched or not (by hand, or at 95 %).
+pub fn set_watched(conn: &Connection, key: &str, watched: bool) -> Result<()> {
+    conn.execute(
+        "INSERT INTO watched (key, watched, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT (key) DO UPDATE SET watched = ?2, updated_at = ?3",
+        params![key, watched, unix_now()],
+    )?;
+    Ok(())
+}
+
+/// Every watched item's key (the lists' check marks).
+pub fn watched_keys(conn: &Connection) -> Result<Vec<String>> {
+    let mut st = conn.prepare_cached("SELECT key FROM watched WHERE watched = 1")?;
+    let rows = st.query_map([], |r| r.get(0))?;
+    rows.collect()
+}
+
+/// The episode after `key`: the next season and episode number of its series, skipping the same episode in another
+/// quality. Xtream Codes episodes share their series' key as category; an M3U group may hold several shows, so there
+/// the name before "S01E02" has to match too. None: the last one, or not a numbered episode.
+pub fn next_episode(conn: &Connection, key: &str) -> Result<Option<Hit>> {
+    let mut st = conn.prepare_cached(
+        "SELECT e.key, e.kind, e.name, e.category, e.logo, e.number, e.archive_days, cur.name
+         FROM items cur JOIN items e ON e.kind = 2 AND e.category = cur.category
+         WHERE cur.key = ?1 AND cur.kind = 2 AND (e.season, e.episode) > (cur.season, cur.episode)
+         ORDER BY e.season, e.episode, e.position",
+    )?;
+    let mut rows = st.query([key])?;
+    while let Some(r) = rows.next()? {
+        let hit = Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: String::new(),
+        };
+        let current: String = r.get(7)?;
+        if hit.category.starts_with("series:") || show_of(&hit.name) == show_of(&current) {
+            return Ok(Some(hit));
+        }
+    }
+    Ok(None)
+}
+
+/// "DE | Dark S01E02 HD" → "dark": what two episodes of one show share in an M3U group.
+fn show_of(name: &str) -> String {
+    fold(&clean_name(m3u::before_episode(name)))
 }
 
 /// Where to resume an item (seconds), if it was left part-way.
@@ -1655,6 +1711,9 @@ http://h.example.invalid/live/alice/s3cret/403.ts
                 "{pos}/{dur}"
             );
         }
+        assert_eq!(watched_keys(&c).unwrap(), ["movie:201"], "95 % marks it");
+        set_watched(&c, "movie:201", false).unwrap();
+        assert!(watched_keys(&c).unwrap().is_empty());
         save_progress(&c, "episode:301", 900, 2700).unwrap();
         let row = continue_watching(&c, &[Kind::Movie, Kind::Episode], 10).unwrap();
         assert_eq!(
@@ -1663,6 +1722,36 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         );
         assert_eq!((row[0].1, row[0].2), (900, 2700));
         assert!(continue_watching(&c, &[Kind::Live], 10).unwrap().is_empty());
+    }
+
+    /// The next episode stays in its show, and the same episode in another quality is not the next one.
+    #[test]
+    fn next_episode_follows_the_numbers_of_its_show() {
+        let mut c = db();
+        let list = "#EXTM3U
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E01 HD\nhttp://h.example.invalid/series/a/b/1.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E01 4K\nhttp://h.example.invalid/series/a/b/2.mkv
+#EXTINF:-1 group-title=\"S\",Other S01E02\nhttp://h.example.invalid/series/a/b/3.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E02 HD\nhttp://h.example.invalid/series/a/b/4.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S02E01 HD\nhttp://h.example.invalid/series/a/b/5.mkv
+";
+        import_m3u(&mut c, list.as_bytes(), &["a", "b"]).unwrap();
+        for (from, want) in [
+            (1, Some(4)),
+            (2, Some(4)),
+            (4, Some(5)),
+            (5, None), // the last one
+            (3, None), // another show's episodes follow it in the group
+        ] {
+            assert_eq!(
+                next_episode(&c, &format!("episode:{from}"))
+                    .unwrap()
+                    .map(|h| h.key),
+                want.map(|n| format!("episode:{n}")),
+                "after {from}"
+            );
+        }
+        assert!(next_episode(&c, "movie:201").unwrap().is_none());
     }
 
     #[test]

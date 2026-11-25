@@ -138,6 +138,9 @@ abstract class Library implements RustOpaqueInterface {
   /// The channels mapped by hand, with their guide channel's name.
   Future<List<MappedChannel>> mappedChannels();
 
+  /// The episode after this one in its series; None after the last.
+  Future<ItemInfo?> nextEpisode({required String key});
+
   /// Now and next for each item key, in the same order.
   Future<List<NowNext>> nowNext({required List<String> keys});
 
@@ -241,6 +244,9 @@ abstract class Library implements RustOpaqueInterface {
 
   void setSetting({required String key, required String value});
 
+  /// Marks a movie or episode as watched or not.
+  void setWatched({required String key, required bool watched});
+
   /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
   String? setting({required String key});
 
@@ -279,6 +285,9 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
     required String query,
   });
+
+  /// Every watched movie's and episode's key, for the lists' check marks.
+  List<String> watchedKeys();
 }
 
 class CategoryInfo {

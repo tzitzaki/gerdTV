@@ -518,6 +518,35 @@ impl Library {
         Ok(db::favourites(&self.conn.lock().unwrap(), kinds, sort)?)
     }
 
+    pub fn set_watched(&self, key: &str, watched: bool) -> Result<()> {
+        Ok(db::set_watched(&self.conn.lock().unwrap(), key, watched)?)
+    }
+
+    pub fn watched_keys(&self) -> Result<Vec<String>> {
+        Ok(db::watched_keys(&self.conn.lock().unwrap())?)
+    }
+
+    /// The episode after `key` (db::next_episode). An Xtream Codes series is asked first: its episodes are dropped by
+    /// every sync and new ones may be out; without an answer the stored ones count.
+    pub async fn next_episode(&self, key: &str) -> Result<Option<Hit>> {
+        let series: Option<String> = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT category FROM items WHERE key = ?1 AND kind = 2",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(series) = series.filter(|s| s.starts_with("series:"))
+            && let Err(e) = self.episodes(&series).await
+        {
+            tracing::warn!("next episode: {e}");
+        }
+        Ok(db::next_episode(&self.conn.lock().unwrap(), key)?)
+    }
+
     pub fn save_progress(&self, key: &str, position: u32, duration: u32) -> Result<()> {
         Ok(db::save_progress(
             &self.conn.lock().unwrap(),
@@ -1610,6 +1639,8 @@ mod tests {
         let eps = lib.episodes(&series).await.unwrap();
         let t = lib.track_info(&eps[0].key).unwrap().unwrap();
         assert!(!t.movie && !t.show.is_empty() && t.season > 0 && t.number > 0);
+        let next = lib.next_episode(&eps[0].key).await.unwrap();
+        assert_eq!(next.as_ref(), eps.get(1), "the series' next one");
         assert!(
             lib.track_info(&archive.key).unwrap().is_none(),
             "live: nothing to track"
