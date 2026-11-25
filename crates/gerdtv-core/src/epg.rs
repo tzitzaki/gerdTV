@@ -1,7 +1,7 @@
 //! The TV guide (EPG): XMLTV import, channel matching, and the queries every screen uses (now/next in lists, the
 //! guide grid's window, programme details, programme search).
 //!
-//! - Parser: streaming over a `BufRead` (quick-xml), gzip detected by its magic bytes (flate2); a 300 MB guide never
+//! - Parser: streaming over a `BufRead` (quick-xml), gzip and xz detected by their magic bytes; a 300 MB guide never
 //!   sits in memory. Times are XMLTV's `YYYYMMDDhhmmss ±hhmm`, stored as UTC seconds; the profile's EPG offset is
 //!   added for providers that send local time as UTC. Malformed programmes are counted and skipped.
 //! - Import: one transaction per source (the provider's built-in guide, then each extra XMLTV URL); a source replaces
@@ -90,14 +90,19 @@ pub fn parse_time(s: &str) -> Option<i64> {
     Some(local - offset)
 }
 
-/// Wraps a reader in a gzip decoder when it starts with gzip's magic bytes.
-pub fn maybe_gunzip<'a>(mut r: impl BufRead + 'a) -> std::io::Result<Box<dyn BufRead + 'a>> {
-    let gz = r.fill_buf()?.starts_with(&[0x1f, 0x8b]);
-    Ok(if gz {
-        Box::new(BufReader::new(flate2::bufread::GzDecoder::new(r)))
-    } else {
-        Box::new(r)
-    })
+/// Wraps a reader in a gzip or xz decoder when it starts with their magic bytes.
+pub fn maybe_unpack<'a>(mut r: impl BufRead + 'a) -> std::io::Result<Box<dyn BufRead + 'a>> {
+    let magic = r.fill_buf()?;
+    if magic.starts_with(&[0x1f, 0x8b]) {
+        return Ok(Box::new(BufReader::new(flate2::bufread::GzDecoder::new(r))));
+    }
+    if magic.starts_with(b"\xfd7zXZ\0") {
+        // Rytec's files. The limit caps the dictionary a (broken or hostile) file can ask for; xz's own presets need
+        // at most 64 MB.
+        let xz = lzma_rust2::XzReader::new_mem_limit(r, true, 65 * 1024);
+        return Ok(Box::new(BufReader::new(xz)));
+    }
+    Ok(Box::new(r))
 }
 
 /// Streams an XMLTV document, calling back per channel and per programme.
@@ -288,11 +293,32 @@ pub fn source_country(url: &str) -> Option<String> {
 /// The matching key of a channel name: without its country code and quality tags, lower-case, accents folded, letters
 /// and digits only. A plus is spelled out: "3+" isn't "3", and "+1" is another schedule.
 pub fn norm(name: &str) -> String {
+    let bein = bein_name(name);
+    let name = bein.as_deref().unwrap_or(name);
     let plus = clean_name(split_country(name).0).replace('+', "plus");
     crate::db::fold(&plus)
         .chars()
         .filter(|c| c.is_alphanumeric())
         .collect()
+}
+
+/// beIN's community file names its channels after logo files: "beIN_SPORTS1_DIGITAL_Mono_EN" is beIN SPORTS 1,
+/// "NEW_beIN-SPORTS-MAX-05_AR" MAX 5. None for every other name.
+fn bein_name(name: &str) -> Option<String> {
+    let low = name.to_ascii_lowercase();
+    let base = low
+        .strip_suffix("_en")
+        .or_else(|| low.strip_suffix("_ar"))?;
+    if !(base.contains("bein") && base.contains("sports")) {
+        return None;
+    }
+    let base = base.split("_digital_mono").next()?.replace("bein.com", "");
+    let words = base
+        .split(['_', '-', ' '])
+        .filter(|w| !["", "new", "logos", "digital"].contains(w))
+        // "05" is 5.
+        .map(|w| w.trim_start_matches('0'));
+    Some(words.collect())
 }
 
 /// How well a guide channel's country fits an item's, best first; None: a different country, no match. Austria,
@@ -322,8 +348,57 @@ pub struct ImportStats {
     pub channels: usize,
     pub programmes: usize,
     pub skipped: usize,
-    /// Programmes left out: outside the window, or for a channel an earlier source already covers.
+    /// Programmes left out: outside the window, for a channel an earlier source already covers, or for a channel no
+    /// item can take.
     pub outside: usize,
+}
+
+/// What the profile's live items can take: their guide ids and manual mappings (lower case), and the countries per
+/// name key. A channel [takes] refuses can never match ([match_open]).
+struct Wanted {
+    ids: std::collections::HashSet<String>,
+    names: HashMap<String, Vec<Option<String>>>,
+}
+
+impl Wanted {
+    fn load(conn: &Connection) -> Result<Wanted> {
+        let mut st = conn.prepare("SELECT epg_id, name FROM items WHERE kind = 0")?;
+        let mut w = Wanted {
+            ids: Default::default(),
+            names: HashMap::new(),
+        };
+        let mut rows = st.query([])?;
+        while let Some(r) = rows.next()? {
+            let (id, name): (String, String) = (r.get(0)?, r.get(1)?);
+            w.ids.insert(id.to_lowercase());
+            w.names.entry(norm(&name)).or_default().push(country(&name));
+        }
+        let mut st = conn.prepare("SELECT channel FROM epg_map")?;
+        let mut rows = st.query([])?;
+        while let Some(r) = rows.next()? {
+            w.ids.insert(r.get::<_, String>(0)?.to_lowercase());
+        }
+        Ok(w)
+    }
+
+    fn takes(&self, c: &XmlChannel, file: Option<&str>) -> bool {
+        if self.names.is_empty() || self.ids.contains(&c.id.to_lowercase()) {
+            return true;
+        }
+        let from = channel_country(&c.id, c.names.first().map_or(&c.id, |n| n), file);
+        c.names
+            .iter()
+            .filter_map(|n| self.names.get(&norm(n)))
+            .flatten()
+            .any(|own| fit(own.as_deref(), from.as_deref()).is_some())
+    }
+}
+
+/// A guide channel's country: its name's, its id's ending ("Name.de"), or its file's.
+fn channel_country(id: &str, name: &str, file: Option<&str>) -> Option<String> {
+    country(name)
+        .or_else(|| id.rsplit_once('.').and_then(|(_, c)| code(c)))
+        .or_else(|| file.map(str::to_string))
 }
 
 /// Imports one source's XMLTV into the guide tables (one transaction; the source's old rows are replaced).
@@ -338,7 +413,7 @@ pub fn import(
     offset_secs: i64,
 ) -> std::io::Result<ImportStats> {
     let io = std::io::Error::other;
-    let input = maybe_gunzip(BufReader::new(input))?;
+    let input = maybe_unpack(BufReader::new(input))?;
     let tx = conn.transaction().map_err(io)?;
     tx.execute(
         "DELETE FROM programmes_fts WHERE rowid IN (SELECT id FROM programmes WHERE source = ?1)",
@@ -366,6 +441,25 @@ pub fn import(
         st.query_map([source, after], |r| r.get(0))?.collect()
     };
     let (taken, ended) = (covered(now).map_err(io)?, covered(0).map_err(io)?);
+    // Programmes are stored only for channels an item can take (owner decision): with dozens of community files most
+    // channels are nobody's. Without any live item (no sync yet) everything is kept.
+    let wanted = Wanted::load(&tx).map_err(io)?;
+    let url = tx
+        .query_row("SELECT url FROM epg_sources WHERE id = ?1", [source], |r| {
+            r.get::<_, String>(0)
+        })
+        .optional()
+        .map_err(io)?
+        .unwrap_or_default();
+    let file = source_country(&url);
+    // free-epg numbers some countries' channels ("9121"): as they are, they could hit a provider's numeric guide id.
+    let numbered = url.contains("free-epg.de/").then(|| file.clone()).flatten();
+    let own_id = |id: String| match &numbered {
+        Some(cc) if id.bytes().all(|b| b.is_ascii_digit()) => format!("{}:{id}", cc.to_lowercase()),
+        _ => id,
+    };
+    // The channels no item can take. A programme whose channel the file hasn't listed yet is kept.
+    let unwanted = std::cell::RefCell::new(std::collections::HashSet::<String>::new());
     let (from, to) = (now - days_back * 86_400, now + days_ahead * 86_400);
     // Both callbacks below record into these (RefCell: two closures can't both borrow them mutably).
     let stats = std::cell::RefCell::new(ImportStats::default());
@@ -396,11 +490,15 @@ pub fn import(
             .map_err(io)?;
         let parsed = parse(
             input,
-            |c| {
+            |mut c| {
+                c.id = own_id(c.id);
                 if failed.borrow().is_some() {
                     return;
                 }
                 let name = c.names.first().cloned().unwrap_or_else(|| c.id.clone());
+                if !wanted.takes(&c, file.as_deref()) {
+                    unwanted.borrow_mut().insert(c.id.clone());
+                }
                 let r = (|| -> rusqlite::Result<()> {
                     if ch.execute(params![c.id, name, c.icon, source])? > 0 {
                         stats.borrow_mut().channels += 1;
@@ -419,6 +517,7 @@ pub fn import(
                 }
             },
             |mut p| {
+                p.channel = own_id(p.channel);
                 if failed.borrow().is_some() {
                     return;
                 }
@@ -427,6 +526,7 @@ pub fn import(
                 if p.stop <= from
                     || p.start >= to
                     || taken.contains(&p.channel)
+                    || unwanted.borrow().contains(&p.channel)
                     || (p.stop <= now && ended.contains(&p.channel))
                 {
                     stats.borrow_mut().outside += 1;
@@ -540,16 +640,14 @@ fn match_open(tx: &rusqlite::Transaction, after: i64) -> Result<()> {
         let mut st = tx.prepare(&format!(
             "SELECT n.norm, n.channel, c.name, coalesce(s.url, ''), coalesce(s.builtin, 0)
              FROM epg_names n JOIN epg_channels c ON c.id = n.channel LEFT JOIN epg_sources s ON s.id = c.source
-             WHERE {filled} ORDER BY {}, n.channel",
+             WHERE {filled} ORDER BY {}, n.channel LIKE '%_AR.bein', n.channel", // beIN's file has each channel twice: English before Arabic
             rank("c.source")
         ))?;
         let mut rows = st.query([])?;
         while let Some(r) = rows.next()? {
             let (k, ch, name): (String, String, String) = (r.get(0)?, r.get(1)?, r.get(2)?);
             let url: String = r.get(3)?;
-            let from = country(&name)
-                .or_else(|| ch.rsplit_once('.').and_then(|(_, c)| code(c)))
-                .or_else(|| source_country(&url));
+            let from = channel_country(&ch, &name, source_country(&url).as_deref());
             names.entry(k).or_default().push((ch, from, r.get(4)?));
         }
     }
@@ -859,14 +957,24 @@ mod tests {
     }
 
     #[test]
-    fn gzip_is_detected() {
+    fn gzip_and_xz_are_detected() {
         use std::io::Write;
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         gz.write_all(DOC.as_bytes()).unwrap();
         let bytes = gz.finish().unwrap();
         let mut n = 0;
-        parse(maybe_gunzip(bytes.as_slice()).unwrap(), |_| {}, |_| n += 1).unwrap();
+        parse(maybe_unpack(bytes.as_slice()).unwrap(), |_| {}, |_| n += 1).unwrap();
         assert_eq!(n, 2);
+        let mut xz =
+            lzma_rust2::XzWriter::new(Vec::new(), lzma_rust2::XzOptions::default()).unwrap();
+        xz.write_all(DOC.as_bytes()).unwrap();
+        let bytes = xz.finish().unwrap();
+        let mut n = 0;
+        parse(maybe_unpack(bytes.as_slice()).unwrap(), |_| {}, |_| n += 1).unwrap();
+        assert_eq!(n, 2);
+        // A download that broke off is an error, not a short guide.
+        let cut = &bytes[..bytes.len() / 2];
+        assert!(parse(maybe_unpack(cut).unwrap(), |_| {}, |_| {}).is_err());
     }
 
     fn db_with_items() -> Connection {
@@ -1048,7 +1156,8 @@ mod tests {
         let mut c = crate::db::open(Path::new(":memory:")).unwrap();
         c.execute_batch(
             "INSERT INTO epg_sources (id, url, builtin, updated_at) VALUES (1, 'builtin', 1, 0),
-             (2, 'https://h.invalid/epg_ripper_DE1.xml.gz', 0, 0), (3, 'https://h.invalid/epg_ripper_UK1.xml.gz', 0, 0)",
+             (2, 'https://h.invalid/epg_ripper_DE1.xml.gz', 0, 0), (3, 'https://h.invalid/epg_ripper_UK1.xml.gz', 0, 0),
+             (4, 'https://free-epg.de/api/epg/gb.xml.gz', 0, 0)",
         )
         .unwrap();
         let pl = "#EXTM3U\n\
@@ -1056,7 +1165,9 @@ mod tests {
             #EXTINF:-1,Comedy DE\nhttp://h/live/u/p/2.ts\n\
             #EXTINF:-1,Comedy AT\nhttp://h/live/u/p/3.ts\n\
             #EXTINF:-1,Comedy RU\nhttp://h/live/u/p/4.ts\n\
-            #EXTINF:-1 tvg-id=\"old\",Krimi DE\nhttp://h/live/u/p/5.ts\n";
+            #EXTINF:-1 tvg-id=\"old\",Krimi DE\nhttp://h/live/u/p/5.ts\n\
+            #EXTINF:-1 tvg-id=\"42\",Numbered\nhttp://h/live/u/p/6.ts\n\
+            #EXTINF:-1,Drama UK\nhttp://h/live/u/p/7.ts\n";
         crate::db::import_m3u(&mut c, pl.as_bytes(), &[]).unwrap();
         let now = 1_763_742_000;
         let doc = |id: &str, name: &str, hours: &str, title: &str| {
@@ -1073,13 +1184,23 @@ mod tests {
             doc("c.de", "Comedy", "17", "German"),
             doc("old", "Krimi", "17", "Krimi now")
         );
-        let uk = format!("<tv>{}</tv>", doc("c.uk", "Comedy", "17", "British"));
+        let uk = format!(
+            "<tv>{}{}</tv>",
+            doc("c.uk", "Comedy", "17", "British"),
+            doc("n.uk", "Nobody", "17", "No item")
+        );
+        let free = format!(
+            "<tv>{}{}</tv>",
+            doc("42", "Other", "17", "Wrong"),
+            doc("43", "Drama", "17", "British drama")
+        );
         for _ in 0..2 {
             import(&mut c, 1, ended.as_bytes(), now, 2, 7, 0).unwrap();
             import(&mut c, 2, de.as_bytes(), now, 2, 7, 0).unwrap();
             import(&mut c, 3, uk.as_bytes(), now, 2, 7, 0).unwrap();
+            import(&mut c, 4, free.as_bytes(), now, 2, 7, 0).unwrap();
             rebuild_matches(&mut c, now).unwrap();
-            let keys: Vec<String> = (1..=5).map(|i| format!("live:{i}")).collect();
+            let keys: Vec<String> = (1..=7).map(|i| format!("live:{i}")).collect();
             let titles: Vec<Option<String>> = now_next(&c, &keys, now)
                 .unwrap()
                 .into_iter()
@@ -1094,8 +1215,19 @@ mod tests {
                     some("German"), // Germany, Austria and Switzerland share channels
                     None,           // no Russian guide: better none than a wrong one
                     some("Krimi now"),
+                    None, // another project's channel number 42
+                    some("British drama"),
                 ]
             );
+            // Programmes of channels no item can take aren't stored.
+            let stored: i64 = c
+                .query_row(
+                    "SELECT count(*) FROM programmes WHERE title IN ('No item', 'Wrong')",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, 0);
         }
     }
 
@@ -1116,6 +1248,12 @@ mod tests {
             ("Planète Süd", "planetesud"),
             ("3+", "3plus"),
             ("Kanal +1", "kanalplus1"),
+            // beIN's file.
+            ("beIN_SPORTS1_DIGITAL_Mono_EN", "beinsports1"),
+            ("NEW_beIN-SPORTS-MAX-05_AR", "beinsportsmax5"),
+            ("logos-_beINSPORTS8_EN", "beinsports8"),
+            ("beIN_SPORTS_XTRA_04_bein.com_AR", "beinsportsxtra4"),
+            ("beIN SPORTS 1 HD QA", "beinsports1"),
         ] {
             assert_eq!(norm(raw), want, "{raw}");
         }
