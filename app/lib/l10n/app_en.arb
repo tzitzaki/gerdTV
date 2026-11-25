@@ -16,6 +16,23 @@
   "accentRed": "Red",
   "accentTeal": "Teal",
   "accentViolet": "Violet",
+  "accountExpires": "Expires {date}",
+  "@accountExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "accountNoExpiry": "No expiry date",
+  "accountStreams": "{count, plural, =1{1 stream at once} other{{count} streams at once}}",
+  "@accountStreams": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "adaptiveBuffer": "Raise the buffer automatically",
   "adaptiveHint": "When a channel stutters more than 3 times in 10 minutes, its buffer goes up one step.",
   "add": "Add",

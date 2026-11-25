@@ -7,6 +7,7 @@
 // stale value usually means its widget read the value once in initState instead of in build.
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -29,6 +30,27 @@ import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
+
+/// What the provider says about the account, as the last sync stored it (gerdtv-core, SETTING_ACCOUNT_*): when it ends
+/// and how many streams it plays at once. Empty before the first sync and for M3U, which tells neither.
+String accountLine(
+  AppLocalizations l10n, {
+  required String? expires,
+  required String? limit,
+}) {
+  final ends = int.tryParse(expires ?? '');
+  final streams = int.tryParse(limit ?? '');
+  return [
+    if (ends != null)
+      l10n.accountExpires(
+        DateFormat.yMMMd(l10n.localeName)
+            .format(DateTime.fromMillisecondsSinceEpoch(ends * 1000)),
+      )
+    else if (streams != null)
+      l10n.accountNoExpiry,
+    if (streams != null) l10n.accountStreams(streams),
+  ].join(' · ');
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session, this.focus});
@@ -100,13 +122,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.account_circle_outlined),
               title: Text(session.profile?.name ?? ''),
               subtitle: Text(
-                session.syncing
-                    ? l10n.syncing
-                    : session.syncError != null
-                    ? l10n.syncFailed(session.syncError!)
-                    : last == null
-                    ? ''
-                    : l10n.settingsLastSync(last.entries, last.categories),
+                [
+                  session.syncing
+                      ? l10n.syncing
+                      : session.syncError != null
+                      ? l10n.syncFailed(session.syncError!)
+                      : last == null
+                      ? ''
+                      : l10n.settingsLastSync(last.entries, last.categories),
+                  if (lib != null)
+                    accountLine(
+                      l10n,
+                      expires: lib.setting(key: 'account_expires'),
+                      limit: lib.setting(key: 'account_limit'),
+                    ),
+                ].where((s) => s.isNotEmpty).join('\n'),
               ),
             ),
           ),

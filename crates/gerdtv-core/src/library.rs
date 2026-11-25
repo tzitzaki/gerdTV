@@ -330,6 +330,12 @@ impl Library {
                 let stats = xtream::write(&mut self.conn.lock().unwrap(), &f)?;
                 // Catch-up URLs name the start in the server's local time.
                 self.set_setting(SETTING_XC_OFFSET, &f.account.time_offset.to_string())?;
+                let expires = f.account.expires.map(|e| e.to_string());
+                self.set_setting(SETTING_ACCOUNT_EXPIRES, &expires.unwrap_or_default())?;
+                self.set_setting(
+                    SETTING_ACCOUNT_LIMIT,
+                    &f.account.max_connections.to_string(),
+                )?;
                 Ok(SyncResult {
                     stats,
                     account: Some(f.account),
@@ -734,6 +740,10 @@ pub const SETTING_GUIDE_OFFSET: &str = "guide_offset_hours";
 pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
 /// Xtream Codes: the server's clock against UTC in seconds (from the last sync), for catch-up URLs.
 pub const SETTING_XC_OFFSET: &str = "xc_time_offset";
+/// Xtream Codes: when the account ends (unix seconds, empty = never) and how many streams it may play at once, as the
+/// last sync read them, so Settings can show them before the next one.
+pub const SETTING_ACCOUNT_EXPIRES: &str = "account_expires";
+pub const SETTING_ACCOUNT_LIMIT: &str = "account_limit";
 
 /// One guide source as Settings → Guide shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -1407,6 +1417,11 @@ mod tests {
         let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
         let r = lib.sync().await.unwrap();
         assert_eq!(r.account.unwrap().max_connections, 2);
+        // Kept for Settings, but not exported: another device reads its own.
+        let kept = |k: &str| lib.setting(k).unwrap();
+        assert_eq!(kept(SETTING_ACCOUNT_EXPIRES).as_deref(), Some("4102444800"));
+        assert_eq!(kept(SETTING_ACCOUNT_LIMIT).as_deref(), Some("2"));
+        assert!(!lib.export_user_data().unwrap().contains("account_"));
 
         let cats = lib.categories(Kind::Live, Sort::Provider).unwrap();
         assert!(!cats.is_empty() && cats.iter().all(|c| c.count > 0));

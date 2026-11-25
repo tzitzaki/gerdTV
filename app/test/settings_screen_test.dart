@@ -15,6 +15,7 @@ import 'package:gerdtv/screens/player_settings.dart';
 import 'package:gerdtv/screens/settings_model.dart';
 import 'package:gerdtv/screens/settings_screen.dart';
 import 'package:gerdtv/services/session.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_core.dart';
@@ -60,6 +61,25 @@ void main() {
       ],
     ),
   ];
+
+  test(
+    'the account line shows what the provider tells, in the app language',
+    () async {
+      final en = await AppLocalizations.delegate.load(const Locale('en'));
+      final de = await AppLocalizations.delegate.load(const Locale('de'));
+      await initializeDateFormatting();
+      // Noon UTC, so the date is the same in every time zone the tests run in.
+      const end = '1804852800'; // 2027-03-12
+      for (final (l10n, expires, limit, want) in [
+        (en, end, '2', 'Expires Mar 12, 2027 · 2 streams at once'),
+        (de, end, '1', 'Läuft ab am 12. März 2027 · 1 Stream gleichzeitig'),
+        (en, '', '1', 'No expiry date · 1 stream at once'),
+        (en, null, null, ''), // M3U, or never synced
+      ]) {
+        expect(accountLine(l10n, expires: expires, limit: limit), want);
+      }
+    },
+  );
 
   test('filterSettings keeps matching entries under their category', () {
     String ids(String q) => [

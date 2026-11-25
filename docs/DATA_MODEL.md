@@ -24,7 +24,7 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
 | `item_epg` | the resolved match per live item (rebuilt after every import and sync) | `item_key` |
 | `reminders` | user data: a reminder for a guide programme (channel, start, stop, title), `updated_at` | `item_key, start` |
-| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `xc_time_offset` (the Xtream Codes server's clock against UTC, from the last sync), `list_mode_live`, `list_mode_movie`, `list_mode_series`, `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
+| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `xc_time_offset` (the Xtream Codes server's clock against UTC, from the last sync), `list_mode_live`, `list_mode_movie`, `list_mode_series`, `account_expires` and `account_limit` (Xtream Codes, from the last sync), `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
 | `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).
@@ -35,7 +35,7 @@ Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never re
 - User data refers to items only by key, so a re-sync never orphans favourites or recents (sync-ready for a later hub).
 
 ## Export and import
-Settings → Account → Your data writes the open profile's user data as one JSON file (`crates/gerdtv-core/src/userdata.rs`, format `gerdtv-user-data`, version 1): favourites, recents, `resume`, `hidden_groups`, `search_history` (kept at the newest 20 per section after an import), `epg_map`, reminders, settings (without the derived `xc_time_offset` and `m3u_tvg_url`), per-channel buffer choices and the extra guide URLs (with their `{secretN}` placeholders). Import merges row by row in one transaction: a row is taken when it is new or its `updated_at` is newer, nothing is deleted; a foreign file or a newer format is refused unchanged.
+Settings → Account → Your data writes the open profile's user data as one JSON file (`crates/gerdtv-core/src/userdata.rs`, format `gerdtv-user-data`, version 1): favourites, recents, `resume`, `hidden_groups`, `search_history` (kept at the newest 20 per section after an import), `epg_map`, reminders, settings (without the derived `xc_time_offset`, `m3u_tvg_url`, `account_expires` and `account_limit`), per-channel buffer choices and the extra guide URLs (with their `{secretN}` placeholders). Import merges row by row in one transaction: a row is taken when it is new or its `updated_at` is newer, nothing is deleted; a foreign file or a newer format is refused unchanged.
 
 ## No credentials on disk
 M3U stream URLs are stored with the profile's secrets replaced by `{secret0}`, `{secret1}` …; the player gets the real URL at play time. Xtream Codes URLs are not stored at all; they are built from the profile's credentials when playing.

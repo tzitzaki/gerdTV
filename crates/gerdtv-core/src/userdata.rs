@@ -15,7 +15,12 @@ const FORMAT: &str = "gerdtv-user-data";
 const VERSION: u32 = 1;
 
 /// Settings the app derives from the provider on every sync; not user choices, so not exported.
-const DERIVED_SETTINGS: &[&str] = &["xc_time_offset", "m3u_tvg_url"];
+const DERIVED_SETTINGS: &[&str] = &[
+    "xc_time_offset",
+    "m3u_tvg_url",
+    "account_expires",
+    "account_limit",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 struct File {

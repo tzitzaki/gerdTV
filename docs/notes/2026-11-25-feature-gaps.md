@@ -11,8 +11,10 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 
 ## Steps
 0. Set-up: started 20:43
-1. Schema 11 and backups: started 20:46 (baseline `just test`: green, 2 min 16 s)
-2. Account info, User-Agent
+1. Schema 11 and backups: started 20:46 (baseline `just test`: green, 2 min 16 s); atomic migrations and
+   backup pruning done 20:49. Open: the schema 11 tables, as one migration with the first feature that needs one (step 3).
+2. Account info, User-Agent: started 20:49; account info done 20:52. Next: the User-Agent field (Settings → Account,
+   `setup_screen.dart` saves ''), then mpv's `user-agent` in `WatchdogAdapter.play` and AVPlayer's direct `.m3u8`.
 3. Watched marks, next episode
 4. Track settings
 5. Picture (aspect, deinterlacing)
