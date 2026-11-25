@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'item_tile.dart' show WatchedButton;
 import 'list_modes.dart' show kindIcon;
 import 'logo.dart';
 import 'trailer.dart';
@@ -147,10 +148,16 @@ class DetailsInfo extends StatelessWidget {
     required this.item,
     required this.details,
     this.onPlay,
+    this.watched = false,
+    this.onWatched,
   });
   final ItemInfo item;
   final ItemDetails? details;
   final VoidCallback? onPlay;
+
+  /// A movie's watched check mark (null: none, as on a series).
+  final bool watched;
+  final VoidCallback? onWatched;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +201,12 @@ class DetailsInfo extends StatelessWidget {
                   label: Text(l10n.trailer),
                   onPressed: () => playTrailer(context, trailer),
                 ),
+              if (onWatched != null)
+                WatchedButton(
+                  item: item,
+                  watched: watched,
+                  onPressed: onWatched!,
+                ),
             ],
           ),
           if (d != null && d.plot.trim().isNotEmpty) ...[
@@ -223,12 +236,18 @@ class MovieScreen extends StatefulWidget {
     required this.library,
     required this.movie,
     required this.onPlay,
+    this.isWatched,
+    this.onWatched,
   });
   final Library library;
   final ItemInfo movie;
 
   /// Opens the player (the caller's route, so the player keeps its usual way in).
   final Future<void> Function() onPlay;
+
+  /// The watched check mark (null: none): read when drawn, toggled by [onWatched].
+  final bool Function()? isWatched;
+  final VoidCallback? onWatched;
 
   @override
   State<MovieScreen> createState() => _MovieScreenState();
@@ -270,6 +289,10 @@ class _MovieScreenState extends State<MovieScreen> {
                 item: widget.movie,
                 details: snap.data,
                 onPlay: widget.onPlay,
+                watched: widget.isWatched?.call() ?? false,
+                onWatched: widget.onWatched == null
+                    ? null
+                    : () => setState(widget.onWatched!),
               ),
             ),
           ],

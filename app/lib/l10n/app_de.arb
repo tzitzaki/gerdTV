@@ -16,6 +16,8 @@
   "adaptiveHint": "Wenn ein Sender in 10 Minuten öfter als 3-mal hängt, steigt sein Puffer um eine Stufe.",
   "add": "Hinzufügen",
   "appTitle": "gerdTV",
+  "autoplayNext": "Nächste Folge abspielen",
+  "autoplayNextHint": "Nach einer Folge, mit einem Countdown zum Abbrechen.",
   "back": "Zurück",
   "browseEmpty": "Hier ist noch nichts. Vielleicht läuft die erste Aktualisierung noch; siehe Einstellungen.",
   "bufferBalanced": "Ausgewogen (ca. 8 s)",
@@ -102,6 +104,8 @@
   "navMovies": "Filme",
   "navSeries": "Serien",
   "navSettings": "Einstellungen",
+  "nextEpisodeIn": "Nächste Folge in {seconds} s",
+  "nextEpisodePlay": "Jetzt abspielen",
   "playerAudio": "Audio",
   "playerChannels": "Sender",
   "playerEngine": "Version des gerdTV-Players",
@@ -169,6 +173,7 @@
   "settingsHealth": "Stream-Zustand",
   "settingsKeywordsAccount": "Profil Anmeldung Sync",
   "settingsKeywordsAdaptive": "Puffer automatisch",
+  "settingsKeywordsAutoplayNext": "autoplay serie weiter",
   "settingsKeywordsBuffer": "Cache Verzögerung Umschalten",
   "settingsKeywordsData": "Export Import Sicherung Favoriten Datei übertragen",
   "settingsKeywordsEngine": "Engine mpv ffmpeg libmpv Decoder Player",
@@ -273,5 +278,8 @@
   "userDataFailed": "Hat nicht geklappt: {reason}",
   "userDataImport": "Daten importieren",
   "userDataImportHint": "Führt einen gerdTV-Export mit diesem Profil zusammen; neuere Einträge gewinnen, nichts wird gelöscht",
-  "userDataImported": "Importiert: {count} neue oder neuere Einträge"
+  "userDataImported": "Importiert: {count} neue oder neuere Einträge",
+  "watchedLabel": "Gesehen",
+  "watchedMark": "Als gesehen markieren",
+  "watchedUnmark": "Als nicht gesehen markieren"
 }

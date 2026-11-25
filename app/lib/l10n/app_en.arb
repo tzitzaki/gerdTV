@@ -37,6 +37,8 @@
   "adaptiveHint": "When a channel stutters more than 3 times in 10 minutes, its buffer goes up one step.",
   "add": "Add",
   "appTitle": "gerdTV",
+  "autoplayNext": "Play the next episode",
+  "autoplayNextHint": "After an episode, with a countdown you can cancel.",
   "back": "Back",
   "browseEmpty": "Nothing here yet. The first update may still be running; check Settings.",
   "bufferBalanced": "Balanced (about 8 s)",
@@ -194,6 +196,15 @@
   "navMovies": "Movies",
   "navSeries": "Series",
   "navSettings": "Settings",
+  "nextEpisodeIn": "Next episode in {seconds} s",
+  "@nextEpisodeIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "nextEpisodePlay": "Play now",
   "playerAudio": "Audio",
   "playerChannels": "Channels",
   "playerEngine": "gerdTV player version",
@@ -338,6 +349,7 @@
   "settingsHealth": "Stream health",
   "settingsKeywordsAccount": "profile login sync",
   "settingsKeywordsAdaptive": "buffer automatic",
+  "settingsKeywordsAutoplayNext": "autoplay series continue",
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsData": "export import backup favourites file transfer",
   "settingsKeywordsEngine": "engine mpv ffmpeg libmpv decoder player",
@@ -529,5 +541,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "watchedLabel": "Watched",
+  "watchedMark": "Mark as watched",
+  "watchedUnmark": "Mark as not watched"
 }

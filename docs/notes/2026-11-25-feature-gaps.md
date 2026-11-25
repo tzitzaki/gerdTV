@@ -15,7 +15,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
    backup pruning done 20:49. Open: the schema 11 tables, as one migration with the first feature that needs one (step 3).
 2. Account info, User-Agent: started 20:49; done 21:06 (integration tests green, 9 min 31 s).
 3. Watched marks, next episode: started 21:19
-4. Track settings
+4. Track settings: started 21:43
 5. Picture (aspect, deinterlacing)
 6. Last channel, CH keys
 7. macOS media keys (iOS and Android came with #62)
@@ -30,6 +30,5 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–2 done, 21:18 (step 1 without the new tables). Next: step 3. Start with migration 10 → 11 (`watched` first; the other
-tables only if their shape is settled by then, else the later features append to the same unreleased entry), then
-`save_progress` at 95 % writes `watched`. Open questions: none blocking.
+Steps 0–3 done 21:43 (integration 8 min 22 s, the journey plays an episode to its end). Migration 11 is unreleased: later
+features append to it. Next: step 4. Open questions: none blocking.

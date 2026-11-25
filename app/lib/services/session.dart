@@ -16,6 +16,7 @@ import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/floating.dart';
+import '../player/next_up.dart';
 import '../player/switch_player.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
@@ -112,6 +113,57 @@ class Session extends ChangeNotifier {
         ? {...favourites, item.key}
         : ({...favourites}..remove(item.key));
     favouritesChanged.value++;
+  }
+
+  /// Bumped when an item is marked as watched or unmarked: the check marks rebuild.
+  final watchedChanged = ValueNotifier<int>(0);
+  Set<String> _watched = const {};
+  Library? _watchedOf;
+
+  /// The open profile's watched movies and episodes (read once per profile, then kept here).
+  Set<String> get watched {
+    final lib = library;
+    if (lib != null && !identical(lib, _watchedOf)) {
+      _watchedOf = lib;
+      _watched = lib.watchedKeys().toSet();
+    }
+    return _watched;
+  }
+
+  void toggleWatched(ItemInfo item) {
+    library?.setWatched(key: item.key, watched: !watched.contains(item.key));
+    _reloadWatched();
+  }
+
+  void _reloadWatched() {
+    _watchedOf = null;
+    watchedChanged.value++;
+  }
+
+  /// The countdown to the next episode (the player shows it).
+  late final nextUp = NextUp((item) => unawaited(play(item)));
+  static const settingAutoplayNext = 'autoplay_next';
+
+  /// The player ran to the end: an episode is followed by its next one, unless that is switched off.
+  Future<void> _onCompleted(bool done) async {
+    final it = nowPlaying.value;
+    final lib = library;
+    if (!done) {
+      nextUp.cancel(); // sought back, or the next one opened
+      return;
+    }
+    _saveProgress(); // the 10 s timer may have missed the last seconds
+    if (it == null || lib == null || it.kind != ItemKind.episode) return;
+    if (lib.setting(key: settingAutoplayNext) == '0') return;
+    final s = player.state;
+    // A connection lost for good also ends the file: only a real end counts (the share the core calls finished).
+    if (s.position.inSeconds < s.duration.inSeconds * 0.95) return;
+    try {
+      final next = await lib.nextEpisode(key: it.key);
+      if (next != null && nowPlaying.value?.key == it.key) nextUp.start(next);
+    } catch (e) {
+      debugPrint('next episode: $e');
+    }
   }
 
   /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
@@ -568,6 +620,7 @@ class Session extends ChangeNotifier {
     if (nowPlaying.value?.key == item.key) {
       return; // reopening the player for the running stream: keep it going
     }
+    nextUp.cancel();
     _saveProgress(); // the one playing until now
     _track('stop');
     _progressTimer ??= Timer.periodic(
@@ -782,7 +835,10 @@ class Session extends ChangeNotifier {
     final s = player.stream;
     _floatSubs = [
       s.playing.listen((_) => _updateFloating()),
-      s.completed.listen((_) => _updateFloating()),
+      s.completed.listen((done) {
+        _updateFloating();
+        unawaited(_onCompleted(done));
+      }),
       s.position.listen((_) => _updateFloating()),
     ];
     adapter.failure.addListener(_updateFloating);
@@ -974,10 +1030,15 @@ class Session extends ChangeNotifier {
       position: pos,
       duration: player.state.duration.inSeconds,
     );
+    // The core marks it from 95 %; the check marks follow.
+    if (!watched.contains(it.key) && lib.watchedKeys().contains(it.key)) {
+      _reloadWatched();
+    }
   }
 
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
+    nextUp.cancel();
     _saveProgress();
     _track('stop');
     _playingKey = null;

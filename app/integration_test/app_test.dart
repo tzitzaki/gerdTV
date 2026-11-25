@@ -404,6 +404,39 @@ void main() {
     debugPrint('JOURNEY: programme search played its channel');
     // Catch-up: a programme that ended on a channel with an archive (every 13th mock channel) plays from the archive.
     final lib = session.library!;
+    // An episode that plays to its end is marked as watched and counts down to the next one; Cancel keeps it away.
+    final episodes = await tester.runAsync(() async {
+      for (final g in await lib.categories(
+        kind: ItemKind.series,
+        sort: 'provider',
+      )) {
+        for (final s in await lib.items(
+          kind: ItemKind.series,
+          category: g.id,
+          sort: 'provider',
+          limit: 20,
+          offset: 0,
+        )) {
+          final eps = await lib.episodes(seriesKey: s.key);
+          if (eps.length > 1) return eps;
+        }
+      }
+      return null;
+    });
+    await tester.runAsync(() => session.play(episodes!.first));
+    await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    await tester.tap(find.byKey(const Key('nowPlaying.bar')));
+    await waitFor(tester, find.byKey(const Key('player.nextUp')));
+    expect(session.nextUp.value!.item.key, episodes![1].key);
+    expect(session.watched, contains(episodes.first.key));
+    await tapReady(tester, find.byKey(const Key('player.nextUp.cancel')));
+    await tester.pump();
+    expect(find.byKey(const Key('player.nextUp')), findsNothing);
+    expect(session.nowPlaying.value!.key, episodes.first.key);
+    await tapStop(tester);
+    await waitFor(tester, liveField.hitTestable());
+    debugPrint('JOURNEY: an episode ended, the next one was cancelled');
+
     final groups = await tester.runAsync(
       () => lib.categories(kind: ItemKind.live, sort: 'provider'),
     );

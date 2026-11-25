@@ -304,6 +304,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           if (lib != null)
             SettingsEntry(
+              id: 'autoplayNext',
+              title: l10n.autoplayNext,
+              keywords: l10n.settingsKeywordsAutoplayNext,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.autoplayNext'),
+                  title: Text(l10n.autoplayNext),
+                  subtitle: Text(l10n.autoplayNextHint),
+                  value: lib.setting(key: Session.settingAutoplayNext) != '0',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: Session.settingAutoplayNext,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (lib != null)
+            SettingsEntry(
               id: 'bufferReadout',
               title: l10n.bufferReadoutShow,
               keywords: l10n.settingsKeywordsBuffer,

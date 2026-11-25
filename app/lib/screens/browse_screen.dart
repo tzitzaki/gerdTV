@@ -45,8 +45,13 @@ void openItem(
   } else if (item.kind == ItemKind.movie && page) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            MovieScreen(library: session.library!, movie: item, onPlay: play),
+        builder: (_) => MovieScreen(
+          library: session.library!,
+          movie: item,
+          onPlay: play,
+          isWatched: () => session.watched.contains(item.key),
+          onWatched: () => session.toggleWatched(item),
+        ),
       ),
     );
   } else {
@@ -443,9 +448,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
           focus: _searchFocus,
           // The Favourites group spans several groups: its search covers the section.
           group: widget.favourites ? null : widget.group,
-          child: ValueListenableBuilder<int>(
-            valueListenable: widget.session.favouritesChanged,
-            builder: (context, _, _) => ItemsView(
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              widget.session.favouritesChanged,
+              widget.session.watchedChanged,
+            ]),
+            builder: (context, _) => ItemsView(
+              watched: widget.session.watched,
               mode: _mode,
               // In Favourites, an unstarred item leaves the list at once.
               items: widget.favourites
@@ -548,9 +557,14 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
                 }
                 return SliverList.builder(
                   itemCount: eps.length,
-                  itemBuilder: (context, i) => ItemTile(
-                    item: eps[i],
-                    onTap: () => openItem(context, session, eps[i]),
+                  itemBuilder: (context, i) => ValueListenableBuilder<int>(
+                    valueListenable: session.watchedChanged,
+                    builder: (context, _, _) => ItemTile(
+                      item: eps[i],
+                      onTap: () => openItem(context, session, eps[i]),
+                      watched: session.watched.contains(eps[i].key),
+                      onWatched: () => session.toggleWatched(eps[i]),
+                    ),
                   ),
                 );
               },

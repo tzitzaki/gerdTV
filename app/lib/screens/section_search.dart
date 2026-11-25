@@ -440,6 +440,7 @@ class _SectionSearchState extends State<SectionSearch> {
       onNearEnd: _model.loadMore,
       highlight: q,
       favourites: widget.session.favourites,
+      watched: widget.session.watched,
       onFavourite: (it) {
         widget.session.toggleFavourite(it);
         setState(() {}); // the star changes at once

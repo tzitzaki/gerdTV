@@ -28,6 +28,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import '../player/live_edge.dart';
+import '../player/next_up.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
 import 'track_sheet.dart';
@@ -138,6 +139,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (session.floating.value) unawaited(session.stopApplePip());
     session.floating.addListener(_onFloating);
     session.userPaused.addListener(_onPaused);
+    session.nextUp.addListener(_onNextUp);
     PlatformBridge.brightness().then((b) {
       if (b != null && mounted) setState(() => _brightness = b);
     });
@@ -145,6 +147,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _shiftTick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _shiftable) setState(() {});
     });
+  }
+
+  /// The countdown to the next episode takes the keys while it shows; afterwards the player has them again.
+  bool _hadNextUp = false;
+  void _onNextUp() {
+    if (!mounted) return;
+    final shown = widget.session.nextUp.value != null;
+    if (_hadNextUp && !shown) _rootFocus.requestFocus();
+    _hadNextUp = shown;
+    setState(() {});
   }
 
   bool get _shiftable => widget.session.timeshiftWindow.value > 0;
@@ -323,6 +335,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     widget.session.pipFailure.removeListener(_showPipFailure);
     widget.session.floating.removeListener(_onFloating);
     widget.session.userPaused.removeListener(_onPaused);
+    widget.session.nextUp.removeListener(_onNextUp);
     _rootFocus.dispose();
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
@@ -563,7 +576,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         if (isDesktop)
           const SingleActivator(LogicalKeyboardKey.keyM): _toggleMute,
         // Only while the channel list is closed: inside it these keys move the focus and pick a channel.
-        if (!_panel && !_dpad) ...{
+        if (!_panel && !_dpad && widget.session.nextUp.value == null) ...{
           const SingleActivator(LogicalKeyboardKey.arrowUp): () => _zap(-1),
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _zap(1),
           const SingleActivator(LogicalKeyboardKey.enter): _togglePanel,
@@ -706,6 +719,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onPause: _togglePause,
                             onStop: _stop,
                             onLeave: _dpad ? _leaveDpad : null,
+                          ),
+                        ),
+                      if (widget.session.nextUp.value case final next?)
+                        Positioned(
+                          right: Tokens.space * 2,
+                          bottom:
+                              _controlsHeight +
+                              MediaQuery.paddingOf(context).bottom,
+                          child: NextUpCard(
+                            next: next,
+                            onPlay: widget.session.nextUp.playNow,
+                            onCancel: widget.session.nextUp.cancel,
                           ),
                         ),
                       if (_banner && !_panel)
@@ -1244,6 +1269,63 @@ class _ChannelPanelState extends State<_ChannelPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Next episode in 10 s" with Play now (focused, for the remote) and Cancel.
+class NextUpCard extends StatelessWidget {
+  const NextUpCard({
+    super.key,
+    required this.next,
+    required this.onPlay,
+    required this.onCancel,
+  });
+  final NextUpState next;
+  final VoidCallback onPlay;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Card(
+      key: const Key('player.nextUp'),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Padding(
+          padding: const EdgeInsets.all(Tokens.space * 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.nextEpisodeIn(next.seconds)),
+              Text(
+                next.item.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: Tokens.space),
+              Wrap(
+                spacing: Tokens.space,
+                children: [
+                  FilledButton(
+                    key: const Key('player.nextUp.play'),
+                    autofocus: true,
+                    onPressed: onPlay,
+                    child: Text(l10n.nextEpisodePlay),
+                  ),
+                  TextButton(
+                    key: const Key('player.nextUp.cancel'),
+                    onPressed: onCancel,
+                    child: Text(l10n.cancel),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
