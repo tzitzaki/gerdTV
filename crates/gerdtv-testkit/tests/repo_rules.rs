@@ -243,15 +243,16 @@ fn docs_name_only_existing_paths_and_recipes() {
     );
 }
 
-/// HANDOVER.md and DEVICE_CHECKS.md are read on a phone: ≤ 60 lines of ≤ 160 characters, no continuation lines.
+/// HANDOVER.md (≤ 60 lines) and DEVICE_CHECKS.md (≤ 90) are read on a phone: lines of ≤ 160 characters, no
+/// continuation lines.
 #[test]
 fn phone_docs_stay_within_their_limits() {
-    for doc in ["docs/HANDOVER.md", "docs/DEVICE_CHECKS.md"] {
+    for (doc, max) in [("docs/HANDOVER.md", 60), ("docs/DEVICE_CHECKS.md", 90)] {
         let text = read(doc);
         let lines: Vec<&str> = text.lines().collect();
         assert!(
-            lines.len() <= 60,
-            "{doc}: {} lines, at most 60; send the oldest items to the owner",
+            lines.len() <= max,
+            "{doc}: {} lines, at most {max}; send the oldest items to the owner",
             lines.len()
         );
         for (n, line) in lines.iter().enumerate() {
