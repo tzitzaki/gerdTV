@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261125.61: macOS keeps logins through Apple's security tool, so updates no longer ask for the keychain password.
+- Version 0.261125.60: more channels with a guide; the player's banner at the bottom; Stop beside play/pause everywhere.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -26,7 +26,7 @@
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
 - Apple minimums 27.0 once `macos-latest` runs macOS 27 (owner decision; Xcode 27 is not on it yet).
-- [DEVICE] Mac: after 0.261125.61 allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
+- [DEVICE] Mac: on the first release with #61 allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
 - [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; a picture hiccup or reconnect there: send the device log.
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
 - Phase 3 rest: PIN-locked groups and the TV-layout focus polish.
