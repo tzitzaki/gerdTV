@@ -179,7 +179,16 @@ const MIGRATIONS: &[&str] = &[
         WHERE key = 'guide_offset_hours'), 0) WHERE builtin = 0;",
     // 10 → 11: movies and episodes seen to the end (user data). An unmark is stored too (watched = 0), so it wins
     // over an older mark from an import or from Simkl.
-    "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);",
+    // The user's own groups, names and group order (groups.rs, user data); removed ones stay as deleted = 1.
+    "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE custom_groups (id TEXT PRIMARY KEY, kind INTEGER NOT NULL, name TEXT NOT NULL,
+        position INTEGER NOT NULL, deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE custom_group_items (group_id TEXT NOT NULL, item_key TEXT NOT NULL, position INTEGER NOT NULL,
+        deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (group_id, item_key));
+     CREATE TABLE group_prefs (kind INTEGER NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+        position INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (kind, category));
+     CREATE TABLE item_prefs (key TEXT PRIMARY KEY, name TEXT NOT NULL, provider_name TEXT NOT NULL DEFAULT '',
+        updated_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -331,6 +340,17 @@ fn index_item(conn: &Connection, rowid: i64, fresh: bool, name: &str, alt: &str)
     conn.prepare_cached("INSERT INTO items_fts (rowid, name, alt) VALUES (?1, ?2, ?3)")?
         .execute(params![rowid, name, alt])?;
     Ok(())
+}
+
+/// Changes an item's name with its search index (the user's own name, groups.rs).
+pub fn rename_item(conn: &Connection, key: &str, name: &str) -> Result<()> {
+    let alt = clean_name(name);
+    let rowid: i64 = conn.query_row(
+        "UPDATE items SET name = ?2, folded = ?3 WHERE key = ?1 RETURNING rowid",
+        params![key, name, fold(&alt)],
+        |r| r.get(0),
+    )?;
+    index_item(conn, rowid, false, name, &alt)
 }
 
 fn unix_now() -> i64 {
@@ -556,6 +576,7 @@ impl<'c> Sync<'c> {
                 params![*kind as i64, id, name, i as i64],
             )?;
         }
+        crate::groups::apply(&self.tx)?;
         self.tx.commit()?;
         Ok(removed)
     }

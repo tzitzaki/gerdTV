@@ -498,6 +498,54 @@ impl Library {
         self.0.save_progress(&key, position, duration).map_err(err)
     }
 
+    /// A new group of the user's own; its category id.
+    pub fn create_group(&self, kind: ItemKind, name: String) -> Result<String, String> {
+        self.0.create_group(to_core(kind), &name).map_err(err)
+    }
+
+    pub fn delete_group(&self, category: String) -> Result<(), String> {
+        self.0.delete_group(&category).map_err(err)
+    }
+
+    /// Names a group; empty: the provider's name again, from the next sync.
+    pub fn rename_group(
+        &self,
+        kind: ItemKind,
+        category: String,
+        name: String,
+    ) -> Result<(), String> {
+        self.0
+            .rename_group(to_core(kind), &category, &name)
+            .map_err(err)
+    }
+
+    /// Names an item; empty: the provider's name again.
+    pub fn rename_item(&self, key: String, name: String) -> Result<(), String> {
+        self.0.rename_item(&key, &name).map_err(err)
+    }
+
+    /// The groups' order, top to bottom.
+    pub fn set_group_order(&self, kind: ItemKind, ids: Vec<String>) -> Result<(), String> {
+        self.0.set_group_order(to_core(kind), &ids).map_err(err)
+    }
+
+    /// Adds an item to a group of the user's own, or removes it.
+    pub fn set_group_member(
+        &self,
+        category: String,
+        key: String,
+        member: bool,
+    ) -> Result<(), String> {
+        self.0
+            .set_group_member(&category, &key, member)
+            .map_err(err)
+    }
+
+    /// The order of an own group's items.
+    pub fn set_item_order(&self, category: String, keys: Vec<String>) -> Result<(), String> {
+        self.0.set_item_order(&category, &keys).map_err(err)
+    }
+
     /// Marks a movie or episode as watched or not.
     #[flutter_rust_bridge::frb(sync)]
     pub fn set_watched(&self, key: String, watched: bool) -> Result<(), String> {
@@ -964,7 +1012,9 @@ impl Library {
             + n.resume
             + n.hidden_groups
             + n.search_history
-            + n.watched)
+            + n.watched
+            + n.own_groups
+            + n.own_names)
     }
 
     pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {

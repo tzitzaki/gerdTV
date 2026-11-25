@@ -12,6 +12,7 @@
 
 use crate::db::{self, Hit, ImportStats, Kind, Sort};
 use crate::epg;
+use crate::groups;
 use crate::xtream::{self, Account, XcError, Xtream};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -375,15 +376,49 @@ impl Library {
         }
     }
 
-    /// Categories of a kind in `sort` order (provider order or by name), with their item counts (empty ones and the
-    /// ones the user hid left out).
+    /// The user's own groups in their order, then the categories of a kind in `sort` order (provider order or by
+    /// name), with their item counts (of the provider's, empty ones and the ones the user hid left out).
     pub fn categories(&self, kind: Kind, sort: Sort) -> Result<Vec<Category>> {
-        Ok(self
-            .all_categories(kind, sort)?
+        let own = groups::list(&self.conn.lock().unwrap(), kind)?;
+        let provider = self.all_categories(kind, sort)?;
+        Ok(own
             .into_iter()
-            .filter(|(_, hidden)| !hidden)
-            .map(|(c, _)| c)
+            .map(|(id, name, count)| Category { id, name, count })
+            .chain(provider.into_iter().filter(|(_, h)| !h).map(|(c, _)| c))
             .collect())
+    }
+
+    pub fn create_group(&self, kind: Kind, name: &str) -> Result<String> {
+        Ok(groups::create(&self.conn.lock().unwrap(), kind, name)?)
+    }
+
+    pub fn delete_group(&self, category: &str) -> Result<()> {
+        Ok(groups::delete(&self.conn.lock().unwrap(), category)?)
+    }
+
+    pub fn rename_group(&self, kind: Kind, category: &str, name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        Ok(groups::rename_group(&conn, kind, category, name)?)
+    }
+
+    pub fn rename_item(&self, key: &str, name: &str) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::rename_item(&mut conn, key, name)?)
+    }
+
+    pub fn set_group_order(&self, kind: Kind, ids: &[String]) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::set_group_order(&mut conn, kind, ids)?)
+    }
+
+    pub fn set_group_member(&self, category: &str, key: &str, member: bool) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        Ok(groups::set_member(&conn, category, key, member)?)
+    }
+
+    pub fn set_item_order(&self, category: &str, keys: &[String]) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::set_item_order(&mut conn, category, keys)?)
     }
 
     /// Every non-empty category of a kind with whether the user hid it (Settings → Hidden groups).
@@ -454,6 +489,9 @@ impl Library {
         offset: usize,
     ) -> Result<Vec<Hit>> {
         let conn = self.conn.lock().unwrap();
+        if category.starts_with(groups::CUSTOM) {
+            return Ok(groups::items(&conn, category, sort, limit, offset)?);
+        }
         let mut stmt = conn.prepare_cached(&format!(
             "SELECT key, kind, name, category, logo, number, archive_days FROM items
              WHERE kind = ?1 AND category = ?2 ORDER BY {} LIMIT ?3 OFFSET ?4",

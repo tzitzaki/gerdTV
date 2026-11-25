@@ -5,6 +5,7 @@
 
 pub mod db;
 pub mod epg;
+pub mod groups;
 pub mod hls;
 pub mod library;
 pub mod logos;

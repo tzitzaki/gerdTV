@@ -74,6 +74,11 @@ abstract class Library implements RustOpaqueInterface {
     required int limit,
   });
 
+  /// A new group of the user's own; its category id.
+  Future<String> createGroup({required ItemKind kind, required String name});
+
+  Future<void> deleteGroup({required String category});
+
   /// A movie's or series' details, from the panel when the page opens.
   Future<ItemDetails> details({required String key});
 
@@ -191,6 +196,16 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
+  /// Names a group; empty: the provider's name again, from the next sync.
+  Future<void> renameGroup({
+    required ItemKind kind,
+    required String category,
+    required String name,
+  });
+
+  /// Names an item; empty: the provider's name again.
+  Future<void> renameItem({required String key, required String name});
+
   /// Where to resume an item (seconds), if it was left part-way.
   int? resumePosition({required String key});
 
@@ -238,8 +253,27 @@ abstract class Library implements RustOpaqueInterface {
     required bool hidden,
   });
 
+  /// Adds an item to a group of the user's own, or removes it.
+  Future<void> setGroupMember({
+    required String category,
+    required String key,
+    required bool member,
+  });
+
+  /// The groups' order, top to bottom.
+  Future<void> setGroupOrder({
+    required ItemKind kind,
+    required List<String> ids,
+  });
+
   /// An extra source's own time offset in hours (applied by the next refresh).
   Future<void> setGuideOffset({required PlatformInt64 id, required int hours});
+
+  /// The order of an own group's items.
+  Future<void> setItemOrder({
+    required String category,
+    required List<String> keys,
+  });
 
   Future<void> setPreferHls({required String key, required bool hls});
 
