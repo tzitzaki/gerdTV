@@ -5,12 +5,12 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## Mac
 - Own engine: Settings → Playback → Player engine gerdTV, restart; a movie plays with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
-- Search: typing in Live TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
+- Search: typing in TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
-- Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
+- Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
-- Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
+- Mini player: P floats the picture on top on every Space; with another app in front hover or a click shows Mute, Restore, Stop; drag; M.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
 - Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
@@ -26,8 +26,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
-- Home: floats only what plays (nothing after Stop, paused or a failed channel); the window's play/pause and skip work.
-- Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
+- Home: floats only what plays, no black; returning closes the window (one picture); the button closes the player, restore reopens it.
+- Lock: sound plays on 5 min, picture at once after; the lock screen card shows title, programme, logo; its and a headset's pause work.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 - iPad: the floating window works over split view; live rewinds 20 min (timeshift 30 min in Settings → Playback) and Live returns.
@@ -36,11 +36,11 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
-- PiP: Home while a channel plays shows it in a floating window (nothing after Stop or paused); tapping it returns to the full player.
+- PiP: Home floats a playing channel (not after Stop or paused), a tap returns; lock screen: the card with title, programme, play/pause.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
-- Voice search: the mic in Live TV's search field opens Google's speech prompt; the spoken words become the search.
+- Voice search: the mic in TV's search field opens Google's speech prompt; the spoken words become the search.
 - Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
 
 ## Shield

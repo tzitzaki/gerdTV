@@ -22,6 +22,8 @@ class MainFlutterWindow: NSWindow {
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
+    // Hover also while another app is in front: the mini player floats above it and shows its buttons on hover.
+    flutterViewController.mouseTrackingMode = .always
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     MenuBar.shared.window = self

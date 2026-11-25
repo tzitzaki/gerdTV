@@ -115,11 +115,11 @@ void main() {
     await tester.pump();
     expect(session.logo, AppLogo.signal);
     expect(appSetting(dir: dir.path, key: Session.settingAppLogo), 'signal');
-    // The rail's Live TV (Appearance lists the sections by name too).
+    // The rail's TV (Appearance lists the sections by name too).
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
+        matching: find.text('TV'),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));
@@ -191,11 +191,28 @@ void main() {
     final mini = MiniWindow();
     final fullWidth = mini.size.width;
     await tester.tap(find.byKey(const Key('player.mini')));
-    await waitFor(tester, find.byKey(const Key('player.restore')));
+    await waitFor(tester, find.byKey(const Key('player.picture')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 800)),
     );
     expect(mini.size.width, closeTo(MiniWindow.miniWidth, 1));
+    // Its buttons are hidden until a tap; Mute, and M, switch the sound.
+    expect(find.byKey(const Key('player.mute')).hitTestable(), findsNothing);
+    await tester.tap(find.byKey(const Key('player.picture')));
+    await tapReady(tester, find.byKey(const Key('player.mute')));
+    for (var i = 0; i < 50 && session.player.state.volume != 0; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    }
+    expect(session.player.state.volume, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    for (var i = 0; i < 50 && session.player.state.volume != 100; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    }
+    expect(session.player.state.volume, 100);
     final inMini = session.player.state.position;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(seconds: 2)),
@@ -206,6 +223,15 @@ void main() {
       greaterThan(inMini),
       reason: 'plays on in the mini player',
     );
+    // (The 3 s may be over: shown again if so.)
+    if (find
+        .byKey(const Key('player.restore'))
+        .hitTestable()
+        .evaluate()
+        .isEmpty) {
+      await tester.tap(find.byKey(const Key('player.picture')));
+      await tester.pump();
+    }
     await tester.tap(find.byKey(const Key('player.restore')));
     await waitFor(tester, find.byKey(const Key('player.back')));
     await tester.runAsync(
@@ -248,6 +274,12 @@ void main() {
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
     await tester.tap(find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    // While Apple's window floats the stream, the bar shows the logo, not a second picture.
+    session.floating.value = true;
+    await waitFor(tester, find.byKey(const Key('nowPlaying.floating')));
+    session.floating.value = false;
+    await tester.pump();
+    expect(find.byKey(const Key('nowPlaying.floating')), findsNothing);
     final atLeave = session.player.state.position;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(seconds: 2)),
@@ -515,7 +547,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
+        matching: find.text('TV'),
       ),
     );
     await waitFor(tester, liveField);
@@ -572,25 +604,15 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     // The guide's field lists programmes instead of the grid.
-    await tapReady(
-      tester,
-      find.descendant(
-        of: find.byType(NavigationRail),
-        matching: find.text('Guide'),
-      ),
-    );
+    await tapReady(tester, find.byKey(const Key('tv.guide')));
     final guideField = find.byKey(const Key('search.guide'));
     await waitFor(tester, guideField.hitTestable());
     await tester.enterText(guideField, 'sport');
     await waitFor(tester, programmeHit);
     await tester.tap(find.byKey(const Key('search.clear')));
     await tester.pump();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationRail),
-        matching: find.text('Live TV'),
-      ),
-    );
+    expect(lib.setting(key: 'tv_view'), 'guide', reason: 'remembered');
+    await tapReady(tester, find.byKey(const Key('tv.list')));
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search in sections, groups and the guide');
@@ -646,7 +668,7 @@ void main() {
 
     debugPrint('JOURNEY: a reminder was set and cleared');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
-    await tapReady(tester, find.text('Guide'));
+    await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));
     // The sort button: the order is Live TV's too; back to the provider's.
     for (final order in ['name_desc', 'provider']) {

@@ -36,6 +36,8 @@ class AvPlatformPlayer extends PlatformPlayer {
       'url': url,
       'bufferSecs': bufferSecs.toDouble(),
     });
+    // The native side makes a new AVPlayer per open, at full volume.
+    if (state.volume != 100) await setVolume(state.volume);
   }
 
   Future<void> setBuffer(int secs) =>
@@ -49,6 +51,11 @@ class AvPlatformPlayer extends PlatformPlayer {
   Future<bool> startPip() async =>
       await _channel.invokeMethod<bool>('startPip') ?? false;
 
+  Future<void> stopPip() => _channel.invokeMethod('stopPip');
+
+  /// The PiP window's restore button.
+  void Function()? onPipRestore;
+
   @override
   Future<void> open(Playable playable, {bool play = true}) async {
     if (playable is Media) await openUrl(playable.uri, bufferSecs: 8);
@@ -58,7 +65,7 @@ class AvPlatformPlayer extends PlatformPlayer {
   Future<void> stop() async {
     await _channel.invokeMethod('stop');
     pip.value = false;
-    _update(const PlayerState());
+    _update(const PlayerState().copyWith(volume: state.volume));
   }
 
   @override
@@ -105,6 +112,7 @@ class AvPlatformPlayer extends PlatformPlayer {
   }
 
   Future<void> _onCall(MethodCall call) async {
+    if (call.method == 'pipRestore') onPipRestore?.call();
     if (call.method != 'state') return;
     final m = Map<String, Object?>.from(call.arguments as Map);
     Duration secs(String k) =>

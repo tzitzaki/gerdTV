@@ -58,6 +58,7 @@ Future<void> main() async {
       );
     },
   );
+  session.onPipRestore = () => reopenPlayer(session);
   unawaited(session.reminders!.init());
   unawaited(session.start());
   session.platform.attach();

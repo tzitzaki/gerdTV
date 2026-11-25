@@ -2,12 +2,13 @@
 // failure message). The watchdog recovers by itself; the user never has to restart a channel.
 // Leaving the screen keeps the stream playing (the now-playing bar takes over); only Stop or another stream end it.
 // Picture mode (desktop: P or the mini-player button) shrinks the window to a floating, always-on-top mini player that
-// shows only the picture, Restore and Stop; drag it anywhere. Android Picture-in-Picture uses the same mode.
+// shows only the picture; a tap or the mouse brings up Mute, Restore and Stop for 3 s (MiniControls); drag it anywhere.
+// Android Picture-in-Picture uses the same mode.
 // Live channels opened from a group or the guide: Up/Down switch to the previous/next channel of that list, a banner
 // shows what's on now and next (5 s after each start or switch, and on OK), OK opens the channel list beside the
 // picture. media_kit's own controls keep Space, Left/Right (seek), J/I and F; their Up/Down (volume) and Esc are ours.
 // Keys: Esc/Back leaves (keeps playing; it closes the channel list or restores picture mode first), S stops,
-// Space pauses, P mini player, Up/Down channels, OK (Enter/Select) the channel list.
+// Space pauses, P mini player, M mutes (desktop), Up/Down channels, OK (Enter/Select) the channel list.
 // Pause and rewind live (timeshift window > 0): the controls' seek bar spans the back buffer up to live; "−5:12" and
 // Go live show at the top while behind live (live_edge.dart says where live is); Left/Right skip 10 s on phone and
 // TV (the D-pad), 2 s on desktop as before.
@@ -19,8 +20,6 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart' show Tracks;
 import 'package:media_kit_video/media_kit_video.dart';
-
-import 'package:window_manager/window_manager.dart' show DragToMoveArea;
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
@@ -94,7 +93,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  bool _paused = false;
+  bool get _paused => widget.session.userPaused.value;
 
   /// What's on, for the banner (the playing channel) and the channel list (every channel of the list).
   bool _banner = false;
@@ -135,6 +134,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
     session.pipFailure.addListener(_showPipFailure);
+    // Opened while it floats (the window's restore, the bar): the picture is here again.
+    if (session.floating.value) unawaited(session.stopApplePip());
+    session.floating.addListener(_onFloating);
+    session.userPaused.addListener(_onPaused);
     PlatformBridge.brightness().then((b) {
       if (b != null && mounted) setState(() => _brightness = b);
     });
@@ -145,6 +148,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   bool get _shiftable => widget.session.timeshiftWindow.value > 0;
+
+  /// The PiP button was pressed: once the window floats, the player closes (the picture would show twice). Not when
+  /// leaving the app floats it: the player is still open on return.
+  bool _pipAsked = false;
+  void _startPip() {
+    _pipAsked = true;
+    unawaited(
+      widget.session.startApplePip().then((_) {
+        if (widget.session.pipFailure.value != null) _pipAsked = false;
+      }),
+    );
+  }
+
+  void _onFloating() {
+    if (!widget.session.floating.value || !_pipAsked || !mounted) return;
+    _pipAsked = false;
+    Navigator.of(context).maybePop();
+  }
 
   /// iOS: why Picture-in-Picture didn't work, so a device report can name it (the stream plays on here).
   void _showPipFailure() {
@@ -275,6 +296,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     widget.session.pictureMode.value = mini;
   }
 
+  /// Mute is volume 0, as media_kit's volume button has it, so both show the same.
+  double _unmuteTo = 100;
+  void _toggleMute() {
+    final p = widget.session.player;
+    final volume = p.state.volume;
+    if (volume > 0) _unmuteTo = volume;
+    p.setVolume(volume > 0 ? 0 : _unmuteTo);
+  }
+
   void _back() {
     if (_panel) {
       setState(() => _panel = false);
@@ -291,6 +321,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     widget.session.pipFailure.removeListener(_showPipFailure);
+    widget.session.floating.removeListener(_onFloating);
+    widget.session.userPaused.removeListener(_onPaused);
     _rootFocus.dispose();
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
@@ -467,11 +499,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePause() async {
-    if (!_paused && _shiftable) {
+    await widget.session.userPause(!_paused);
+  }
+
+  /// Paused or playing again, here or from outside (lock screen, floating window, menu bar).
+  void _onPaused() {
+    if (_paused && _shiftable) {
       _liveEdge.detach(); // paused: live moves on without us
     }
-    await widget.session.userPause(!_paused);
-    setState(() => _paused = !_paused);
+    if (mounted) setState(() {});
   }
 
   /// Play/pause in the controls while timeshift is on: ours (see the keyboard shortcuts above).
@@ -524,6 +560,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SingleActivator(LogicalKeyboardKey.keyP): _toggleMini,
         const SingleActivator(LogicalKeyboardKey.space): _togglePause,
         const SingleActivator(LogicalKeyboardKey.keyS): _stop,
+        if (isDesktop)
+          const SingleActivator(LogicalKeyboardKey.keyM): _toggleMute,
         // Only while the channel list is closed: inside it these keys move the focus and pick a channel.
         if (!_panel && !_dpad) ...{
           const SingleActivator(LogicalKeyboardKey.arrowUp): () => _zap(-1),
@@ -647,7 +685,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                   icon: const Icon(
                                     Icons.picture_in_picture_alt,
                                   ),
-                                  onPressed: widget.session.startApplePip,
+                                  onPressed: _startPip,
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
@@ -809,40 +847,166 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ];
   }
 
-  /// Picture mode: only the video, with Restore and Stop; the whole picture drags the floating window (desktop).
+  /// Picture mode: only the video; on desktop with [MiniControls].
   Widget _pictureOnly(AppLocalizations l10n) {
+    final player = widget.session.player;
     final video = playerVideo(widget.session.video, controls: NoVideoControls);
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: isDesktop ? DragToMoveArea(child: video) : video,
-          ),
-          if (isDesktop)
-            Positioned(
-              top: Tokens.space,
-              right: Tokens.space,
-              child: Row(
-                children: [
-                  IconButton.filledTonal(
-                    key: const Key('player.restore'),
-                    tooltip: l10n.restore,
-                    icon: const Icon(Icons.open_in_full),
-                    onPressed: _toggleMini,
-                  ),
-                  const SizedBox(width: Tokens.space),
-                  IconButton.filledTonal(
-                    tooltip: l10n.stop,
-                    icon: const Icon(Icons.stop),
-                    onPressed: () async {
-                      _toggleMini();
-                      await _stop();
-                    },
-                  ),
-                ],
+      body: !isDesktop
+          ? SizedBox.expand(child: video)
+          : StreamBuilder<double>(
+              stream: player.stream.volume,
+              builder: (context, _) => MiniControls(
+                muted: player.state.volume == 0,
+                onDrag: _miniWindow.startDragging,
+                onMute: _toggleMute,
+                onRestore: _toggleMini,
+                onStop: () async {
+                  _toggleMini();
+                  await _stop();
+                },
+                child: video,
               ),
             ),
+    );
+  }
+}
+
+/// The desktop mini player: [child] (the picture) drags the window, and Mute, Restore and Stop show for 3 s after a
+/// tap or a mouse movement; a second tap hides them at once.
+/// Not window_manager's DragToMoveArea: it also listens for double taps, which holds every tap back for 300 ms.
+class MiniControls extends StatefulWidget {
+  const MiniControls({
+    super.key,
+    required this.muted,
+    required this.onDrag,
+    required this.onMute,
+    required this.onRestore,
+    required this.onStop,
+    required this.child,
+  });
+  final bool muted;
+  final VoidCallback onDrag, onMute, onRestore, onStop;
+  final Widget child;
+
+  @override
+  State<MiniControls> createState() => _MiniControlsState();
+}
+
+class _MiniControlsState extends State<MiniControls> {
+  bool _shown = false;
+
+  /// A mouse moves before it clicks, so hover has usually shown the buttons already: a tap hides only what a tap
+  /// showed, else every click would be a "hide".
+  bool _byTap = false;
+
+  /// After a tap hid them: the mouse, still there, doesn't bring them back until it left the picture.
+  bool _quiet = false;
+
+  /// The keyboard is on one of the buttons: they stay.
+  bool _focused = false;
+  Timer? _timer;
+
+  void _show({bool byTap = false}) {
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 3), _hide);
+    setState(() {
+      _shown = true;
+      _byTap = _byTap || byTap;
+    });
+  }
+
+  void _hide() {
+    _timer?.cancel();
+    setState(() => _shown = _byTap = false);
+  }
+
+  void _tap() {
+    _quiet = _byTap;
+    _byTap ? _hide() : _show(byTap: true);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final visible = _shown || _focused;
+    return MouseRegion(
+      onHover: (_) {
+        if (!_quiet) _show();
+      },
+      onExit: (_) => _quiet = false,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              key: const Key('player.picture'),
+              behavior: HitTestBehavior.opaque,
+              onTap: _tap,
+              onPanStart: (_) => widget.onDrag(),
+              child: widget.child,
+            ),
+          ),
+          Positioned(
+            top: Tokens.space,
+            right: Tokens.space,
+            child: IgnorePointer(
+              ignoring: !visible,
+              child: AnimatedOpacity(
+                opacity: visible ? 1 : 0,
+                duration: const Duration(milliseconds: 150),
+                child: Focus(
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  onFocusChange: (on) => setState(() => _focused = on),
+                  // The player's own Space and Enter (pause, channel list) would win over the focused button.
+                  child: Shortcuts(
+                    shortcuts: const {
+                      SingleActivator(LogicalKeyboardKey.enter):
+                          ActivateIntent(),
+                      SingleActivator(LogicalKeyboardKey.space):
+                          ActivateIntent(),
+                    },
+                    child: Row(
+                      children: [
+                        IconButton.filledTonal(
+                          key: const Key('player.mute'),
+                          tooltip: widget.muted ? l10n.unmute : l10n.mute,
+                          icon: Icon(
+                            widget.muted ? Icons.volume_off : Icons.volume_up,
+                          ),
+                          onPressed: () {
+                            widget.onMute();
+                            _show();
+                          },
+                        ),
+                        const SizedBox(width: Tokens.space),
+                        IconButton.filledTonal(
+                          key: const Key('player.restore'),
+                          tooltip: l10n.restore,
+                          icon: const Icon(Icons.open_in_full),
+                          onPressed: widget.onRestore,
+                        ),
+                        const SizedBox(width: Tokens.space),
+                        IconButton.filledTonal(
+                          key: const Key('player.miniStop'),
+                          tooltip: l10n.stop,
+                          icon: const Icon(Icons.stop),
+                          onPressed: widget.onStop,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

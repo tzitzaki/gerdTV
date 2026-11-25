@@ -8,7 +8,20 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../theme.dart';
+import 'list_modes.dart';
+import 'logo.dart';
 import 'player_screen.dart';
+
+/// Opens the player on the running stream (nothing plays or it is open: nothing happens).
+void reopenPlayer(Session session) {
+  final item = session.nowPlaying.value;
+  if (item == null || session.playerOpen.value) return;
+  session.navigatorKey.currentState?.push(
+    MaterialPageRoute<void>(
+      builder: (_) => PlayerScreen(session: session, item: item),
+    ),
+  );
+}
 
 class NowPlayingBar extends StatelessWidget {
   const NowPlayingBar({super.key, required this.session});
@@ -21,6 +34,7 @@ class NowPlayingBar extends StatelessWidget {
       listenable: Listenable.merge([
         session.nowPlaying,
         session.playerOpen,
+        session.floating,
         session.onAvPlayer, // the engine's picture is another controller
       ]),
       builder: (context, _) {
@@ -33,22 +47,25 @@ class NowPlayingBar extends StatelessWidget {
           key: const Key('nowPlaying.bar'),
           color: Theme.of(context).colorScheme.surfaceContainerHigh,
           child: InkWell(
-            onTap: () => session.navigatorKey.currentState!.push(
-              MaterialPageRoute<void>(
-                builder: (_) => PlayerScreen(session: session, item: item),
-              ),
-            ),
+            onTap: () => reopenPlayer(session),
             child: SizedBox(
               height: 72,
               child: Row(
                 children: [
-                  // The same video controller renders here and in the player: one stream, two views.
+                  // The same video controller renders here and in the player: one stream, two views. Not while the
+                  // floating window shows it.
                   SizedBox(
                     width: 128,
-                    child: playerVideo(
-                      session.video,
-                      controls: NoVideoControls,
-                    ),
+                    child: session.floating.value
+                        ? Center(
+                            key: const Key('nowPlaying.floating'),
+                            child: Logo(
+                              url: item.logo,
+                              size: 48,
+                              icon: kindIcon(item.kind),
+                            ),
+                          )
+                        : playerVideo(session.video, controls: NoVideoControls),
                   ),
                   const SizedBox(width: Tokens.space * 2),
                   Expanded(

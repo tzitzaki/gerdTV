@@ -30,30 +30,8 @@ String sizeLabel(int bytes) => bytes >= 1000000000
     ? '${(bytes / 1e9).toStringAsFixed(1)} GB'
     : '${(bytes / 1e6).round()} MB';
 
-/// The row atop Movies while Premiumize is linked.
-class PremiumizeRow extends StatelessWidget {
-  const PremiumizeRow({super.key, required this.session});
-  final Session session;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return ListTile(
-      key: const Key('premiumize.open'),
-      leading: const Icon(Icons.cloud_outlined),
-      title: Text(l10n.premiumizeCloud),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => PremiumizeScreen(session: session),
-        ),
-      ),
-    );
-  }
-}
-
 /// One folder of the cloud ([folderId] null: the root, with Transfers in its bar).
-class PremiumizeScreen extends StatelessWidget {
+class PremiumizeScreen extends StatefulWidget {
   const PremiumizeScreen({
     super.key,
     required this.session,
@@ -63,6 +41,19 @@ class PremiumizeScreen extends StatelessWidget {
   final Session session;
   final String? folderId;
   final String? title;
+
+  @override
+  State<PremiumizeScreen> createState() => _PremiumizeScreenState();
+}
+
+class _PremiumizeScreenState extends State<PremiumizeScreen> {
+  Session get session => widget.session;
+
+  /// Asked once: as a section this rebuilds with the shell (a sync's progress, say).
+  late final _entries = pmFolder(
+    token: session.premiumizeToken ?? '',
+    id: widget.folderId,
+  );
 
   Future<void> _play(BuildContext context, PmEntry e) async {
     final item = ItemInfo(
@@ -86,12 +77,11 @@ class PremiumizeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final token = session.premiumizeToken ?? '';
     return Scaffold(
       appBar: AppBar(
-        title: Text(title ?? l10n.premiumizeCloud),
+        title: Text(widget.title ?? l10n.premiumizeCloud),
         actions: [
-          if (folderId == null)
+          if (widget.folderId == null)
             TextButton.icon(
               key: const Key('premiumize.transfers'),
               icon: const Icon(Icons.downloading),
@@ -105,7 +95,7 @@ class PremiumizeScreen extends StatelessWidget {
         ],
       ),
       body: FutureBuilder<List<PmEntry>>(
-        future: pmFolder(token: token, id: folderId),
+        future: _entries,
         builder: (context, snap) {
           if (snap.hasError) {
             return Center(child: Text(l10n.syncFailed('${snap.error}')));

@@ -1,7 +1,7 @@
 // The TV guide grid (docs/SPEC.md "TV guide"): channels of one group down the left (fixed), a local-time ruler on top
 // (fixed), programmes as cells in between; the body scrolls both ways and drags the column and the ruler along. A
 // line marks now. The header shows the focused programme; a cell opens the programme sheet (Watch plays the
-// channel). Jumps: Now, 20:15, and a day from 2 back to the kept days ahead. Keyboard and remote move between cells.
+// channel); a channel's name opens its menu (Watch, favourite). Jumps: Now, 20:15, and a day from 2 back to the kept days ahead. Keyboard and remote move between cells.
 // Rows load in pages of 50 channels as they come into view; a page holds the whole day for its channels.
 // Debugging: an empty grid means no guide match for the group (Settings → Guide lists the unmatched channels).
 
@@ -14,6 +14,7 @@ import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'browse_screen.dart';
 import 'guide_math.dart';
 import 'list_modes.dart';
 import 'logo.dart';
@@ -364,19 +365,40 @@ class _GuideScreenState extends State<GuideScreen> {
         itemCount: _channels.length,
         itemBuilder: (context, i) {
           final c = _channels[i];
-          return Row(
-            children: [
-              Logo(url: c.logo, size: narrow ? 28 : 36, icon: kindIcon(c.kind)),
-              const SizedBox(width: Tokens.space),
-              Expanded(
-                child: Text(
-                  c.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
+          void menu() => showChannelMenu(
+            context,
+            c,
+            favourite: widget.session.favourites.contains(c.key),
+            onWatch: () => openItem(
+              this.context,
+              widget.session,
+              c,
+              channels: List.of(_channels),
+            ),
+            onFavourite: () => widget.session.toggleFavourite(c),
+          );
+          return InkWell(
+            key: Key('guide.channel.${c.key}'),
+            onTap: menu,
+            onLongPress: menu,
+            child: Row(
+              children: [
+                Logo(
+                  url: c.logo,
+                  size: narrow ? 28 : 36,
+                  icon: kindIcon(c.kind),
                 ),
-              ),
-            ],
+                const SizedBox(width: Tokens.space),
+                Expanded(
+                  child: Text(
+                    c.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

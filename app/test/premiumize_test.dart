@@ -4,6 +4,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/premiumize_screen.dart';
+import 'package:gerdtv/screens/shell.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -71,6 +72,18 @@ void main() {
     expect(find.byKey(const Key('premiumize.linked')), findsOneWidget);
     expect(secrets.services, {'premiumize.p1': 'good-key'});
     expect(session.premiumizeToken, 'good-key');
+    // Linked, it is a section of its own after Series.
+    expect(shellPages(premiumize: true).map((p) => p.name), [
+      'tv',
+      'movies',
+      'series',
+      'premiumize',
+      'settings',
+    ]);
+    expect(
+      shellPages(premiumize: false),
+      isNot(contains(ShellPage.premiumize)),
+    );
     expect(
       find.byKey(const Key('premiumize.code')),
       findsNothing,

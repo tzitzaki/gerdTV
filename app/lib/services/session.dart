@@ -25,6 +25,7 @@ import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'reminders.dart';
+import 'media_card.dart';
 import 'secrets.dart';
 import 'tracking.dart';
 
@@ -39,7 +40,18 @@ class Session extends ChangeNotifier {
       unawaited(platform.setPlaying(nowPlaying.value?.name));
       _updateFloating();
     });
+    nowPlaying.addListener(
+      () => userPaused.value = false,
+    ); // a new stream plays
+    _card = MediaCard(this);
+    platform.pip.addListener(_updatePip);
+    platform.onPipRestore = () => onPipRestore?.call();
   }
+
+  late final MediaCard _card;
+
+  /// Paused by the user, wherever: player, floating window, lock screen, menu bar (not a stall or a stream's start).
+  final ValueNotifier<bool> userPaused = ValueNotifier(false);
 
   final Secrets secrets;
 
@@ -167,6 +179,8 @@ class Session extends ChangeNotifier {
       _av = AvPlatformPlayer();
       _avPlayer = Player(platformPlayer: _av);
       _avErrors = _av!.stream.error.listen(_onAvError);
+      _av!.pip.addListener(_updatePip);
+      _av!.onPipRestore = () => onPipRestore?.call();
     }
     return _av!;
   }
@@ -567,6 +581,7 @@ class Session extends ChangeNotifier {
   /// A pause or resume by the user (the player's button or Space, the macOS menu bar): the watchdog's own pause,
   /// and the tracking services hear of it.
   Future<void> userPause(bool pause) async {
+    userPaused.value = pause;
     _track(pause ? 'pause' : 'start');
     if (onAvPlayer.value) {
       // AVPlayer has no watchdog here: the core keeps its provider connection alive while paused.
@@ -666,6 +681,17 @@ class Session extends ChangeNotifier {
     }
   }
 
+  /// True while Apple's floating window shows the stream, whichever engine plays: the app then shows no second one.
+  final ValueNotifier<bool> floating = ValueNotifier(false);
+  void _updatePip() =>
+      floating.value = platform.pip.value || (_av?.pip.value ?? false);
+
+  /// The floating window's restore button (main: reopens the player).
+  void Function()? onPipRestore;
+
+  Future<void> stopApplePip() =>
+      onAvPlayer.value ? _avEngine.stopPip() : platform.stopApplePip();
+
   /// iOS, while mpv plays: its frames feed the PiP layer, and the PiP window's play/pause, skip and seek range follow
   /// the player (once a second).
   void _mpvPip(bool on) {
@@ -732,6 +758,7 @@ class Session extends ChangeNotifier {
   /// Follows the player from the first stream on (creating the player starts mpv, so not earlier).
   void _watchFloating() {
     if (_floatSubs != null) return;
+    _card.watch();
     final s = player.stream;
     _floatSubs = [
       s.playing.listen((_) => _updateFloating()),
@@ -939,6 +966,7 @@ class Session extends ChangeNotifier {
 
   @override
   void dispose() {
+    _card.dispose();
     _progressTimer?.cancel();
     _pipTimer?.cancel();
     for (final s in _floatSubs ?? const <StreamSubscription<Object?>>[]) {

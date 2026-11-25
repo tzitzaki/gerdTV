@@ -268,7 +268,7 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 200)),
         );
       }
-      await section('Live TV');
+      await section('TV');
       await tester.enterText(find.byKey(const Key('search.live')), 'sport');
       await waitFor(tester, find.byType(ItemRow).hitTestable());
       await checkScreen(tester, form, 'search', size);
@@ -287,7 +287,9 @@ void main() {
       await tester.tap(find.byKey(const Key('search.clear')));
 
       // The guide grid (the guide imported above) and a programme's sheet.
-      await section('Guide');
+      await section('TV');
+      await tapReady(tester, find.byKey(const Key('tv.guide')));
+      await settle(tester);
       final cell = find.byWidgetPredicate(
         (w) =>
             w.key is ValueKey<String> &&
@@ -379,7 +381,9 @@ void main() {
         );
         session.navigatorKey.currentState!.popUntil((r) => r.isFirst);
         await settle(tester);
-        await section('Live TV');
+        await section('TV');
+        await tapReady(tester, find.byKey(const Key('tv.list')));
+        await settle(tester);
         await checkScreen(tester, form, 'light-live', size);
         await tapReady(tester, find.byType(ListTile));
         await waitFor(tester, find.byType(ItemRow).hitTestable());

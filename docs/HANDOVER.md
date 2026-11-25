@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261125.60: more channels with a guide; the player's banner at the bottom; Stop beside play/pause everywhere.
+- Version 0.261125.62: one TV section (lists or guide), Premiumize as a section, Now Playing card, one picture when floating, no Mac keychain prompts.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -26,8 +26,8 @@
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
 - Apple minimums 27.0 once `macos-latest` runs macOS 27 (owner decision; Xcode 27 is not on it yet).
-- [DEVICE] Mac: on the first release with #61 allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
-- [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; a picture hiccup or reconnect there: send the device log.
+- [DEVICE] Mac: on the first release with #61 (0.261125.62) allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
+- [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; black or a long freeze: send the log ("TextureHW: first picture").
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
 - Phase 3 rest: PIN-locked groups and the TV-layout focus polish.
 - Phase 4 TMDB enrichment; Phase 5 recordings and menu bar/tray; lazy VOD details.
@@ -40,7 +40,7 @@
 - Guide names are judged by country code; a provider without codes in its names falls back to the sources' order.
 - Own engines in CI: Android and macOS play the testkit clip headless (smoke: ok); iOS only compiles; picture, hwdec and PiP are device checks.
 - With Apple's player chosen, a channel starts once its local HLS has three segments (~6 s): slower zapping than mpv's Fast zap.
-- Background PiP of mpv's picture switches mpv to software rendering at PiP size: a short picture hiccup on leaving and returning.
+- Background PiP switches mpv to software rendering and decoding: a short freeze on leaving and returning; 4K HEVC may stutter there.
 - German public channels send no IDR frames (open GOP): with Apple's player, segments start on recovery-point I-frames.
 - Both libmpvs may be in one Apple process (media_kit links Mpv); the plugin calls only the chosen one, and mpv's ObjC class names may warn twice.
 - Linux CI hang: the app blocks at player start in the system libmpv while its Lua scripts start; CI runs integration on the own engine.

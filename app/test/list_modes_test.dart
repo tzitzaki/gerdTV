@@ -1,6 +1,6 @@
 // New, because nothing owns how the list modes render: every mode at phone and desktop width lays out without
 // overflow (stars included), shows the name (without the channel number), and shows what's on now where the mode has room for it (list and tiles,
-// not compact). Favourites: the star, a long press and a long OK toggle one; a short OK opens.
+// not compact). Favourites: the star toggles one; a long press or long OK opens the channel's menu; a short OK opens.
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
@@ -100,7 +100,7 @@ void main() {
   }
 
   testWidgets(
-    'star, long press and long OK toggle a favourite; short OK opens',
+    'the star toggles a favourite, long press and long OK open the channel menu; short OK opens',
     (tester) async {
       final opened = <String>[], starred = <String>[];
       await tester.pumpWidget(
@@ -120,8 +120,18 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('item.star.live:1')));
       await tester.longPress(find.byKey(const Key('item.live:2')));
+      await tester.pumpAndSettle();
+      expect(starred, ['live:1'], reason: 'a hold opens the menu');
+      await tester.tap(find.byKey(const Key('channel.favourite')));
+      await tester.pumpAndSettle();
       expect(starred, ['live:1', 'live:2']);
       expect(opened, isEmpty);
+      await tester.longPress(find.byKey(const Key('item.live:2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('channel.watch')));
+      await tester.pumpAndSettle();
+      expect(opened, ['live:2']);
+      opened.clear();
       // The remote: Tab focuses the first row, then OK briefly (opens) and held (toggles).
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
@@ -133,7 +143,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
       expect(opened, ['live:1'], reason: 'held OK does not open');
-      expect(starred.last, 'live:1');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('channel.favourite')), findsOneWidget);
     },
   );
 
