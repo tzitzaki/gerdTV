@@ -39,6 +39,7 @@ enum MPV {
     OpaquePointer?, UnsafeMutablePointer<mpv_render_param>?
   ) -> CInt
   private typealias RenderContextUpdate = @convention(c) (OpaquePointer?) -> UInt64
+  private typealias RenderContextGetInfo = @convention(c) (OpaquePointer?, mpv_render_param) -> CInt
   private typealias GetPropertyString = @convention(c) (OpaquePointer?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<
     CChar
   >?
@@ -58,6 +59,7 @@ enum MPV {
   private static let renderContextFreeFn = symbol("mpv_render_context_free", RenderContextFree.self)
   private static let renderContextRenderFn = symbol("mpv_render_context_render", RenderContextRender.self)
   private static let renderContextUpdateFn = symbol("mpv_render_context_update", RenderContextUpdate.self)
+  private static let renderContextGetInfoFn = symbol("mpv_render_context_get_info", RenderContextGetInfo.self)
   private static let getPropertyStringFn = symbol("mpv_get_property_string", GetPropertyString.self)
   private static let setPropertyStringFn = symbol("mpv_set_property_string", SetPropertyString.self)
   private static let freeFn = symbol("mpv_free", Free.self)
@@ -81,6 +83,10 @@ enum MPV {
   ) -> CInt { renderContextRenderFn(ctx, params) }
 
   static func renderContextUpdate(_ ctx: OpaquePointer?) -> UInt64 { renderContextUpdateFn(ctx) }
+
+  static func renderContextGetInfo(_ ctx: OpaquePointer?, _ param: mpv_render_param) -> CInt {
+    renderContextGetInfoFn(ctx, param)
+  }
 
   static func getPropertyString(_ mpv: OpaquePointer?, _ name: String) -> String? {
     guard let p = getPropertyStringFn(mpv, name) else { return nil }

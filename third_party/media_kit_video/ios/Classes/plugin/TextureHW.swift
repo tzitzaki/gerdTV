@@ -163,6 +163,8 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
   public static var pipSink: ((CVPixelBuffer) -> Void)?
   public static var pipActive = false
   private var software = false
+  /// Set from a renderer switch until the first picture after it ([hasPicture]).
+  private var switchedAt: Date?
   private var pool: CVPixelBufferPool?
   private var poolSize = CGSize.zero
   private static let bgr0 = strdup("bgr0")
@@ -174,6 +176,7 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     let vid = MPV.getPropertyString(handle, "vid")
     disposeMPV()
     software = on
+    switchedAt = Date()
     if on {
       var params: [mpv_render_param] = [
         mpv_render_param(
@@ -191,13 +194,31 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       MPV.setPropertyString(handle, "vid", "no")
       MPV.setPropertyString(handle, "vid", vid)
     }
-    needsDraw = true
+  }
+
+  /// After a renderer switch mpv draws black until the rebuilt video chain has its first picture. Until then nothing is
+  /// drawn, so the last picture stays (in the player and in PiP). True: draw.
+  private func hasPicture() -> Bool {
+    guard let since = switchedAt else { return true }
+    var info = mpv_render_frame_info()
+    let got = withUnsafeMutablePointer(to: &info) {
+      MPV.renderContextGetInfo(
+        renderContext, mpv_render_param(type: MPV_RENDER_PARAM_NEXT_FRAME_INFO, data: UnsafeMutableRawPointer($0)))
+    }
+    let present = UInt64(MPV_RENDER_FRAME_INFO_PRESENT.rawValue)
+    let redraw = UInt64(MPV_RENDER_FRAME_INFO_REDRAW.rawValue)
+    guard got >= 0, info.flags & present != 0, info.flags & redraw == 0 else { return false }
+    switchedAt = nil
+    let decoder = MPV.getPropertyString(handle, "hwdec-current") ?? "?"
+    NSLog("TextureHW: first picture \(Date().timeIntervalSince(since)) s after the switch, hwdec \(decoder)")
+    return true
   }
 
   /// One software frame for PiP: the picture's aspect within 640×360 (CPU work for every frame).
   private func renderSoftware(_ size: CGSize) -> Bool {
     guard TextureHW.pipActive, let sink = TextureHW.pipSink,
-      MPV.renderContextUpdate(renderContext) & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) != 0
+      MPV.renderContextUpdate(renderContext) & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) != 0,
+      hasPicture()
     else { return false }
     let scale = min(1, 640 / max(size.width, 1), 360 / max(size.height, 1))
     let w = Int((size.width * scale / 2).rounded() * 2)
@@ -269,6 +290,9 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
     // mpv_render_context_update runs mpv's pending render-thread work (which may use GL, hence after making the
     // context current) and says whether a new frame waits.
     if MPV.renderContextUpdate(renderContext) & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) == 0 && !needsDraw {
+      return false
+    }
+    if !hasPicture() {
       return false
     }
 
