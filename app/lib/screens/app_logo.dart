@@ -40,8 +40,9 @@ Future<Uint8List> renderLogoPng(
   return png!.buffer.asUint8List();
 }
 
-/// The logo inside the app, [size] logical pixels square. Its tile takes the surface colour (owner decision): the
-/// icon's blue-black tile showed as a faint square on the warm surfaces. App icons keep [Tokens.ink].
+/// The logo inside the app, [size] logical pixels square. Its tile takes the surface colour in the dark theme
+/// (owner decision): the icon's blue-black tile showed as a faint square on the warm surfaces. App icons and the light
+/// theme use [Tokens.ink].
 class AppLogoMark extends StatelessWidget {
   const AppLogoMark({super.key, required this.logo, this.size = 40});
   final AppLogo logo;
@@ -52,9 +53,13 @@ class AppLogoMark extends StatelessWidget {
     size: Size.square(size),
     painter: AppLogoPainter(
       logo,
-      tileColor: Theme.of(context).colorScheme.surface,
+      tileColor: tileFor(Theme.of(context).colorScheme),
     ),
   );
+
+  /// The tile behind the logo inside the app: the logos' white parts need a dark one in the light theme too.
+  static Color tileFor(ColorScheme s) =>
+      s.brightness == Brightness.light ? Tokens.ink : s.surface;
 }
 
 class AppLogoPainter extends CustomPainter {
@@ -68,7 +73,7 @@ class AppLogoPainter extends CustomPainter {
   /// Draw the rounded background tile. Off for the Android banner, which has its own background.
   final bool tile;
 
-  /// The tile's colour: [Tokens.ink] for app icons, the surface inside the app.
+  /// The tile's colour: [Tokens.ink] for app icons; inside the app see [AppLogoMark.tileFor].
   final Color tileColor;
 
   @override

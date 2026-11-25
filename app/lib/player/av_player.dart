@@ -41,6 +41,10 @@ class AvPlatformPlayer extends PlatformPlayer {
   Future<void> setBuffer(int secs) =>
       _channel.invokeMethod('setBuffer', {'secs': secs.toDouble()});
 
+  /// iOS: leaving the app floats the picture (lib/player/floating.dart).
+  Future<void> setFloating(bool on) =>
+      _channel.invokeMethod('setFloating', {'on': on});
+
   /// Starts Picture-in-Picture (false when it isn't possible right now).
   Future<bool> startPip() async =>
       await _channel.invokeMethod<bool>('startPip') ?? false;

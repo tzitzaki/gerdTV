@@ -15,6 +15,7 @@ import '../platform/menu_bar.dart';
 import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
+import '../player/floating.dart';
 import '../player/switch_player.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
@@ -33,10 +34,11 @@ enum SessionState { loading, needsSetup, choosing, ready }
 class Session extends ChangeNotifier {
   Session({Secrets? secrets, this.appDir}) : secrets = secrets ?? Secrets() {
     // Every start and stop reaches the native side in one place: Android keeps its foreground service (playback
-    // with the screen off) and enters Picture-in-Picture on leaving only while something plays.
-    nowPlaying.addListener(
-      () => unawaited(platform.setPlaying(nowPlaying.value?.name)),
-    );
+    // with the screen off). Floating on leaving is stricter: see [_updateFloating].
+    nowPlaying.addListener(() {
+      unawaited(platform.setPlaying(nowPlaying.value?.name));
+      _updateFloating();
+    });
   }
 
   final Secrets secrets;
@@ -148,13 +150,19 @@ class Session extends ChangeNotifier {
   final ValueNotifier<bool> onAvPlayer = ValueNotifier(false);
 
   /// Live channels play in AVPlayer on Apple platforms when Settings → Playback says so (gerdTV's player by
-  /// default). Read once, at the first live channel: a change applies after closing and reopening gerdTV.
-  late final bool _avForLive =
+  /// default). Read once, at start: a change applies after closing and reopening gerdTV.
+  bool get _avForLive =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) &&
       appDir != null &&
-      readLivePlayer(appDir!) == LivePlayer.apple;
+      runningPlayers.live == LivePlayer.apple;
+
+  /// The players this run uses, as stored when it started (Settings changes apply to the next one).
+  late final ({PlayerEngine engine, LivePlayer live}) runningPlayers = (
+    engine: readEngine(appDir!),
+    live: readLivePlayer(appDir!),
+  );
 
   AvPlatformPlayer get _avEngine {
     if (_av == null) {
@@ -293,6 +301,7 @@ class Session extends ChangeNotifier {
   /// Opens the first profile whose secrets are readable; otherwise asks for setup.
   Future<void> start() async {
     final dir = await _dir();
+    runningPlayers; // captured now, before Settings can change them
     logo = parseAppLogo(appSetting(dir: dir, key: settingAppLogo));
     theme.value = ThemePrefs.parse(
       mode: appSetting(dir: dir, key: settingThemeMode),
@@ -628,6 +637,7 @@ class Session extends ChangeNotifier {
   /// iOS, while mpv plays: its frames feed the PiP layer, and the PiP window's play/pause, skip and seek range follow
   /// the player (once a second).
   void _mpvPip(bool on) {
+    _watchFloating();
     if (!isApple) return;
     _pipTimer?.cancel();
     _pipTimer = null;
@@ -662,6 +672,43 @@ class Session extends ChangeNotifier {
   }
 
   Timer? _pipTimer;
+
+  /// Leaving the app floats the picture only while something really plays (lib/player/floating.dart): evaluated on
+  /// every player event, sent to the native side of the engine that plays when it changed.
+  void _updateFloating() {
+    final st = _front?.state; // none before the first stream
+    final on =
+        st != null &&
+        floatsOnLeave(
+          selected: nowPlaying.value != null,
+          playing: st.playing,
+          completed: st.completed,
+          position: st.position,
+          failed: _adapter?.failure.value != null,
+        );
+    final next = (mpv: on && !onAvPlayer.value, av: on && onAvPlayer.value);
+    if (next == _floating) return;
+    final prev = _floating;
+    _floating = next;
+    if (next.mpv != prev.mpv) unawaited(platform.setFloating(next.mpv));
+    if (next.av != prev.av) unawaited(_av?.setFloating(next.av));
+  }
+
+  ({bool mpv, bool av}) _floating = (mpv: false, av: false);
+  List<StreamSubscription<Object?>>? _floatSubs;
+
+  /// Follows the player from the first stream on (creating the player starts mpv, so not earlier).
+  void _watchFloating() {
+    if (_floatSubs != null) return;
+    final s = player.stream;
+    _floatSubs = [
+      s.playing.listen((_) => _updateFloating()),
+      s.completed.listen((_) => _updateFloating()),
+      s.position.listen((_) => _updateFloating()),
+    ];
+    adapter.failure.addListener(_updateFloating);
+    onAvPlayer.addListener(_updateFloating);
+  }
 
   /// Opens [item] with its buffer (own override, else the profile's preset), measured bitrate, adaptive mode, and for
   /// live channels the timeshift back buffer (pause/rewind) from settings.
@@ -744,7 +791,8 @@ class Session extends ChangeNotifier {
         // Refused or no data: mpv plays it, and its watchdog shows why.
         debugPrint('local HLS: $e; ${item.name} plays in mpv');
         _avFailed.add(item.key);
-        await _start(item, lib);
+        // Stopped or zapped while it was starting: nothing plays in its place.
+        if (nowPlaying.value?.key == item.key) await _start(item, lib);
         return;
       }
     }
@@ -861,6 +909,9 @@ class Session extends ChangeNotifier {
   void dispose() {
     _progressTimer?.cancel();
     _pipTimer?.cancel();
+    for (final s in _floatSubs ?? const <StreamSubscription<Object?>>[]) {
+      unawaited(s.cancel());
+    }
     _avProgress?.cancel();
     _hlsPoll?.cancel();
     _hls?.stop();

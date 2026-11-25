@@ -26,7 +26,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
-- Home: swiping to Home while a channel or a movie plays floats it by itself; tapping the window shows play/pause and skip, which work.
+- Home: floats only what plays (nothing after Stop, paused or a failed channel); the window's play/pause and skip work.
 - Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
@@ -36,7 +36,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
-- PiP: Home while a channel plays shows it in a floating window; tapping it returns to the full player.
+- PiP: Home while a channel plays shows it in a floating window (nothing after Stop or paused); tapping it returns to the full player.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.

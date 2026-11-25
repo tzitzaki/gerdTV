@@ -146,6 +146,20 @@ class PlatformBridge {
   /// layer and swiping to Home floats the picture by itself.
   Future<void> preparePip(bool on) => _ios('preparePip', {'on': on});
 
+  /// Android and iOS: leaving the app floats the picture (lib/player/floating.dart). Off never closes an open window.
+  Future<void> setFloating(bool on) async {
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
+    try {
+      await channel.invokeMethod('setFloating', {'on': on});
+    } on MissingPluginException {
+      // Tests and builds without the native side.
+    }
+  }
+
   /// iOS: what the PiP window shows (play/pause button, the seek range; live has none).
   Future<void> pipState({
     required bool playing,
