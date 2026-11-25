@@ -239,7 +239,8 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
 
   // MARK: AVPictureInPictureControllerDelegate
 
-  func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+  /// Before the start, not after: the app's background notice may come first, and media_kit then picks the renderer.
+  func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
     TextureHW.pipActive = true
   }
 
@@ -251,6 +252,7 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     _ controller: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
+    TextureHW.pipActive = false
     NSLog("GerdtvPlatform: PiP failed: \(error.localizedDescription)")
   }
 
