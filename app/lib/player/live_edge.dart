@@ -32,7 +32,8 @@ class LiveEdge {
   DateTime _edgeAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _detached = false;
 
-  /// The first position seen: the back buffer can't reach before the stream's start.
+  /// The smallest position seen: the back buffer can't reach before the stream's start. Not simply the first: right
+  /// after zapping that can be a late event of the previous channel.
   double? start;
 
   /// mpv's cache end (seconds) at [now]; taken as live unless the user paused or seeked back.
@@ -42,7 +43,7 @@ class LiveEdge {
     _edgeAt = now;
   }
 
-  void position(double secs) => start ??= secs;
+  void position(double secs) => start = math.min(start ?? secs, secs);
 
   /// The user paused or seeked back: from now on live moves on in real time.
   void detach() => _detached = true;

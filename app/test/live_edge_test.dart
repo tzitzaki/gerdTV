@@ -49,6 +49,13 @@ void main() {
       final z = LiveEdge()..position(7.3);
       z.cache(2, at(0));
       expect(z.earliest(3600, at(0)), 2);
+      // That late event of the previous channel is forgotten once this stream's own, smaller positions arrive: it
+      // pushed Live past the cache's end (mpv dropped its cache and froze for 2 s) and blocked rewinding.
+      final late = LiveEdge()
+        ..position(6.3) // the previous channel's
+        ..position(0.02);
+      late.cache(5.94, at(0));
+      expect(late.earliest(3600, at(0)), 0.02);
     },
   );
 
