@@ -36,6 +36,8 @@ class AvPlatformPlayer extends PlatformPlayer {
       'url': url,
       'bufferSecs': bufferSecs.toDouble(),
     });
+    // The native side makes a new AVPlayer per open, at full volume.
+    if (state.volume != 100) await setVolume(state.volume);
   }
 
   Future<void> setBuffer(int secs) =>
@@ -58,7 +60,7 @@ class AvPlatformPlayer extends PlatformPlayer {
   Future<void> stop() async {
     await _channel.invokeMethod('stop');
     pip.value = false;
-    _update(const PlayerState());
+    _update(const PlayerState().copyWith(volume: state.volume));
   }
 
   @override

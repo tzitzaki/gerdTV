@@ -24,6 +24,9 @@ class SwitchPlatformPlayer extends PlatformPlayer {
   /// Follows [engine] from now on (the previous one should be stopped by the caller).
   void switchTo(PlatformPlayer engine) {
     if (identical(engine, _active)) return;
+    // Muted (or turned down) stays so when the other engine takes over.
+    final volume = state.volume;
+    if (engine.state.volume != volume) engine.setVolume(volume);
     _active = engine;
     _follow(engine);
   }

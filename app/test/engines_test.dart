@@ -23,6 +23,9 @@ class _Engine extends PlatformPlayer {
   Future<void> seek(Duration d) async => calls.add('seek ${d.inSeconds}');
   @override
   Future<void> pause() async => calls.add('pause');
+  @override
+  Future<void> setVolume(double volume) async =>
+      calls.add('volume ${volume.round()}');
 }
 
 void main() {
@@ -45,6 +48,12 @@ void main() {
     await front.pause();
     expect(av.calls, ['seek 90', 'pause']);
     expect(mpv.calls, isEmpty);
+
+    // A muted player stays muted when the other engine takes over.
+    av.state = av.state.copyWith(volume: 0);
+    front.state = av.state;
+    front.switchTo(mpv);
+    expect(mpv.calls, ['volume 0']);
   });
 
   test('AVPlayer state and commands map onto media_kit', () async {
@@ -117,6 +126,14 @@ void main() {
         {'kind': 'subtitle', 'index': 0},
       ],
     ]);
+
+    // Stop and the next channel keep the volume: the native side makes a new player, at full volume, per open.
+    calls.clear();
+    await av.stop();
+    await av.openUrl('http://127.0.0.1:1/t/index.m3u8', bufferSecs: 8);
+    expect(av.state.volume, 50);
+    expect(calls.map((c) => c.method), ['stop', 'open', 'setVolume']);
+    expect(calls.last.arguments, {'volume': 0.5});
 
     await native({'position': 0.0, 'error': 'Cannot decode'});
     await pumpEventQueue();
