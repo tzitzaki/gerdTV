@@ -17,6 +17,7 @@ import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/floating.dart';
 import '../player/next_up.dart';
+import '../player/picture.dart';
 import '../player/switch_player.dart';
 import '../player/track_prefs.dart';
 import '../screens/app_logo.dart';
@@ -631,6 +632,7 @@ class Session extends ChangeNotifier {
     lib.touchRecent(key: item.key);
     nowPlaying.value = item;
     _playingKey = item.key;
+    _loadPictureFormat();
     await _start(item, lib);
     _track('start', item: item);
   }
@@ -686,6 +688,7 @@ class Session extends ChangeNotifier {
     _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = item.key;
+    _loadPictureFormat();
     bufferRaisedTo.value = null;
     timeshiftWindow.value = 0;
     final choice = lib.bufferFor(key: item.key);
@@ -696,7 +699,7 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: _trackOptions(lib),
+      extraOptions: [..._trackOptions(lib), ...await _deinterlaceOptions(lib)],
     );
   }
 
@@ -707,6 +710,36 @@ class Session extends ChangeNotifier {
       audio: lib?.setting(key: settingAudioLanguage),
       subtitle: lib?.setting(key: settingSubtitleLanguage),
     );
+  }
+
+  /// Deinterlacing for the next start. Nothing is touched until it was on once; from then on, off restores the
+  /// decoder the video controller chose (read before the first change).
+  Future<List<MpvOption>> _deinterlaceOptions(Library? lib) async {
+    final on = lib?.setting(key: settingDeinterlace) == '1';
+    if (!on && _defaultHwdec == null) return const [];
+    _defaultHwdec ??= await (mpvPlayer.platform as NativePlayer).getProperty(
+      'hwdec',
+    );
+    return deinterlaceOptions(on: on, defaultHwdec: _defaultHwdec!);
+  }
+
+  String? _defaultHwdec;
+
+  /// The running item's picture format (player/picture.dart), remembered per item.
+  final pictureFormat = ValueNotifier(PictureFormat.fit);
+
+  void _loadPictureFormat() => pictureFormat.value = PictureFormat.parse(
+    library?.setting(key: PictureFormat.settingFor(_playingKey ?? '')),
+  );
+
+  void setPictureFormat(PictureFormat f) {
+    final key = _playingKey;
+    if (key == null) return;
+    library?.setSetting(
+      key: PictureFormat.settingFor(key),
+      value: f == PictureFormat.fit ? '' : f.name,
+    );
+    pictureFormat.value = f;
   }
 
   /// The delays of what plays, as the track sheet shows them.
@@ -745,6 +778,7 @@ class Session extends ChangeNotifier {
     _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = channel.key;
+    _loadPictureFormat();
     final choice = lib.bufferFor(key: channel.key);
     bufferRaisedTo.value = null;
     timeshiftWindow.value =
@@ -756,7 +790,7 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: _trackOptions(lib),
+      extraOptions: [..._trackOptions(lib), ...await _deinterlaceOptions(lib)],
       userAgent: profile?.userAgent ?? '',
     );
     return true;
@@ -900,6 +934,7 @@ class Session extends ChangeNotifier {
       },
       extraOptions: [
         ..._trackOptions(lib),
+        ...await _deinterlaceOptions(lib),
         if (live && shift > 0)
           ...timeshiftOptions(
             windowSeconds: shift,

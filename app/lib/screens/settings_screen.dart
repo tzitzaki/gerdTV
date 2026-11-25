@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/engine.dart';
+import '../player/picture.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
@@ -317,6 +318,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (on) {
                     lib.setSetting(
                       key: Session.settingAutoplayNext,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'deinterlace',
+              title: l10n.deinterlace,
+              keywords: l10n.settingsKeywordsDeinterlace,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.deinterlace'),
+                  title: Text(l10n.deinterlace),
+                  subtitle: Text(l10n.deinterlaceHint),
+                  value: lib.setting(key: settingDeinterlace) == '1',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: settingDeinterlace,
                       value: on ? '1' : '0',
                     );
                     setState(() {});

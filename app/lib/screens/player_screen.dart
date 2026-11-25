@@ -29,6 +29,7 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import '../player/live_edge.dart';
 import '../player/next_up.dart';
+import '../player/picture.dart';
 import '../player/track_prefs.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
@@ -77,12 +78,15 @@ Video playerVideo(
   VideoController controller, {
   required VideoControlsBuilder? controls,
   SubtitleViewConfiguration subtitles = const SubtitleViewConfiguration(),
+  PictureFormat format = PictureFormat.fit,
 }) => Video(
   // A new state per controller: the picture moves between engines (mpv, AVPlayer) with the same widget tree.
   key: ObjectKey(controller),
   controller: controller,
   controls: controls,
   subtitleViewConfiguration: subtitles,
+  fit: format.boxFit,
+  aspectRatio: format.aspect,
   pauseUponEnteringBackgroundMode: false,
   resumeUponEnteringForegroundMode: false,
 );
@@ -377,6 +381,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ListTile(
+                      title: Text(l10n.pictureFormat),
+                      trailing: DropdownButton<PictureFormat>(
+                        key: const Key('player.format'),
+                        value: widget.session.pictureFormat.value,
+                        onChanged: (f) {
+                          widget.session.setPictureFormat(f!);
+                          setSheet(() {});
+                        },
+                        items: [
+                          for (final (f, label) in [
+                            (PictureFormat.fit, l10n.pictureFit),
+                            (PictureFormat.zoom, l10n.pictureZoom),
+                            (PictureFormat.stretch, l10n.pictureStretch),
+                            (PictureFormat.wide, '16:9'),
+                            (PictureFormat.classic, '4:3'),
+                          ])
+                            DropdownMenuItem(value: f, child: Text(label)),
+                        ],
+                      ),
+                    ),
+                    ListTile(
                       title: Text(
                         l10n.bufferThisChannel,
                         style: Theme.of(context).textTheme.titleMedium,
@@ -601,6 +626,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           listenable: Listenable.merge([
             widget.session.pictureMode,
             widget.session.onAvPlayer,
+            widget.session.pictureFormat,
           ]),
           builder: (context, _) => widget.session.pictureMode.value
               ? _pictureOnly(l10n)
@@ -618,6 +644,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             child: playerVideo(
                               widget.session.video,
                               controls: AdaptiveVideoControls,
+                              format: widget.session.pictureFormat.value,
                               subtitles: subtitleLook(
                                 size: widget.session.library?.setting(
                                   key: settingSubtitleSize,

@@ -25,7 +25,7 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
 | `item_epg` | the resolved match per live item (rebuilt after every import and sync) | `item_key` |
 | `reminders` | user data: a reminder for a guide programme (channel, start, stop, title), `updated_at` | `item_key, start` |
-| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `xc_time_offset` (the Xtream Codes server's clock against UTC, from the last sync), `list_mode_live`, `list_mode_movie`, `list_mode_series`, `account_expires` and `account_limit` (Xtream Codes, from the last sync), `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
+| `settings` | profile settings: `buffer_preset`, `adaptive_buffer`, `timeshift_secs`, `guide_offset_hours`, `xc_time_offset` (the Xtream Codes server's clock against UTC, from the last sync), `list_mode_live`, `list_mode_movie`, `list_mode_series`, `account_expires` and `account_limit` (Xtream Codes, from the last sync), `picture:<item key>` (an item's picture format), `deinterlace`, `autoplay_next`, `audio_language`, `subtitle_language`, `subtitle_size`, `subtitle_background`, `m3u_tvg_url` (the playlist header's guide URL) (values as text), `updated_at` | `key` |
 | `stream_health` | every recovery the watchdog made or gave up on: time, item key, trigger, attempts, recovered, seconds; the newest 2,000 kept | `id` |
 
 Item kinds are stored as numbers: 0 live, 1 movie, 2 episode, 3 series (never renumbered).
