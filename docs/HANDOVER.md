@@ -1,9 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261124.58: mpv plays everything on Apple again (one player, every format); Apple's player for live is a Settings choice.
+- Version 0.261125.59: leaving the app floats only what really plays; clearer player settings; readable logo in light.
+- In .58: mpv plays everything on Apple again (one player, every format); Apple's player for live is a Settings choice.
 - Also .58: with Apple's player, DVB-sound channels play (MP2 left out, AC-3 kept) and what it can't play goes to mpv within 15 s.
-- Also .57: PiP without a hand-over (Home floats it on iOS), no reload after background sound, a leaner mpv frame path, Apple 26.0+.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -24,7 +24,7 @@
 
 ## Open work
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- Flaky journey on mpv (main too, ~half of CI runs): after Live mpv waits for cache, cache end stuck at pause point + read-ahead; harness can't repeat it.
+- Flaky journey on mpv (main too): after Live mpv waits for cache, cache end stuck at pause point + read-ahead; #58 merged on a later green run.
 - A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
