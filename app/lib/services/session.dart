@@ -18,6 +18,7 @@ import '../player/av_player.dart';
 import '../player/floating.dart';
 import '../player/next_up.dart';
 import '../player/switch_player.dart';
+import '../player/track_prefs.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/hls.dart';
@@ -695,8 +696,30 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: const [],
+      extraOptions: _trackOptions(lib),
     );
+  }
+
+  /// The profile's audio and subtitle languages, set (or put back) before each start.
+  List<MpvOption> _trackOptions(Library? lib) {
+    delays = TrackDelays();
+    return trackOptions(
+      audio: lib?.setting(key: settingAudioLanguage),
+      subtitle: lib?.setting(key: settingSubtitleLanguage),
+    );
+  }
+
+  /// The delays of what plays, as the track sheet shows them.
+  TrackDelays delays = TrackDelays();
+
+  /// Audio or subtitles later (positive) or earlier, in milliseconds, for what plays now; the next start is at 0 again.
+  Future<void> setDelay({int? audioMs, int? subtitleMs}) async {
+    if (audioMs != null) {
+      await adapter.setProperty('audio-delay', '${audioMs / 1000}');
+    }
+    if (subtitleMs != null) {
+      await adapter.setProperty('sub-delay', '${subtitleMs / 1000}');
+    }
   }
 
   /// Plays a programme from the channel's catch-up archive, from its start (false when there is none: no archive,
@@ -733,7 +756,7 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: const [],
+      extraOptions: _trackOptions(lib),
       userAgent: profile?.userAgent ?? '',
     );
     return true;
@@ -875,15 +898,17 @@ class Session extends ChangeNotifier {
         final secs? => Duration(seconds: secs),
         null => null,
       },
-      extraOptions: live && shift > 0
-          ? timeshiftOptions(
-              windowSeconds: shift,
-              bitrateBps: bitrate > 0 ? BigInt.from(bitrate) : null,
-              // The back buffer's disk budget: a quarter of this. A free-space query per platform is a follow-up.
-              freeDiskBytes: BigInt.from(isDesktop ? 16000000000 : 4000000000),
-              cacheDir: await _timeshiftDir(),
-            )
-          : const [],
+      extraOptions: [
+        ..._trackOptions(lib),
+        if (live && shift > 0)
+          ...timeshiftOptions(
+            windowSeconds: shift,
+            bitrateBps: bitrate > 0 ? BigInt.from(bitrate) : null,
+            // The back buffer's disk budget: a quarter of this. A free-space query per platform is a follow-up.
+            freeDiskBytes: BigInt.from(isDesktop ? 16000000000 : 4000000000),
+            cacheDir: await _timeshiftDir(),
+          ),
+      ],
     );
   }
 

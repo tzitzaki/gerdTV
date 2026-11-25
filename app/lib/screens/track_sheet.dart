@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../player/track_prefs.dart';
 
 /// The stream's own tracks (mpv's "auto" and "no" left out).
 List<T> realTracks<T>(List<T> tracks, String Function(T) id) => [
@@ -45,6 +46,8 @@ Future<void> showTrackSheet(
   required Track current,
   required ValueChanged<AudioTrack> onAudio,
   required ValueChanged<SubtitleTrack> onSubtitle,
+  Future<void> Function({int? audioMs, int? subtitleMs})? onDelay,
+  TrackDelays? delays,
 }) {
   final l10n = AppLocalizations.of(context);
   final audio = realTracks(tracks.audio, (a) => a.id);
@@ -112,10 +115,78 @@ Future<void> showTrackSheet(
                     () => onSubtitle(s),
                   ),
               ],
+              if (onDelay != null && delays != null) ...[
+                _DelayRow(
+                  id: 'audio',
+                  label: l10n.audioDelay,
+                  value: delays.audio,
+                  onChanged: (ms) => onDelay(audioMs: delays.audio = ms),
+                ),
+                if (subs.isNotEmpty)
+                  _DelayRow(
+                    id: 'subtitle',
+                    label: l10n.subtitleDelay,
+                    value: delays.subtitle,
+                    onChanged: (ms) =>
+                        onDelay(subtitleMs: delays.subtitle = ms),
+                  ),
+              ],
             ],
           ),
         ),
       );
     },
   );
+}
+
+/// "Audio delay  −  100 ms  +": buttons rather than a slider, so a D-pad reaches them; the sheet stays open.
+class _DelayRow extends StatefulWidget {
+  const _DelayRow({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+  final String id;
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_DelayRow> createState() => _DelayRowState();
+}
+
+class _DelayRowState extends State<_DelayRow> {
+  late int _ms = widget.value;
+
+  void _step(int by) {
+    setState(() => _ms += by);
+    widget.onChanged(_ms);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ListTile(
+      title: Text(widget.label),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: Key('delay.${widget.id}.less'),
+            tooltip: l10n.delayEarlier,
+            icon: const Icon(Icons.remove),
+            onPressed: () => _step(-50),
+          ),
+          Text('$_ms ms'),
+          IconButton(
+            key: Key('delay.${widget.id}.more'),
+            tooltip: l10n.delayLater,
+            icon: const Icon(Icons.add),
+            onPressed: () => _step(50),
+          ),
+        ],
+      ),
+    );
+  }
 }

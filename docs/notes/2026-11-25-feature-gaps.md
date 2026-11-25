@@ -17,7 +17,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 2. Account info, User-Agent: started 20:49; done 21:06 (integration tests green, 9 min 31 s).
 3. Watched marks, next episode: started 21:19
 4. Track settings: started 21:43
-5. Picture (aspect, deinterlacing)
+5. Picture (aspect, deinterlacing): started 22:11
 6. Last channel, CH keys
 7. macOS media keys (iOS and Android came with #62)
 8. Auto frame rate (Android TV)
@@ -31,5 +31,5 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–3 done 21:43 (integration 8 min 22 s, the journey plays an episode to its end). Migration 11 is unreleased: later
-features append to it. Next: step 4. Open questions: none blocking.
+Steps 0–4 done 22:11 (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 5. Open questions: none blocking.

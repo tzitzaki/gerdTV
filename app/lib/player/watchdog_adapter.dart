@@ -84,6 +84,10 @@ class WatchdogAdapter {
     }
   }
 
+  /// One mpv property of the running stream (the next [play] sets its own).
+  Future<void> setProperty(String name, String value) =>
+      (player.platform as NativePlayer).setProperty(name, value);
+
   UrlFor? _urlFor;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _ticker;

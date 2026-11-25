@@ -24,6 +24,7 @@ import 'list_modes.dart';
 import 'player_settings.dart';
 import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
+import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
 import 'settings_model.dart';
@@ -322,6 +323,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'tracks',
+              title: l10n.playerTracks,
+              keywords: l10n.settingsKeywordsTracks,
+              build: (_) => TrackPrefsSettings(library: lib),
             ),
           if (lib != null)
             SettingsEntry(

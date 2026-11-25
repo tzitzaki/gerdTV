@@ -5,6 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/player/track_prefs.dart';
 import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
@@ -83,7 +84,11 @@ void main() {
           ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
           live: true,
           userAgent: 'Player/1.0',
+          extraOptions: trackOptions(audio: 'de', subtitle: subtitlesOff),
         );
+        // mpv keeps the choice past media_kit's own open.
+        expect(await native.getProperty('alang'), 'de,deu,ger');
+        expect(await native.getProperty('options/sid'), 'no');
         expect(await native.getProperty('user-agent'), 'Player/1.0');
         await adapter.play(
           ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',

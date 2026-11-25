@@ -29,6 +29,7 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import '../player/live_edge.dart';
 import '../player/next_up.dart';
+import '../player/track_prefs.dart';
 import 'buffer_picker.dart';
 import 'list_modes.dart';
 import 'track_sheet.dart';
@@ -75,11 +76,13 @@ MaterialVideoControlsThemeData withGestures(
 Video playerVideo(
   VideoController controller, {
   required VideoControlsBuilder? controls,
+  SubtitleViewConfiguration subtitles = const SubtitleViewConfiguration(),
 }) => Video(
   // A new state per controller: the picture moves between engines (mpv, AVPlayer) with the same widget tree.
   key: ObjectKey(controller),
   controller: controller,
   controls: controls,
+  subtitleViewConfiguration: subtitles,
   pauseUponEnteringBackgroundMode: false,
   resumeUponEnteringForegroundMode: false,
 );
@@ -615,6 +618,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             child: playerVideo(
                               widget.session.video,
                               controls: AdaptiveVideoControls,
+                              subtitles: subtitleLook(
+                                size: widget.session.library?.setting(
+                                  key: settingSubtitleSize,
+                                ),
+                                background: widget.session.library?.setting(
+                                  key: settingSubtitleBackground,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -652,13 +663,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
-                              // Audio and subtitles, when the stream has a choice (track_sheet.dart).
+                              // Audio and subtitles (track_sheet.dart).
                               StreamBuilder<Tracks>(
                                 stream: widget.session.player.stream.tracks,
                                 initialData: widget.session.player.state.tracks,
                                 builder: (context, snap) {
                                   final p = widget.session.player;
-                                  if (!hasTrackChoice(snap.data!)) {
+                                  // mpv always has the delays to set.
+                                  if (widget.session.onAvPlayer.value &&
+                                      !hasTrackChoice(snap.data!)) {
                                     return const SizedBox.shrink();
                                   }
                                   return Padding(
@@ -677,6 +690,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                         current: p.state.track,
                                         onAudio: p.setAudioTrack,
                                         onSubtitle: p.setSubtitleTrack,
+                                        // Apple's player has no delays.
+                                        onDelay: widget.session.onAvPlayer.value
+                                            ? null
+                                            : widget.session.setDelay,
+                                        delays: widget.session.delays,
                                       ),
                                     ),
                                   );
