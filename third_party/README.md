@@ -23,5 +23,6 @@ commits of their own, so `git log -p third_party/` shows every change. Its licen
   (the app feeds its PiP layer); in the background with PiP showing (`TextureHW.pipActive`) mpv renders in software at
   PiP size (`useSoftware`, the track re-selected on the new renderer); `Worker.sync`; `MPV.get/setPropertyString`. After a
   switch nothing is drawn until mpv has a picture (`hasPicture`, `MPV.renderContextGetInfo`): the last one stays.
+  While mpv renders in software it also decodes in software (`hwdec`).
 
 Updating it: copy the new release over the folder in one commit, then re-apply the patches (see git log).

@@ -165,6 +165,8 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
   private var software = false
   /// Set from a renderer switch until the first picture after it ([hasPicture]).
   private var switchedAt: Date?
+  /// The user's decoding choice while [software] decodes.
+  private var hwdec: String?
   private var pool: CVPixelBufferPool?
   private var poolSize = CGSize.zero
   private static let bgr0 = strdup("bgr0")
@@ -189,6 +191,13 @@ public class TextureHW: NSObject, FlutterTexture, ResizableTextureProtocol {
       setUpdateCallback()
     } else {
       initMPV()
+    }
+    // iOS ends hardware decoding in the background; mpv would notice frame by frame and then wait for a keyframe.
+    if on {
+      hwdec = MPV.getPropertyString(handle, "hwdec")
+      MPV.setPropertyString(handle, "hwdec", "no")
+    } else if let hwdec {
+      MPV.setPropertyString(handle, "hwdec", hwdec)
     }
     if let vid, vid != "no" {
       MPV.setPropertyString(handle, "vid", "no")
