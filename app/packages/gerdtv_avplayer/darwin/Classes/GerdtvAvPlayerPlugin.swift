@@ -358,5 +358,7 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
     if let player {
       layer?.player = player
     }
+    // Back in the app the player shows the picture: the window would show it a second time.
+    pip?.stopPictureInPicture()
   }
 }

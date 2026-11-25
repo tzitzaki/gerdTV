@@ -69,6 +69,10 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     NotificationCenter.default.addObserver(
       forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
     ) { [weak self] _ in self?.restoreBrightness() }
+    // Back in the app the player shows the picture: the window would show it a second time.
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+    ) { [weak self] _ in self?.pip?.stopPictureInPicture() }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       let args = call.arguments as? [String: Any] ?? [:]
