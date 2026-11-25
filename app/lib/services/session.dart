@@ -104,6 +104,7 @@ class Session extends ChangeNotifier {
 
   /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
   bool guideRefreshing = false;
+  bool _guideAgain = false;
 
   /// Bumped after each guide import so now/next and the grid reload.
   int guideGeneration = 0;
@@ -483,7 +484,12 @@ class Session extends ChangeNotifier {
       const Duration(hours: 1),
       (_) => unawaited(refreshGuide()),
     );
-    if (lib == null || guideRefreshing) return;
+    if (lib == null) return;
+    if (guideRefreshing) {
+      // A source added meanwhile isn't in the running refresh: once more afterwards, else it waits up to 12 h.
+      _guideAgain |= force;
+      return;
+    }
     final age = await lib.guideAge();
     if (!force && age != null && age < guideMaxAge.inSeconds) return;
     guideRefreshing = true;
@@ -498,6 +504,10 @@ class Session extends ChangeNotifier {
     } finally {
       guideRefreshing = false;
       notifyListeners();
+    }
+    if (_guideAgain) {
+      _guideAgain = false;
+      await refreshGuide(force: true);
     }
   }
 
