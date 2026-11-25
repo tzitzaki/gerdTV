@@ -239,6 +239,22 @@ impl Library {
     /// Downloads `url` to a temp file (streamed), so a big playlist or guide never sits in memory and the current data
     /// stays usable until the download is complete. The caller removes the file.
     async fn download(&self, url: &str, name: &str) -> Result<PathBuf> {
+        match self.download_if_changed(url, name, "", "").await? {
+            Some(d) => Ok(d.file),
+            // Only a conditional request may be answered with 304.
+            None => Err(XcError::Http(304).into()),
+        }
+    }
+
+    /// [download], asking only for a file that changed since the answer with this ETag and date (both empty: any);
+    /// None: unchanged.
+    async fn download_if_changed(
+        &self,
+        url: &str,
+        name: &str,
+        etag: &str,
+        modified: &str,
+    ) -> Result<Option<Download>> {
         xtream::ensure_tls_provider();
         let net = |e: reqwest::Error| XcError::Network(e.without_url().to_string());
         let ua = if self.profile.user_agent.is_empty() {
@@ -248,9 +264,27 @@ impl Library {
         };
         let client = reqwest::Client::builder()
             .user_agent(ua)
+            // A server that hangs must not hold the guide refresh (or sync) forever; no total limit: big files are fine.
+            .connect_timeout(CONNECT_TIMEOUT)
+            .read_timeout(READ_TIMEOUT)
             .build()
             .map_err(net)?;
-        let mut res = client.get(url).send().await.map_err(net)?;
+        let mut req = client.get(url);
+        if !etag.is_empty() {
+            req = req.header("If-None-Match", etag);
+        }
+        if !modified.is_empty() {
+            req = req.header("If-Modified-Since", modified);
+        }
+        let mut res = req.send().await.map_err(net)?;
+        if res.status().as_u16() == 304 {
+            return Ok(None);
+        }
+        let header = |n: &str| {
+            let v = res.headers().get(n).and_then(|v| v.to_str().ok());
+            v.unwrap_or("").to_string()
+        };
+        let (etag, modified) = (header("etag"), header("last-modified"));
         if !res.status().is_success() {
             return Err(XcError::Http(res.status().as_u16()).into());
         }
@@ -260,11 +294,22 @@ impl Library {
         std::fs::create_dir_all(tmp.parent().unwrap())?;
         use std::io::Write;
         let mut f = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+        let mut size = 0;
         while let Some(chunk) = res.chunk().await.map_err(net)? {
+            size += chunk.len() as u64;
+            if size > MAX_DOWNLOAD {
+                drop(f);
+                let _ = std::fs::remove_file(&tmp);
+                return Err(std::io::Error::other("the file is too big").into());
+            }
             f.write_all(&chunk)?;
         }
         f.flush()?;
-        Ok(tmp)
+        Ok(Some(Download {
+            file: tmp,
+            etag,
+            modified,
+        }))
     }
 
     /// Downloads and writes the catalogue (the database is only locked for the final write), then re-matches the
@@ -680,7 +725,7 @@ impl Library {
 pub const SETTING_BUFFER: &str = "buffer_preset";
 pub const SETTING_ADAPTIVE: &str = "adaptive_buffer";
 pub const SETTING_TIMESHIFT: &str = "timeshift_secs";
-/// Hours added to every guide time of this profile (some providers send local time as UTC); Settings → Guide.
+/// Hours added to the times of the provider's guide (some providers send local time as UTC); Settings → Guide.
 pub const SETTING_GUIDE_OFFSET: &str = "guide_offset_hours";
 /// M3U profiles: the playlist header's guide URL (templated).
 pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
@@ -699,7 +744,28 @@ pub struct GuideSource {
     pub status: String,
     pub channels: u32,
     pub programmes: u32,
+    /// How many of the profile's channels show this source's programmes.
+    pub matched: u32,
+    /// Hours added to this source's times (the provider's: [SETTING_GUIDE_OFFSET]).
+    pub offset_hours: i64,
 }
+
+/// What [Library::download_if_changed] fetched: the temp file and the server's two change markers.
+struct Download {
+    file: PathBuf,
+    etag: String,
+    modified: String,
+}
+
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+/// Between two pieces of a download.
+const READ_TIMEOUT: std::time::Duration =
+    std::time::Duration::from_secs(if cfg!(test) { 2 } else { 60 });
+/// Bytes over the wire (the biggest known guide is 20 MB packed).
+const MAX_DOWNLOAD: u64 = 500 << 20;
+/// A guide is refreshed when it is this old; the streaming services' files reach a day or less ahead.
+const GUIDE_MAX_AGE: i64 = 12 * 3600;
+const GUIDE_MAX_AGE_SHORT: i64 = 6 * 3600;
 
 /// The built-in guide's row in epg_sources (its real URL holds the login and is built when needed).
 const BUILTIN: &str = "builtin";
@@ -728,6 +794,15 @@ pub struct HealthEntry {
 /// How many stream_health rows are kept (older ones are pruned on insert).
 const HEALTH_KEEP: i64 = 2000;
 
+fn due(s: &GuideSource) -> bool {
+    let max = if s.url.contains("//i.mjh.nz/") {
+        GUIDE_MAX_AGE_SHORT
+    } else {
+        GUIDE_MAX_AGE
+    };
+    now() - s.last_fetch >= max
+}
+
 impl Library {
     /// The provider's own guide URL: Xtream Codes xmltv.php, or the M3U header's url-tvg; None for M3U files without.
     fn builtin_guide_url(&self) -> Result<Option<String>> {
@@ -741,6 +816,10 @@ impl Library {
 
     /// The guide sources, the provider's first (its row is created as soon as the provider offers a guide).
     pub fn guide_sources(&self) -> Result<Vec<GuideSource>> {
+        let provider = self
+            .setting(SETTING_GUIDE_OFFSET)?
+            .and_then(|h| h.parse().ok())
+            .unwrap_or(0);
         if self.builtin_guide_url()?.is_some() {
             self.conn.lock().unwrap().execute(
                 "INSERT OR IGNORE INTO epg_sources (url, builtin, updated_at) VALUES (?1, 1, ?2)",
@@ -749,8 +828,12 @@ impl Library {
         }
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare_cached(
-            "SELECT id, url, builtin, last_fetch, status, channels, programmes FROM epg_sources
-             ORDER BY builtin DESC, id",
+            // matched: a channel's programmes come from one source, so any one of them names it.
+            "SELECT s.id, s.url, s.builtin, s.last_fetch, s.status, s.channels, s.programmes, coalesce(m.n, 0), s.offset_hours
+             FROM epg_sources s LEFT JOIN (
+               SELECT (SELECT p.source FROM programmes p WHERE p.channel = e.channel ORDER BY p.start DESC LIMIT 1) src,
+                 count(*) n FROM item_epg e GROUP BY src) m ON m.src = s.id
+             ORDER BY s.builtin DESC, s.id",
         )?;
         let rows = st.query_map([], |r| {
             let builtin: bool = r.get(2)?;
@@ -762,6 +845,8 @@ impl Library {
                 status: r.get(4)?,
                 channels: r.get(5)?,
                 programmes: r.get(6)?,
+                matched: r.get(7)?,
+                offset_hours: if builtin { provider } else { r.get(8)? },
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -772,6 +857,15 @@ impl Library {
         self.conn.lock().unwrap().execute(
             "INSERT OR IGNORE INTO epg_sources (url, builtin, updated_at) VALUES (?1, 0, ?2)",
             params![db::template_secrets(url.trim(), &self.secret_refs()), now()],
+        )?;
+        Ok(())
+    }
+
+    /// An extra source's own time offset in hours (applied by the next refresh).
+    pub fn set_guide_offset(&self, id: i64, hours: i64) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE epg_sources SET offset_hours = ?2, updated_at = ?3 WHERE id = ?1 AND builtin = 0",
+            params![id, hours, now()],
         )?;
         Ok(())
     }
@@ -791,24 +885,43 @@ impl Library {
         Ok(())
     }
 
-    /// Downloads and imports every guide source (the provider's first), keeps `days_ahead` days (and 2 back), prunes,
-    /// and rebuilds the channel matches. A failing source keeps its previous data and records the error.
-    pub async fn refresh_guide(&self, days_ahead: i64) -> Result<Vec<GuideSource>> {
+    /// Downloads and imports the guide sources that are due, or with `force` every one (the provider's first), keeps
+    /// `days_ahead` days (and 2 back), prunes, and rebuilds the channel matches. A failing source keeps its previous
+    /// data and records the error.
+    pub async fn refresh_guide(&self, days_ahead: i64, force: bool) -> Result<Vec<GuideSource>> {
         let sources = self.guide_sources()?;
-        let offset = self
-            .setting(SETTING_GUIDE_OFFSET)?
-            .and_then(|h| h.parse::<i64>().ok())
-            .unwrap_or(0)
-            * 3600;
+        // What a source's stored rows depend on besides its file: while this is the same as at its last import, an
+        // unchanged file needs no new import. The day is in it because the kept window moves.
+        let with = format!(
+            "{} {days_ahead} {} {:?}",
+            now() / 86_400,
+            epg::wanted_hash(&self.conn.lock().unwrap())?,
+            sources.iter().map(|s| s.id).collect::<Vec<_>>()
+        );
         for src in &sources {
+            if !force && !due(src) {
+                continue;
+            }
             let url = if src.builtin {
                 self.builtin_guide_url()?.unwrap_or_default()
             } else {
                 db::fill_secrets(&src.url, &self.secret_refs())
             };
-            let outcome = match self.download(&url, &format!("guide-{}.xml", src.id)).await {
-                Ok(tmp) => {
-                    let r = std::fs::File::open(&tmp)
+            let with = format!("{with} {}", src.offset_hours);
+            let (etag, modified): (String, String) = self.conn.lock().unwrap().query_row(
+                "SELECT etag, last_modified FROM epg_sources WHERE id = ?1 AND imported_with = ?2
+                 UNION ALL SELECT '', '' LIMIT 1",
+                params![src.id, with],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            let name = format!("guide-{}.xml", src.id);
+            let outcome = match self
+                .download_if_changed(&url, &name, &etag, &modified)
+                .await
+            {
+                Ok(None) => Ok(None),
+                Ok(Some(d)) => {
+                    let r = std::fs::File::open(&d.file)
                         .map_err(LibraryError::from)
                         .and_then(|f| {
                             epg::import(
@@ -818,21 +931,25 @@ impl Library {
                                 now(),
                                 2,
                                 days_ahead,
-                                offset,
+                                src.offset_hours * 3600,
                             )
                             .map_err(LibraryError::from)
                         });
-                    let _ = std::fs::remove_file(&tmp);
-                    r
+                    let _ = std::fs::remove_file(&d.file);
+                    r.map(|st| Some((st, d)))
                 }
                 Err(e) => Err(e),
             };
             let conn = self.conn.lock().unwrap();
             match outcome {
-                Ok(st) => conn.execute(
-                    "UPDATE epg_sources SET last_fetch = ?2, status = '', channels = ?3, programmes = ?4, updated_at = ?2
-                     WHERE id = ?1",
-                    params![src.id, now(), st.channels as i64, st.programmes as i64],
+                Ok(None) => conn.execute(
+                    "UPDATE epg_sources SET last_fetch = ?2, status = '', updated_at = ?2 WHERE id = ?1",
+                    params![src.id, now()],
+                )?,
+                Ok(Some((st, d))) => conn.execute(
+                    "UPDATE epg_sources SET last_fetch = ?2, status = '', channels = ?3, programmes = ?4, updated_at = ?2,
+                       etag = ?5, last_modified = ?6, imported_with = ?7 WHERE id = ?1",
+                    params![src.id, now(), st.channels as i64, st.programmes as i64, d.etag, d.modified, with],
                 )?,
                 Err(e) => conn.execute(
                     "UPDATE epg_sources SET status = ?2, updated_at = ?3 WHERE id = ?1",
@@ -848,14 +965,19 @@ impl Library {
         self.guide_sources()
     }
 
-    /// Seconds since the oldest successful guide import (None: never imported) — drives the 12 h refresh.
-    pub fn guide_age(&self) -> Result<Option<i64>> {
-        let oldest: Option<i64> = self.conn.lock().unwrap().query_row(
-            "SELECT min(last_fetch) FROM epg_sources WHERE last_fetch > 0",
-            [],
-            |r| r.get(0),
-        )?;
-        Ok(oldest.map(|t| now() - t))
+    /// Whether a guide source was never imported or is too old (the app checks hourly and after each sync).
+    pub fn guide_due(&self) -> Result<bool> {
+        Ok(self.guide_sources()?.iter().any(due))
+    }
+
+    /// Guide channels that an unmatched item may be (epg::suggest).
+    pub fn suggest_guide_channels(&self, key: &str, limit: usize) -> Result<Vec<(String, String)>> {
+        Ok(epg::suggest(&self.conn.lock().unwrap(), key, limit)?)
+    }
+
+    /// The items mapped by hand: key, name, guide channel's name.
+    pub fn mapped_channels(&self) -> Result<Vec<(String, String, String)>> {
+        Ok(epg::mapped(&self.conn.lock().unwrap())?)
     }
 
     pub fn now_next(
@@ -1165,6 +1287,106 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A tiny server for one guide file: answers each request with the next response, remembering what was asked.
+    /// None: it accepts and then says nothing.
+    async fn serve(
+        answers: Vec<Option<Vec<u8>>>,
+    ) -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/g.xml", l.local_addr().unwrap());
+        let asked = std::sync::Arc::new(std::sync::Mutex::new(vec![]));
+        let log = asked.clone();
+        tokio::spawn(async move {
+            let mut open = vec![];
+            for a in answers {
+                let (mut s, _) = l.accept().await.unwrap();
+                let mut buf = vec![0; 4096];
+                let n = s.read(&mut buf).await.unwrap();
+                log.lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(&buf[..n]).to_lowercase());
+                match a {
+                    Some(bytes) => s.write_all(&bytes).await.unwrap(),
+                    None => open.push(s),
+                }
+            }
+        });
+        (url, asked)
+    }
+
+    /// Own offset, "not modified", and every bad answer keeps the guide that was there.
+    async fn extra_guide_behaves(lib: &Library, key: &str) {
+        let at = xmltv_time(now() + 3600);
+        let end = xmltv_time(now() + 7200);
+        let doc = format!(
+            r#"<tv><channel id="own"><display-name>Own</display-name></channel><programme start="{at} +0000" stop="{end} +0000" channel="own"><title>Own show</title></programme></tv>"#
+        );
+        let ok = |body: &str, extra: &str| {
+            Some(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{extra}Connection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .into_bytes(),
+            )
+        };
+        let unchanged = Some(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n".to_vec());
+        let huge = Some(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 600000000\r\nConnection: close\r\n\r\n".to_vec(),
+        );
+        let (url, asked) = serve(vec![
+            ok(&doc, "ETag: \"v1\"\r\n"),
+            unchanged,
+            ok(&doc, "ETag: \"v1\"\r\n"),
+            ok("<tv></tv>", ""),
+            huge,
+            None,
+        ])
+        .await;
+        lib.map_channel(key, Some("own")).unwrap();
+        lib.add_guide_url(&url).unwrap();
+        let show = || lib.guide_window(&[key.to_string()], 0, i64::MAX).unwrap()[0].clone();
+        let own = || lib.guide_sources().unwrap().pop().unwrap();
+        lib.refresh_guide(7, true).await.unwrap();
+        let first = show().last().unwrap().clone();
+        assert_eq!(first.title, "Own show");
+        // At least the mapped one (a twin of it may borrow its channel).
+        assert!(own().status.is_empty() && own().matched >= 1, "{:?}", own());
+        // Unchanged: asked with the ETag, kept, and fresh.
+        lib.refresh_guide(7, true).await.unwrap();
+        assert!(asked.lock().unwrap()[1].contains("if-none-match: \"v1\""));
+        assert_eq!(
+            (show().last().unwrap().start, own().status.as_str()),
+            (first.start, "")
+        );
+        // Its own offset: asked again in full (the stored times change), and only its times move.
+        lib.set_guide_offset(own().id, 2).unwrap();
+        lib.refresh_guide(7, true).await.unwrap();
+        assert!(!asked.lock().unwrap()[2].contains("if-none-match"));
+        assert_eq!(show().last().unwrap().start, first.start + 7200);
+        // Empty, too big, hanging: an error each, and the guide stays.
+        for what in ["empty", "too big", "hanging"] {
+            lib.refresh_guide(7, true).await.unwrap();
+            assert!(!own().status.is_empty(), "{what}");
+            assert_eq!(show().last().unwrap().title, "Own show", "{what}");
+        }
+        lib.map_channel(key, None).unwrap();
+        lib.remove_guide_source(own().id).unwrap();
+    }
+
+    /// UTC seconds as XMLTV's digits, by the database's clock functions (no date crate needed).
+    fn xmltv_time(t: i64) -> String {
+        Connection::open_in_memory()
+            .unwrap()
+            .query_row(
+                "SELECT strftime('%Y%m%d%H%M%S', ?1, 'unixepoch')",
+                [t],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn xtream_profile_syncs_browses_searches_and_plays() {
         let mock = MockXc::start(2000, 9).await;
@@ -1240,13 +1462,14 @@ mod tests {
         assert_eq!(lib.bitrate(&key).unwrap(), 6_500_000);
 
         // The guide: the panel's xmltv.php is the built-in source; after a refresh, matched channels have now/next.
-        let sources = lib.refresh_guide(7).await.unwrap();
+        let sources = lib.refresh_guide(7, true).await.unwrap();
         assert_eq!(sources.len(), 1);
         assert!(
             sources[0].builtin && sources[0].status.is_empty() && sources[0].programmes > 1000,
             "{sources:?}"
         );
-        assert!(lib.guide_age().unwrap().unwrap() < 60);
+        assert!(!lib.guide_due().unwrap());
+        assert!(sources[0].matched > 10, "{sources:?}");
         let live: Vec<String> = lib
             .items(Kind::Live, &cats[0].id, Sort::Provider, 50, 0)
             .unwrap()
@@ -1272,20 +1495,22 @@ mod tests {
             .find_map(|(i, v)| v.first().map(|p| (i, p.clone())))
             .unwrap();
         lib.set_setting(SETTING_GUIDE_OFFSET, "1").unwrap();
-        lib.refresh_guide(7).await.unwrap();
+        lib.refresh_guide(7, true).await.unwrap();
         let shifted = &lib.guide_window(&live[i..=i], 0, i64::MAX).unwrap()[0][0];
         assert_eq!(
             (shifted.title.as_str(), shifted.start),
             (first.title.as_str(), first.start + 3600)
         );
         lib.add_guide_url("http://127.0.0.1:9/extra.xml").unwrap();
-        let sources = lib.refresh_guide(7).await.unwrap();
+        assert!(lib.guide_due().unwrap(), "never imported");
+        let sources = lib.refresh_guide(7, true).await.unwrap();
         assert_eq!(sources.len(), 2);
         assert!(
             sources[1].status.starts_with("network error"),
             "a failing extra source records its error"
         );
         lib.remove_guide_source(sources[1].id).unwrap();
+        extra_guide_behaves(&lib, &live[i]).await;
 
         // Catch-up: the mock panel gives every 13th live channel a 3-day archive.
         let t = now();

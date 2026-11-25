@@ -226,6 +226,9 @@ pub struct GuideSourceInfo {
     pub status: String,
     pub channels: u32,
     pub programmes: u32,
+    /// How many of the profile's channels show this source's programmes.
+    pub matched: u32,
+    pub offset_hours: i32,
 }
 
 impl From<core::GuideSource> for GuideSourceInfo {
@@ -238,6 +241,8 @@ impl From<core::GuideSource> for GuideSourceInfo {
             status: g.status,
             channels: g.channels,
             programmes: g.programmes,
+            matched: g.matched,
+            offset_hours: g.offset_hours as i32,
         }
     }
 }
@@ -300,6 +305,13 @@ pub struct ReminderInfo {
 pub struct ChannelRef {
     pub id: String,
     pub name: String,
+}
+
+/// A live channel mapped to a guide channel by hand.
+pub struct MappedChannel {
+    pub id: String,
+    pub name: String,
+    pub guide: String,
 }
 
 fn refs(v: Vec<(String, String)>) -> Vec<ChannelRef> {
@@ -731,15 +743,24 @@ impl Library {
         self.0.add_guide_url(&url).map_err(err)
     }
 
+    /// An extra source's own time offset in hours (applied by the next refresh).
+    pub fn set_guide_offset(&self, id: i64, hours: i32) -> Result<(), String> {
+        self.0.set_guide_offset(id, hours as i64).map_err(err)
+    }
+
     pub fn remove_guide_source(&self, id: i64) -> Result<(), String> {
         self.0.remove_guide_source(id).map_err(err)
     }
 
     /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
-    pub async fn refresh_guide(&self, days_ahead: u32) -> Result<Vec<GuideSourceInfo>, String> {
+    pub async fn refresh_guide(
+        &self,
+        days_ahead: u32,
+        force: bool,
+    ) -> Result<Vec<GuideSourceInfo>, String> {
         Ok(self
             .0
-            .refresh_guide(days_ahead as i64)
+            .refresh_guide(days_ahead as i64, force)
             .await
             .map_err(err)?
             .into_iter()
@@ -748,8 +769,8 @@ impl Library {
     }
 
     /// Seconds since the oldest successful import (None: never); the app refreshes when it is over 12 h.
-    pub fn guide_age(&self) -> Result<Option<i64>, String> {
-        self.0.guide_age().map_err(err)
+    pub fn guide_due(&self) -> Result<bool, String> {
+        self.0.guide_due().map_err(err)
     }
 
     /// Now and next for each item key, in the same order.
@@ -821,6 +842,28 @@ impl Library {
                 .unmatched_channels(limit as usize, offset as usize, &query)
                 .map_err(err)?,
         ))
+    }
+
+    /// Guide channels an unmatched channel may be, best first.
+    pub fn suggest_guide_channels(
+        &self,
+        item_key: String,
+        limit: u32,
+    ) -> Result<Vec<ChannelRef>, String> {
+        Ok(refs(
+            self.0
+                .suggest_guide_channels(&item_key, limit as usize)
+                .map_err(err)?,
+        ))
+    }
+
+    /// The channels mapped by hand, with their guide channel's name.
+    pub fn mapped_channels(&self) -> Result<Vec<MappedChannel>, String> {
+        let rows = self.0.mapped_channels().map_err(err)?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, name, guide)| MappedChannel { id, name, guide })
+            .collect())
     }
 
     /// Guide channels whose name or id contains the query.

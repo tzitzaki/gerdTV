@@ -141,7 +141,7 @@ async fn live_library_and_one_playback_probe() {
     }
     // The guide: the panel's xmltv.php imported; how many live channels show a programme now.
     let t = std::time::Instant::now();
-    let sources = lib.refresh_guide(7).await.expect("guide");
+    let sources = lib.refresh_guide(7, true).await.expect("guide");
     println!(
         "guide: {} channels, {} programmes in {:.1} s, status {:?}",
         sources[0].channels,
@@ -360,7 +360,7 @@ async fn live_guide_gaps() {
             on_now
         );
     };
-    lib.refresh_guide(3).await.expect("guide");
+    lib.refresh_guide(3, true).await.expect("guide");
     report("provider guide");
     let urls = std::env::var("GERDTV_GAP_SOURCES")
         .unwrap_or_else(|_| "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz".into());
@@ -370,7 +370,7 @@ async fn live_guide_gaps() {
             lib.add_guide_url(url).unwrap();
         }
         let t = std::time::Instant::now();
-        let sources = lib.refresh_guide(3).await.expect("guide");
+        let sources = lib.refresh_guide(3, true).await.expect("guide");
         for s in &sources {
             println!(
                 "{}: {} channels, {} programmes, status {}",

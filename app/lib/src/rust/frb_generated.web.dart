@@ -109,9 +109,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double dco_decode_box_autoadd_f_64(dynamic raw);
 
   @protected
-  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
-
-  @protected
   ItemInfo dco_decode_box_autoadd_item_info(dynamic raw);
 
   @protected
@@ -220,6 +217,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<KindCount> dco_decode_list_kind_count(dynamic raw);
 
   @protected
+  List<MappedChannel> dco_decode_list_mapped_channel(dynamic raw);
+
+  @protected
   List<MpvOption> dco_decode_list_mpv_option(dynamic raw);
 
   @protected
@@ -256,6 +256,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LocalHlsStatus dco_decode_local_hls_status(dynamic raw);
 
   @protected
+  MappedChannel dco_decode_mapped_channel(dynamic raw);
+
+  @protected
   MpvOption dco_decode_mpv_option(dynamic raw);
 
   @protected
@@ -269,9 +272,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
-
-  @protected
-  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
   ItemInfo? dco_decode_opt_box_autoadd_item_info(dynamic raw);
@@ -426,9 +426,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
 
   @protected
-  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
-
-  @protected
   ItemInfo sse_decode_box_autoadd_item_info(SseDeserializer deserializer);
 
   @protected
@@ -547,6 +544,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<KindCount> sse_decode_list_kind_count(SseDeserializer deserializer);
 
   @protected
+  List<MappedChannel> sse_decode_list_mapped_channel(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<MpvOption> sse_decode_list_mpv_option(SseDeserializer deserializer);
 
   @protected
@@ -591,6 +593,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LocalHlsStatus sse_decode_local_hls_status(SseDeserializer deserializer);
 
   @protected
+  MappedChannel sse_decode_mapped_channel(SseDeserializer deserializer);
+
+  @protected
   MpvOption sse_decode_mpv_option(SseDeserializer deserializer);
 
   @protected
@@ -606,9 +611,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
-
-  @protected
-  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   ItemInfo? sse_decode_opt_box_autoadd_item_info(SseDeserializer deserializer);
@@ -779,12 +781,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_i_64(
-    PlatformInt64 self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_box_autoadd_item_info(
     ItemInfo self,
     SseSerializer serializer,
@@ -935,6 +931,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_mapped_channel(
+    List<MappedChannel> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_mpv_option(
     List<MpvOption> self,
     SseSerializer serializer,
@@ -1001,6 +1003,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_mapped_channel(MappedChannel self, SseSerializer serializer);
+
+  @protected
   void sse_encode_mpv_option(MpvOption self, SseSerializer serializer);
 
   @protected
@@ -1017,12 +1022,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_opt_box_autoadd_i_64(
-    PlatformInt64? self,
-    SseSerializer serializer,
-  );
 
   @protected
   void sse_encode_opt_box_autoadd_item_info(

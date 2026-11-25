@@ -428,6 +428,40 @@ fn channel_country(id: &str, name: &str, file: Option<&str>) -> Option<String> {
         .or_else(|| file.map(str::to_string))
 }
 
+/// How much a guide may unpack to (the biggest known one: 160 MB).
+const MAX_UNPACKED: u64 = 1 << 30;
+
+/// Reads at most `left` bytes, then fails: a tiny file can unpack to terabytes.
+struct Limit<R> {
+    inner: R,
+    left: u64,
+}
+
+impl<R: Read> Read for Limit<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.left = self
+            .left
+            .checked_sub(n as u64)
+            .ok_or_else(|| std::io::Error::other("the guide is too big"))?;
+        Ok(n)
+    }
+}
+
+/// A fingerprint of what decides which channels an import stores ([Wanted]): live items and manual mappings.
+pub fn wanted_hash(conn: &Connection) -> Result<u64> {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    let mut st = conn.prepare(
+        "SELECT epg_id, name FROM items WHERE kind = 0 UNION ALL SELECT item_key, channel FROM epg_map ORDER BY 1, 2",
+    )?;
+    let mut rows = st.query([])?;
+    while let Some(r) = rows.next()? {
+        (r.get::<_, String>(0)?, r.get::<_, String>(1)?).hash(&mut h);
+    }
+    Ok(h.finish())
+}
+
 /// Imports one source's XMLTV into the guide tables (one transaction; the source's old rows are replaced).
 /// `now`: UTC seconds; the window is now − `days_back` … now + `days_ahead`; `offset_secs` corrects provider times.
 pub fn import(
@@ -440,7 +474,10 @@ pub fn import(
     offset_secs: i64,
 ) -> std::io::Result<ImportStats> {
     let io = std::io::Error::other;
-    let input = maybe_unpack(BufReader::new(input))?;
+    let input = BufReader::new(Limit {
+        inner: maybe_unpack(BufReader::new(input))?,
+        left: MAX_UNPACKED,
+    });
     let tx = conn.transaction().map_err(io)?;
     tx.execute(
         "DELETE FROM programmes_fts WHERE rowid IN (SELECT id FROM programmes WHERE source = ?1)",
@@ -485,6 +522,8 @@ pub fn import(
         Some(cc) if id.bytes().all(|b| b.is_ascii_digit()) => format!("{}:{id}", cc.to_lowercase()),
         _ => id,
     };
+    // Every channel with a programme in the file, stored or not: what [suggest] may offer.
+    let seen = std::cell::RefCell::new(std::collections::HashSet::<String>::new());
     // The channels no item can take. A programme whose channel the file hasn't listed yet is kept.
     let unwanted = std::cell::RefCell::new(std::collections::HashSet::<String>::new());
     let (from, to) = (now - days_back * 86_400, now + days_ahead * 86_400);
@@ -548,6 +587,9 @@ pub fn import(
                 if failed.borrow().is_some() {
                     return;
                 }
+                if !seen.borrow().contains(&p.channel) {
+                    seen.borrow_mut().insert(p.channel.clone());
+                }
                 p.start += offset_secs;
                 p.stop += offset_secs;
                 if p.stop <= from
@@ -588,9 +630,21 @@ pub fn import(
         )
         .map_err(std::io::Error::other)?; // the XML error type differs from io()'s rusqlite one
         stats.borrow_mut().skipped = parsed.skipped;
+        // A file without a single programme is a broken one: rolled back, the previous guide stays.
+        if parsed.programmes == 0 {
+            return Err(std::io::Error::other("the guide has no programmes"));
+        }
     }
     if let Some(e) = failed.into_inner() {
         return Err(io(e)); // rolled back: the previous guide stays
+    }
+    {
+        let mut st = tx
+            .prepare("UPDATE epg_channels SET filled = 1 WHERE id = ?1")
+            .map_err(io)?;
+        for id in seen.borrow().iter() {
+            st.execute([id]).map_err(io)?;
+        }
     }
     // Lower-ranked sources' schedules for the channels this one now fills go (they come back if this one drops them).
     let lower = format!(
@@ -891,6 +945,95 @@ pub fn find_channels(
         .collect()
 }
 
+/// A name's words for [suggest]: cleaned like [norm], split at anything that isn't a letter or digit.
+fn words(name: &str) -> Vec<String> {
+    let name = clean_name(split_country(name).0).replace('+', " plus ");
+    crate::db::fold(&name)
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// How alike two names are, 0…1: the share of words they have in common (a typo counts, a wrong number doesn't:
+/// "Sport 1" is no hint for "Sport 2").
+fn likeness(a: &[String], b: &[String]) -> f64 {
+    let numbers = |w: &[String]| {
+        let mut n: Vec<String> = w
+            .iter()
+            .map(|w| w.chars().filter(char::is_ascii_digit).collect())
+            .filter(|n: &String| !n.is_empty())
+            .collect();
+        n.sort();
+        n
+    };
+    if a.is_empty() || b.is_empty() || numbers(a) != numbers(b) {
+        return 0.0;
+    }
+    if a.concat() == b.concat() {
+        return 1.0; // "W Polska" and "wPolska"
+    }
+    let mut left: Vec<&String> = b.iter().collect();
+    let mut common = 0;
+    for w in a {
+        if let Some(i) = left.iter().position(|o| crate::db::is_typo(w, o)) {
+            left.remove(i);
+            common += 1;
+        }
+    }
+    2.0 * common as f64 / (a.len() + b.len()) as f64
+}
+
+/// Guide channels with programmes that an unmatched item may be, best first; another country's come after the same
+/// one's. The user confirms one with a tap: nothing is mapped by itself (owner decision).
+pub fn suggest(conn: &Connection, item_key: &str, limit: usize) -> Result<Vec<(String, String)>> {
+    let Some(name) = conn
+        .query_row("SELECT name FROM items WHERE key = ?1", [item_key], |r| {
+            r.get::<_, String>(0)
+        })
+        .optional()?
+    else {
+        return Ok(vec![]);
+    };
+    let (own, mine) = (country(&name), words(&name));
+    let mut st = conn.prepare(
+        "SELECT c.id, c.name, coalesce(s.url, '') FROM epg_channels c LEFT JOIN epg_sources s ON s.id = c.source
+         WHERE c.filled = 1",
+    )?;
+    let mut rows = st.query([])?;
+    let mut found: Vec<(f64, String, String)> = vec![];
+    while let Some(r) = rows.next()? {
+        let (id, guide, url): (String, String, String) = (r.get(0)?, r.get(1)?, r.get(2)?);
+        let like = likeness(&mine, &words(&guide));
+        if like < 0.6 {
+            continue; // fewer than about two of three words: noise
+        }
+        let from = channel_country(&id, &guide, source_country(&url).as_deref());
+        let other = if fit(own.as_deref(), from.as_deref()).is_some() {
+            0.0
+        } else {
+            1.0
+        };
+        found.push((like - other, id, guide));
+    }
+    found.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.2.cmp(&b.2)));
+    Ok(found
+        .into_iter()
+        .take(limit)
+        .map(|(_, id, n)| (id, n))
+        .collect())
+}
+
+/// The items mapped by hand, with the guide channel's name (its id when the guide no longer has it), by name.
+pub fn mapped(conn: &Connection) -> Result<Vec<(String, String, String)>> {
+    let mut st = conn.prepare_cached(
+        "SELECT m.item_key, i.name, coalesce(c.name, m.channel) FROM epg_map m JOIN items i ON i.key = m.item_key
+         LEFT JOIN epg_channels c ON c.id = m.channel ORDER BY i.name",
+    )?;
+    st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .collect()
+}
+
 /// Maps an item to a guide channel by hand (None removes the mapping), then rebuilds the matches.
 pub fn map_channel(
     conn: &mut Connection,
@@ -981,6 +1124,19 @@ mod tests {
             1800,
             "a missing stop means half an hour"
         );
+    }
+
+    #[test]
+    fn unpacking_stops_at_the_limit() {
+        let read = |left| {
+            Limit {
+                inner: &[0u8; 100][..],
+                left,
+            }
+            .read_to_end(&mut vec![])
+        };
+        assert_eq!(read(100).unwrap(), 100);
+        assert!(read(99).is_err());
     }
 
     #[test]
@@ -1082,6 +1238,11 @@ mod tests {
             "a manual mapping counts, programmes or not"
         );
         assert!(now_next(&c, &keys[3..], now).unwrap()[0].0.is_some());
+        // Undone: back to the automatic match (none here).
+        assert_eq!(mapped(&c).unwrap().len(), 2);
+        map_channel(&mut c, "live:4", None, now).unwrap();
+        assert_eq!(unmatched(&c, 10, 0, "").unwrap()[0].0, "live:4");
+        assert_eq!(mapped(&c).unwrap().len(), 1);
     }
 
     #[test]
@@ -1256,6 +1417,51 @@ mod tests {
                 .unwrap();
             assert_eq!(stored, 0);
         }
+    }
+
+    #[test]
+    fn suggestions_are_alike_and_prefer_the_country() {
+        let mut c = crate::db::open(Path::new(":memory:")).unwrap();
+        let pl = "#EXTM3U\n\
+            #EXTINF:-1,Kino Nord Deutschland HD DE\nhttp://h/live/u/p/1.ts\n\
+            #EXTINF:-1,w Polna PL\nhttp://h/live/u/p/2.ts\n\
+            #EXTINF:-1,Sport Arena 2 DE\nhttp://h/live/u/p/3.ts\n\
+            #EXTINF:-1,Ganz Anders DE\nhttp://h/live/u/p/4.ts\n";
+        crate::db::import_m3u(&mut c, pl.as_bytes(), &[]).unwrap();
+        let mut xml = String::from("<tv>");
+        for (id, name) in [
+            ("a.uk", "Kino Nord Deutschland Extra"),
+            ("b.de", "Kino Nord Deutschlnd Extra"), // a typo still counts
+            ("d.pl", "wPolna"),
+            ("e.de", "Sport Arena 1"),
+            ("f.de", "Kino"),
+        ] {
+            xml += &format!(
+                r#"<channel id="{id}"><display-name>{name}</display-name></channel>
+                   <programme start="20251121170000 +0100" stop="20251121180000 +0100" channel="{id}"><title>x</title></programme>"#
+            );
+        }
+        // No programmes: never offered.
+        xml += r#"<channel id="g.de"><display-name>Ganz Anders Neu</display-name></channel></tv>"#;
+        import(&mut c, 1, xml.as_bytes(), 1_763_742_000, 2, 7, 0).unwrap();
+        let ids = |key: &str| -> Vec<String> {
+            suggest(&c, key, 3)
+                .unwrap()
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect()
+        };
+        assert_eq!(
+            ids("live:1"),
+            ["b.de", "a.uk"],
+            "the other country comes last"
+        );
+        assert_eq!(ids("live:2"), ["d.pl"]);
+        assert!(
+            ids("live:3").is_empty(),
+            "another number is another channel"
+        );
+        assert!(ids("live:4").is_empty());
     }
 
     #[test]
