@@ -402,6 +402,7 @@
   "setupRequired": "Required",
   "setupServer": "Server address",
   "setupTitle": "Add your provider",
+  "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
   "setupXtream": "Xtream Codes",
   "sortAdded": "Recently added",

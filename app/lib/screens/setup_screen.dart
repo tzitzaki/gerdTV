@@ -36,13 +36,14 @@ class _SetupScreenState extends State<SetupScreen> {
   final _user = TextEditingController();
   final _pass = TextEditingController();
   final _m3u = TextEditingController();
+  final _userAgent = TextEditingController();
   bool _xtream = true;
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
-    for (final c in [_server, _user, _pass, _m3u]) {
+    for (final c in [_server, _user, _pass, _m3u, _userAgent]) {
       c.dispose();
     }
     super.dispose();
@@ -60,7 +61,7 @@ class _SetupScreenState extends State<SetupScreen> {
       name: _xtream ? (Uri.tryParse(server)?.host ?? 'Xtream Codes') : 'M3U',
       source: _xtream ? SourceKind.xtream : SourceKind.m3UUrl,
       server: _xtream ? server : '',
-      userAgent: '',
+      userAgent: _userAgent.text,
     );
     final secrets = _xtream
         ? [_user.text.trim(), _pass.text]
@@ -168,6 +169,19 @@ class _SetupScreenState extends State<SetupScreen> {
                         validator: (v) => checkUrl(v, l10n),
                         onFieldSubmitted: (_) => _connect(),
                       ),
+                    const SizedBox(height: Tokens.space * 2),
+                    // Optional: some providers only answer players they know.
+                    TextFormField(
+                      key: const Key('setup.userAgent'),
+                      controller: _userAgent,
+                      decoration: InputDecoration(
+                        labelText: l10n.userAgent,
+                        helperText: l10n.setupUserAgentHint,
+                        helperMaxLines: 2,
+                      ),
+                      autocorrect: false,
+                      onFieldSubmitted: (_) => _connect(),
+                    ),
                     const SizedBox(height: Tokens.space * 3),
                     FilledButton(
                       key: const Key('setup.connect'),

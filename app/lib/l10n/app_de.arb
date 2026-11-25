@@ -216,6 +216,7 @@
   "setupRequired": "Pflichtfeld",
   "setupServer": "Server-Adresse",
   "setupTitle": "Anbieter hinzufügen",
+  "setupUserAgentHint": "Optional: nur wenn der Anbieter einen bestimmten Player verlangt.",
   "setupUsername": "Benutzername",
   "setupXtream": "Xtream Codes",
   "sortAdded": "Zuletzt hinzugefügt",

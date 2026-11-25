@@ -14,8 +14,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 1. Schema 11 and backups: started 20:46 (baseline `just test`: green, 2 min 16 s); atomic migrations and
    backup pruning done 20:49. Open: the schema 11 tables, as one migration with the first feature that needs one (step 3).
 2. Account info, User-Agent: started 20:49; done 21:06 (integration tests green, 9 min 31 s).
-   The field is in Settings → Account only, not in the setup form: a provider that refuses the default at setup can't be added yet.
-3. Watched marks, next episode
+3. Watched marks, next episode: started 21:19
 4. Track settings
 5. Picture (aspect, deinterlacing)
 6. Last channel, CH keys
@@ -29,3 +28,8 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 14. Recordings (first prove that an alarm can start the core on Android)
 15. Cast and AirPlay (Spike C first)
 16. Wrap-up
+
+## State
+Steps 0–2 done, 21:18 (step 1 without the new tables). Next: step 3. Start with migration 10 → 11 (`watched` first; the other
+tables only if their shape is settled by then, else the later features append to the same unreleased entry), then
+`save_progress` at 95 % writes `watched`. Open questions: none blocking.
