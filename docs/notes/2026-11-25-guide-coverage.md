@@ -10,6 +10,7 @@ undo a mapping, counts and offset per source, robust downloads.
 | 2-4 matcher | 11:01 | done 11:10: 2203 to 2321 with the same 31 guides; 57 guides incl. other countries 2730, refresh 195 s |
 | player: Stop beside play/pause everywhere | 11:21 | done 11:33 |
 | 5 refresh, 8 sort | 11:33 | done |
+| 6, 6b, 6c presets, beIN, storage | 11:35 | done 11:42: 2365 of 5097 with the asked countries (epgshare01, free-epg, Rytec, Pluto, Samsung; open-epg not fetched); core and widget tests green, integration not rerun |
 
 Owner answers 11:21: store programmes only for channels the profile has; every fresh free-epg country; Stop beside play/pause everywhere.
-Next: 6 presets (hide added ones; beIN names need a rule; check the lost match of one Polish channel), 6b Rytec/Pluto/Samsung/open-epg, 7, 9-12, 13.
+Next: 7 suggestions, 9 undo, 10 counts, 11 offset per source, 12 downloads, 13 docs (SPEC, DECISIONS 49, HANDOVER, DEVICE_CHECKS) and wrap-up. Open: free-epg US import time on a phone; Pluto/Samsung refresh after 6 h; epg budget test.
