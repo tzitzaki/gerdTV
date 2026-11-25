@@ -280,6 +280,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await _switchTo(list[(i + delta + list.length) % list.length]);
   }
 
+  /// Back to the channel before this one, and forth again.
+  void _lastChannel() {
+    final last = widget.session.lastChannel;
+    if (last != null) _switchTo(last);
+  }
+
   Future<void> _switchTo(ItemInfo channel) async {
     await widget.session.play(channel);
     await _showBanner();
@@ -607,6 +613,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
         if (!_panel && !_dpad && widget.session.nextUp.value == null) ...{
           const SingleActivator(LogicalKeyboardKey.arrowUp): () => _zap(-1),
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _zap(1),
+          // A remote's channel keys: CH+ is the next one, as on a TV (Up is the one above in the list).
+          const SingleActivator(LogicalKeyboardKey.channelUp): () => _zap(1),
+          const SingleActivator(LogicalKeyboardKey.channelDown): () => _zap(-1),
+          const SingleActivator(LogicalKeyboardKey.mediaLast): _lastChannel,
+          const SingleActivator(LogicalKeyboardKey.backspace): _lastChannel,
           const SingleActivator(LogicalKeyboardKey.enter): _togglePanel,
           const SingleActivator(LogicalKeyboardKey.select): _togglePanel,
           // The D-pad on TV (and arrow keys on phones): 10 s per press; desktop keeps media_kit's 2 s.
@@ -660,93 +671,119 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       SafeArea(
                         child: Padding(
                           padding: const EdgeInsets.all(Tokens.space),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              IconButton.filledTonal(
-                                key: const Key('player.back'),
-                                tooltip: l10n.back,
-                                icon: const Icon(Icons.arrow_back),
-                                onPressed: _back,
-                              ),
-                              const SizedBox(width: Tokens.space),
-                              Expanded(
-                                child: Text(
-                                  _current.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(color: Colors.white),
-                                ),
-                              ),
-                              ..._behindLive(l10n),
-                              if (isDesktop) ...[
-                                IconButton.filledTonal(
-                                  key: const Key('player.mini'),
-                                  tooltip: l10n.miniPlayer,
-                                  icon: const Icon(
-                                    Icons.picture_in_picture_alt,
+                              Row(
+                                children: [
+                                  IconButton.filledTonal(
+                                    key: const Key('player.back'),
+                                    tooltip: l10n.back,
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: _back,
                                   ),
-                                  onPressed: _toggleMini,
-                                ),
-                                const SizedBox(width: Tokens.space),
-                              ],
-                              // Audio and subtitles (track_sheet.dart).
-                              StreamBuilder<Tracks>(
-                                stream: widget.session.player.stream.tracks,
-                                initialData: widget.session.player.state.tracks,
-                                builder: (context, snap) {
-                                  final p = widget.session.player;
-                                  // mpv always has the delays to set.
-                                  if (widget.session.onAvPlayer.value &&
-                                      !hasTrackChoice(snap.data!)) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: Tokens.space,
+                                  const SizedBox(width: Tokens.space),
+                                  Expanded(
+                                    child: Text(
+                                      _current.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(color: Colors.white),
                                     ),
-                                    child: IconButton.filledTonal(
-                                      key: const Key('player.tracks'),
-                                      tooltip: l10n.playerTracks,
+                                  ),
+                                  if (!_narrow) ..._behindLive(l10n),
+                                  if (isDesktop) ...[
+                                    IconButton.filledTonal(
+                                      key: const Key('player.mini'),
+                                      tooltip: l10n.miniPlayer,
                                       icon: const Icon(
-                                        Icons.subtitles_outlined,
+                                        Icons.picture_in_picture_alt,
                                       ),
-                                      onPressed: () => showTrackSheet(
-                                        context,
-                                        tracks: p.state.tracks,
-                                        current: p.state.track,
-                                        onAudio: p.setAudioTrack,
-                                        onSubtitle: p.setSubtitleTrack,
-                                        // Apple's player has no delays.
-                                        onDelay: widget.session.onAvPlayer.value
-                                            ? null
-                                            : widget.session.setDelay,
-                                        delays: widget.session.delays,
-                                      ),
+                                      onPressed: _toggleMini,
                                     ),
-                                  );
-                                },
-                              ),
-                              IconButton.filledTonal(
-                                key: const Key('player.buffer'),
-                                tooltip: l10n.bufferThisChannel,
-                                icon: const Icon(Icons.tune),
-                                onPressed: _bufferSheet,
-                              ),
-                              const SizedBox(width: Tokens.space),
-                              // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
-                              if (isApple ||
-                                  widget.session.onAvPlayer.value) ...[
-                                IconButton.filledTonal(
-                                  key: const Key('player.applePip'),
-                                  tooltip: l10n.miniPlayer,
-                                  icon: const Icon(
-                                    Icons.picture_in_picture_alt,
+                                    const SizedBox(width: Tokens.space),
+                                  ],
+                                  // Audio and subtitles (track_sheet.dart).
+                                  StreamBuilder<Tracks>(
+                                    stream: widget.session.player.stream.tracks,
+                                    initialData:
+                                        widget.session.player.state.tracks,
+                                    builder: (context, snap) {
+                                      final p = widget.session.player;
+                                      // mpv always has the delays to set.
+                                      if (widget.session.onAvPlayer.value &&
+                                          !hasTrackChoice(snap.data!)) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: Tokens.space,
+                                        ),
+                                        child: IconButton.filledTonal(
+                                          key: const Key('player.tracks'),
+                                          tooltip: l10n.playerTracks,
+                                          icon: const Icon(
+                                            Icons.subtitles_outlined,
+                                          ),
+                                          onPressed: () => showTrackSheet(
+                                            context,
+                                            tracks: p.state.tracks,
+                                            current: p.state.track,
+                                            onAudio: p.setAudioTrack,
+                                            onSubtitle: p.setSubtitleTrack,
+                                            // Apple's player has no delays.
+                                            onDelay:
+                                                widget.session.onAvPlayer.value
+                                                ? null
+                                                : widget.session.setDelay,
+                                            delays: widget.session.delays,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  onPressed: _startPip,
+                                  if (_current.kind == ItemKind.live &&
+                                      widget.session.lastChannel != null) ...[
+                                    IconButton.filledTonal(
+                                      key: const Key('player.last'),
+                                      tooltip: l10n.lastChannel,
+                                      icon: const Icon(Icons.swap_horiz),
+                                      onPressed: _lastChannel,
+                                    ),
+                                    const SizedBox(width: Tokens.space),
+                                  ],
+                                  IconButton.filledTonal(
+                                    key: const Key('player.buffer'),
+                                    tooltip: l10n.bufferThisChannel,
+                                    icon: const Icon(Icons.tune),
+                                    onPressed: _bufferSheet,
+                                  ),
+                                  const SizedBox(width: Tokens.space),
+                                  // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
+                                  if (isApple ||
+                                      widget.session.onAvPlayer.value) ...[
+                                    IconButton.filledTonal(
+                                      key: const Key('player.applePip'),
+                                      tooltip: l10n.miniPlayer,
+                                      icon: const Icon(
+                                        Icons.picture_in_picture_alt,
+                                      ),
+                                      onPressed: _startPip,
+                                    ),
+                                    const SizedBox(width: Tokens.space),
+                                  ],
+                                ],
+                              ),
+                              // Phones: no room beside the buttons.
+                              if (_narrow) const SizedBox(height: Tokens.space),
+                              if (_narrow)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: _behindLive(l10n),
                                 ),
-                                const SizedBox(width: Tokens.space),
-                              ],
                             ],
                           ),
                         ),
@@ -894,6 +931,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// While behind live: how far ("−5:12") and Go live (reachable with the D-pad).
+  bool get _narrow => MediaQuery.sizeOf(context).width < 600;
+
   List<Widget> _behindLive(AppLocalizations l10n) {
     final behind = _shiftable
         ? _liveEdge.behind(_position, DateTime.now(), slack: _slack)

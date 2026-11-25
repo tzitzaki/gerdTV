@@ -84,6 +84,7 @@
   "healthRecovered": "wiederhergestellt nach {attempts} Versuchen, {secs} s",
   "hiddenGroups": "Ausgeblendete Gruppen",
   "hiddenGroupsHint": "Angehakte Gruppen verschwinden aus Listen, Suche und Programm",
+  "lastChannel": "Letzter Sender",
   "linkCodeHint": "Diese Adresse auf einem anderen Gerät öffnen und den Code eingeben:",
   "listModeCompact": "Kompakte Liste",
   "listModeLargeTiles": "Große Kacheln",

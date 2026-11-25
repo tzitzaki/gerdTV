@@ -248,6 +248,21 @@ void main() {
     // The buffer readout is off unless switched on (on: the guide's Watch below).
     expect(find.byKey(const Key('player.bufferReadout')), findsNothing);
     expect(session.nowPlaying.value!.key, session.zapList[i + 1].key);
+    // A remote's keys: last channel goes back and forth, CH- and CH+ step through the list.
+    for (final (key, at) in [
+      (LogicalKeyboardKey.backspace, i),
+      (LogicalKeyboardKey.backspace, i + 1),
+      (LogicalKeyboardKey.channelDown, i),
+      (LogicalKeyboardKey.channelUp, i + 1),
+    ]) {
+      // As an Android remote sends them (Linux has no channel keys to simulate).
+      await tester.sendKeyEvent(key, platform: 'android');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 500)),
+      );
+      await tester.pump();
+      expect(session.nowPlaying.value!.key, session.zapList[at].key);
+    }
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await waitFor(tester, find.byKey(const Key('player.panel')));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);

@@ -176,6 +176,7 @@
   },
   "hiddenGroups": "Hidden groups",
   "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
+  "lastChannel": "Last channel",
   "linkCodeHint": "Open this address on another device and enter the code:",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",

@@ -19,7 +19,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 4. Track settings: started 21:43
 5. Picture (aspect, deinterlacing): started 22:11
 6. Last channel, CH keys: started 22:21
-7. macOS media keys (iOS and Android came with #62)
+7. macOS media keys (started 22:48) (iOS and Android came with #62)
 8. Auto frame rate (Android TV)
 9. Android TV home row
 10. Custom groups, names, order (extends #62's long-hold menu)
@@ -31,5 +31,5 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–5 done 22:21 (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: step 6. Open questions: none blocking.
+Steps 0–6 done 22:48 (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 7. Open questions: none blocking.

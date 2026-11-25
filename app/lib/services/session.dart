@@ -293,6 +293,11 @@ class Session extends ChangeNotifier {
   /// The channels Up/Down switch through in the player: the group (or guide rows) the channel was opened from.
   List<ItemInfo> zapList = const [];
 
+  /// The live channel played before the current (or last) one: the player's "last channel". A movie in between or
+  /// Stop doesn't change it.
+  ItemInfo? lastChannel;
+  ItemInfo? _channel;
+
   /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
   /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
   final ValueNotifier<ItemInfo?> nowPlaying = ValueNotifier(null);
@@ -445,6 +450,7 @@ class Session extends ChangeNotifier {
     if (s == null && p.source != SourceKind.m3UFile) return false;
     if (library != null) await stopPlayback();
     zapList = const [];
+    lastChannel = _channel = null;
     if (!await _open(p, s ?? const [])) return false;
     final dir = await _dir();
     setAppSetting(dir: dir, key: settingLastProfile, value: p.id);
@@ -629,6 +635,10 @@ class Session extends ChangeNotifier {
       const Duration(seconds: 10),
       (_) => _saveProgress(),
     );
+    if (item.kind == ItemKind.live && item.key != _channel?.key) {
+      lastChannel = _channel;
+      _channel = item;
+    }
     lib.touchRecent(key: item.key);
     nowPlaying.value = item;
     _playingKey = item.key;
