@@ -169,19 +169,6 @@ class _SetupScreenState extends State<SetupScreen> {
                         validator: (v) => checkUrl(v, l10n),
                         onFieldSubmitted: (_) => _connect(),
                       ),
-                    const SizedBox(height: Tokens.space * 2),
-                    // Optional: some providers only answer players they know.
-                    TextFormField(
-                      key: const Key('setup.userAgent'),
-                      controller: _userAgent,
-                      decoration: InputDecoration(
-                        labelText: l10n.userAgent,
-                        helperText: l10n.setupUserAgentHint,
-                        helperMaxLines: 2,
-                      ),
-                      autocorrect: false,
-                      onFieldSubmitted: (_) => _connect(),
-                    ),
                     const SizedBox(height: Tokens.space * 3),
                     FilledButton(
                       key: const Key('setup.connect'),
@@ -208,6 +195,19 @@ class _SetupScreenState extends State<SetupScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(height: Tokens.space * 3),
+                    // Optional (some providers only answer players they know), so below Connect, which must stay in view.
+                    TextFormField(
+                      key: const Key('setup.userAgent'),
+                      controller: _userAgent,
+                      decoration: InputDecoration(
+                        labelText: l10n.userAgent,
+                        helperText: l10n.setupUserAgentHint,
+                        helperMaxLines: 2,
+                      ),
+                      autocorrect: false,
+                      onFieldSubmitted: (_) => _connect(),
+                    ),
                   ],
                 ),
               ),

@@ -8,6 +8,7 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 - DEVICE_CHECKS may have 90 lines; no existing check is touched (housekeeping is a later round).
 - Simkl: send ids when known, import watched marks and paused positions (Trakt gets the ids). OpenSubtitles with the user's own key.
 - Old database backups are deleted: each profile keeps its newest; a removed profile keeps none.
+- No CI per commit: commits stay local, one push at the wrap-up (21:49).
 
 ## Steps
 0. Set-up: started 20:43
