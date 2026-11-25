@@ -171,6 +171,7 @@
   "menuBarPlayPause": "Play/Pause",
   "menuBarQuit": "Quit gerdTV",
   "miniPlayer": "Mini player",
+  "mute": "Mute",
   "navGuide": "Guide",
   "navLive": "Live TV",
   "navMovies": "Movies",
@@ -444,6 +445,7 @@
   "trackUnavailable": "Not in this build: it needs gerdTV's registration with the service.",
   "trailer": "Trailer",
   "trailerOnYouTube": "Watch on YouTube",
+  "unmute": "Unmute",
   "updateAvailable": "Version {version} is available",
   "@updateAvailable": {
     "placeholders": {

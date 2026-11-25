@@ -11,7 +11,8 @@ Started 16:10. Branch feat/floating-players. One commit per step.
 6. iOS: PiP flag earlier, log lines
 7. iOS button: one picture (player closes, bar shows the logo)
 8. Lock screen card (iOS Now Playing, Android media session)
-9. Wrap-up and release
+9. Owner request 16:12: the debrid account becomes a main section after Series while one is linked
+10. Wrap-up and release
 
 ## Decisions
 - Buttons by tap or hover, 3 s; double-click does nothing; Now Playing card with play/pause only, no Live Activity.

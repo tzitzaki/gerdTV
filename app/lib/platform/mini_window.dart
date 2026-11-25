@@ -50,6 +50,10 @@ class MiniWindow {
     _restore = null;
   }
 
+  /// Moves the window with the pointer (call when a drag starts; the system takes over until the release).
+  void startDragging() =>
+      wm.WindowManager.instance.getCurrent()?.startDragging();
+
   /// The current window size (for tests and layout decisions).
   ({double width, double height}) get size {
     final s = _window.size;

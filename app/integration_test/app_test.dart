@@ -163,11 +163,28 @@ void main() {
     final mini = MiniWindow();
     final fullWidth = mini.size.width;
     await tester.tap(find.byKey(const Key('player.mini')));
-    await waitFor(tester, find.byKey(const Key('player.restore')));
+    await waitFor(tester, find.byKey(const Key('player.picture')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 800)),
     );
     expect(mini.size.width, closeTo(MiniWindow.miniWidth, 1));
+    // Its buttons are hidden until a tap; Mute, and M, switch the sound.
+    expect(find.byKey(const Key('player.mute')).hitTestable(), findsNothing);
+    await tester.tap(find.byKey(const Key('player.picture')));
+    await tapReady(tester, find.byKey(const Key('player.mute')));
+    for (var i = 0; i < 50 && session.player.state.volume != 0; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    }
+    expect(session.player.state.volume, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    for (var i = 0; i < 50 && session.player.state.volume != 100; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    }
+    expect(session.player.state.volume, 100);
     final inMini = session.player.state.position;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(seconds: 2)),
@@ -178,6 +195,15 @@ void main() {
       greaterThan(inMini),
       reason: 'plays on in the mini player',
     );
+    // (The 3 s may be over: shown again if so.)
+    if (find
+        .byKey(const Key('player.restore'))
+        .hitTestable()
+        .evaluate()
+        .isEmpty) {
+      await tester.tap(find.byKey(const Key('player.picture')));
+      await tester.pump();
+    }
     await tester.tap(find.byKey(const Key('player.restore')));
     await waitFor(tester, find.byKey(const Key('player.back')));
     await tester.runAsync(
