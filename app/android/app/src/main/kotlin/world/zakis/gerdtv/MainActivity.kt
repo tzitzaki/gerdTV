@@ -12,7 +12,8 @@ package world.zakis.gerdtv
 //   file_paths.xml); the user confirms there, and allows "install unknown apps" for gerdTV the first time.
 // - Settings → Your data: saveToDownloads writes the export into the public Downloads folder (MediaStore, Android
 //   10+, no permission needed); older Android gets the app's own Downloads folder and the path is returned.
-// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setFloating(Boolean), setLogo(String name), installApk(String
+// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), nowPlaying(…) and
+// clearNowPlaying() (the media session's card, PlaybackService; its play/pause → mediaCommand(String)), setFloating(Boolean), setLogo(String name), installApk(String
 // path), saveToDownloads(String name, String text) → String, voiceAvailable(), listen(String prompt) → String?
 // (null: cancelled or nothing heard); native →
 // pictureMode(Boolean).
@@ -47,6 +48,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        PlaybackService.onCommand = { action -> channel?.invokeMethod("mediaCommand", action) }
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "gerdtv/platform").also {
             it.setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -55,6 +57,23 @@ class MainActivity : FlutterActivity() {
                         val title = call.argument<String>("title") ?: ""
                         val service = Intent(this, PlaybackService::class.java).putExtra("title", title)
                         if (playing) startForegroundServiceCompat(service) else stopService(service)
+                        result.success(null)
+                    }
+                    "nowPlaying" -> {
+                        PlaybackService.show(
+                            PlaybackService.Card(
+                                title = call.argument<String>("title") ?: "",
+                                subtitle = call.argument<String>("subtitle") ?: "",
+                                artwork = call.argument<String>("artwork"),
+                                playing = call.argument<Boolean>("playing") ?: false,
+                                positionMs = ((call.argument<Double>("position") ?: 0.0) * 1000).toLong(),
+                                durationMs = ((call.argument<Double>("duration") ?: 0.0) * 1000).toLong(),
+                            )
+                        )
+                        result.success(null)
+                    }
+                    "clearNowPlaying" -> {
+                        PlaybackService.show(null)
                         result.success(null)
                     }
                     "setFloating" -> {

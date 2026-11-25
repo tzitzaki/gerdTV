@@ -26,8 +26,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
-- Home: floats only what plays (nothing after Stop, paused or a failed channel); the window's play/pause and skip work.
-- Background: locked for 5 min the sound plays on; unlocking, or PiP back to the app, shows the picture at once with no reconnect.
+- Home: floats only what plays, no black; returning closes the window (one picture); the button closes the player, restore reopens it.
+- Lock: sound plays on 5 min, picture at once after; the lock screen card shows title, programme, logo; its and a headset's pause work.
 - Logo: picking another logo in Settings → Appearance shows iOS's "icon changed" alert and the home screen icon changes.
 - Your data: Export opens the share sheet and "Save to Files" works; Import picks that file and reports the entries taken.
 - iPad: the floating window works over split view; live rewinds 20 min (timeshift 30 min in Settings → Playback) and Live returns.
@@ -36,7 +36,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
-- PiP: Home while a channel plays shows it in a floating window (nothing after Stop or paused); tapping it returns to the full player.
+- PiP: Home floats a playing channel (not after Stop or paused), a tap returns; lock screen: the card with title, programme, play/pause.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
 - Background: with the screen off the sound keeps playing for at least 10 minutes; the gerdTV notification opens the app.
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.

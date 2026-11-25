@@ -25,6 +25,7 @@ import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'reminders.dart';
+import 'media_card.dart';
 import 'secrets.dart';
 import 'tracking.dart';
 
@@ -39,9 +40,18 @@ class Session extends ChangeNotifier {
       unawaited(platform.setPlaying(nowPlaying.value?.name));
       _updateFloating();
     });
+    nowPlaying.addListener(
+      () => userPaused.value = false,
+    ); // a new stream plays
+    _card = MediaCard(this);
     platform.pip.addListener(_updatePip);
     platform.onPipRestore = () => onPipRestore?.call();
   }
+
+  late final MediaCard _card;
+
+  /// Paused by the user, wherever: player, floating window, lock screen, menu bar (not a stall or a stream's start).
+  final ValueNotifier<bool> userPaused = ValueNotifier(false);
 
   final Secrets secrets;
 
@@ -571,6 +581,7 @@ class Session extends ChangeNotifier {
   /// A pause or resume by the user (the player's button or Space, the macOS menu bar): the watchdog's own pause,
   /// and the tracking services hear of it.
   Future<void> userPause(bool pause) async {
+    userPaused.value = pause;
     _track(pause ? 'pause' : 'start');
     if (onAvPlayer.value) {
       // AVPlayer has no watchdog here: the core keeps its provider connection alive while paused.
@@ -747,6 +758,7 @@ class Session extends ChangeNotifier {
   /// Follows the player from the first stream on (creating the player starts mpv, so not earlier).
   void _watchFloating() {
     if (_floatSubs != null) return;
+    _card.watch();
     final s = player.stream;
     _floatSubs = [
       s.playing.listen((_) => _updateFloating()),
@@ -954,6 +966,7 @@ class Session extends ChangeNotifier {
 
   @override
   void dispose() {
+    _card.dispose();
     _progressTimer?.cancel();
     _pipTimer?.cancel();
     for (final s in _floatSubs ?? const <StreamSubscription<Object?>>[]) {

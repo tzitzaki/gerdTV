@@ -29,6 +29,9 @@ class PlatformBridge {
   final ValueNotifier<bool> pip = ValueNotifier(false);
   void Function()? onPipRestore;
 
+  /// Android and iOS: play/pause on the Now Playing card or a headset ("play" or "pause").
+  void Function(String action)? onMediaCommand;
+
   /// Set while the system's Picture-in-Picture window shows the app.
   final ValueNotifier<bool> pictureMode;
 
@@ -47,10 +50,47 @@ class PlatformBridge {
         pip.value = call.arguments == true;
       } else if (call.method == 'pipRestore') {
         onPipRestore?.call();
+      } else if (call.method == 'mediaCommand') {
+        onMediaCommand?.call(call.arguments as String);
       } else if (call.method == 'menuBar') {
         onMenuBar?.call(call.arguments as String);
       }
     });
+  }
+
+  /// Android and iOS: the Now Playing card (lib/services/media_card.dart). [artwork] is a local file; seconds.
+  Future<void> nowPlaying({
+    required String title,
+    required String subtitle,
+    required String? artwork,
+    required bool playing,
+    required double position,
+    required double duration,
+    required bool live,
+  }) => _mobile('nowPlaying', {
+    'title': title,
+    'subtitle': subtitle,
+    'artwork': artwork,
+    'playing': playing,
+    'position': position,
+    'duration': duration,
+    'live': live,
+  });
+
+  /// Stop: the card goes.
+  Future<void> clearNowPlaying() => _mobile('clearNowPlaying', const {});
+
+  Future<void> _mobile(String method, Map<String, Object?> args) async {
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
+    try {
+      await channel.invokeMethod(method, args);
+    } on MissingPluginException {
+      // Tests and builds without the native side.
+    }
   }
 
   /// Something started (title) or stopped (null). Android keeps a foreground service alive while playing.

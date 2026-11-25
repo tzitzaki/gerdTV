@@ -93,7 +93,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  bool _paused = false;
+  bool get _paused => widget.session.userPaused.value;
 
   /// What's on, for the banner (the playing channel) and the channel list (every channel of the list).
   bool _banner = false;
@@ -137,6 +137,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Opened while it floats (the window's restore, the bar): the picture is here again.
     if (session.floating.value) unawaited(session.stopApplePip());
     session.floating.addListener(_onFloating);
+    session.userPaused.addListener(_onPaused);
     PlatformBridge.brightness().then((b) {
       if (b != null && mounted) setState(() => _brightness = b);
     });
@@ -319,6 +320,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void dispose() {
     widget.session.pipFailure.removeListener(_showPipFailure);
     widget.session.floating.removeListener(_onFloating);
+    widget.session.userPaused.removeListener(_onPaused);
     _rootFocus.dispose();
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
@@ -495,11 +497,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePause() async {
-    if (!_paused && _shiftable) {
+    await widget.session.userPause(!_paused);
+  }
+
+  /// Paused or playing again, here or from outside (lock screen, floating window, menu bar).
+  void _onPaused() {
+    if (_paused && _shiftable) {
       _liveEdge.detach(); // paused: live moves on without us
     }
-    await widget.session.userPause(!_paused);
-    setState(() => _paused = !_paused);
+    if (mounted) setState(() {});
   }
 
   /// Play/pause in the controls while timeshift is on: ours (see the keyboard shortcuts above).

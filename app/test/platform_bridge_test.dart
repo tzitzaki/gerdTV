@@ -39,9 +39,11 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final calls = <Object?>[];
+      final cards = <MethodCall>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
             if (call.method == 'setPlaying') calls.add(call.arguments);
+            if (call.method.endsWith('owPlaying')) cards.add(call);
             return null;
           });
       final session = Session(appDir: '/nonexistent');
@@ -60,6 +62,30 @@ void main() {
         {'playing': true, 'title': 'Channel One'},
         {'playing': false, 'title': ''},
       ]);
+      // The lock screen's card follows, without the stream's URL; its play/pause comes back.
+      expect(cards.map((c) => c.method), ['nowPlaying', 'clearNowPlaying']);
+      expect(cards.first.arguments, {
+        'title': 'Channel One',
+        'subtitle': '',
+        'artwork': null,
+        'playing': true,
+        'position': 0.0,
+        'duration': 0.0,
+        'live': true,
+      });
+      final actions = <String>[];
+      PlatformBridge(pictureMode: ValueNotifier(false))
+        ..onMediaCommand = actions.add
+        ..attach();
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            PlatformBridge.channel.name,
+            PlatformBridge.channel.codec.encodeMethodCall(
+              const MethodCall('mediaCommand', 'pause'),
+            ),
+            (_) {},
+          );
+      expect(actions, ['pause']);
     },
   );
 

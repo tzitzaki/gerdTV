@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import Flutter
+import MediaPlayer
 import UIKit
 import UserNotifications
 import media_kit_video
@@ -42,7 +43,7 @@ import media_kit_video
   }
 }
 
-/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), setFloating(on), pipState(playing, position,
+/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), nowPlaying(…), clearNowPlaying (→ mediaCommand), preparePip(on), setFloating(on), pipState(playing, position,
 /// duration, live), startPip → Bool, stopPip, setLogo(name), openUrl(url) → Bool, brightness → Double,
 /// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs), pip(Bool: the window shows), pipRestore.
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
@@ -55,6 +56,8 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   private var format: CMVideoFormatDescription?
   // What the PiP window shows, from Dart's pipState (once a second).
   private var playing = false
+  /// The Now Playing card says playing (what a headset's toggle turns around).
+  private var cardPlaying = false
   private var duration = 0.0
   private var live = false
   /// Leaving the app floats the picture (Dart decides: lib/player/floating.dart).
@@ -73,6 +76,13 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     NotificationCenter.default.addObserver(
       forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
     ) { [weak self] _ in self?.pip?.stopPictureInPicture() }
+    // The Now Playing card's only control is play/pause (owner decision); a command without a target stays off.
+    let commands = MPRemoteCommandCenter.shared()
+    commands.playCommand.addTarget { [weak self] _ in self?.media("play") ?? .commandFailed }
+    commands.pauseCommand.addTarget { [weak self] _ in self?.media("pause") ?? .commandFailed }
+    commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+      self?.media(self?.cardPlaying == true ? "pause" : "play") ?? .commandFailed
+    }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       let args = call.arguments as? [String: Any] ?? [:]
@@ -80,6 +90,12 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       case "setPlaying":
         let playing = args["playing"] as? Bool ?? false
         try? AVAudioSession.sharedInstance().setActive(playing)
+        result(nil)
+      case "nowPlaying":
+        self.showNowPlaying(args)
+        result(nil)
+      case "clearNowPlaying":
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         result(nil)
       case "preparePip":
         self.prepare(args["on"] as? Bool ?? false)
@@ -135,6 +151,32 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  private func media(_ action: String) -> MPRemoteCommandHandlerStatus {
+    DispatchQueue.main.async { self.channel.invokeMethod("mediaCommand", arguments: action) }
+    return .success
+  }
+
+  /// The lock screen's and Control Center's card (Dart: lib/services/media_card.dart).
+  private func showNowPlaying(_ args: [String: Any]) {
+    cardPlaying = args["playing"] as? Bool ?? false
+    let live = args["live"] as? Bool ?? false
+    var info: [String: Any] = [
+      MPMediaItemPropertyTitle: args["title"] as? String ?? "",
+      MPMediaItemPropertyArtist: args["subtitle"] as? String ?? "",
+      MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
+      MPNowPlayingInfoPropertyIsLiveStream: live,
+      MPNowPlayingInfoPropertyPlaybackRate: cardPlaying ? 1.0 : 0.0,
+    ]
+    if !live, let duration = args["duration"] as? Double, duration > 0 {
+      info[MPMediaItemPropertyPlaybackDuration] = duration
+      info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = args["position"] as? Double ?? 0
+    }
+    if let path = args["artwork"] as? String, let image = UIImage(contentsOfFile: path) {
+      info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+    }
+    MPNowPlayingInfoCenter.default().nowPlayingInfo = info
   }
 
   private func restoreBrightness() {
