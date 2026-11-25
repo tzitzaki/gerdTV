@@ -169,6 +169,16 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await bridge.preparePip(false);
     expect(calls, hasLength(3));
+    // Floating on leaving is Android's and iOS's alike, apart from setPlaying; desktop has none.
+    await bridge.setFloating(true);
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    await bridge.setFloating(false);
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    await bridge.setFloating(true);
+    expect(calls.skip(3).map((c) => (c.method, (c.arguments as Map)['on'])), [
+      ('setFloating', true),
+      ('setFloating', false),
+    ]);
   });
 
   test('setLogo sends the name and, on Linux, a PNG of the logo', () async {

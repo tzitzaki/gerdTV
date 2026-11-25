@@ -42,7 +42,7 @@ import media_kit_video
   }
 }
 
-/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), pipState(playing, position,
+/// The "gerdtv/platform" channel on iOS: setPlaying (audio session), preparePip(on), setFloating(on), pipState(playing, position,
 /// duration, live), startPip → Bool, stopPip, setLogo(name), openUrl(url) → Bool, brightness → Double,
 /// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs).
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
@@ -57,6 +57,8 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   private var playing = false
   private var duration = 0.0
   private var live = false
+  /// Leaving the app floats the picture (Dart decides: lib/player/floating.dart).
+  private var floating = false
   /// The screen's brightness before the player's swipe changed it (nil: unchanged).
   private var ownBrightness: CGFloat?
 
@@ -77,6 +79,10 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
         result(nil)
       case "preparePip":
         self.prepare(args["on"] as? Bool ?? false)
+        result(nil)
+      case "setFloating":
+        self.floating = args["on"] as? Bool ?? false
+        self.pip?.canStartPictureInPictureAutomaticallyFromInline = self.floating
         result(nil)
       case "pipState":
         let wasPlaying = self.playing
@@ -132,7 +138,8 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
     ownBrightness = nil
   }
 
-  /// mpv plays (on): its frames go to the PiP layer, and Home floats it. Off: AVPlayer or nothing plays.
+  /// mpv's stream is open (on): its frames go to the PiP layer; Home floats it while [floating]. Off (Stop, or
+  /// AVPlayer takes over): the window closes and nothing of it stays, or iOS may still offer the last picture.
   private func prepare(_ on: Bool) {
     if on && host == nil {
       guard
@@ -153,11 +160,17 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       pip.delegate = self
       self.pip = pip
     }
-    pip?.canStartPictureInPictureAutomaticallyFromInline = on
+    pip?.canStartPictureInPictureAutomaticallyFromInline = on && floating
     TextureHW.pipSink = on ? { [weak self] buffer in self?.enqueue(buffer) } : nil
     if !on {
       pip?.stopPictureInPicture()
+      pip = nil
+      playing = false
+      TextureHW.pipActive = false  // the released controller no longer reports the end
       display.sampleBufferRenderer.flush(removingDisplayedImage: true, completionHandler: nil)
+      display.removeFromSuperlayer()
+      host?.removeFromSuperview()
+      host = nil
     }
   }
 

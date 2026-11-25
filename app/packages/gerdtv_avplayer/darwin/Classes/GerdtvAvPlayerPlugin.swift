@@ -12,7 +12,7 @@
 //   plays on. Closing the PiP window keeps the sound too (owner rule: playback ends only by Stop).
 //
 // Channel "gerdtv/avplayer": open(url, bufferSecs) → texture id, play, pause, seek(secs), setVolume(volume 0…1),
-// setRate(rate), setBuffer(secs), selectTrack(kind "audio"/"subtitle", index, -1 = off), startPip → Bool, stopPip,
+// setRate(rate), setBuffer(secs), setFloating(on), selectTrack(kind "audio"/"subtitle", index, -1 = off), startPip → Bool, stopPip,
 // stop. → "state" every 0.25 s (position, duration, seekStart, seekEnd, playing, buffering, width, height, pip,
 // audio, audioIndex, subtitles, subtitleIndex, error).
 // Debugging: "GerdtvAvPlayer:" lines in the device log; item errors arrive in Dart as the player's error.
@@ -116,6 +116,12 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
     case "selectTrack":
       selectTrack(kind: args["kind"] as? String ?? "", index: args["index"] as? Int ?? -1)
       result(nil)
+    case "setFloating":
+      #if os(iOS)
+        // Dart decides (lib/player/floating.dart); mpv's picture has a PiP of its own (ios/Runner/AppDelegate.swift).
+        pip?.canStartPictureInPictureAutomaticallyFromInline = args["on"] as? Bool ?? false
+      #endif
+      result(nil)
     case "startPip":
       guard let pip, pip.isPictureInPicturePossible else {
         result(false)
@@ -153,10 +159,6 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
       textureId = textures.register(self)
     }
     attachLayer(player)
-    #if os(iOS)
-      // Only while AVPlayer plays: mpv's picture has a PiP of its own (app/ios/Runner/AppDelegate.swift).
-      pip?.canStartPictureInPictureAutomaticallyFromInline = true
-    #endif
     frameTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
       self?.pullFrame()
     }

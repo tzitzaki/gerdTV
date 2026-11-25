@@ -12,7 +12,7 @@ package world.zakis.gerdtv
 //   file_paths.xml); the user confirms there, and allows "install unknown apps" for gerdTV the first time.
 // - Settings → Your data: saveToDownloads writes the export into the public Downloads folder (MediaStore, Android
 //   10+, no permission needed); older Android gets the app's own Downloads folder and the path is returned.
-// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setLogo(String name), installApk(String
+// Channel "gerdtv/platform": Dart → setPlaying(Boolean, String title), setFloating(Boolean), setLogo(String name), installApk(String
 // path), saveToDownloads(String name, String text) → String, voiceAvailable(), listen(String prompt) → String?
 // (null: cancelled or nothing heard); native →
 // pictureMode(Boolean).
@@ -39,6 +39,9 @@ class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var playing = false
 
+    /// Leaving the app floats the picture (Dart decides: lib/player/floating.dart).
+    private var floating = false
+
     /// The Dart call waiting for the speech recognizer's answer (one at a time).
     private var listening: MethodChannel.Result? = null
 
@@ -50,9 +53,13 @@ class MainActivity : FlutterActivity() {
                     "setPlaying" -> {
                         playing = call.argument<Boolean>("playing") ?: false
                         val title = call.argument<String>("title") ?: ""
-                        updatePipParams()
                         val service = Intent(this, PlaybackService::class.java).putExtra("title", title)
                         if (playing) startForegroundServiceCompat(service) else stopService(service)
+                        result.success(null)
+                    }
+                    "setFloating" -> {
+                        floating = call.argument<Boolean>("on") ?: false
+                        updatePipParams()
                         result.success(null)
                     }
                     "setLogo" -> {
@@ -185,18 +192,18 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
     }
 
-    /// Android 12+: enter PiP automatically when the user leaves while playing (smoother than onUserLeaveHint).
+    /// Android 12+: enter PiP automatically when the user leaves while floating is on (smoother than onUserLeaveHint).
     private fun updatePipParams() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val builder = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) builder.setAutoEnterEnabled(playing)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) builder.setAutoEnterEnabled(floating)
         setPictureInPictureParams(builder.build())
     }
 
-    /// Android 8–11: enter PiP by hand when the user leaves (Home, recents) while playing.
+    /// Android 8–11: enter PiP by hand when the user leaves (Home, recents) while floating is on.
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (playing && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        if (floating && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
         }
     }
