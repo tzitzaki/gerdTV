@@ -67,11 +67,16 @@ void main() {
     final av = AvPlatformPlayer();
     final errors = <String>[];
     av.stream.error.listen(errors.add);
-    await av.openUrl('http://127.0.0.1:1/t/index.m3u8', bufferSecs: 8);
+    await av.openUrl(
+      'http://127.0.0.1:1/t/index.m3u8',
+      bufferSecs: 8,
+      userAgent: 'Player/1.0',
+    );
     expect(av.textureId.value, 7);
     expect(calls.single.arguments, {
       'url': 'http://127.0.0.1:1/t/index.m3u8',
       'bufferSecs': 8.0,
+      'userAgent': 'Player/1.0',
     });
 
     Future<void> native(Map<String, Object?> state) =>

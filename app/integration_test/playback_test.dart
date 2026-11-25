@@ -76,10 +76,20 @@ void main() {
           }
         });
 
+        // A profile's own User-Agent lasts until the next start, which puts mpv's default back.
+        final native = player.platform as NativePlayer;
+        final mpvDefault = await native.getProperty('user-agent');
+        await adapter.play(
+          ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
+          live: true,
+          userAgent: 'Player/1.0',
+        );
+        expect(await native.getProperty('user-agent'), 'Player/1.0');
         await adapter.play(
           ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
           live: true,
         );
+        expect(await native.getProperty('user-agent'), mpvDefault);
         // Balanced: mpv waits for 8 s of cache before starting.
         final wait = await (player.platform as NativePlayer).getProperty(
           'cache-pause-wait',

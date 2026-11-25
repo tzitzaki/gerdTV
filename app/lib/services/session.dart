@@ -406,6 +406,25 @@ class Session extends ChangeNotifier {
     return true;
   }
 
+  /// Changes what the open profile's provider sees as the player ("" = the default). Reopens the profile, because its
+  /// connections carry the old one, which ends what plays.
+  Future<void> setUserAgent(String value) async {
+    final p = profile!;
+    final saved = await saveProfile(
+      dir: await _dir(),
+      profile: ProfileInfo(
+        id: p.id,
+        name: p.name,
+        source: p.source,
+        server: p.server,
+        userAgent: value,
+        maxConnections: p.maxConnections,
+      ),
+    );
+    profiles = [for (final q in profiles) q.id == saved.id ? saved : q];
+    await openProfile(saved);
+  }
+
   /// Whether [p] opens without asking.
   bool opensAlways(ProfileInfo p) =>
       appDir != null &&
@@ -662,6 +681,7 @@ class Session extends ChangeNotifier {
       adaptive: false,
       preferHls: false,
       extraOptions: const [],
+      userAgent: profile?.userAgent ?? '',
     );
     return true;
   }
@@ -794,6 +814,7 @@ class Session extends ChangeNotifier {
       bitrate: bitrate > 0 ? bitrate : null,
       adaptive: lib.setting(key: settingAdaptive) == '1',
       preferHls: live && lib.preferHls(key: item.key),
+      userAgent: profile?.userAgent ?? '',
       start: switch (live ? null : lib.resumePosition(key: item.key)) {
         final secs? => Duration(seconds: secs),
         null => null,
@@ -861,7 +882,11 @@ class Session extends ChangeNotifier {
     onAvPlayer.value = true;
     adapter.target.value =
         choice.seconds; // the player's "Buffer x / target" readout
-    await av.openUrl(url, bufferSecs: choice.seconds);
+    await av.openUrl(
+      url,
+      bufferSecs: choice.seconds,
+      userAgent: profile?.userAgent ?? '',
+    );
     // The safety net: AVPlayer waits silently (no error) on a stream it can't decode. Not playing 15 s after the
     // start, unpaused, the channel goes to mpv for this run.
     final from = av.state.position;

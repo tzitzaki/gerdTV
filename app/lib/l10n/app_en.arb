@@ -359,6 +359,7 @@
   "settingsKeywordsTracking": "trakt simkl tracking scrobble watched history",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
+  "settingsKeywordsUserAgent": "user agent player header",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -498,6 +499,8 @@
   "updateNone": "gerdTV is up to date.",
   "updatePage": "Release page",
   "updateShowFolder": "Show in folder",
+  "userAgent": "User-Agent",
+  "userAgentHint": "What your provider sees as the player; empty for the default. Press Enter to apply: playback stops and the account reconnects.",
   "userDataExport": "Export your data",
   "userDataExportHint": "Favourites, history, hidden groups, reminders and settings of this profile, without the login",
   "userDataExportedTo": "Saved to {path}",

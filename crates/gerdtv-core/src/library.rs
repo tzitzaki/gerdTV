@@ -129,6 +129,9 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
             db::fnv1a(&format!("{}{}{}", p.name, p.server, now())) & 0xffff_ffff
         );
     }
+    // Sent as an HTTP header: printable ASCII only, or the clients could not be built from it.
+    p.user_agent.retain(|c| (' '..='~').contains(&c));
+    p.user_agent = p.user_agent.trim().to_string();
     p.updated_at = now();
     match all.iter_mut().find(|x| x.id == p.id) {
         Some(x) => *x = p.clone(),
@@ -1268,6 +1271,8 @@ mod tests {
         assert_ne!(a.id, b.id);
         let mut renamed = a.clone();
         renamed.name = "Renamed".into();
+        // Pasted text may carry a line break or an emoji, which no HTTP header takes (the client would not build).
+        renamed.user_agent = " VLC/3.0\r\nX: y \u{1F600}".into();
         save_profile(&dir, renamed).unwrap();
         let all = load_profiles(&dir).unwrap();
         assert_eq!(
@@ -1278,6 +1283,8 @@ mod tests {
         let backup = |id: &str| dir.join("profiles").join(format!("{id}.db.bak-100"));
         std::fs::write(backup(&a.id), "x").unwrap();
         std::fs::write(backup(&b.id), "x").unwrap();
+        assert_eq!(all[0].user_agent, "VLC/3.0X: y");
+        Xtream::new("http://h.invalid", "u", "p", Some(&all[0].user_agent));
         delete_profile(&dir, &b.id).unwrap();
         assert!(backup(&a.id).exists() && !backup(&b.id).exists());
         assert_eq!(load_profiles(&dir).unwrap().len(), 1);

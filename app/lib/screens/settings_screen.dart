@@ -198,6 +198,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: session.sync,
             ),
           ),
+          // What the provider sees as the player; some only serve players they know.
+          if (lib != null)
+            SettingsEntry(
+              id: 'userAgent',
+              section: provider,
+              title: l10n.userAgent,
+              keywords: l10n.settingsKeywordsUserAgent,
+              build: (_) => Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Tokens.space * 2,
+                  vertical: Tokens.space,
+                ),
+                // A new profile gets a new field, or the old one's text would stay in it.
+                child: TextFormField(
+                  key: Key('settings.userAgent.${session.profile?.id}'),
+                  initialValue: session.profile?.userAgent ?? '',
+                  decoration: InputDecoration(
+                    labelText: l10n.userAgent,
+                    helperText: l10n.userAgentHint,
+                    helperMaxLines: 3,
+                  ),
+                  autocorrect: false,
+                  onFieldSubmitted: session.setUserAgent,
+                ),
+              ),
+            ),
           // Your data: export and import the profile's user data (one JSON file).
           if (lib != null)
             SettingsEntry(
