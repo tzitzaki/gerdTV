@@ -81,6 +81,33 @@ void main() {
     );
   });
 
+  test(
+    'Live is live also when the cache lags the projected edge (slow network)',
+    () {
+      final e = LiveEdge()..position(0);
+      e.cache(10, at(0));
+      e.detach(); // paused; 6 s later live is projected at 16, but only 13 arrived
+      final to = e.seek(
+        13 - goLiveMargin(2),
+        at(6),
+        windowSecs: 3600,
+        slack: liveSlackFor(2),
+        toLive: true,
+      );
+      expect(to, 8);
+      e.cache(
+        13,
+        at(6),
+      ); // mpv's next report: the cache around the new position
+      expect(e.behind(8, at(6), slack: liveSlackFor(2)), 0);
+      e.cache(17, at(10)); // the label doesn't come back while it plays on
+      expect(e.behind(12, at(10), slack: liveSlackFor(2)), 0);
+      // A plain seek to the same place is still off live.
+      e.seek(8, at(10), windowSecs: 3600, slack: liveSlackFor(2));
+      expect(e.detached, isTrue);
+    },
+  );
+
   test('labels', () {
     for (final (secs, label) in [
       (0, '−0:00'),

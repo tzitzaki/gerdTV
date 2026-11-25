@@ -51,6 +51,24 @@ class LiveEdge {
   /// Back at live (Go live, or played up to it).
   void attach() => _detached = false;
 
+  /// Where a seek to [target] goes (inside the last [windowSecs], never past live); null until live is known.
+  /// Off live when that is [slack] or more behind it, except for Live itself ([toLive]): it lands short of what is
+  /// cached, and on a slow connection that lags the projected edge by more than the slack, so it would stay "behind
+  /// live" for good. Attached, the next cache end mpv reports is live again.
+  double? seek(
+    double target,
+    DateTime now, {
+    required int windowSecs,
+    required double slack,
+    bool toLive = false,
+  }) {
+    final l = live(now);
+    if (l == null) return null;
+    final to = target.clamp(earliest(windowSecs, now), l);
+    toLive || l - to < slack ? attach() : detach();
+    return to;
+  }
+
   bool get detached => _detached;
 
   /// Live in stream seconds at [now] (null until mpv reported its cache).

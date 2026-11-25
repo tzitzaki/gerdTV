@@ -2,8 +2,6 @@
 
 ## State
 - Version 0.261125.60: more channels with a guide; the player's banner at the bottom; Stop beside play/pause everywhere.
-- Guide names match without country code, only within a country (DE/AT/CH share); live report: 2109 provider only, 2398 of 5097 with 50 guides.
-- Presets from six projects; suggestions map with one tap; programmes are stored only for the profile's channels (schema 10).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -28,6 +26,7 @@
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
 - Apple minimums 27.0 once `macos-latest` runs macOS 27 (owner decision; Xcode 27 is not on it yet).
+- [DEVICE] Mac: on the first release with #61 allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
 - [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; a picture hiccup or reconnect there: send the device log.
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.
 - Phase 3 rest: PIN-locked groups and the TV-layout focus polish.
@@ -54,6 +53,7 @@
 - flutter_secure_storage_linux crashes the app when deleting a key that was never written: delete only what exists (Session.removeProfile).
 
 ## Ideas not chosen
+- Apple Developer ID (99 USD a year): Keychain tied to the team ID, notarized; possible later step (docs/RELEASING.md).
 - The provider's short EPG per channel, and an own iptv-org grabber on a server.
 - Seamless reconnect with a second player taking over (costs a second provider connection).
 - A persistent macOS Finder icon for the chosen logo (changing the app bundle breaks its code signature).

@@ -174,16 +174,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Seeks by [secs] inside the back buffer (never past live, never before its start); back means off live.
   Future<void> _shift(double secs) => _seekTo(_position + secs);
 
-  Future<void> _seekTo(double target) async {
-    final now = DateTime.now();
-    final e = _liveEdge;
-    final live = e.live(now);
-    if (live == null) return;
-    final to = target.clamp(
-      e.earliest(widget.session.timeshiftWindow.value, now),
-      live,
+  Future<void> _seekTo(double target, {bool toLive = false}) async {
+    final to = _liveEdge.seek(
+      target,
+      DateTime.now(),
+      windowSecs: widget.session.timeshiftWindow.value,
+      slack: _slack,
+      toLive: toLive,
     );
-    live - to < _slack ? e.attach() : e.detach();
+    if (to == null) return;
     await widget.session.player.seek(
       Duration(milliseconds: (to * 1000).round()),
     );
@@ -201,7 +200,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (live == null) return;
     // Never past what is cached: on a slow connection the projected live edge runs ahead of the data (macOS CI).
     final cached = widget.session.player.state.buffer.inMilliseconds / 1000;
-    await _seekTo((cached < live ? cached : live) - goLiveMargin(_pauseWait));
+    await _seekTo(
+      (cached < live ? cached : live) - goLiveMargin(_pauseWait),
+      toLive: true,
+    );
     if (_paused) await _togglePause();
   }
 
