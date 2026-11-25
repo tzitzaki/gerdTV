@@ -4,6 +4,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/theme.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -24,6 +25,11 @@ void main() {
             );
             final what =
                 'accent $accent $brightness tinted $tinted black $black';
+            expect(
+              contrast(Colors.white, AppLogoMark.tileFor(s)),
+              greaterThanOrEqualTo(3),
+              reason: 'the logo\'s white letters, $what',
+            );
             expect(
               contrast(s.onSurface, s.surface),
               greaterThanOrEqualTo(4.5),
