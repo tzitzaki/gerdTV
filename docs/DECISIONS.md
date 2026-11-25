@@ -9,7 +9,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Crates: `gerdtv-core` (all logic), `gerdtv-api` (bridge surface only; package `gerdtv_api` because Cargokit names the native library after it), `gerdtv-testkit`, `gerdtv-release`.
 - Player libraries (Spike A): media_kit 1.2.6 with the upstream `media_kit_libs_video` packages on every platform, pinned to exact versions; media_kit_video 2.0.1 vendored in `third_party/` and patched (Apple: libmpv looked up at run time), not forked on GitHub.
 - Playback ends only by Stop or by starting another stream; leaving the player keeps it running (now-playing bar, floating mini player, background playback).
-- Floating/background playback: desktop floating always-on-top window, Android system Picture-in-Picture with a foreground service, Apple Picture-in-Picture without a hand-over (swiping to Home starts it on iOS).
+- Floating/background playback: desktop floating always-on-top window, Android system Picture-in-Picture with a foreground service, Apple Picture-in-Picture without a hand-over (swiping to Home starts it on iOS); leaving the app floats only what really plays.
 - Apple platforms: mpv plays everything by default (its own frames feed iOS PiP); AVPlayer over the core's local HLS is a Settings choice for live, applied at the next start.
 - Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).
 - Channel lists: four display modes (compact list, list, tiles, large tiles) per section, with a quick toggle in the list bar.
