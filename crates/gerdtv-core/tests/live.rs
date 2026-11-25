@@ -362,9 +362,8 @@ async fn live_guide_gaps() {
     };
     lib.refresh_guide(3).await.expect("guide");
     report("provider guide");
-    let urls = std::env::var("GERDTV_GAP_SOURCES").unwrap_or_else(|_| {
-        "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz".into()
-    });
+    let urls = std::env::var("GERDTV_GAP_SOURCES")
+        .unwrap_or_else(|_| "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz".into());
     // One refresh per ';' batch: each refresh downloads every source again, the provider's too.
     for batch in urls.split(';') {
         for url in batch.split(',') {

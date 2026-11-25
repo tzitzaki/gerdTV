@@ -216,13 +216,96 @@ pub fn parse(
     Ok(stats)
 }
 
-/// The matching key of a channel name: cleaned (prefixes, quality tags), lower-case, letters and digits only.
+/// Country codes providers and guide files put on channel names (the ones seen in both; "TV" or "FM" must stay out).
+/// LAM, ARB: regions some providers use like a country.
+const COUNTRIES: &[&str] = &[
+    "AE", "AL", "AM", "AR", "ARB", "AT", "AU", "AZ", "BA", "BE", "BG", "BH", "BO", "BR", "CA",
+    "CH", "CL", "CN", "CO", "CY", "CZ", "DE", "DK", "DZ", "EC", "EE", "EG", "ES", "FI", "FR", "GB",
+    "GR", "HR", "HU", "IE", "IL", "IN", "IQ", "IR", "IS", "IT", "JO", "JP", "KW", "LAM", "LB",
+    "LT", "LU", "LV", "LY", "MA", "ME", "MK", "MT", "MX", "MY", "NL", "NO", "NZ", "PE", "PL", "PT",
+    "QA", "RO", "RS", "RU", "SA", "SE", "SI", "SK", "SY", "TN", "TR", "UA", "UK", "US", "UY", "VE",
+    "XK", "YE", "ZA",
+];
+
+/// A known country code (any case), in one spelling per country.
+fn code(s: &str) -> Option<String> {
+    let c = s.trim().to_ascii_uppercase();
+    COUNTRIES.contains(&c.as_str()).then(|| match c.as_str() {
+        "GB" => "UK".into(),
+        "BH" => "BA".into(), // a community file's code for Bosnia and Herzegovina
+        _ => c,
+    })
+}
+
+/// Splits a channel name into what is left without its country code, and the code: "AT - Name", "[DE] Name",
+/// "DE: Name", "|DE| Name", "Name (RS)", "Name FHD DE". Codes are upper case, so "Nova it" keeps its last word.
+fn split_country(name: &str) -> (&str, Option<String>) {
+    let upper = |c: &str| {
+        if c.chars().any(|ch| ch.is_lowercase()) {
+            None
+        } else {
+            code(c)
+        }
+    };
+    let s = name.trim().trim_start_matches(['|', '[']).trim();
+    if let Some((head, rest)) = s
+        .split_once(['|', ':', ']'])
+        .or_else(|| s.split_once(" - "))
+        && let Some(c) = upper(head)
+        && !rest.trim().is_empty()
+    {
+        return (rest.trim(), Some(c));
+    }
+    if let Some((rest, tail)) = name.trim().rsplit_once(char::is_whitespace)
+        && let Some(c) = upper(tail.trim_matches(['(', ')', '[', ']']))
+    {
+        return (rest.trim(), Some(c));
+    }
+    (name, None)
+}
+
+/// The country a channel name says it is from.
+pub fn country(name: &str) -> Option<String> {
+    split_country(name).1
+}
+
+/// The country of a community guide file, from its URL (epgshare01, free-epg); None for any other.
+pub fn source_country(url: &str) -> Option<String> {
+    let file = url.rsplit('/').next()?.split('.').next()?;
+    if let Some(f) = file.strip_prefix("epg_ripper_") {
+        // beIN's file is its Middle East line-up.
+        return if f.starts_with("BEIN") {
+            Some("QA".into())
+        } else {
+            code(f.get(..2)?)
+        };
+    }
+    url.contains("free-epg.de/api/epg/")
+        .then(|| code(file))
+        .flatten()
+}
+
+/// The matching key of a channel name: without its country code and quality tags, lower-case, accents folded, letters
+/// and digits only. A plus is spelled out: "3+" isn't "3", and "+1" is another schedule.
 pub fn norm(name: &str) -> String {
-    clean_name(name)
+    let plus = clean_name(split_country(name).0).replace('+', "plus");
+    crate::db::fold(&plus)
         .chars()
         .filter(|c| c.is_alphanumeric())
-        .flat_map(char::to_lowercase)
         .collect()
+}
+
+/// How well a guide channel's country fits an item's, best first; None: a different country, no match. Austria,
+/// Switzerland and Germany share channels; a side that names no country fits any.
+fn fit(item: Option<&str>, guide: Option<&str>) -> Option<u8> {
+    const DACH: [&str; 3] = ["DE", "AT", "CH"];
+    match (item, guide) {
+        (Some(a), Some(b)) if a == b => Some(0),
+        (Some(a), Some(b)) if DACH.contains(&a) && DACH.contains(&b) => Some(1),
+        (Some(_), Some(_)) => None,
+        (None, _) => Some(0), // any country: the sources' order decides
+        (Some(_), None) => Some(2),
+    }
 }
 
 /// SQL for a source's rank (`col` holds a source id): the provider's guide first, then extra sources in the order
@@ -271,21 +354,18 @@ pub fn import(
     .map_err(io)?;
     tx.execute("DELETE FROM epg_channels WHERE source = ?1", [source])
         .map_err(io)?;
-    // Channels a higher-ranked source already fills: this source must not add a second schedule for them. (A
+    // Channels a higher-ranked source already fills (a schedule that has ended doesn't count): this source must not add a second schedule for them. (A
     // lower-ranked source's schedule for a channel this one fills is removed after the import, below.)
-    let taken: std::collections::HashSet<String> = {
-        let mut st = tx
-            .prepare(&format!(
-                "SELECT DISTINCT channel FROM programmes WHERE {} < {}",
-                rank("source"),
-                rank("?1")
-            ))
-            .map_err(io)?;
-        st.query_map([source], |r| r.get(0))
-            .map_err(io)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(io)?
+    // Channels where it only has ended programmes keep those, so this source adds just what is still to come.
+    let covered = |after: i64| -> rusqlite::Result<std::collections::HashSet<String>> {
+        let mut st = tx.prepare(&format!(
+            "SELECT DISTINCT channel FROM programmes WHERE stop > ?2 AND {} < {}",
+            rank("source"),
+            rank("?1")
+        ))?;
+        st.query_map([source, after], |r| r.get(0))?.collect()
     };
+    let (taken, ended) = (covered(now).map_err(io)?, covered(0).map_err(io)?);
     let (from, to) = (now - days_back * 86_400, now + days_ahead * 86_400);
     // Both callbacks below record into these (RefCell: two closures can't both borrow them mutably).
     let stats = std::cell::RefCell::new(ImportStats::default());
@@ -324,11 +404,12 @@ pub fn import(
                 let r = (|| -> rusqlite::Result<()> {
                     if ch.execute(params![c.id, name, c.icon, source])? > 0 {
                         stats.borrow_mut().channels += 1;
-                        for n in &c.names {
-                            let k = norm(n);
-                            if !k.is_empty() {
-                                nm.execute(params![k, c.id])?;
-                            }
+                    }
+                    // Also for an id a higher-ranked source has: this one may be the source with the schedule.
+                    for n in &c.names {
+                        let k = norm(n);
+                        if !k.is_empty() {
+                            nm.execute(params![k, c.id])?;
                         }
                     }
                     Ok(())
@@ -343,7 +424,11 @@ pub fn import(
                 }
                 p.start += offset_secs;
                 p.stop += offset_secs;
-                if p.stop <= from || p.start >= to || taken.contains(&p.channel) {
+                if p.stop <= from
+                    || p.start >= to
+                    || taken.contains(&p.channel)
+                    || (p.stop <= now && ended.contains(&p.channel))
+                {
                     stats.borrow_mut().outside += 1;
                     return;
                 }
@@ -382,7 +467,8 @@ pub fn import(
     }
     // Lower-ranked sources' schedules for the channels this one now fills go (they come back if this one drops them).
     let lower = format!(
-        "SELECT id FROM programmes WHERE {} > {} AND channel IN (SELECT DISTINCT channel FROM programmes WHERE source = ?1)",
+        "SELECT id FROM programmes WHERE {} > {} AND channel IN
+           (SELECT DISTINCT channel FROM programmes WHERE source = ?1 AND stop > {now})",
         rank("source"),
         rank("?1")
     );
@@ -416,85 +502,113 @@ pub fn prune(conn: &Connection, now: i64, days_back: i64) -> Result<usize> {
 /// for the automatic steps, so a provider guide that lists a channel without programmes doesn't hide an extra source
 /// that has them (where both have programmes, the import gave the channel and its names to the provider).
 /// Returns the number of matched items. Debugging: `SELECT * FROM item_epg WHERE item_key = …` shows the result.
-pub fn rebuild_matches(conn: &mut Connection) -> Result<usize> {
+pub fn rebuild_matches(conn: &mut Connection, now: i64) -> Result<usize> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM item_epg", [])?;
     tx.execute(
         "INSERT OR IGNORE INTO item_epg (item_key, channel) SELECT item_key, channel FROM epg_map",
         [],
     )?;
-    const FILLED: &str = "EXISTS (SELECT 1 FROM programmes p WHERE p.channel = c.id)";
-    tx.execute(
-        &format!(
-            "INSERT OR IGNORE INTO item_epg (item_key, channel)
-             SELECT i.key, c.id FROM items i JOIN epg_channels c ON c.id = i.epg_id
-             WHERE i.kind = 0 AND i.epg_id != '' AND {FILLED}"
-        ),
-        [],
-    )?;
-    tx.execute(
-        &format!(
-            "INSERT OR IGNORE INTO item_epg (item_key, channel)
-             SELECT i.key, c.id FROM items i JOIN epg_channels c ON lower(c.id) = lower(i.epg_id)
-             WHERE i.kind = 0 AND i.epg_id != '' AND {FILLED}"
-        ),
-        [],
-    )?;
-    // Names: done in Rust (norm() isn't SQL). Only for the items still without a match. A name several sources share
-    // goes to the highest-ranked source's channel (the first row per name wins).
-    let mut names: HashMap<String, String> = HashMap::new();
+    // First the channels with something still to come; then, for what is left, any schedule (a guide that couldn't be
+    // refreshed for days still serves catch-up).
+    for after in [now, 0] {
+        match_open(&tx, after)?;
+    }
+    let n = tx.query_row("SELECT count(*) FROM item_epg", [], |r| r.get::<_, i64>(0))? as usize;
+    tx.commit()?;
+    Ok(n)
+}
+
+/// One matching pass over the items without a match, against the guide channels with a programme ending after `after`.
+fn match_open(tx: &rusqlite::Transaction, after: i64) -> Result<()> {
+    let filled =
+        format!("EXISTS (SELECT 1 FROM programmes p WHERE p.channel = c.id AND p.stop > {after})");
+    for id in ["c.id = i.epg_id", "lower(c.id) = lower(i.epg_id)"] {
+        tx.execute(
+            &format!(
+                "INSERT OR IGNORE INTO item_epg (item_key, channel)
+                 SELECT i.key, c.id FROM items i JOIN epg_channels c ON {id}
+                 WHERE i.kind = 0 AND i.epg_id != '' AND {filled}"
+            ),
+            [],
+        )?;
+    }
+    // Names: done in Rust (norm() isn't SQL). Per name every channel that has it, in the sources' order, with its
+    // country (its name's, its id's ending as in "Name.de", or its file's) and whether it is the provider's.
+    let mut names: HashMap<String, Vec<(String, Option<String>, bool)>> = HashMap::new();
     {
         let mut st = tx.prepare(&format!(
-            "SELECT n.norm, n.channel FROM epg_names n JOIN epg_channels c ON c.id = n.channel WHERE {FILLED}
-             ORDER BY {}, n.channel",
+            "SELECT n.norm, n.channel, c.name, coalesce(s.url, ''), coalesce(s.builtin, 0)
+             FROM epg_names n JOIN epg_channels c ON c.id = n.channel LEFT JOIN epg_sources s ON s.id = c.source
+             WHERE {filled} ORDER BY {}, n.channel",
             rank("c.source")
         ))?;
-        let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
-        for row in rows {
-            let (k, ch) = row?;
-            names.entry(k).or_insert(ch);
+        let mut rows = st.query([])?;
+        while let Some(r) = rows.next()? {
+            let (k, ch, name): (String, String, String) = (r.get(0)?, r.get(1)?, r.get(2)?);
+            let url: String = r.get(3)?;
+            let from = country(&name)
+                .or_else(|| ch.rsplit_once('.').and_then(|(_, c)| code(c)))
+                .or_else(|| source_country(&url));
+            names.entry(k).or_default().push((ch, from, r.get(4)?));
         }
     }
-    let open = |tx: &rusqlite::Transaction| -> Result<Vec<(String, String)>> {
+    let open = || -> Result<Vec<(String, String)>> {
         let mut st = tx.prepare(
             "SELECT key, name FROM items WHERE kind = 0 AND key NOT IN (SELECT item_key FROM item_epg)",
         )?;
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<_>>()
     };
+    let mut ins =
+        tx.prepare("INSERT OR IGNORE INTO item_epg (item_key, channel) VALUES (?1, ?2)")?;
+    for (key, name) in open()? {
+        let own = country(&name);
+        // The best fit; among equals the first source (min_by_key keeps the first). The provider's own channel wins
+        // unless it names another country (owner decision: the provider's guide first).
+        let best =
+            names
+                .get(&norm(&name))
+                .into_iter()
+                .flatten()
+                .filter_map(|(ch, from, builtin)| {
+                    let f = fit(own.as_deref(), from.as_deref())?;
+                    Some((if *builtin && f != 1 { 0 } else { f + 1 }, ch))
+                });
+        if let Some((_, ch)) = best.min_by_key(|(f, _)| *f) {
+            ins.execute(params![key, ch])?;
+        }
+    }
+    // Twins: a matched item of the same name (and no other country) lends its channel to the unmatched ones.
+    let mut twins: HashMap<String, Vec<(String, Option<String>)>> = HashMap::new();
     {
-        let mut ins =
-            tx.prepare("INSERT OR IGNORE INTO item_epg (item_key, channel) VALUES (?1, ?2)")?;
-        for (key, name) in open(&tx)? {
-            if let Some(ch) = names.get(&norm(&name)) {
-                ins.execute(params![key, ch])?;
-            }
-        }
-        // Twins: the first matched item of each normalised name lends its channel to the unmatched ones.
-        let mut twins: HashMap<String, String> = HashMap::new();
-        {
-            let mut st = tx.prepare(
-                "SELECT i.name, e.channel FROM item_epg e JOIN items i ON i.key = e.item_key ORDER BY i.position",
-            )?;
-            let rows =
-                st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
-            for row in rows {
-                let (name, ch) = row?;
-                let k = norm(&name);
-                if !k.is_empty() {
-                    twins.entry(k).or_insert(ch);
-                }
-            }
-        }
-        for (key, name) in open(&tx)? {
-            if let Some(ch) = twins.get(&norm(&name)) {
-                ins.execute(params![key, ch])?;
+        let mut st = tx.prepare(
+            "SELECT i.name, e.channel FROM item_epg e JOIN items i ON i.key = e.item_key ORDER BY i.position",
+        )?;
+        let mut rows = st.query([])?;
+        while let Some(r) = rows.next()? {
+            let name: String = r.get(0)?;
+            let k = norm(&name);
+            if !k.is_empty() {
+                twins
+                    .entry(k)
+                    .or_default()
+                    .push((r.get(1)?, country(&name)));
             }
         }
     }
-    let n = tx.query_row("SELECT count(*) FROM item_epg", [], |r| r.get::<_, i64>(0))? as usize;
-    tx.commit()?;
-    Ok(n)
+    for (key, name) in open()? {
+        let own = country(&name);
+        let best = twins
+            .get(&norm(&name))
+            .into_iter()
+            .flatten()
+            .filter_map(|(ch, from)| Some((fit(own.as_deref(), from.as_deref())?, ch)));
+        if let Some((_, ch)) = best.min_by_key(|(f, _)| *f) {
+            ins.execute(params![key, ch])?;
+        }
+    }
+    Ok(())
 }
 
 /// A programme as the screens show it.
@@ -667,7 +781,7 @@ pub fn map_channel(
         )?,
         None => conn.execute("DELETE FROM epg_map WHERE item_key = ?1", [item_key])?,
     };
-    rebuild_matches(conn)?;
+    rebuild_matches(conn, now)?;
     Ok(())
 }
 
@@ -774,7 +888,7 @@ mod tests {
         assert_eq!((stats.channels, stats.programmes), (2, 2));
         // Matching: exact id, normalised display name ("ARD" ← "DE: ARD HD"); not "Unknown", and not Arte: its guide
         // channel has no programmes (an extra source may fill it).
-        assert_eq!(rebuild_matches(&mut c).unwrap(), 2);
+        assert_eq!(rebuild_matches(&mut c, now).unwrap(), 2);
         let keys: Vec<String> = ["live:1", "live:2", "live:3", "live:4"]
             .iter()
             .map(|s| s.to_string())
@@ -902,7 +1016,7 @@ mod tests {
         for _ in 0..2 {
             import(&mut c, 1, provider.as_bytes(), now, 2, 7, 0).unwrap();
             import(&mut c, 2, extra.as_bytes(), now, 2, 7, 0).unwrap();
-            rebuild_matches(&mut c).unwrap();
+            rebuild_matches(&mut c, now).unwrap();
             let keys: Vec<String> = (1..=4).map(|i| format!("live:{i}")).collect();
             let titles: Vec<Option<String>> = now_next(&c, &keys, now)
                 .unwrap()
@@ -930,14 +1044,98 @@ mod tests {
     }
 
     #[test]
+    fn a_shared_name_needs_the_right_country_and_a_running_schedule() {
+        let mut c = crate::db::open(Path::new(":memory:")).unwrap();
+        c.execute_batch(
+            "INSERT INTO epg_sources (id, url, builtin, updated_at) VALUES (1, 'builtin', 1, 0),
+             (2, 'https://h.invalid/epg_ripper_DE1.xml.gz', 0, 0), (3, 'https://h.invalid/epg_ripper_UK1.xml.gz', 0, 0)",
+        )
+        .unwrap();
+        let pl = "#EXTM3U\n\
+            #EXTINF:-1,Comedy HD UK\nhttp://h/live/u/p/1.ts\n\
+            #EXTINF:-1,Comedy DE\nhttp://h/live/u/p/2.ts\n\
+            #EXTINF:-1,Comedy AT\nhttp://h/live/u/p/3.ts\n\
+            #EXTINF:-1,Comedy RU\nhttp://h/live/u/p/4.ts\n\
+            #EXTINF:-1 tvg-id=\"old\",Krimi DE\nhttp://h/live/u/p/5.ts\n";
+        crate::db::import_m3u(&mut c, pl.as_bytes(), &[]).unwrap();
+        let now = 1_763_742_000;
+        let doc = |id: &str, name: &str, hours: &str, title: &str| {
+            format!(
+                r#"<channel id="{id}"><display-name>{name}</display-name></channel>
+                   <programme start="20251121{hours}0000 +0100" stop="20251121180000 +0100" channel="{id}"><title>{title}</title></programme>"#
+            )
+        };
+        // The provider's schedule for "old" ended at noon; the German file has the channel under the same id.
+        let ended = r#"<tv><channel id="old"><display-name>Alt</display-name></channel>
+            <programme start="20251121110000 +0100" stop="20251121120000 +0100" channel="old"><title>Ended</title></programme></tv>"#;
+        let de = format!(
+            "<tv>{}{}</tv>",
+            doc("c.de", "Comedy", "17", "German"),
+            doc("old", "Krimi", "17", "Krimi now")
+        );
+        let uk = format!("<tv>{}</tv>", doc("c.uk", "Comedy", "17", "British"));
+        for _ in 0..2 {
+            import(&mut c, 1, ended.as_bytes(), now, 2, 7, 0).unwrap();
+            import(&mut c, 2, de.as_bytes(), now, 2, 7, 0).unwrap();
+            import(&mut c, 3, uk.as_bytes(), now, 2, 7, 0).unwrap();
+            rebuild_matches(&mut c, now).unwrap();
+            let keys: Vec<String> = (1..=5).map(|i| format!("live:{i}")).collect();
+            let titles: Vec<Option<String>> = now_next(&c, &keys, now)
+                .unwrap()
+                .into_iter()
+                .map(|(n, _)| n.map(|p| p.title))
+                .collect();
+            let some = |s: &str| Some(s.to_string());
+            assert_eq!(
+                titles,
+                [
+                    some("British"), // although the German file ranks first
+                    some("German"),
+                    some("German"), // Germany, Austria and Switzerland share channels
+                    None,           // no Russian guide: better none than a wrong one
+                    some("Krimi now"),
+                ]
+            );
+        }
+    }
+
+    #[test]
     fn names_normalise_for_matching() {
         for (raw, want) in [
             ("DE | Das Erste HD", "daserste"),
             ("[DE] ZDF FHD", "zdf"),
             ("Sky Cinema (HEVC)", "skycinema"),
             ("BBC-One", "bbcone"),
+            // A country code at the end, or before a dash (several community files).
+            ("Kanal 5 FHD DE", "kanal5"),
+            ("AT - Kanal 5", "kanal5"),
+            // Only known codes, and never the whole name.
+            ("Kanal TV", "kanaltv"),
+            ("DE", "de"),
+            // Accents fold; a plus is a different channel, not decoration.
+            ("Planète Süd", "planetesud"),
+            ("3+", "3plus"),
+            ("Kanal +1", "kanalplus1"),
         ] {
             assert_eq!(norm(raw), want, "{raw}");
+        }
+        for (raw, want) in [
+            ("Kanal 5 HD DE", Some("DE")),
+            ("AT - Kanal 5", Some("AT")),
+            ("|DE| Kanal", Some("DE")),
+            ("GB: Kanal", Some("UK")),
+            ("Kanal (RS)", Some("RS")),
+            ("Kanal 5", None),
+        ] {
+            assert_eq!(country(raw).as_deref(), want, "{raw}");
+        }
+        for (url, want) in [
+            ("https://h.invalid/epg_ripper_AT1.xml.gz", Some("AT")),
+            ("https://h.invalid/epg_ripper_BEIN1.xml.gz", Some("QA")),
+            ("https://free-epg.de/api/epg/gb.xml.gz", Some("UK")),
+            ("https://h.invalid/guide.xml", None),
+        ] {
+            assert_eq!(source_country(url).as_deref(), want, "{url}");
         }
     }
 }

@@ -271,7 +271,7 @@ impl Library {
     /// channels to the guide, since items may have changed.
     pub async fn sync(&self) -> Result<SyncResult> {
         let r = self.sync_catalogue().await?;
-        epg::rebuild_matches(&mut self.conn.lock().unwrap())?;
+        epg::rebuild_matches(&mut self.conn.lock().unwrap(), now())?;
         Ok(r)
     }
 
@@ -787,7 +787,7 @@ impl Library {
             "DELETE FROM epg_sources WHERE id = ?1 AND builtin = 0",
             [id],
         )?;
-        epg::rebuild_matches(&mut conn)?;
+        epg::rebuild_matches(&mut conn, now())?;
         Ok(())
     }
 
@@ -843,7 +843,7 @@ impl Library {
         {
             let mut conn = self.conn.lock().unwrap();
             epg::prune(&conn, now(), 2)?;
-            epg::rebuild_matches(&mut conn)?;
+            epg::rebuild_matches(&mut conn, now())?;
         }
         self.guide_sources()
     }
