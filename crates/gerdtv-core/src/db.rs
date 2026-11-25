@@ -167,6 +167,16 @@ const MIGRATIONS: &[&str] = &[
      INSERT INTO epg_names_new SELECT norm, channel FROM epg_names;
      DROP TABLE epg_names;
      ALTER TABLE epg_names_new RENAME TO epg_names;",
+    // 9 → 10: guide sources: an offset of their own (the profile's stays the provider's; extra sources take it over,
+    // so nothing shifts on update), what the server said about the last download (to ask for changes only) and what
+    // it was imported with. Channels: whether the file has programmes for them, for the mapping suggestions.
+    "ALTER TABLE epg_sources ADD COLUMN offset_hours INTEGER NOT NULL DEFAULT 0;
+     ALTER TABLE epg_sources ADD COLUMN etag TEXT NOT NULL DEFAULT '';
+     ALTER TABLE epg_sources ADD COLUMN last_modified TEXT NOT NULL DEFAULT '';
+     ALTER TABLE epg_sources ADD COLUMN imported_with TEXT NOT NULL DEFAULT '';
+     ALTER TABLE epg_channels ADD COLUMN filled INTEGER NOT NULL DEFAULT 0;
+     UPDATE epg_sources SET offset_hours = coalesce((SELECT CAST(value AS INTEGER) FROM settings
+        WHERE key = 'guide_offset_hours'), 0) WHERE builtin = 0;",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -643,6 +653,12 @@ fn typo_budget(len: usize) -> usize {
         4..=6 => 1,
         _ => 2,
     }
+}
+
+/// Whether two words are the same but for a typo (within the budget of the shorter one).
+pub fn is_typo(a: &str, b: &str) -> bool {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    a == b || osa(&a, &b) <= typo_budget(a.len().min(b.len()))
 }
 
 /// The index terms a word could be a typo of: within its budget of the word, compared with the term's start too (the
@@ -1655,6 +1671,51 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             )
             .unwrap();
         assert_eq!(kept, 20);
+    }
+
+    /// 9 → 10: extra guide sources take over the profile's offset (the provider's stays in the setting), mappings stay.
+    #[test]
+    fn guide_offsets_move_to_the_sources() {
+        let dir = std::env::temp_dir().join(format!("gerdtv-migrate10-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("p.db");
+        {
+            let c = Connection::open(&path).unwrap();
+            c.execute_batch(SCHEMA).unwrap();
+            for m in &MIGRATIONS[..8] {
+                c.execute_batch(m).unwrap();
+            }
+            c.execute_batch(
+                "INSERT INTO meta VALUES ('schema', '9');
+                 INSERT INTO settings VALUES ('guide_offset_hours', '-2', 0);
+                 INSERT INTO epg_map VALUES ('live:1', 'x', 0);
+                 INSERT INTO epg_sources (url, builtin, updated_at) VALUES ('builtin', 1, 0), ('http://example.invalid/g', 0, 0);",
+            )
+            .unwrap();
+        }
+        let c = open(&path).unwrap();
+        let offsets: Vec<i64> = c
+            .prepare("SELECT offset_hours FROM epg_sources ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_>>()
+            .unwrap();
+        assert_eq!(offsets, [0, -2]);
+        let kept: (i64, String) = c
+            .query_row(
+                "SELECT (SELECT count(*) FROM epg_map), (SELECT value FROM settings)",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(kept, (1, "-2".to_string()));
+        let backup = std::fs::read_dir(&dir)
+            .unwrap()
+            .any(|e| e.unwrap().file_name().to_string_lossy().contains(".bak-"));
+        assert!(backup);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// A version-1 database on disk gets the new column, a backup copy, and keeps its rows.

@@ -118,7 +118,17 @@ class _GuideScreenState extends State<GuideScreen> {
     await _selectGroup(groups.first);
   }
 
-  Future<void> _selectGroup(CategoryInfo g) async {
+  /// Shared with Live TV (owner decision); the group and the shown time stay.
+  Future<void> _setSort(ListSort s) async {
+    _lib.setSetting(
+      key: sortSetting(ItemKind.live, groups: false),
+      value: s.value,
+    );
+    final g = _group;
+    if (g != null) await _selectGroup(g, keepTime: true);
+  }
+
+  Future<void> _selectGroup(CategoryInfo g, {bool keepTime = false}) async {
     final items = await _lib.items(
       kind: ItemKind.live,
       category: g.id,
@@ -135,6 +145,7 @@ class _GuideScreenState extends State<GuideScreen> {
       _pages.clear();
     });
     if (_v.hasClients) _v.jumpTo(0);
+    if (keepTime) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToStart());
   }
 
@@ -173,9 +184,14 @@ class _GuideScreenState extends State<GuideScreen> {
         for (final c in _channels.skip(page * _page).take(_page)) c.key,
       ];
       final day = _day;
+      final channels = _channels;
       _lib.guideWindow(keys: keys, from: _from, to: _to).then((r) {
         _loading.remove(page);
-        if (mounted && day == _day) setState(() => _pages[page] = r);
+        if (!mounted) return;
+        // Rows of another day, group or order are dropped; the redraw asks again.
+        setState(() {
+          if (day == _day && identical(channels, _channels)) _pages[page] = r;
+        });
       });
     }
     return null;
@@ -240,6 +256,13 @@ class _GuideScreenState extends State<GuideScreen> {
             ],
             onChanged: (g) => g == null ? null : _selectGroup(g),
           ),
+        SortButton(
+          value: parseSort(
+            _lib.setting(key: sortSetting(ItemKind.live, groups: false)),
+          ),
+          options: sortOptions(ItemKind.live, groups: false, xtream: true),
+          onSelected: _setSort,
+        ),
         OutlinedButton(
           key: const Key('guide.now'),
           onPressed: () => _setDay(

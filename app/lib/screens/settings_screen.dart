@@ -21,7 +21,7 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'player_settings.dart';
-import 'player_screen.dart' show playerGesturesSetting;
+import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
@@ -246,6 +246,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'bufferReadout',
+              title: l10n.bufferReadoutShow,
+              keywords: l10n.settingsKeywordsBuffer,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.bufferReadout'),
+                  title: Text(l10n.bufferReadoutShow),
+                  subtitle: Text(l10n.bufferReadoutShowHint),
+                  value: lib.setting(key: bufferReadoutSetting) == 'on',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: bufferReadoutSetting,
+                      value: on ? 'on' : 'off',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
           if (defaultTargetPlatform == TargetPlatform.macOS)
             SettingsEntry(
               id: 'menuBar',
@@ -314,6 +335,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: l10n.settingsTheme,
             keywords: l10n.settingsKeywordsTheme,
             build: (_) => _ThemeSettings(session: session),
+          ),
+          SettingsEntry(
+            id: 'overlay',
+            title: l10n.settingsOverlay,
+            keywords: l10n.settingsKeywordsOverlay,
+            build: (_) => _OverlaySettings(session: session),
           ),
           SettingsEntry(
             id: 'logo',
@@ -809,6 +836,32 @@ class _ThemeSettings extends StatelessWidget {
                 : (v) => session.setTheme(t.copyWith(black: v)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Settings → Appearance → Player banner: how much of the picture shows through it, in steps of 10 %.
+class _OverlaySettings extends StatelessWidget {
+  const _OverlaySettings({required this.session});
+  final Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: session.overlayTranslucency,
+      builder: (context, percent, _) => ListTile(
+        title: Text(l10n.settingsOverlay),
+        subtitle: Slider(
+          key: const Key('settings.overlay'),
+          max: Session.maxOverlayTranslucency.toDouble(),
+          divisions: Session.maxOverlayTranslucency ~/ 10,
+          label: '$percent %',
+          value: percent.toDouble(),
+          onChanged: (v) => session.setOverlayTranslucency(v.round()),
+        ),
+        trailing: Text('$percent %'),
       ),
     );
   }

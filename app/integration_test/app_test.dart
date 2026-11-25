@@ -157,7 +157,7 @@ void main() {
     expect(await pauseWait(), 2);
     await tester.tapAt(const Offset(10, 10)); // close the sheet
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.textContaining('/ 2 s'), findsOneWidget);
+    expect(session.adapter.target.value, 2);
 
     // Desktop mini player: the window shrinks to the floating player, playback continues, Restore brings it back.
     final mini = MiniWindow();
@@ -191,6 +191,8 @@ void main() {
     final i = session.zapList.indexWhere((c) => c.key == before);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await waitFor(tester, find.byKey(const Key('player.banner')));
+    // The buffer readout is off unless switched on (on: the guide's Watch below).
+    expect(find.byKey(const Key('player.bufferReadout')), findsNothing);
     expect(session.nowPlaying.value!.key, session.zapList[i + 1].key);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await waitFor(tester, find.byKey(const Key('player.panel')));
@@ -334,7 +336,7 @@ void main() {
     // The programme's sheet: the top hit is running, Watch plays its channel live.
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     // macOS slides the player in from the right: Stop (right edge) is outside the window until it settles.
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     // Back in search for real (the field also exists underneath an open player).
     await waitFor(tester, liveField.hitTestable());
     expect(session.nowPlaying.value, isNull);
@@ -403,7 +405,7 @@ void main() {
       );
       await tester.pump();
     }
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     // Back in search for real (the field also exists underneath the closing player).
     await waitFor(tester, liveField.hitTestable());
 
@@ -618,6 +620,13 @@ void main() {
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.text('Guide'));
     await tapReady(tester, find.byKey(const Key('guide.now')));
+    // The sort button: the order is Live TV's too; back to the provider's.
+    for (final order in ['name_desc', 'provider']) {
+      await tapReady(tester, find.byKey(const Key('list.sort')));
+      await tapReady(tester, find.byKey(Key('sort.$order')));
+      await tester.pumpAndSettle();
+      expect(lib.setting(key: 'sort_live_items'), order);
+    }
     final running = find.byWidgetPredicate(
       (w) =>
           w.key is ValueKey<String> &&
@@ -625,10 +634,13 @@ void main() {
     );
     await waitFor(tester, running.hitTestable());
     await tapReady(tester, running);
+    lib.setSetting(key: 'player_buffer_readout', value: 'on');
     await tapReady(tester, find.byKey(const Key('guide.sheet.watch')));
     await waitFor(tester, find.byKey(const Key('player.back')));
+    await waitFor(tester, find.byKey(const Key('player.bufferReadout')));
+    lib.setSetting(key: 'player_buffer_readout', value: 'off');
     expect(session.nowPlaying.value, isNotNull);
-    await tapReady(tester, find.byKey(const Key('player.stop')));
+    await tapStop(tester);
     await waitFor(tester, find.byKey(const Key('guide.now')).hitTestable());
     expect(session.nowPlaying.value, isNull);
 

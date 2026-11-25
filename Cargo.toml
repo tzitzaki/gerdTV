@@ -5,7 +5,7 @@ resolver = "3"
 members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release"]
 
 [workspace.package]
-version = "0.261125.59"
+version = "0.261125.60"
 edition = "2024"
 license = "GPL-3.0-only"
 
@@ -18,6 +18,7 @@ tracing = "0.1.44"
 thiserror = "2.0.21"
 quick-xml = "0.42.0"
 flate2 = "1.1.11"
+lzma-rust2 = { version = "0.25.0", default-features = false, features = ["std", "optimization", "xz"] }
 serde = { version = "1.0.229", features = ["derive"] }
 # TLS via rustls with the ring provider (no C toolchain for Android/iOS cross builds, unlike aws-lc-rs).
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "gzip", "stream", "http2", "charset", "query"] }

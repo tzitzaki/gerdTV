@@ -141,7 +141,7 @@ async fn live_library_and_one_playback_probe() {
     }
     // The guide: the panel's xmltv.php imported; how many live channels show a programme now.
     let t = std::time::Instant::now();
-    let sources = lib.refresh_guide(7).await.expect("guide");
+    let sources = lib.refresh_guide(7, true).await.expect("guide");
     println!(
         "guide: {} channels, {} programmes in {:.1} s, status {:?}",
         sources[0].channels,
@@ -299,7 +299,9 @@ async fn live_library_and_one_playback_probe() {
 }
 
 /// How many live channels show a guide: the provider's alone, then with a community country file added (the
-/// presets in Settings → Guide). Prints counts only, no names or URLs of the provider; no stream is opened.
+/// presets in Settings → Guide; GERDTV_GAP_SOURCES replaces it: URLs with commas, batches with semicolons). Prints counts only, no names or URLs
+/// of the provider; no stream is opened. GERDTV_GAP_FILE gets the missing channels (group, name) and every guide name:
+/// real provider output, so a file outside the repo, deleted after use.
 #[tokio::test]
 #[ignore = "needs a real account: just test-live"]
 async fn live_guide_gaps() {
@@ -327,16 +329,24 @@ async fn live_guide_gaps() {
     .unwrap();
     lib.sync().await.expect("sync");
     let mut live_keys = vec![];
+    let mut groups = std::collections::HashMap::new();
     for cat in lib.categories(Kind::Live, Sort::Provider).unwrap() {
-        live_keys.extend(
-            lib.items(Kind::Live, &cat.id, Sort::Provider, 10_000, 0)
-                .unwrap()
-                .into_iter()
-                .map(|h| h.key),
-        );
+        for h in lib
+            .items(Kind::Live, &cat.id, Sort::Provider, 10_000, 0)
+            .unwrap()
+        {
+            groups.insert(h.key.clone(), cat.name.clone());
+            live_keys.push(h.key);
+        }
     }
     let report = |label: &str| {
-        let unmatched = lib.unmatched_channels(100_000, 0, "").unwrap().len();
+        let missing = lib.unmatched_channels(100_000, 0, "").unwrap();
+        let unmatched = missing.len();
+        // "##### SPORT #####": a heading, not a channel.
+        let headings = missing
+            .iter()
+            .filter(|(_, n)| n.contains("##") || n.contains("===") || n.contains("▬▬"))
+            .count();
         let on_now = lib
             .now_next(&live_keys)
             .unwrap()
@@ -344,29 +354,45 @@ async fn live_guide_gaps() {
             .filter(|(n, _)| n.is_some())
             .count();
         println!(
-            "{label}: {} of {} live channels matched, {} show a programme now",
+            "{label}: {} of {} live channels matched, {} show a programme now ({headings} of the missing are headings)",
             live_keys.len() - unmatched,
             live_keys.len(),
             on_now
         );
     };
-    lib.refresh_guide(3).await.expect("guide");
+    lib.refresh_guide(3, true).await.expect("guide");
     report("provider guide");
-    lib.add_guide_url("https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz")
-        .unwrap();
-    let t = std::time::Instant::now();
-    let sources = lib.refresh_guide(3).await.expect("guide");
-    println!(
-        "community DE file: {} channels, {} programmes, refresh {:.1} s, status {}",
-        sources[1].channels,
-        sources[1].programmes,
-        t.elapsed().as_secs_f64(),
-        if sources[1].status.is_empty() {
-            "ok"
-        } else {
-            "error"
+    let urls = std::env::var("GERDTV_GAP_SOURCES")
+        .unwrap_or_else(|_| "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz".into());
+    // One refresh per ';' batch: each refresh downloads every source again, the provider's too.
+    for batch in urls.split(';') {
+        for url in batch.split(',') {
+            lib.add_guide_url(url).unwrap();
         }
-    );
-    report("provider + community DE");
+        let t = std::time::Instant::now();
+        let sources = lib.refresh_guide(3, true).await.expect("guide");
+        for s in &sources {
+            println!(
+                "{}: {} channels, {} programmes, status {}",
+                if s.builtin { "provider" } else { &s.url },
+                s.channels,
+                s.programmes,
+                if s.status.is_empty() { "ok" } else { "error" }
+            );
+        }
+        println!("refresh {:.1} s", t.elapsed().as_secs_f64());
+        report("  with them");
+    }
+    if let Ok(file) = std::env::var("GERDTV_GAP_FILE") {
+        let mut out = String::new();
+        for (key, name) in lib.unmatched_channels(100_000, 0, "").unwrap() {
+            let group = groups.get(&key).map(String::as_str).unwrap_or("");
+            out += &format!("M\t{group}\t{name}\n");
+        }
+        for (id, name) in lib.find_guide_channels("", 100_000).unwrap() {
+            out += &format!("G\t{id}\t{name}\n");
+        }
+        std::fs::write(file, out).unwrap();
+    }
     std::fs::remove_dir_all(&dir).unwrap();
 }

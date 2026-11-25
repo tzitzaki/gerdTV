@@ -298,6 +298,17 @@ void main() {
           find.byKey(const Key('settings.black')),
         );
         expect(black.onChanged, isNull);
+        // The player banner's translucency: stored at once; unknown values keep the default, others stay readable.
+        final overlay = tester.widget<Slider>(
+          find.byKey(const Key('settings.overlay')),
+        );
+        overlay.onChanged!(60);
+        await tester.pump();
+        expect(session.overlayTranslucency.value, 60);
+        expect(core.appSettings[Session.settingOverlayTranslucency], '60');
+        expect(find.text('60 %'), findsOneWidget);
+        expect(Session.parseOverlayTranslucency('?'), 40);
+        expect(Session.parseOverlayTranslucency('100'), 80);
         // Stored values come back; unknown ones keep the defaults.
         expect(
           ThemePrefs.parse(mode: 'light', accent: '4', tinted: 'true').tinted,

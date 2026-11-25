@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 ed25519-dalek.workspace = true
 flate2.workspace = true
+lzma-rust2.workspace = true
 quick-xml.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
@@ -21,6 +22,7 @@ tracing.workspace = true
 
 
 [dev-dependencies]
+lzma-rust2 = { workspace = true, features = ["encoder"] } # tests pack their own .xz
 criterion.workspace = true
 gerdtv-testkit = { path = "../gerdtv-testkit" }
 

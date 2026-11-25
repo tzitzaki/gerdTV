@@ -35,7 +35,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - macOS menu bar mode, on by default and switchable: closing or quitting from the Dock hides gerdTV into the menu bar; built natively in Swift (no tray_manager).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
-- Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
+- Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, lzma-rust2 (xz guides), rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
 - Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), webview_flutter with its Android and WebKit packages (trailers), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n), material_ui (Material moved out of the SDK) and cupertino_ui (its Cupertino counterpart, pulled in by material_ui; used for the phones' swipe-back slide).
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
 - Benchmarks compare A/B in one run (origin/main's core, then the branch's), not against a stored baseline.
@@ -46,7 +46,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
-- Missing guide data: twins (same name, other quality) borrow a match; community guide presets from epgshare01 (a third party; files may go away).
+- Missing guide data: community presets (epgshare01, free-epg, Rytec over plain HTTP as the one exception, Pluto TV, Samsung TV Plus, open-epg; third parties), none added by default; names match within a country (DE/AT/CH share), no automatic fuzzy matching, suggestions need a tap; programmes only for channels the profile has.
 - Secrets (provider credentials, TMDB key, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage`, are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.

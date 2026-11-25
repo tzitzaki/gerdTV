@@ -46,6 +46,8 @@
       }
     }
   },
+  "bufferReadoutShow": "Show the buffer in the player",
+  "bufferReadoutShowHint": "Buffered and target seconds over the picture.",
   "bufferSmooth": "Smooth (about 30 s)",
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",
@@ -67,7 +69,9 @@
   "guideAddUrl": "Extra XMLTV URL",
   "guideCommunity": "Community guides",
   "guideCommunityAdd": "Add a community guide",
-  "guideCommunityHint": "Free XMLTV files per country from the epgshare01 project, rebuilt daily, about 4 days ahead. Where they overlap with your provider's guide, the provider's wins.",
+  "guideCommunityHint": "Free XMLTV files from several projects, most rebuilt daily and some days ahead. Where they overlap with your provider's guide, the provider's wins. Guides you added aren't listed.",
+  "guideCommunityNone": "No more guides to add.",
+  "guideCommunitySearch": "Search country or project",
   "guideEmpty": "No channels in this group.",
   "guideFailed": "Failed: {error}",
   "@guideFailed": {
@@ -78,9 +82,12 @@
     }
   },
   "guideFindHint": "Search guide channels",
+  "guideMapped": "Mapped by hand",
+  "guideMappedNone": "No channel is mapped by hand.",
+  "guideMappedUndo": "Undo",
   "guideNever": "Not loaded yet",
   "guideOffset": "Time offset",
-  "guideOffsetHint": "For providers whose guide times are off by whole hours.",
+  "guideOffsetHint": "For a provider whose guide times are off by whole hours. Added guides have their own: tap one.",
   "guideOffsetHours": "{hours} h",
   "@guideOffsetHours": {
     "placeholders": {
@@ -100,9 +107,12 @@
   "guideProvider": "Provider guide",
   "guideRefresh": "Refresh the guide now",
   "guideRefreshing": "Loading the guide…",
-  "guideSourceStatus": "{channels} channels, {programmes} programmes · updated {time}",
+  "guideSourceStatus": "{matched} of your channels · {channels} in the guide, {programmes} programmes stored · updated {time}",
   "@guideSourceStatus": {
     "placeholders": {
+      "matched": {
+        "type": "int"
+      },
       "channels": {
         "type": "int"
       },
@@ -191,6 +201,7 @@
       }
     }
   },
+  "playerPlayPause": "Play/pause",
   "playerReconnecting": "Reconnecting ({attempt})…",
   "@playerReconnecting": {
     "placeholders": {
@@ -321,6 +332,7 @@
   "settingsKeywordsLivePlayer": "avplayer apple mpv live picture-in-picture pip floating engine battery",
   "settingsKeywordsLogo": "icon app launcher",
   "settingsKeywordsOffset": "time zone hours",
+  "settingsKeywordsOverlay": "player banner overlay transparency opacity translucent",
   "settingsKeywordsPremiumize": "debrid premiumize cloud",
   "settingsKeywordsProfiles": "profile account provider switch add another",
   "settingsKeywordsRemove": "logout delete sign out",
@@ -345,6 +357,7 @@
   "settingsLogo": "Logo",
   "settingsLogoHint": "Also changes the app icon.",
   "settingsNoMatch": "No settings match.",
+  "settingsOverlay": "Player banner translucency",
   "settingsPlayback": "Playback",
   "settingsProvider": "Provider",
   "settingsRemove": "Remove this account",

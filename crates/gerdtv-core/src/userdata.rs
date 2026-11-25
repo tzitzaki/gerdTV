@@ -107,6 +107,9 @@ struct ChannelBuffer {
 #[derive(Debug, Serialize, Deserialize)]
 struct GuideUrl {
     url: String,
+    /// Missing in older exports.
+    #[serde(default)]
+    offset_hours: i64,
     updated_at: i64,
 }
 
@@ -215,11 +218,12 @@ pub fn export(conn: &Connection) -> rusqlite::Result<String> {
         )?,
         guide_urls: rows(
             conn,
-            "SELECT url, updated_at FROM epg_sources WHERE builtin = 0 ORDER BY url",
+            "SELECT url, offset_hours, updated_at FROM epg_sources WHERE builtin = 0 ORDER BY url",
             |r| {
                 Ok(GuideUrl {
                     url: r.get(0)?,
-                    updated_at: r.get(1)?,
+                    offset_hours: r.get(1)?,
+                    updated_at: r.get(2)?,
                 })
             },
         )?,
@@ -324,8 +328,8 @@ pub fn import(conn: &mut Connection, json: &str) -> Result<ImportCounts, UserDat
     for g in &file.guide_urls {
         // Same URL = same source; the next guide refresh imports a new one.
         n.guide_urls += tx.execute(
-            "INSERT INTO epg_sources (url, builtin, updated_at) VALUES (?1, 0, ?2) ON CONFLICT (url) DO NOTHING",
-            params![g.url, g.updated_at],
+            "INSERT INTO epg_sources (url, builtin, offset_hours, updated_at) VALUES (?1, 0, ?2, ?3) ON CONFLICT (url) DO NOTHING",
+            params![g.url, g.offset_hours, g.updated_at],
         )?;
     }
     for r in &file.resume {

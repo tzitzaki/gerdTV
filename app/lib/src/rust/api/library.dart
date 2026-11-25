@@ -100,7 +100,7 @@ abstract class Library implements RustOpaqueInterface {
   });
 
   /// Seconds since the oldest successful import (None: never); the app refreshes when it is over 12 h.
-  Future<PlatformInt64?> guideAge();
+  Future<bool> guideDue();
 
   /// The guide sources, the provider's first.
   Future<List<GuideSourceInfo>> guideSources();
@@ -134,6 +134,9 @@ abstract class Library implements RustOpaqueInterface {
 
   /// Maps a live item to a guide channel by hand (None: back to automatic matching).
   Future<void> mapChannel({required String itemKey, String? channel});
+
+  /// The channels mapped by hand, with their guide channel's name.
+  Future<List<MappedChannel>> mappedChannels();
 
   /// Now and next for each item key, in the same order.
   Future<List<NowNext>> nowNext({required List<String> keys});
@@ -172,7 +175,10 @@ abstract class Library implements RustOpaqueInterface {
   void recordSearch({required String section, required String query});
 
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
-  Future<List<GuideSourceInfo>> refreshGuide({required int daysAhead});
+  Future<List<GuideSourceInfo>> refreshGuide({
+    required int daysAhead,
+    required bool force,
+  });
 
   /// Reminders still to come, soonest first.
   Future<List<ReminderInfo>> reminders();
@@ -226,6 +232,9 @@ abstract class Library implements RustOpaqueInterface {
     required bool hidden,
   });
 
+  /// An extra source's own time offset in hours (applied by the next refresh).
+  Future<void> setGuideOffset({required PlatformInt64 id, required int hours});
+
   Future<void> setPreferHls({required String key, required bool hls});
 
   Future<void> setReminder({required ReminderInfo reminder, required bool on_});
@@ -248,6 +257,12 @@ abstract class Library implements RustOpaqueInterface {
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});
+
+  /// Guide channels an unmatched channel may be, best first.
+  Future<List<ChannelRef>> suggestGuideChannels({
+    required String itemKey,
+    required int limit,
+  });
 
   Future<SyncSummary> sync_();
 
@@ -388,6 +403,10 @@ class GuideSourceInfo {
   final int channels;
   final int programmes;
 
+  /// How many of the profile's channels show this source's programmes.
+  final int matched;
+  final int offsetHours;
+
   const GuideSourceInfo({
     required this.id,
     required this.url,
@@ -396,6 +415,8 @@ class GuideSourceInfo {
     required this.status,
     required this.channels,
     required this.programmes,
+    required this.matched,
+    required this.offsetHours,
   });
 
   @override
@@ -406,7 +427,9 @@ class GuideSourceInfo {
       lastFetch.hashCode ^
       status.hashCode ^
       channels.hashCode ^
-      programmes.hashCode;
+      programmes.hashCode ^
+      matched.hashCode ^
+      offsetHours.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -419,7 +442,9 @@ class GuideSourceInfo {
           lastFetch == other.lastFetch &&
           status == other.status &&
           channels == other.channels &&
-          programmes == other.programmes;
+          programmes == other.programmes &&
+          matched == other.matched &&
+          offsetHours == other.offsetHours;
 }
 
 /// One stream_health row.
@@ -590,6 +615,31 @@ class KindCount {
           runtimeType == other.runtimeType &&
           kind == other.kind &&
           count == other.count;
+}
+
+/// A live channel mapped to a guide channel by hand.
+class MappedChannel {
+  final String id;
+  final String name;
+  final String guide;
+
+  const MappedChannel({
+    required this.id,
+    required this.name,
+    required this.guide,
+  });
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode ^ guide.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MappedChannel &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          guide == other.guide;
 }
 
 /// What is on a channel now and next (either may be missing).

@@ -1,10 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261125.59: leaving the app floats only what really plays; clearer player settings; readable logo in light.
-- Also .59: Live right after zapping no longer freezes about 2 s and rewinding works at once (the journey's flaky step had that cause).
-- In .58: mpv plays everything on Apple again (one player, every format); Apple's player for live is a Settings choice.
-- Also .58: with Apple's player, DVB-sound channels play (MP2 left out, AC-3 kept) and what it can't play goes to mpv within 15 s.
+- Version 0.261125.60: more channels with a guide; the player's banner at the bottom; Stop beside play/pause everywhere.
+- Guide names match without country code, only within a country (DE/AT/CH share); live report: 2109 provider only, 2398 of 5097 with 50 guides.
+- Presets from six projects; suggestions map with one tap; programmes are stored only for the profile's channels (schema 10).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -38,8 +37,8 @@
 - Trailers play in YouTube's embed in a web view; YouTube refuses embeds without a referrer (error 153), so gerdTV sends its own origin.
 - Tracking matches by cleaned title and year; a provider name that keeps decorations clean_title misses is sent as it is (tracking.rs).
 - Player gestures use media_kit's own: no seek swipe on live channels (timeshift keeps its bar); the volume swipe sets mpv's volume, not the system's.
-- The community guide presets point at epgshare01, a third party: a file that moves shows as the source's error in Settings → Guide.
-- About 1000 provider channels are listed without programmes; they now count as "without guide" and can take a community guide or a mapping.
+- The guide presets are third parties: free-epg has no licence or named operator and some stale feeds; open-epg is mid-migration.
+- Guide names are judged by country code; a provider without codes in its names falls back to the sources' order.
 - Own engines in CI: Android and macOS play the testkit clip headless (smoke: ok); iOS only compiles; picture, hwdec and PiP are device checks.
 - With Apple's player chosen, a channel starts once its local HLS has three segments (~6 s): slower zapping than mpv's Fast zap.
 - Background PiP of mpv's picture switches mpv to software rendering at PiP size: a short picture hiccup on leaving and returning.
@@ -55,6 +54,7 @@
 - flutter_secure_storage_linux crashes the app when deleting a key that was never written: delete only what exists (Session.removeProfile).
 
 ## Ideas not chosen
+- The provider's short EPG per channel, and an own iptv-org grabber on a server.
 - Seamless reconnect with a second player taking over (costs a second provider connection).
 - A persistent macOS Finder icon for the chosen logo (changing the app bundle breaks its code signature).
 - A Vulkan render path for mpv (mpv 0.42 has no Vulkan render API, mpv#18343; it would be our own mpv patch).

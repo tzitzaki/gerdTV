@@ -18,9 +18,9 @@ One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the pla
 | `hidden_groups` | user data: groups the user hid (kind, provider category id, `updated_at`); an Xtream Codes episode is hidden with its series' group | `kind, category` |
 | `resume` | user data: where a movie or episode was left (position and duration in seconds, `updated_at`); kept from 2 min, removed from 95 % | `key` |
 | `stream_prefs` | per channel: whether the HLS form worked last (the watchdog's TS ↔ HLS switch), its own buffer preset (empty = the profile's), the last measured video bitrate, `updated_at` | `key` |
-| `epg_channels`, `epg_names` | guide channels (id, first display name, icon, the highest-ranked source listing it) and every display name normalised for matching, per channel | `id` / `norm, channel` |
+| `epg_channels`, `epg_names` | guide channels (id, first display name, icon, the highest-ranked source listing it, whether a file has programmes for it) and every display name normalised for matching, per channel | `id` / `norm, channel` |
 | `programmes`, `programmes_fts` | guide programmes (channel, start/stop UTC, title, sub-title, description, category, episode, icon, source) with an FTS index over title, sub-title and description; kept 2 days back to 7 ahead | `id` |
-| `epg_sources` | the provider's built-in guide (its URL is built when needed) and extra XMLTV URLs (credentials templated out), each with last import, status and counts | `id` |
+| `epg_sources` | the provider's built-in guide (its URL is built when needed) and extra XMLTV URLs (credentials templated out), each with last import, status, counts, own time offset, the server's change markers and what the import depended on | `id` |
 | `epg_map` | user data: an item mapped to a guide channel by hand, `updated_at` | `item_key` |
 | `item_epg` | the resolved match per live item (rebuilt after every import and sync) | `item_key` |
 | `reminders` | user data: a reminder for a guide programme (channel, start, stop, title), `updated_at` | `item_key, start` |

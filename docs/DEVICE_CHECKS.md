@@ -9,10 +9,10 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
-- Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
+- Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
-- Guide: Settings → Guide shows the provider guide with channel and programme counts a minute after the first start.
+- Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
 - Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
@@ -54,7 +54,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles row by row, the mode toggle is reachable; holding OK on a channel adds it to Favourites, a short OK plays.
 - Search: Up reaches the section's search field; typed or spoken (its mic) words find channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
-- Zapping and timeshift: Up/Down switch with the banner, OK opens the channel list; Left skips 10 s back ("−0:10", Live), Right forward to now.
+- Zapping: Up/Down, banner at the bottom; OK opens the list, Left from it Stop; Left skips 10 s back ("−0:10", Live), Right to now.
 - Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
 - Your data: Export says Downloads/gerdtv-….json; Import opens a file picker that reaches that file (if none opens, note the error shown).

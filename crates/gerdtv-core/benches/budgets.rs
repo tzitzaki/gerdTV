@@ -77,7 +77,7 @@ fn guide(c: &mut Criterion) {
     let mut conn = db::open(Path::new(":memory:")).unwrap();
     db::import_m3u(&mut conn, pl.as_slice(), &[]).unwrap();
     epg::import(&mut conn, 1, xml.as_slice(), now, 2, 7, 0).unwrap();
-    epg::rebuild_matches(&mut conn).unwrap();
+    epg::rebuild_matches(&mut conn, now).unwrap();
     let keys: Vec<String> = {
         let mut st = conn
             .prepare("SELECT item_key FROM item_epg LIMIT 100")

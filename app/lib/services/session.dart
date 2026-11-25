@@ -104,15 +104,13 @@ class Session extends ChangeNotifier {
 
   /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
   bool guideRefreshing = false;
+  bool _guideAgain = false;
 
   /// Bumped after each guide import so now/next and the grid reload.
   int guideGeneration = 0;
 
-  /// Checks hourly whether the guide is older than [guideMaxAge] (the app may stay open for days).
+  /// Checks hourly whether a guide source is due (the app may stay open for days).
   Timer? _guideTimer;
-
-  /// The guide is refreshed when its oldest source is older than this (and once a profile is open without one).
-  static const guideMaxAge = Duration(hours: 12);
 
   /// Days of guide kept ahead: a week on desktop, 3 days on phones and TVs (smaller storage, slower imports).
   static int get guideDaysAhead => isDesktop ? 7 : 3;
@@ -285,6 +283,29 @@ class Session extends ChangeNotifier {
     theme.value = t;
   }
 
+  /// How much of the picture shows through the player's banner, in percent (app-wide, Settings → Appearance).
+  final overlayTranslucency = ValueNotifier(defaultOverlayTranslucency);
+  static const settingOverlayTranslucency = 'overlay_translucency';
+
+  /// White on black at 40 % stays readable (5.7:1) even over a white picture; the slider ends at [maxOverlayTranslucency].
+  static const defaultOverlayTranslucency = 40, maxOverlayTranslucency = 80;
+
+  /// The stored value; anything unknown is the default.
+  static int parseOverlayTranslucency(String? v) =>
+      (int.tryParse(v ?? '') ?? defaultOverlayTranslucency).clamp(
+        0,
+        maxOverlayTranslucency,
+      );
+
+  Future<void> setOverlayTranslucency(int percent) async {
+    overlayTranslucency.value = percent;
+    setAppSetting(
+      dir: await _dir(),
+      key: settingOverlayTranslucency,
+      value: '$percent',
+    );
+  }
+
   /// macOS: whether closing keeps gerdTV in the menu bar (Settings → Playback; app-wide).
   bool menuBar = true;
 
@@ -308,6 +329,9 @@ class Session extends ChangeNotifier {
       accent: appSetting(dir: dir, key: settingThemeAccent),
       tinted: appSetting(dir: dir, key: settingThemeTinted),
       black: appSetting(dir: dir, key: settingThemeBlack),
+    );
+    overlayTranslucency.value = parseOverlayTranslucency(
+      appSetting(dir: dir, key: settingOverlayTranslucency),
     );
     menuBar = menuBarOn(appSetting(dir: dir, key: settingMenuBar));
     unawaited(applyMenuBar(menuBar));
@@ -449,7 +473,7 @@ class Session extends ChangeNotifier {
     await refreshGuide();
   }
 
-  /// Refreshes the guide when it is missing or older than [guideMaxAge] (or always with [force]: "Refresh now").
+  /// Refreshes the guide sources that are missing or too old (12 h; 6 h for a few; or all, always, with [force]: "Refresh now").
   /// Failures are kept per source (Settings → Guide shows them); the previous guide stays meanwhile.
   Future<void> refreshGuide({bool force = false}) async {
     final lib = library;
@@ -457,13 +481,17 @@ class Session extends ChangeNotifier {
       const Duration(hours: 1),
       (_) => unawaited(refreshGuide()),
     );
-    if (lib == null || guideRefreshing) return;
-    final age = await lib.guideAge();
-    if (!force && age != null && age < guideMaxAge.inSeconds) return;
+    if (lib == null) return;
+    if (guideRefreshing) {
+      // A source added meanwhile isn't in the running refresh: once more afterwards, else it waits up to 12 h.
+      _guideAgain |= force;
+      return;
+    }
+    if (!force && !await lib.guideDue()) return;
     guideRefreshing = true;
     notifyListeners();
     try {
-      await lib.refreshGuide(daysAhead: guideDaysAhead);
+      await lib.refreshGuide(daysAhead: guideDaysAhead, force: force);
       guideGeneration++;
     } catch (e) {
       debugPrint(
@@ -472,6 +500,10 @@ class Session extends ChangeNotifier {
     } finally {
       guideRefreshing = false;
       notifyListeners();
+    }
+    if (_guideAgain) {
+      _guideAgain = false;
+      await refreshGuide(force: true);
     }
   }
 

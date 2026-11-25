@@ -786,12 +786,13 @@ dependencies = [
 
 [[package]]
 name = "gerdtv-core"
-version = "0.261125.59"
+version = "0.261125.60"
 dependencies = [
  "criterion",
  "ed25519-dalek",
  "flate2",
  "gerdtv-testkit",
+ "lzma-rust2",
  "quick-xml",
  "reqwest",
  "rusqlite",
@@ -806,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "gerdtv-release"
-version = "0.261125.59"
+version = "0.261125.60"
 dependencies = [
  "ed25519-dalek",
  "serde_json",
@@ -815,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "gerdtv-testkit"
-version = "0.261125.59"
+version = "0.261125.60"
 dependencies = [
  "ed25519-dalek",
  "gerdtv-core",
@@ -827,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "gerdtv_api"
-version = "0.261125.59"
+version = "0.261125.60"
 dependencies = [
  "flutter_rust_bridge",
  "gerdtv-core",
@@ -1277,6 +1278,15 @@ name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
+
+[[package]]
+name = "lzma-rust2"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1d73c59a56771343712b22ea5615092c612c16ba291c0979e3105dfeec4890"
+dependencies = [
+ "sha2",
+]
 
 [[package]]
 name = "md-5"
