@@ -22,6 +22,8 @@
   "bufferMaxSmooth": "Maximal ruhig (ca. 90 s)",
   "bufferRaised": "Puffer für diesen Sender auf {seconds} s erhöht",
   "bufferReadout": "Puffer {buffered} / {target} s",
+  "bufferReadoutShow": "Puffer im Player anzeigen",
+  "bufferReadoutShowHint": "Gepufferte und angestrebte Sekunden über dem Bild.",
   "bufferSmooth": "Ruhig (ca. 30 s)",
   "bufferThisChannel": "Puffer für diesen Sender",
   "bufferUseDefault": "Standard verwenden",

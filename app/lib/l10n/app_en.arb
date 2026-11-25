@@ -46,6 +46,8 @@
       }
     }
   },
+  "bufferReadoutShow": "Show the buffer in the player",
+  "bufferReadoutShowHint": "Buffered and target seconds over the picture.",
   "bufferSmooth": "Smooth (about 30 s)",
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",

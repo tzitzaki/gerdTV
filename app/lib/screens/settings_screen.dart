@@ -21,7 +21,7 @@ import 'buffer_picker.dart';
 import 'guide_settings.dart';
 import 'list_modes.dart';
 import 'player_settings.dart';
-import 'player_screen.dart' show playerGesturesSetting;
+import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
@@ -239,6 +239,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (on) {
                     lib.setSetting(
                       key: playerGesturesSetting,
+                      value: on ? 'on' : 'off',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'bufferReadout',
+              title: l10n.bufferReadoutShow,
+              keywords: l10n.settingsKeywordsBuffer,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.bufferReadout'),
+                  title: Text(l10n.bufferReadoutShow),
+                  subtitle: Text(l10n.bufferReadoutShowHint),
+                  value: lib.setting(key: bufferReadoutSetting) == 'on',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: bufferReadoutSetting,
                       value: on ? 'on' : 'off',
                     );
                     setState(() {});

@@ -9,7 +9,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop Live TV; a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
-- Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; the player shows "Buffer x / 30 s".
+- Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
 - Mini player: P shrinks to a floating picture that stays on top of other apps and on every Space; drag moves it; Restore returns.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.

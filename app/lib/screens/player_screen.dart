@@ -36,6 +36,9 @@ import 'track_sheet.dart';
 /// The profile setting for the player gestures: on unless "off" (Settings → Playback).
 const playerGesturesSetting = 'player_gestures';
 
+/// Profile setting: the buffer readout over the picture, "on" or off (default, owner decision).
+const bufferReadoutSetting = 'player_buffer_readout';
+
 /// The player gestures on touch screens (owner decision; media_kit's own, so they work in fullscreen too):
 /// - movies and episodes: a horizontal swipe seeks (the further, the more), a double tap on the left or right third
 ///   skips 10 s;
@@ -243,6 +246,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Without a channel list, OK on a remote moves onto play/pause and Stop ([DpadControls]): meanwhile the arrows and
   /// OK belong to them. Up goes back to the picture.
   bool _dpad = false;
+  bool get _readout =>
+      widget.session.library?.setting(key: bufferReadoutSetting) == 'on';
   final _rootFocus = FocusNode();
 
   void _leaveDpad() {
@@ -668,7 +673,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           // Above the controls and the buffer readout, so all can show at once.
                           bottom:
                               _controlsHeight +
-                              Tokens.space * 3 +
+                              (_readout ? Tokens.space * 3 : 0) +
                               MediaQuery.paddingOf(context).bottom,
                           left: Tokens.space * 2,
                           right: Tokens.space * 2,
@@ -698,9 +703,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             },
                           ),
                         ),
-                      // Buffered seconds vs. the target (above the controls: on them it took Stop's clicks). Hidden under the
+                      // If switched on: buffered seconds vs. the target (above the controls: on them it took Stop's clicks). Hidden under the
                       // channel list, which reaches that corner on a phone (the screen check found them overlapping).
-                      if (!_panel)
+                      if (_readout && !_panel)
                         Positioned(
                           left: Tokens.space * 2,
                           bottom:
