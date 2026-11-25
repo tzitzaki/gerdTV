@@ -191,6 +191,7 @@
       }
     }
   },
+  "playerPlayPause": "Play/pause",
   "playerReconnecting": "Reconnecting ({attempt})…",
   "@playerReconnecting": {
     "placeholders": {

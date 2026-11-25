@@ -240,9 +240,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await _showBanner();
   }
 
+  /// Without a channel list, OK on a remote moves onto play/pause and Stop ([DpadControls]): meanwhile the arrows and
+  /// OK belong to them. Up goes back to the picture.
+  bool _dpad = false;
+  final _rootFocus = FocusNode();
+
+  void _leaveDpad() {
+    setState(() => _dpad = false);
+    _rootFocus.requestFocus();
+  }
+
   void _togglePanel() {
     if (_channels.length < 2) {
       _showBanner();
+      if (!isDesktop) setState(() => _dpad = true);
       return;
     }
     setState(() => _panel = !_panel);
@@ -262,6 +273,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       setState(() => _panel = false);
       return;
     }
+    if (_dpad) return _leaveDpad();
     if (widget.session.pictureMode.value && isDesktop) {
       _toggleMini();
       return;
@@ -272,6 +284,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     widget.session.pipFailure.removeListener(_showPipFailure);
+    _rootFocus.dispose();
     _bannerTimer?.cancel();
     _shiftTick?.cancel();
     _positionSub?.cancel();
@@ -365,7 +378,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       bottomButtonBar: _shiftable
           ? [
               _pauseButton(desktop: true),
-              _stopButton(),
+              _stopButton(desktop: true),
               Expanded(child: _timeshiftBar()),
               const MaterialDesktopVolumeButton(),
               const MaterialDesktopFullscreenButton(),
@@ -374,7 +387,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           : [
               const MaterialDesktopSkipPreviousButton(),
               const MaterialDesktopPlayOrPauseButton(),
-              _stopButton(),
+              _stopButton(desktop: true),
               const MaterialDesktopSkipNextButton(),
               const MaterialDesktopVolumeButton(),
               const MaterialDesktopPositionIndicator(),
@@ -401,17 +414,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _shiftable
           ? MaterialVideoControlsThemeData(
               displaySeekBar: false,
-              primaryButtonBar: [
-                const Spacer(),
-                _pauseButton(desktop: false),
-                const Spacer(),
-              ],
+              // Play/pause and Stop sit at the bottom left, as on desktop; media_kit hides the centre while buffering.
+              primaryButtonBar: const [],
               bottomButtonBar: [
+                _pauseButton(desktop: false),
+                _stopButton(desktop: false),
                 Expanded(child: _timeshiftBar()),
                 const MaterialFullscreenButton(),
               ],
             )
-          : kDefaultMaterialVideoControlsThemeData,
+          : MaterialVideoControlsThemeData(
+              primaryButtonBar: const [],
+              bottomButtonBar: [
+                const MaterialPlayOrPauseButton(),
+                _stopButton(desktop: false),
+                const MaterialPositionIndicator(),
+                const Spacer(),
+                const MaterialFullscreenButton(),
+              ],
+            ),
       enabled:
           widget.session.library?.setting(key: playerGesturesSetting) != 'off',
       vod: _current.kind != ItemKind.live,
@@ -458,25 +479,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
         : MaterialCustomButton(
             key: const Key('player.pause'),
             icon: icon,
-            iconSize: 48,
             onPressed: _togglePause,
           );
   }
 
-  /// Desktop: Stop beside play/pause in media_kit's bar. In its fullscreen (a route above this one) that route goes
-  /// first, else the pop in [_stop] would only leave fullscreen and keep the player open without a stream.
-  Widget _stopButton() => Builder(
-    builder: (context) => Tooltip(
-      message: AppLocalizations.of(context).stop,
-      child: MaterialDesktopCustomButton(
-        key: const Key('player.stop'),
-        icon: const Icon(Icons.stop),
-        onPressed: () async {
-          if (isFullscreen(context)) await exitFullscreen(context);
-          await _stop();
-        },
-      ),
-    ),
+  /// Stop beside play/pause in media_kit's bar. In its fullscreen (a route above this one) that route goes first, else
+  /// the pop in [_stop] would only leave fullscreen and keep the player open without a stream.
+  Widget _stopButton({required bool desktop}) => Builder(
+    builder: (context) {
+      const key = Key('player.stop');
+      final icon = Icon(
+        Icons.stop,
+        semanticLabel: AppLocalizations.of(context).stop,
+      );
+      Future<void> onPressed() async {
+        if (isFullscreen(context)) await exitFullscreen(context);
+        await _stop();
+      }
+
+      return desktop
+          ? MaterialDesktopCustomButton(
+              key: key,
+              icon: icon,
+              onPressed: onPressed,
+            )
+          : MaterialCustomButton(key: key, icon: icon, onPressed: onPressed);
+    },
   );
 
   @override
@@ -490,7 +518,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SingleActivator(LogicalKeyboardKey.space): _togglePause,
         const SingleActivator(LogicalKeyboardKey.keyS): _stop,
         // Only while the channel list is closed: inside it these keys move the focus and pick a channel.
-        if (!_panel) ...{
+        if (!_panel && !_dpad) ...{
           const SingleActivator(LogicalKeyboardKey.arrowUp): () => _zap(-1),
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _zap(1),
           const SingleActivator(LogicalKeyboardKey.enter): _togglePanel,
@@ -505,6 +533,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         },
       },
       child: Focus(
+        focusNode: _rootFocus,
         autofocus: true,
         child: ListenableBuilder(
           // The engine too: its picture is another controller (session.video).
@@ -615,19 +644,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                                 const SizedBox(width: Tokens.space),
                               ],
-                              // Phone and TV: here, where it never hides (a D-pad can't bring media_kit's bar up).
-                              // Desktop: in the bar ([_stopButton]).
-                              if (!isDesktop)
-                                IconButton.filledTonal(
-                                  key: const Key('player.stop'),
-                                  tooltip: l10n.stop,
-                                  icon: const Icon(Icons.stop),
-                                  onPressed: _stop,
-                                ),
                             ],
                           ),
                         ),
                       ),
+                      // A D-pad can't bring media_kit's bar up (it takes a tap): play/pause and Stop stay visible.
+                      // With the channel list open, Left from it gets here.
+                      if (!isDesktop)
+                        Positioned(
+                          left: Tokens.space * 2,
+                          bottom:
+                              Tokens.space * 2 +
+                              MediaQuery.paddingOf(context).bottom,
+                          child: DpadControls(
+                            paused: _paused,
+                            onPause: _togglePause,
+                            onStop: _stop,
+                            onLeave: _dpad ? _leaveDpad : null,
+                          ),
+                        ),
                       if (_banner && !_panel)
                         Positioned(
                           // Above the controls and the buffer readout, so all can show at once.
@@ -803,6 +838,83 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Play/pause and Stop for a remote, shown only while keys (not touch) drive the app.
+class DpadControls extends StatefulWidget {
+  const DpadControls({
+    super.key,
+    required this.paused,
+    required this.onPause,
+    required this.onStop,
+    this.onLeave,
+  });
+  final bool paused;
+  final VoidCallback onPause, onStop;
+
+  /// Set while the remote is on these buttons: the first one takes the focus, and Up calls it.
+  final VoidCallback? onLeave;
+
+  @override
+  State<DpadControls> createState() => _DpadControlsState();
+}
+
+class _DpadControlsState extends State<DpadControls> {
+  final _first = FocusNode();
+
+  @override
+  void didUpdateWidget(DpadControls old) {
+    super.didUpdateWidget(old);
+    if (old.onLeave == null && widget.onLeave != null) _first.requestFocus();
+  }
+
+  void _changed(FocusHighlightMode _) => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addHighlightModeListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeHighlightModeListener(_changed);
+    _first.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (FocusManager.instance.highlightMode == FocusHighlightMode.touch) {
+      return const SizedBox.shrink();
+    }
+    final l10n = AppLocalizations.of(context);
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          key: const Key('player.dpad.pause'),
+          focusNode: _first,
+          icon: Icon(
+            widget.paused ? Icons.play_arrow : Icons.pause,
+            semanticLabel: l10n.playerPlayPause,
+          ),
+          onPressed: widget.onPause,
+        ),
+        const SizedBox(width: Tokens.space),
+        IconButton.filledTonal(
+          key: const Key('player.dpad.stop'),
+          icon: Icon(Icons.stop, semanticLabel: l10n.stop),
+          onPressed: widget.onStop,
+        ),
+      ],
+    );
+    final leave = widget.onLeave;
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.arrowUp): ?leave},
+      child: row,
     );
   }
 }

@@ -54,7 +54,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: the D-pad moves through tiles row by row, the mode toggle is reachable; holding OK on a channel adds it to Favourites, a short OK plays.
 - Search: Up reaches the section's search field; typed or spoken (its mic) words find channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
-- Zapping and timeshift: Up/Down switch with the banner, OK opens the channel list; Left skips 10 s back ("−0:10", Live), Right forward to now.
+- Zapping: Up/Down, banner at the bottom; OK opens the list, Left from it Stop; Left skips 10 s back ("−0:10", Live), Right to now.
 - Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
 - Your data: Export says Downloads/gerdtv-….json; Import opens a file picker that reaches that file (if none opens, note the error shown).
