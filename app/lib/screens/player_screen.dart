@@ -119,6 +119,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// The screen's brightness when the player opened (the brightness swipe starts there); 0.5 until it is known.
   double _brightness = 0.5;
 
+  /// OpenSubtitles: with the user's key, for a movie or episode in mpv (not catch-up or Premiumize files).
+  bool get _canFindSubtitles =>
+      widget.session.subtitlesKey != null &&
+      !widget.session.onAvPlayer.value &&
+      (_current.kind == ItemKind.movie || _current.kind == ItemKind.episode) &&
+      !_current.key.startsWith('catchup:') &&
+      !_current.key.startsWith('premiumize:');
+
   ItemInfo get _current => widget.session.nowPlaying.value ?? widget.item;
   List<ItemInfo> get _channels => widget.session.zapList;
   static final _miniWindow = MiniWindow();
@@ -740,6 +748,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                 ? null
                                                 : widget.session.setDelay,
                                             delays: widget.session.delays,
+                                            onFind: _canFindSubtitles
+                                                ? () => showFoundSubtitles(
+                                                    context,
+                                                    found: widget.session
+                                                        .findSubtitles(
+                                                          l10n.localeName,
+                                                        ),
+                                                    onPick: widget
+                                                        .session
+                                                        .loadSubtitle,
+                                                  )
+                                                : null,
                                           ),
                                         ),
                                       );

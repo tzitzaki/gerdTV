@@ -31,9 +31,10 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 16. Wrap-up
 
 ## State
-Steps 0–12 done 20:23 (Simkl import tested on the mock only: no client id registered yet) (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: step 13 (OpenSubtitles). Open questions: none blocking.
+Steps 0–13 done 20:37 (Simkl import tested on the mock only: no client id registered yet) (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: the watchdog fix, then step 14 (recordings). Open questions: none blocking.
 Step 10: core committed, app side written 23:17 (not committed), integration running; then step 11 (TMDB: read its terms first).
 Found 23:37: an episode's end is reported twice, the stream reopened in between (the watchdog reopening a finished VOD?). To check after step 10.
 Resumed 19:36 (idle 00:23–19:35, my mistake). Step 10: fixing the journey's ambiguous long press.
 Step 11 live 19:54: 20 real movies, 18 matched by the panel's id, 0 by name, 2 unmatched (6.2 s).
+Found 20:27: the watchdog stays Playing after a VOD's end, counts a stall after 18 s and reopens near the end (up to 6 times, each a provider connection). Fix next, after step 13's integration run: State::Ended.

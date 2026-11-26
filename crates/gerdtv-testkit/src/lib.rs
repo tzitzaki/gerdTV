@@ -7,6 +7,7 @@
 pub mod fault;
 pub mod generate;
 pub mod http;
+pub mod mock_opensubtitles;
 pub mod mock_premiumize;
 pub mod mock_release;
 pub mod mock_tmdb;

@@ -391,6 +391,7 @@
   "settingsKeywordsPremiumize": "debrid premiumize cloud",
   "settingsKeywordsProfiles": "profile account provider switch add another",
   "settingsKeywordsRemove": "logout delete sign out",
+  "settingsKeywordsSubtitles": "opensubtitles subtitles srt download key",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",
   "settingsKeywordsTimeshift": "pause rewind live",
   "settingsKeywordsTmdb": "tmdb movie database posters plot cast key",
@@ -472,6 +473,15 @@
   "subtitleDelay": "Subtitle delay",
   "subtitleLanguage": "Subtitle language",
   "subtitleSize": "Subtitle size",
+  "subtitlesFind": "Find subtitles online",
+  "subtitlesHearingImpaired": "for the hearing impaired",
+  "subtitlesKey": "OpenSubtitles API key",
+  "subtitlesKeyHint": "Optional, your own (opensubtitles.com → API consumers): the player's subtitle button finds subtitles for movies and episodes. Press Enter to save; empty removes it.",
+  "subtitlesLoggedIn": "Logged in: your account's downloads count",
+  "subtitlesLogin": "Log in",
+  "subtitlesLoginHint": "Optional: your OpenSubtitles account's daily downloads instead of the key's 5.",
+  "subtitlesNone": "Nothing found.",
+  "subtitlesTranslated": "machine-translated",
   "syncFailed": "Update failed: {message}",
   "@syncFailed": {
     "placeholders": {

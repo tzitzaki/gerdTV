@@ -11,7 +11,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'playback.dart';
 import 'tracking.dart';
 
-// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `to_core`
+// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `search_for_subtitles`, `to_core`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`
 
 Future<List<ProfileInfo>> listProfiles({required String dir}) =>

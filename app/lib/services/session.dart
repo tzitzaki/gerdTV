@@ -3,6 +3,7 @@
 // Plain ChangeNotifier (docs/DECISIONS.md: no state-management packages).
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -25,6 +26,7 @@ import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/hls.dart';
 import '../src/rust/api/library.dart';
+import '../src/rust/api/subtitles.dart';
 import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
@@ -524,6 +526,11 @@ class Session extends ChangeNotifier {
       profile = p;
       premiumizeToken = await secrets.readService(p.id, 'premiumize');
       tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
+      subtitlesKey = await secrets.readService(_appSecrets, 'opensubtitles');
+      _subtitlesLogin = await secrets.readService(
+        _appSecrets,
+        'opensubtitles-login',
+      );
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
@@ -716,6 +723,81 @@ class Session extends ChangeNotifier {
     );
     tmdbKey = k == null || k.isEmpty ? null : k;
     notifyListeners();
+  }
+
+  /// OpenSubtitles (app-wide, the user's own): the API key, and optionally a login for the account's download quota
+  /// (without one, a free key allows 5 a day). The login's token is kept for this run only: logging in is
+  /// rate-limited (core: opensubtitles.rs).
+  String? subtitlesKey;
+  String? _subtitlesLogin; // JSON [username, password]
+  String? _subtitlesToken;
+
+  bool get hasSubtitlesLogin => _subtitlesLogin != null;
+
+  Future<void> setSubtitlesKey(String? key) async {
+    final k = key?.trim();
+    subtitlesKey = k == null || k.isEmpty ? null : k;
+    await secrets.writeService(_appSecrets, 'opensubtitles', subtitlesKey);
+    notifyListeners();
+  }
+
+  /// Checks the login with OpenSubtitles first (throws its reason); null removes it.
+  Future<void> setSubtitlesLogin(String? user, String? password) async {
+    _subtitlesToken = null;
+    if (user == null || user.trim().isEmpty) {
+      _subtitlesLogin = null;
+    } else {
+      _subtitlesToken = await subsLogin(
+        key: subtitlesKey ?? '',
+        username: user.trim(),
+        password: password ?? '',
+      );
+      _subtitlesLogin = jsonEncode([user.trim(), password ?? '']);
+    }
+    await secrets.writeService(
+      _appSecrets,
+      'opensubtitles-login',
+      _subtitlesLogin,
+    );
+    notifyListeners();
+  }
+
+  /// Subtitles for what plays (a movie or episode): in the preferred subtitle language, else the app's and English.
+  Future<List<SubtitleInfo>> findSubtitles(String appLanguage) async {
+    final lib = library, key = subtitlesKey, it = nowPlaying.value;
+    if (lib == null || key == null || it == null) return const [];
+    final wish = lib.setting(key: settingSubtitleLanguage);
+    final languages = trackLanguages.containsKey(wish)
+        ? wish!
+        : {appLanguage, 'en'}.join(',');
+    return subsSearch(
+      library_: lib,
+      key: key,
+      itemKey: it.key,
+      languages: languages,
+    );
+  }
+
+  /// Downloads a found subtitle and shows it in mpv (logged in first, once per run, when there is a login).
+  Future<void> loadSubtitle(SubtitleInfo s) async {
+    final key = subtitlesKey;
+    if (key == null) return;
+    if (_subtitlesToken == null && _subtitlesLogin != null) {
+      final login = (jsonDecode(_subtitlesLogin!) as List).cast<String>();
+      _subtitlesToken = await subsLogin(
+        key: key,
+        username: login[0],
+        password: login[1],
+      );
+    }
+    final path = await subsDownload(
+      key: key,
+      token: _subtitlesToken,
+      fileId: s.fileId,
+      dir: '${(await getTemporaryDirectory()).path}/subtitles',
+    );
+    // Added as a track of its own and selected; gone with the next start.
+    await (_mpv.platform as NativePlayer).command(['sub-add', path, 'select']);
   }
 
   /// The owner of app-wide secrets in secure storage (profile secrets carry the profile's id there).

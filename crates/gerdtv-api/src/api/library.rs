@@ -434,6 +434,16 @@ impl Library {
             }))
     }
 
+    /// OpenSubtitles' search for an item (not for the app: api::subtitles calls it).
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn search_for_subtitles(
+        &self,
+        key: &str,
+        languages: &str,
+    ) -> Result<Option<gerdtv_core::opensubtitles::Search>, String> {
+        self.0.subtitle_search(key, languages).map_err(err)
+    }
+
     /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
     pub fn track_item(&self, key: String) -> Result<Option<super::tracking::TrackItem>, String> {
         Ok(self

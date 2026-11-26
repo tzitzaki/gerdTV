@@ -1,0 +1,69 @@
+//! Bridge surface for OpenSubtitles (logic: gerdtv_core::opensubtitles). The app passes the user's API key (and a
+//! login token, when the user gave a login) from its secure storage with every call.
+
+use gerdtv_core::opensubtitles as core;
+use std::path::PathBuf;
+
+use crate::api::library::Library;
+
+/// One subtitle to choose in the player.
+pub struct SubtitleInfo {
+    pub file_id: u64,
+    /// ISO 639-1.
+    pub language: String,
+    pub release: String,
+    pub hearing_impaired: bool,
+    /// Machine- or AI-translated.
+    pub translated: bool,
+}
+
+fn client(key: &str) -> core::OpenSubtitles {
+    core::OpenSubtitles::new(core::BASE, key)
+}
+
+/// A token for the user's own download quota (wrong login: the error says so; don't retry, it's rate-limited).
+pub async fn subs_login(key: String, username: String, password: String) -> Result<String, String> {
+    client(&key)
+        .login(&username, &password)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Subtitles for a movie or episode of the open profile in `languages` ("de,en"; empty: all).
+pub async fn subs_search(
+    library: &Library,
+    key: String,
+    item_key: String,
+    languages: String,
+) -> Result<Vec<SubtitleInfo>, String> {
+    let Some(search) = library.search_for_subtitles(&item_key, &languages)? else {
+        return Ok(vec![]);
+    };
+    Ok(client(&key)
+        .search(&search)
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|f| SubtitleInfo {
+            file_id: f.file_id,
+            language: f.language,
+            release: f.release,
+            hearing_impaired: f.hearing_impaired,
+            translated: f.translated,
+        })
+        .collect())
+}
+
+/// Downloads a subtitle into `dir` (the cache folder); its path, for mpv's sub-add.
+pub async fn subs_download(
+    key: String,
+    token: Option<String>,
+    file_id: u64,
+    dir: String,
+) -> Result<String, String> {
+    let path = client(&key)
+        .download(file_id, token.as_deref(), &PathBuf::from(dir))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}

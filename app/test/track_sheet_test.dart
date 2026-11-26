@@ -1,9 +1,10 @@
-// New, because nothing owned the audio/subtitle choice: the button shows only when there is one (mpv's "auto" and
+// New, because nothing owned the audio/subtitle choice (and later the subtitles found online): the button shows only when there is one (mpv's "auto" and
 // "no" don't count), tracks are named by language, title and codec (or "Track n"), and a tap applies the track.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/player/track_prefs.dart';
 import 'package:gerdtv/screens/track_sheet.dart';
+import 'package:gerdtv/src/rust/api/subtitles.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -113,5 +114,54 @@ void main() {
     await open();
     expect(find.text('100 ms'), findsOneWidget);
     expect(find.text('-50 ms'), findsOneWidget);
+    expect(
+      find.byKey(const Key('track.find')),
+      findsNothing,
+      reason: 'no OpenSubtitles key',
+    );
   });
+
+  testWidgets(
+    'subtitles found online: a tap loads one, an error stays in its row',
+    (tester) async {
+      final loaded = <BigInt>[];
+      SubtitleInfo found(int id) => SubtitleInfo(
+        fileId: BigInt.from(id),
+        language: 'de',
+        release: 'Release $id',
+        hearingImpaired: id == 2,
+        translated: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showFoundSubtitles(
+                  context,
+                  found: Future.value([found(1), found(2)]),
+                  onPick: (s) async {
+                    if (s.fileId == BigInt.two) throw 'quota used up';
+                    loaded.add(s.fileId);
+                  },
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('de · for the hearing impaired'), findsOneWidget);
+      await tester.tap(find.text('Release 2'));
+      await tester.pumpAndSettle();
+      expect(find.text('quota used up'), findsOneWidget);
+      await tester.tap(find.text('Release 1'));
+      await tester.pumpAndSettle();
+      expect(loaded, [BigInt.one]);
+      expect(find.text('Release 1'), findsNothing, reason: 'the sheet closed');
+    },
+  );
 }

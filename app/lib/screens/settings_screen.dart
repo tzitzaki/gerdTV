@@ -26,6 +26,7 @@ import 'list_modes.dart';
 import 'player_settings.dart';
 import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
+import 'subtitles_settings.dart';
 import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
@@ -283,6 +284,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onFieldSubmitted: session.setTmdbKey,
               ),
             ),
+          ),
+          SettingsEntry(
+            id: 'opensubtitles',
+            section: 'OpenSubtitles',
+            title: l10n.subtitlesKey,
+            keywords: l10n.settingsKeywordsSubtitles,
+            build: (_) => SubtitlesSettings(session: session),
           ),
           if (lib != null)
             for (final t in trackServices)

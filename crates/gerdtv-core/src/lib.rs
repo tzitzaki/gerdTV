@@ -10,6 +10,7 @@ pub mod hls;
 pub mod library;
 pub mod logos;
 pub mod m3u;
+pub mod opensubtitles;
 pub mod playback;
 pub mod premiumize;
 pub mod tmdb;

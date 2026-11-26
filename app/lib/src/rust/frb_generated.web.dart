@@ -12,6 +12,7 @@ import 'api/logos.dart';
 import 'api/playback.dart';
 import 'api/premiumize.dart';
 import 'api/simple.dart';
+import 'api/subtitles.dart';
 import 'api/tracking.dart';
 import 'api/update.dart';
 
@@ -253,6 +254,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ResumeItem> dco_decode_list_resume_item(dynamic raw);
 
   @protected
+  List<SubtitleInfo> dco_decode_list_subtitle_info(dynamic raw);
+
+  @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
 
   @protected
@@ -332,6 +336,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SourceKind dco_decode_source_kind(dynamic raw);
+
+  @protected
+  SubtitleInfo dco_decode_subtitle_info(dynamic raw);
 
   @protected
   SyncSummary dco_decode_sync_summary(dynamic raw);
@@ -597,6 +604,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ResumeItem> sse_decode_list_resume_item(SseDeserializer deserializer);
 
   @protected
+  List<SubtitleInfo> sse_decode_list_subtitle_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
     SseDeserializer deserializer,
   );
@@ -688,6 +700,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SourceKind sse_decode_source_kind(SseDeserializer deserializer);
+
+  @protected
+  SubtitleInfo sse_decode_subtitle_info(SseDeserializer deserializer);
 
   @protected
   SyncSummary sse_decode_sync_summary(SseDeserializer deserializer);
@@ -1017,6 +1032,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_subtitle_info(
+    List<SubtitleInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_watchdog_command(
     List<WatchdogCommand> self,
     SseSerializer serializer,
@@ -1120,6 +1141,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_source_kind(SourceKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_subtitle_info(SubtitleInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_sync_summary(SyncSummary self, SseSerializer serializer);

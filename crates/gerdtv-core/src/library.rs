@@ -715,6 +715,26 @@ impl Library {
             .optional()?)
     }
 
+    /// What OpenSubtitles is asked for an item: TMDB's id when known, else the cleaned title and year; an episode
+    /// as its show with season and number. None for anything but a movie or episode.
+    pub fn subtitle_search(
+        &self,
+        key: &str,
+        languages: &str,
+    ) -> Result<Option<crate::opensubtitles::Search>> {
+        Ok(self.track_info(key)?.map(|t| {
+            let (title, year) =
+                crate::tracking::clean_title(if t.movie { &t.name } else { &t.show });
+            crate::opensubtitles::Search {
+                tmdb: t.tmdb,
+                title,
+                year: t.year.or(year),
+                episode: (!t.movie).then_some((t.season, t.number)),
+                languages: languages.to_string(),
+            }
+        }))
+    }
+
     /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
     /// for other kinds and for M3U sources, which have none.
     pub async fn details(&self, key: &str, tmdb: Option<&tmdb::Tmdb>) -> Result<xtream::Details> {
