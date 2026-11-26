@@ -341,6 +341,38 @@ fn android_renders_with_skia_and_has_wide_banners() {
     }
 }
 
+/// The start never flashes white: Android's launch and window backgrounds are gerdTV's dark ink in light and dark
+/// system modes (Flutter's template is white in light mode, which the Shield uses), and so is iOS's launch screen.
+#[test]
+fn launch_screens_are_dark() {
+    let res = "app/android/app/src/main/res";
+    assert!(
+        read(&format!("{res}/values/colors.xml")).contains("<color name=\"ink\">#FF12121A</color>")
+    );
+    for file in [
+        "drawable/launch_background.xml",
+        "drawable-v21/launch_background.xml",
+    ] {
+        assert!(
+            read(&format!("{res}/{file}")).contains("@color/ink"),
+            "{file}: dark background"
+        );
+    }
+    for file in ["values/styles.xml", "values-night/styles.xml"] {
+        // LaunchTheme draws launch_background (above), NormalTheme the colour itself.
+        assert!(
+            read(&format!("{res}/{file}"))
+                .contains("<item name=\"android:windowBackground\">@color/ink</item>"),
+            "{file}: NormalTheme dark"
+        );
+    }
+    assert!(
+        !read("app/ios/Runner/Base.lproj/LaunchScreen.storyboard")
+            .contains("red=\"1\" green=\"1\" blue=\"1\""),
+        "LaunchScreen.storyboard: no white background"
+    );
+}
+
 /// Every platform shows the exact name "gerdTV" (lowercase `gerdtv` only for ids and binaries).
 #[test]
 fn platforms_show_the_name_gerdtv() {
