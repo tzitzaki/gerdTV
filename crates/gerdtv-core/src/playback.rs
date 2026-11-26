@@ -242,6 +242,8 @@ pub enum State {
     Buffering,
     Reconnecting,
     Failed,
+    /// A film or episode played to its end (live never ends): nothing to watch over until it plays again.
+    Ended,
 }
 
 /// mpv's messages when it can't open an audio output (ao/…). Matched loosely on purpose: the wording differs per
@@ -376,8 +378,13 @@ impl Watchdog {
             (_, PlayerEvent::Error(m)) if hard_error(&m).is_some() => {
                 self.fail(hard_error(&m).unwrap(), Trigger::Error)
             }
-            // A live stream never ends on its own: an end of file is a failure. VOD ends normally.
-            (_, PlayerEvent::EndOfFile) if !self.live => vec![],
+            // A live stream never ends on its own: an end of file is a failure. VOD ends normally, and stays ended:
+            // the stall clock stops (it reopened a finished film near its end, up to 6 times). Seeking back plays
+            // again (a Position event), and the watchdog watches over it as before.
+            (_, PlayerEvent::EndOfFile) if !self.live => {
+                self.state = State::Ended;
+                vec![]
+            }
             (State::Reconnecting, PlayerEvent::EndOfFile | PlayerEvent::Error(_)) => vec![],
             (_, PlayerEvent::EndOfFile) => self.schedule_reload(Trigger::LiveEnd),
             (_, PlayerEvent::Error(_)) => self.schedule_reload(Trigger::Error),
@@ -601,7 +608,11 @@ mod tests {
                 vec![Command::ShowReconnecting(1)],
                 State::Reconnecting,
             ),
-            (false, vec![Playing, EndOfFile], vec![], State::Playing),
+            (false, vec![Playing, EndOfFile], vec![], State::Ended),
+            // A film that ended stays ended: no stall, no reopening near its end (each one a provider connection).
+            (false, [vec![Playing, EndOfFile], ticks(60)].concat(), vec![], State::Ended),
+            // Sought back from the end, it plays again and is watched over as before.
+            (false, vec![Playing, EndOfFile, Position(1000)], vec![], State::Playing),
             (
                 true,
                 vec![Error("x".into())],
