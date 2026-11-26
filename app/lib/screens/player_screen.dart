@@ -90,7 +90,7 @@ Video playerVideo(
   },
   onExitFullscreen: () async {
     await defaultExitNativeFullscreen();
-    window?.lock('fullscreen');
+    await window?.lock('fullscreen');
   },
 );
 
@@ -330,7 +330,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _miniWindow.enter(_pictureRatio ?? 16 / 9);
     } else {
       _miniWindow.exit();
-      window.lock('mini');
+      unawaited(window.lock('mini'));
     }
     widget.session.pictureMode.value = mini;
   }

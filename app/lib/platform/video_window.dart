@@ -84,15 +84,35 @@ class VideoWindow {
   /// Fullscreen or the mini player take over with their own size and no lock (a ratio lock keeps macOS fullscreen
   /// from filling a screen of another ratio). [lock] with the same reason puts it back.
   void unlock(String why) {
+    final w = _window;
+    if (_unlockedFor.isEmpty && w != null) {
+      _widthAtUnlock = w.contentSize.toSize().width;
+      _ratioAtUnlock = _ratio;
+    }
     _unlockedFor.add(why);
-    _window?.aspectRatio = 0;
+    w?.aspectRatio = 0;
   }
 
-  void lock(String why) {
+  /// The content width and the ratio when the lock was lifted: what the window comes back to.
+  double? _widthAtUnlock;
+  double? _ratioAtUnlock;
+
+  /// Fullscreen or the mini player ended. Their restore of the old bounds is still pending then (GTK applies it later,
+  /// and the window still reports the small size: reading it shrank the restored player to 555 px), so this waits a
+  /// moment and reads no size. The restored window has the player's ratio already; only a ratio that changed meanwhile
+  /// (zapping in the mini player) re-fits, at the width from before.
+  Future<void> lock(String why) async {
     _unlockedFor.remove(why);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     final w = _window;
-    if (w == null || _ratio == null || _unlockedFor.isNotEmpty) return;
-    _apply(w, w.contentSize.toSize().width, animate: false);
+    final ratio = _ratio;
+    final width = _widthAtUnlock;
+    if (w == null || ratio == null || _unlockedFor.isNotEmpty) return;
+    if (ratio != _ratioAtUnlock && width != null) {
+      _apply(w, width, animate: false);
+    } else {
+      w.aspectRatio = ratio;
+    }
   }
 
   /// The player closed: remember its size (the user's resizes included), drop the lock, back to the browsing size.
