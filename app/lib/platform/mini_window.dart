@@ -11,9 +11,8 @@ import 'dart:ui' as ui;
 import 'package:window_manager/window_manager.dart' as wm;
 
 class MiniWindow {
-  /// The mini window's size in logical pixels (16:9).
+  /// The mini window's width in logical pixels; its height follows the picture's ratio (no black bars).
   static const miniWidth = 480.0;
-  static const miniHeight = 270.0;
 
   // Flutter geometry here; window_manager's extensions convert to and from nativeapi's (toNative/toRect).
   ui.Rect? _restore;
@@ -26,16 +25,18 @@ class MiniWindow {
     return w;
   }
 
-  /// Shrinks into mini mode, remembering the current bounds.
-  void enter() {
+  /// Shrinks into mini mode at the picture's [ratio] (width / height; 16:9 before a picture is known), remembering the
+  /// current bounds. Resizing keeps the ratio.
+  void enter([double ratio = 16 / 9]) {
     if (isMini) return;
     final w = _window;
     _restore = w.bounds.toRect();
     w.titleBarStyle = wm.TitleBarStyle.hidden;
     w.isAlwaysOnTop = true;
     w.isVisibleOnAllWorkspaces = true; // macOS: follows the user across Spaces
-    w.minimumSize = const ui.Size(240, 135).toNative();
-    w.setSize(const ui.Size(miniWidth, miniHeight).toNative(), false);
+    w.minimumSize = ui.Size(miniWidth / 2, miniWidth / 2 / ratio).toNative();
+    w.aspectRatio = ratio;
+    w.setSize(ui.Size(miniWidth, miniWidth / ratio).toNative(), false);
   }
 
   /// Grows back to the remembered bounds.
@@ -43,6 +44,7 @@ class MiniWindow {
     final restore = _restore;
     if (restore == null) return;
     final w = _window;
+    w.aspectRatio = 0;
     w.isAlwaysOnTop = false;
     w.isVisibleOnAllWorkspaces = false;
     w.titleBarStyle = wm.TitleBarStyle.normal;

@@ -1,5 +1,6 @@
 // Spike B journey: switching the desktop window into mini-player mode and back keeps the stream running: the
-// position keeps advancing and the fault server never sees a second request for the stream.
+// position keeps advancing and the fault server never sees a second request for the stream. Also the player window's
+// sizes (VideoWindow): it takes the picture's ratio and returns to the browsing size.
 // Needs the fault server: `just test-integration` starts it and passes its URL as GERDTV_FAULT_SERVER.
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/platform/mini_window.dart';
+import 'package:gerdtv/platform/video_window.dart';
 import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
@@ -85,10 +87,28 @@ void main() {
       final requests = await liveRequests();
       final normal = mini.size;
 
-      mini.enter();
+      // The player window: the picture's ratio at the remembered player width, then back to the browsing size.
+      final settings = <String, String>{
+        VideoWindow.playerKey: '640x480', // the remembered player size
+      };
+      final window = VideoWindow(
+        read: (k) async => settings[k],
+        write: (k, v) async => settings[k] = v,
+      );
+      await window.follow(4 / 3);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect(mini.size.width, closeTo(640, 1));
+      expect(mini.size.height, closeTo(480, 1));
+      await window.leave();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect(mini.size.width, closeTo(normal.width, 1));
+      expect(mini.size.height, closeTo(normal.height, 1));
+
+      // The mini window takes the picture's ratio too (4:3 here, so no black bars).
+      mini.enter(4 / 3);
       await Future<void>.delayed(const Duration(milliseconds: 500));
       expect(mini.size.width, closeTo(MiniWindow.miniWidth, 1));
-      expect(mini.size.height, closeTo(MiniWindow.miniHeight, 1));
+      expect(mini.size.height, closeTo(MiniWindow.miniWidth * 3 / 4, 1));
       await playsOn(player, 'in mini mode');
 
       mini.exit();

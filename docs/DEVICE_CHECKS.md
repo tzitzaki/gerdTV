@@ -5,12 +5,12 @@ Things for the owner to look at on a real device; one line each, deleted once se
 ## Mac
 - Own engine: Settings → Playback → Player engine gerdTV, restart; a movie plays with picture and sound, hardware decoded.
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
-- Search: typing in TV (no click) finds channels of every group and a show's programmes with their local time; Enter plays the top one.
+- Search: in TV lists and guide "tnt 4"-style queries list the channel first, then Live now and Upcoming; Show earlier; the guide's group chip limits it.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
-- Mini player: P floats the picture on top on every Space; with another app in front hover or a click shows Mute, Restore, Stop; drag; M.
+- Player window: no black bars, resizing keeps the ratio, 4:3 channels re-fit, back returns to the list size (also after a restart); P floats it at that ratio.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
 - Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
