@@ -14,6 +14,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
 gerdtv-core.workspace = true
+tokio.workspace = true # pairing: its listener's event queue and the blocking mDNS browse
 
 [lints.rust]
 # frb_expand is a cfg flutter_rust_bridge's codegen sets while it expands macros.

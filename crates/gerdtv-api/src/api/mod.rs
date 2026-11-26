@@ -2,6 +2,7 @@ pub mod cast;
 pub mod hls;
 pub mod library;
 pub mod logos;
+pub mod pairing;
 pub mod playback;
 pub mod premiumize;
 pub mod simple;

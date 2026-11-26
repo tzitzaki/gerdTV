@@ -165,6 +165,17 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
     Ok(p)
 }
 
+/// Adds or replaces a profile exactly as given, `updated_at` included: a profile from another device (pairing.rs)
+/// keeps its time, so the next sync between the two compares the real edit times and doesn't bounce back and forth.
+pub fn put_profile(dir: &Path, p: &Profile) -> Result<()> {
+    let mut all = load_profiles(dir)?;
+    match all.iter_mut().find(|x| x.id == p.id) {
+        Some(x) => *x = p.clone(),
+        None => all.push(p.clone()),
+    }
+    store_profiles(dir, &all)
+}
+
 /// Removes a profile, its database and the database's backups (inside the app's own folder; the app confirms first).
 pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     let mut all = load_profiles(dir)?;

@@ -7,6 +7,7 @@ import 'api/cast.dart';
 import 'api/hls.dart';
 import 'api/library.dart';
 import 'api/logos.dart';
+import 'api/pairing.dart';
 import 'api/playback.dart';
 import 'api/premiumize.dart';
 import 'api/simple.dart';
@@ -43,6 +44,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLocalHlsStreamPtr;
 
   CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_PairConnectionPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnectionPtr;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_PairListenerPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListenerPtr;
+
+  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_WatchdogPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdogPtr;
 
@@ -61,6 +70,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   LocalHlsStream
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLocalHlsStream(
+    dynamic raw,
+  );
+
+  @protected
+  PairConnection
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    dynamic raw,
+  );
+
+  @protected
+  PairListener
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
     dynamic raw,
   );
 
@@ -89,10 +110,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PairConnection
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    dynamic raw,
+  );
+
+  @protected
+  PairListener
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    dynamic raw,
+  );
+
+  @protected
   Watchdog
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     dynamic raw,
   );
+
+  @protected
+  Map<String, String> dco_decode_Map_String_String_None(dynamic raw);
 
   @protected
   CastHandle
@@ -113,6 +149,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PairConnection
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    dynamic raw,
+  );
+
+  @protected
+  PairListener
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    dynamic raw,
+  );
+
+  @protected
   Watchdog
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     dynamic raw,
@@ -122,7 +170,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AppliedInfo dco_decode_applied_info(dynamic raw);
+
+  @protected
+  AppliedProfileInfo dco_decode_applied_profile_info(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
+
+  @protected
+  AppliedInfo dco_decode_box_autoadd_applied_info(dynamic raw);
+
+  @protected
+  AppliedProfileInfo dco_decode_box_autoadd_applied_profile_info(dynamic raw);
 
   @protected
   BufferPreset dco_decode_box_autoadd_buffer_preset(dynamic raw);
@@ -131,13 +191,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CastDeviceInfo dco_decode_box_autoadd_cast_device_info(dynamic raw);
 
   @protected
+  DeviceInfo dco_decode_box_autoadd_device_info(dynamic raw);
+
+  @protected
   double dco_decode_box_autoadd_f_64(dynamic raw);
 
   @protected
   ItemInfo dco_decode_box_autoadd_item_info(dynamic raw);
 
   @protected
+  LocalInfo dco_decode_box_autoadd_local_info(dynamic raw);
+
+  @protected
+  PairEvent dco_decode_box_autoadd_pair_event(dynamic raw);
+
+  @protected
+  PairLink dco_decode_box_autoadd_pair_link(dynamic raw);
+
+  @protected
+  PeerInfo dco_decode_box_autoadd_peer_info(dynamic raw);
+
+  @protected
   ProfileInfo dco_decode_box_autoadd_profile_info(dynamic raw);
+
+  @protected
+  ProfileSecretsInfo dco_decode_box_autoadd_profile_secrets_info(dynamic raw);
 
   @protected
   ProgrammeInfo dco_decode_box_autoadd_programme_info(dynamic raw);
@@ -179,7 +257,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CommandKind dco_decode_command_kind(dynamic raw);
 
   @protected
+  DeviceInfo dco_decode_device_info(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
+
+  @protected
+  FoundDevice dco_decode_found_device(dynamic raw);
 
   @protected
   GroupHit dco_decode_group_hit(dynamic raw);
@@ -218,6 +302,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<bool> dco_decode_list_bool(dynamic raw);
+
+  @protected
   List<CastDeviceInfo> dco_decode_list_cast_device_info(dynamic raw);
 
   @protected
@@ -225,6 +312,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ChannelRef> dco_decode_list_channel_ref(dynamic raw);
+
+  @protected
+  List<FoundDevice> dco_decode_list_found_device(dynamic raw);
 
   @protected
   List<GroupHit> dco_decode_list_group_hit(dynamic raw);
@@ -260,6 +350,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NowNext> dco_decode_list_now_next(dynamic raw);
 
   @protected
+  List<PeerInfo> dco_decode_list_peer_info(dynamic raw);
+
+  @protected
   List<PmEntry> dco_decode_list_pm_entry(dynamic raw);
 
   @protected
@@ -276,6 +369,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ProgrammeInfo> dco_decode_list_programme_info(dynamic raw);
+
+  @protected
+  List<(String, String)> dco_decode_list_record_string_string(dynamic raw);
 
   @protected
   List<RecordingInfo> dco_decode_list_recording_info(dynamic raw);
@@ -296,6 +392,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LocalHlsStatus dco_decode_local_hls_status(dynamic raw);
 
   @protected
+  LocalInfo dco_decode_local_info(dynamic raw);
+
+  @protected
   MappedChannel dco_decode_mapped_channel(dynamic raw);
 
   @protected
@@ -305,7 +404,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NowNext dco_decode_now_next(dynamic raw);
 
   @protected
+  Map<String, String>? dco_decode_opt_Map_String_String_None(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  AppliedInfo? dco_decode_opt_box_autoadd_applied_info(dynamic raw);
+
+  @protected
+  AppliedProfileInfo? dco_decode_opt_box_autoadd_applied_profile_info(
+    dynamic raw,
+  );
 
   @protected
   BufferPreset? dco_decode_opt_box_autoadd_buffer_preset(dynamic raw);
@@ -315,6 +425,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ItemInfo? dco_decode_opt_box_autoadd_item_info(dynamic raw);
+
+  @protected
+  PairEvent? dco_decode_opt_box_autoadd_pair_event(dynamic raw);
+
+  @protected
+  PairLink? dco_decode_opt_box_autoadd_pair_link(dynamic raw);
+
+  @protected
+  ProfileSecretsInfo? dco_decode_opt_box_autoadd_profile_secrets_info(
+    dynamic raw,
+  );
 
   @protected
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
@@ -335,6 +456,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   UpdateInfo? dco_decode_opt_box_autoadd_update_info(dynamic raw);
 
   @protected
+  List<String>? dco_decode_opt_list_String(dynamic raw);
+
+  @protected
+  PairEvent dco_decode_pair_event(dynamic raw);
+
+  @protected
+  PairLink dco_decode_pair_link(dynamic raw);
+
+  @protected
+  PeerInfo dco_decode_peer_info(dynamic raw);
+
+  @protected
   PmDeviceCode dco_decode_pm_device_code(dynamic raw);
 
   @protected
@@ -350,10 +483,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProfileInfo dco_decode_profile_info(dynamic raw);
 
   @protected
+  ProfileSecretsInfo dco_decode_profile_secrets_info(dynamic raw);
+
+  @protected
   ProgrammeHit dco_decode_programme_hit(dynamic raw);
 
   @protected
   ProgrammeInfo dco_decode_programme_info(dynamic raw);
+
+  @protected
+  QrInfo dco_decode_qr_info(dynamic raw);
+
+  @protected
+  (String, String) dco_decode_record_string_string(dynamic raw);
 
   @protected
   RecordingInfo dco_decode_recording_info(dynamic raw);
@@ -431,6 +573,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PairConnection
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairListener
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Watchdog
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     SseDeserializer deserializer,
@@ -455,8 +609,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PairConnection
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairListener
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Watchdog
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  Map<String, String> sse_decode_Map_String_String_None(
     SseDeserializer deserializer,
   );
 
@@ -479,6 +650,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PairConnection
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairListener
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Watchdog
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     SseDeserializer deserializer,
@@ -488,7 +671,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AppliedInfo sse_decode_applied_info(SseDeserializer deserializer);
+
+  @protected
+  AppliedProfileInfo sse_decode_applied_profile_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  AppliedInfo sse_decode_box_autoadd_applied_info(SseDeserializer deserializer);
+
+  @protected
+  AppliedProfileInfo sse_decode_box_autoadd_applied_profile_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BufferPreset sse_decode_box_autoadd_buffer_preset(
@@ -501,13 +700,33 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DeviceInfo sse_decode_box_autoadd_device_info(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
 
   @protected
   ItemInfo sse_decode_box_autoadd_item_info(SseDeserializer deserializer);
 
   @protected
+  LocalInfo sse_decode_box_autoadd_local_info(SseDeserializer deserializer);
+
+  @protected
+  PairEvent sse_decode_box_autoadd_pair_event(SseDeserializer deserializer);
+
+  @protected
+  PairLink sse_decode_box_autoadd_pair_link(SseDeserializer deserializer);
+
+  @protected
+  PeerInfo sse_decode_box_autoadd_peer_info(SseDeserializer deserializer);
+
+  @protected
   ProfileInfo sse_decode_box_autoadd_profile_info(SseDeserializer deserializer);
+
+  @protected
+  ProfileSecretsInfo sse_decode_box_autoadd_profile_secrets_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProgrammeInfo sse_decode_box_autoadd_programme_info(
@@ -553,7 +772,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CommandKind sse_decode_command_kind(SseDeserializer deserializer);
 
   @protected
+  DeviceInfo sse_decode_device_info(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  FoundDevice sse_decode_found_device(SseDeserializer deserializer);
 
   @protected
   GroupHit sse_decode_group_hit(SseDeserializer deserializer);
@@ -592,6 +817,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<bool> sse_decode_list_bool(SseDeserializer deserializer);
+
+  @protected
   List<CastDeviceInfo> sse_decode_list_cast_device_info(
     SseDeserializer deserializer,
   );
@@ -603,6 +831,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ChannelRef> sse_decode_list_channel_ref(SseDeserializer deserializer);
+
+  @protected
+  List<FoundDevice> sse_decode_list_found_device(SseDeserializer deserializer);
 
   @protected
   List<GroupHit> sse_decode_list_group_hit(SseDeserializer deserializer);
@@ -644,6 +875,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<NowNext> sse_decode_list_now_next(SseDeserializer deserializer);
 
   @protected
+  List<PeerInfo> sse_decode_list_peer_info(SseDeserializer deserializer);
+
+  @protected
   List<PmEntry> sse_decode_list_pm_entry(SseDeserializer deserializer);
 
   @protected
@@ -662,6 +896,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ProgrammeInfo> sse_decode_list_programme_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<(String, String)> sse_decode_list_record_string_string(
     SseDeserializer deserializer,
   );
 
@@ -692,6 +931,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LocalHlsStatus sse_decode_local_hls_status(SseDeserializer deserializer);
 
   @protected
+  LocalInfo sse_decode_local_info(SseDeserializer deserializer);
+
+  @protected
   MappedChannel sse_decode_mapped_channel(SseDeserializer deserializer);
 
   @protected
@@ -701,7 +943,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NowNext sse_decode_now_next(SseDeserializer deserializer);
 
   @protected
+  Map<String, String>? sse_decode_opt_Map_String_String_None(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  AppliedInfo? sse_decode_opt_box_autoadd_applied_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AppliedProfileInfo? sse_decode_opt_box_autoadd_applied_profile_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BufferPreset? sse_decode_opt_box_autoadd_buffer_preset(
@@ -713,6 +970,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ItemInfo? sse_decode_opt_box_autoadd_item_info(SseDeserializer deserializer);
+
+  @protected
+  PairEvent? sse_decode_opt_box_autoadd_pair_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairLink? sse_decode_opt_box_autoadd_pair_link(SseDeserializer deserializer);
+
+  @protected
+  ProfileSecretsInfo? sse_decode_opt_box_autoadd_profile_secrets_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ProgrammeInfo? sse_decode_opt_box_autoadd_programme_info(
@@ -741,6 +1011,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
+
+  @protected
+  PairEvent sse_decode_pair_event(SseDeserializer deserializer);
+
+  @protected
+  PairLink sse_decode_pair_link(SseDeserializer deserializer);
+
+  @protected
+  PeerInfo sse_decode_peer_info(SseDeserializer deserializer);
+
+  @protected
   PmDeviceCode sse_decode_pm_device_code(SseDeserializer deserializer);
 
   @protected
@@ -756,10 +1038,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProfileInfo sse_decode_profile_info(SseDeserializer deserializer);
 
   @protected
+  ProfileSecretsInfo sse_decode_profile_secrets_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ProgrammeHit sse_decode_programme_hit(SseDeserializer deserializer);
 
   @protected
   ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
+
+  @protected
+  QrInfo sse_decode_qr_info(SseDeserializer deserializer);
+
+  @protected
+  (String, String) sse_decode_record_string_string(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RecordingInfo sse_decode_recording_info(SseDeserializer deserializer);
@@ -841,6 +1136,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    PairConnection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    PairListener self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
     SseSerializer serializer,
@@ -869,8 +1178,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    PairConnection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    PairListener self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_Map_String_String_None(
+    Map<String, String> self,
     SseSerializer serializer,
   );
 
@@ -897,6 +1226,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    PairConnection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    PairListener self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
     SseSerializer serializer,
@@ -906,7 +1249,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_applied_info(AppliedInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_applied_profile_info(
+    AppliedProfileInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_applied_info(
+    AppliedInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_applied_profile_info(
+    AppliedProfileInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_buffer_preset(
@@ -921,6 +1285,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_device_info(
+    DeviceInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
 
   @protected
@@ -930,8 +1300,38 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_local_info(
+    LocalInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pair_event(
+    PairEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pair_link(
+    PairLink self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_peer_info(
+    PeerInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_profile_info(
     ProfileInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_profile_secrets_info(
+    ProfileSecretsInfo self,
     SseSerializer serializer,
   );
 
@@ -993,7 +1393,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_command_kind(CommandKind self, SseSerializer serializer);
 
   @protected
+  void sse_encode_device_info(DeviceInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_found_device(FoundDevice self, SseSerializer serializer);
 
   @protected
   void sse_encode_group_hit(GroupHit self, SseSerializer serializer);
@@ -1038,6 +1444,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_bool(List<bool> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_cast_device_info(
     List<CastDeviceInfo> self,
     SseSerializer serializer,
@@ -1052,6 +1461,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_channel_ref(
     List<ChannelRef> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_found_device(
+    List<FoundDevice> self,
     SseSerializer serializer,
   );
 
@@ -1107,6 +1522,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_now_next(List<NowNext> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_peer_info(List<PeerInfo> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_pm_entry(List<PmEntry> self, SseSerializer serializer);
 
   @protected
@@ -1136,6 +1554,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_programme_info(
     List<ProgrammeInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_record_string_string(
+    List<(String, String)> self,
     SseSerializer serializer,
   );
 
@@ -1176,6 +1600,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_local_info(LocalInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_mapped_channel(MappedChannel self, SseSerializer serializer);
 
   @protected
@@ -1185,7 +1612,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_now_next(NowNext self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_Map_String_String_None(
+    Map<String, String>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_applied_info(
+    AppliedInfo? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_applied_profile_info(
+    AppliedProfileInfo? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_buffer_preset(
@@ -1199,6 +1644,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_item_info(
     ItemInfo? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_pair_event(
+    PairEvent? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_pair_link(
+    PairLink? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_profile_secrets_info(
+    ProfileSecretsInfo? self,
     SseSerializer serializer,
   );
 
@@ -1233,6 +1696,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pair_event(PairEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pair_link(PairLink self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_peer_info(PeerInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_pm_device_code(PmDeviceCode self, SseSerializer serializer);
 
   @protected
@@ -1248,10 +1723,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_profile_info(ProfileInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_profile_secrets_info(
+    ProfileSecretsInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_programme_hit(ProgrammeHit self, SseSerializer serializer);
 
   @protected
   void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_qr_info(QrInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_record_string_string(
+    (String, String) self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_recording_info(RecordingInfo self, SseSerializer serializer);
@@ -1431,6 +1921,74 @@ class RustLibWire implements BaseWire {
       );
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLocalHlsStream =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLocalHlsStreamPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnectionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_gerdtv_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnectionPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnectionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_gerdtv_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnection =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairConnectionPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListenerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_gerdtv_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListenerPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListenerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_gerdtv_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListener =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPairListenerPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
