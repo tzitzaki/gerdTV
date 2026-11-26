@@ -376,13 +376,16 @@ void main() {
     );
     // (Scrolled to the programmes' header, the one unique widget there: a programme row isn't built until it is
     // near the screen, and a finder for "the first of none" throws.)
+    // The list is pinned by its element: a finder relative to the first row loses it once that row scrolls away.
     await waitFor(tester, find.byType(ItemRow));
-    final results = find
+    final resultsElement = find
         .ancestor(
           of: find.byType(ItemRow).first,
           matching: find.byType(Scrollable),
         )
+        .evaluate()
         .first;
+    final results = find.byElementPredicate((e) => e == resultsElement);
     await tester.scrollUntilVisible(
       find.byKey(const Key('search.showEarlier')),
       400,
@@ -476,12 +479,14 @@ void main() {
       tester,
       find.byType(ItemRow),
     ); // the results load after the player closed
-    final resultList = find
+    final resultListElement = find
         .ancestor(
           of: find.byType(ItemRow).first,
           matching: find.byType(Scrollable),
         )
+        .evaluate()
         .first;
+    final resultList = find.byElementPredicate((e) => e == resultListElement);
     expect(find.byKey(const Key('search.earlier')), findsNothing);
     final showEarlier = find.byKey(const Key('search.showEarlier'));
     await tester.scrollUntilVisible(

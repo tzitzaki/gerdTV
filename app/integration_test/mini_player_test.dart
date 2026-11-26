@@ -13,6 +13,7 @@ import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 
 import 'package:gerdtv/src/rust/api/playback.dart';
 
@@ -44,6 +45,19 @@ Future<void> playsOn(Player player, String phase) async {
     greaterThan(const Duration(seconds: 2)),
     reason: 'still playing $phase',
   );
+}
+
+/// The window's content size once it stopped changing (macOS animates the player window's resize).
+Future<({double width, double height})> settledContent() async {
+  final w = wm.WindowManager.instance.getCurrent()!;
+  var last = w.contentSize.toSize();
+  for (var i = 0; i < 30; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    final now = w.contentSize.toSize();
+    if (now == last) break;
+    last = now;
+  }
+  return (width: last.width, height: last.height);
 }
 
 void main() {
@@ -86,6 +100,7 @@ void main() {
       }
       final requests = await liveRequests();
       final normal = mini.size;
+      final normalContent = await settledContent();
 
       // The player window: the picture's ratio at the remembered player width, then back to the browsing size.
       final settings = <String, String>{
@@ -95,14 +110,17 @@ void main() {
         read: (k) async => settings[k],
         write: (k, v) async => settings[k] = v,
       );
+      // Content sizes: macOS's frame adds the title bar.
       await window.follow(4 / 3);
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      expect(mini.size.width, closeTo(640, 1));
-      expect(mini.size.height, closeTo(480, 1));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final inPlayer = await settledContent();
+      expect(inPlayer.width, closeTo(640, 1));
+      expect(inPlayer.height, closeTo(480, 1));
       await window.leave();
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      expect(mini.size.width, closeTo(normal.width, 1));
-      expect(mini.size.height, closeTo(normal.height, 1));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final back = await settledContent();
+      expect(back.width, closeTo(normalContent.width, 1));
+      expect(back.height, closeTo(normalContent.height, 1));
 
       // The mini window takes the picture's ratio too (4:3 here, so no black bars).
       mini.enter(4 / 3);
