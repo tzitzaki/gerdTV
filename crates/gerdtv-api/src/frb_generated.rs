@@ -5751,7 +5751,8 @@ fn wire__crate__api__subtitles__subs_download_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_key = <String>::sse_decode(&mut deserializer);
-            let api_token = <Option<String>>::sse_decode(&mut deserializer);
+            let api_login =
+                <Option<crate::api::subtitles::SubsLogin>>::sse_decode(&mut deserializer);
             let api_file_id = <u64>::sse_decode(&mut deserializer);
             let api_dir = <String>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -5760,7 +5761,7 @@ fn wire__crate__api__subtitles__subs_download_impl(
                     (move || async move {
                         let output_ok = crate::api::subtitles::subs_download(
                             api_key,
-                            api_token,
+                            api_login,
                             api_file_id,
                             api_dir,
                         )
@@ -5839,6 +5840,8 @@ fn wire__crate__api__subtitles__subs_search_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>,
             >>::sse_decode(&mut deserializer);
             let api_key = <String>::sse_decode(&mut deserializer);
+            let api_login =
+                <Option<crate::api::subtitles::SubsLogin>>::sse_decode(&mut deserializer);
             let api_item_key = <String>::sse_decode(&mut deserializer);
             let api_languages = <String>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -5867,6 +5870,7 @@ fn wire__crate__api__subtitles__subs_search_impl(
                         let output_ok = crate::api::subtitles::subs_search(
                             &*api_library_guard,
                             api_key,
+                            api_login,
                             api_item_key,
                             api_languages,
                         )
@@ -6893,6 +6897,17 @@ impl SseDecode for Option<crate::api::library::SimklImport> {
     }
 }
 
+impl SseDecode for Option<crate::api::subtitles::SubsLogin> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::subtitles::SubsLogin>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::tracking::TrackItem> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -7166,6 +7181,18 @@ impl SseDecode for crate::api::library::SourceKind {
             1 => crate::api::library::SourceKind::M3uUrl,
             2 => crate::api::library::SourceKind::M3uFile,
             _ => unreachable!("Invalid variant for SourceKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::subtitles::SubsLogin {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_token = <String>::sse_decode(deserializer);
+        let mut var_host = <String>::sse_decode(deserializer);
+        return crate::api::subtitles::SubsLogin {
+            token: var_token,
+            host: var_host,
         };
     }
 }
@@ -8435,6 +8462,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::library::SourceKind>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::subtitles::SubsLogin {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.token.into_into_dart().into_dart(),
+            self.host.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::subtitles::SubsLogin
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::subtitles::SubsLogin>
+    for crate::api::subtitles::SubsLogin
+{
+    fn into_into_dart(self) -> crate::api::subtitles::SubsLogin {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::subtitles::SubtitleInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -9250,6 +9298,16 @@ impl SseEncode for Option<crate::api::library::SimklImport> {
     }
 }
 
+impl SseEncode for Option<crate::api::subtitles::SubsLogin> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::subtitles::SubsLogin>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::tracking::TrackItem> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -9438,6 +9496,14 @@ impl SseEncode for crate::api::library::SourceKind {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::subtitles::SubsLogin {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.token, serializer);
+        <String>::sse_encode(self.host, serializer);
     }
 }
 
