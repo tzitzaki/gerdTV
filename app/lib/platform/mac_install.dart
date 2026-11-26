@@ -51,6 +51,7 @@ Future<String?> installMacUpdate(String zip) async {
     '$pid',
     installed,
     candidate,
+    zip, // deleted once installed
   ], mode: ProcessStartMode.detached);
   exit(0); // the swap waits for this process to end
 }
