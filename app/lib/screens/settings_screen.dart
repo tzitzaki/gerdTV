@@ -181,6 +181,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         );
                       }),
                     ),
+                  // Edit the open profile's provider: the setup form, pre-filled; a new login replaces the old one only
+                  // once it works.
+                  if (session.profile != null)
+                    ListTile(
+                      key: const Key('settings.profileEdit'),
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(l10n.profileEdit),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => SetupScreen(
+                            session: session,
+                            edit: session.profile,
+                          ),
+                        ),
+                      ),
+                    ),
                   ListTile(
                     key: const Key('settings.profileAdd'),
                     leading: const Icon(Icons.add),

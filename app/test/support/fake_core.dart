@@ -40,6 +40,27 @@ class FakeCore implements RustLibApi {
     required String dir,
   }) async => profiles;
 
+  /// Login checks: [loginError] is thrown (null: every login works); [saved] collects every saved profile.
+  String? loginError;
+  final saved = <ProfileInfo>[];
+
+  @override
+  Future<void> crateApiLibraryCheckLogin({
+    required ProfileInfo profile,
+    required List<String> secrets,
+  }) async {
+    if (loginError != null) throw loginError!;
+  }
+
+  @override
+  Future<ProfileInfo> crateApiLibrarySaveProfile({
+    required String dir,
+    required ProfileInfo profile,
+  }) async {
+    saved.add(profile);
+    return profile;
+  }
+
   /// Premiumize: every key but "bad" is accepted (the real check asks Premiumize's account/info).
   @override
   Future<void> crateApiPremiumizePmCheck({required String token}) async {

@@ -519,6 +519,26 @@ class Session extends ChangeNotifier {
     await openProfile(saved);
   }
 
+  /// Replaces the open profile's provider login (Settings → Account → Edit) only once the new one works: tested first
+  /// (nothing stored), then saved with its secrets and the profile reopened, which syncs the new catalogue; the user
+  /// data stays, it lives in the same profile database. Returns why it failed, or null; on failure the old login is
+  /// untouched and keeps working.
+  Future<String?> updateProfile(
+    ProfileInfo info,
+    List<String> newSecrets,
+  ) async {
+    try {
+      await checkLogin(profile: info, secrets: newSecrets);
+    } catch (e) {
+      return '$e';
+    }
+    final saved = await saveProfile(dir: await _dir(), profile: info);
+    await secrets.write(saved.id, newSecrets);
+    profiles = [for (final q in profiles) q.id == saved.id ? saved : q];
+    await openProfile(saved);
+    return null;
+  }
+
   /// Whether [p] opens without asking.
   bool opensAlways(ProfileInfo p) =>
       appDir != null &&

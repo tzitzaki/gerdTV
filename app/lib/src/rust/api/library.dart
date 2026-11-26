@@ -13,7 +13,7 @@ import 'playback.dart';
 import 'tracking.dart';
 
 // These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `search_for_subtitles`, `to_core`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`
 
 Future<List<ProfileInfo>> listProfiles({required String dir}) =>
     RustLib.instance.api.crateApiLibraryListProfiles(dir: dir);
@@ -38,6 +38,15 @@ Future<ProfileInfo> saveProfile({
   required ProfileInfo profile,
 }) =>
     RustLib.instance.api.crateApiLibrarySaveProfile(dir: dir, profile: profile);
+
+/// Tests a login without storing anything (Settings → Account → Edit saves only a working one).
+Future<void> checkLogin({
+  required ProfileInfo profile,
+  required List<String> secrets,
+}) => RustLib.instance.api.crateApiLibraryCheckLogin(
+  profile: profile,
+  secrets: secrets,
+);
 
 Future<void> deleteProfile({required String dir, required String id}) =>
     RustLib.instance.api.crateApiLibraryDeleteProfile(dir: dir, id: id);

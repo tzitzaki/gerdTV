@@ -1,5 +1,6 @@
 // New, because nothing owns which profile opens at start: one opens by itself, several show the picker with the last
 // one used first, "Always open this one" skips the picker, and a profile that can't open falls back to the picker.
+// Also the provider edit: a new login replaces the old one only once it works.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
@@ -11,6 +12,13 @@ import 'support/fake_core.dart';
 class NoSecrets extends Secrets {
   @override
   Future<List<String>?> read(String profileId) async => null;
+
+  /// What was written, by profile id (nothing reaches real secure storage).
+  final written = <String, List<String>>{};
+
+  @override
+  Future<void> write(String profileId, List<String> secrets) async =>
+      written[profileId] = secrets;
 }
 
 ProfileInfo profile(String id) => ProfileInfo(
@@ -45,6 +53,16 @@ void main() {
     core.appSettings[Session.settingAlwaysProfile] = 'a';
     final s = await start([profile('a'), profile('b')]);
     expect(s.state, SessionState.choosing);
+  });
+
+  test('edit: a refused login saves nothing, the old one stays', () async {
+    final s = await start([profile('a')]);
+    core.loginError = 'the server rejected the login';
+    final error = await s.updateProfile(profile('a'), ['new', 'wrong']);
+    expect(error, 'the server rejected the login');
+    expect(core.saved, isEmpty);
+    expect((s.secrets as NoSecrets).written, isEmpty);
+    core.loginError = null;
   });
 
   test('a single profile that cannot open: setup', () async {

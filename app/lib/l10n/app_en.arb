@@ -297,6 +297,7 @@
   "profileAdd": "Add a provider",
   "profileAlways": "Always open this one",
   "profileChoose": "Which provider?",
+  "profileEdit": "Edit the provider",
   "profileFailed": "Could not open (sign in again by adding it anew)",
   "profileSwitch": "Switch to {name}",
   "@profileSwitch": {
@@ -470,6 +471,7 @@
   "setupBadUrl": "Enter an address starting with http:// or https://",
   "setupConnect": "Connect",
   "setupConnecting": "Connecting and loading the catalogue…",
+  "setupEditTitle": "Edit your provider",
   "setupFailed": "Couldn't connect: {message}",
   "@setupFailed": {
     "placeholders": {
@@ -481,8 +483,10 @@
   "setupIntro": "Enter the login your provider gave you. It is stored only in this device's secure storage.",
   "setupM3u": "M3U playlist",
   "setupM3uUrl": "Playlist URL",
+  "setupName": "Name",
   "setupPassword": "Password",
   "setupRequired": "Required",
+  "setupSave": "Test and save",
   "setupServer": "Server address",
   "setupTitle": "Add your provider",
   "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",

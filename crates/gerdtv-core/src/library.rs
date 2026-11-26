@@ -177,6 +177,57 @@ pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Tests a login before it replaces a profile's working one (Settings → Account → Edit): Xtream Codes asks for the
+/// account info (a refused or expired login fails), an M3U URL must answer with a playlist (only its first bytes are
+/// read, so a big list costs nothing here; the sync after saving downloads it). Nothing is stored.
+pub async fn check_login(p: &Profile, secrets: &[String]) -> Result<()> {
+    let need = match p.source {
+        SourceKind::Xtream => 2,
+        SourceKind::M3uUrl => 1,
+        SourceKind::M3uFile => 0,
+    };
+    if secrets.len() < need {
+        return Err(LibraryError::Secrets(need));
+    }
+    match p.source {
+        SourceKind::Xtream => {
+            let ua = Some(p.user_agent.as_str());
+            Xtream::new(&p.server, &secrets[0], &secrets[1], ua)
+                .account()
+                .await?;
+        }
+        SourceKind::M3uUrl => {
+            xtream::ensure_tls_provider();
+            let net = |e: reqwest::Error| XcError::Network(e.without_url().to_string());
+            let ua = if p.user_agent.is_empty() {
+                "gerdTV"
+            } else {
+                &p.user_agent
+            };
+            let client = reqwest::Client::builder()
+                .user_agent(ua)
+                .connect_timeout(CONNECT_TIMEOUT)
+                .read_timeout(READ_TIMEOUT)
+                .build()
+                .map_err(net)?;
+            let mut res = client.get(&secrets[0]).send().await.map_err(net)?;
+            if !res.status().is_success() {
+                return Err(XcError::Http(res.status().as_u16()).into());
+            }
+            // The first chunk is enough: every M3U starts with "#EXTM3U" (after an optional UTF-8 BOM).
+            let head = res.chunk().await.map_err(net)?.unwrap_or_default();
+            let head = head.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&head);
+            if !head.trim_ascii_start().starts_with(b"#EXTM3U") {
+                return Err(XcError::Parse("playlist").into());
+            }
+        }
+        SourceKind::M3uFile => {
+            std::fs::metadata(&p.server)?;
+        }
+    }
+    Ok(())
+}
+
 fn db_path(dir: &Path, id: &str) -> PathBuf {
     dir.join("profiles").join(format!("{id}.db"))
 }
@@ -2010,6 +2061,44 @@ mod tests {
         lib.delete_recording(planned).await.unwrap();
         assert_eq!(lib.recordings().unwrap().len(), 2);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn check_login_accepts_only_a_working_login() {
+        let mock = MockXc::start(10, 1).await;
+        let xc = profile(SourceKind::Xtream, &mock.base());
+        let m3u = profile(SourceKind::M3uUrl, "");
+        let list = |user: &str| {
+            vec![format!(
+                "{}/get.php?username={user}&password={PASS}&type=m3u_plus",
+                mock.base()
+            )]
+        };
+        let s = |u: &str, p: &str| vec![u.to_string(), p.to_string()];
+        assert!(check_login(&xc, &s(USER, PASS)).await.is_ok());
+        assert!(matches!(
+            check_login(&xc, &s(USER, "wrong")).await,
+            Err(LibraryError::Xtream(XcError::Auth))
+        ));
+        assert!(check_login(&m3u, &list(USER)).await.is_ok());
+        assert!(matches!(
+            check_login(&m3u, &list("wrong")).await,
+            Err(LibraryError::Xtream(XcError::Http(401)))
+        ));
+        // Something that answers, but not with a playlist (the panel's API instead of get.php).
+        let api = vec![format!(
+            "{}/player_api.php?username={USER}&password={PASS}",
+            mock.base()
+        )];
+        assert!(matches!(
+            check_login(&m3u, &api).await,
+            Err(LibraryError::Xtream(XcError::Parse("playlist")))
+        ));
+        mock.set_expired(true);
+        assert!(matches!(
+            check_login(&xc, &s(USER, PASS)).await,
+            Err(LibraryError::Xtream(XcError::Expired(_)))
+        ));
     }
 
     #[tokio::test]
