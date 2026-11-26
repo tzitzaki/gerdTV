@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261125.62: one TV section (lists or guide), Premiumize as a section, Now Playing card, one picture when floating, no Mac keychain prompts.
+- Version 0.261126.64: the desktop player window keeps the picture's ratio, TV search lists channels then live and upcoming, Mac updates delete their download.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -22,7 +22,6 @@
 
 ## Open work
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
 - Apple minimums 27.0 once `macos-latest` runs macOS 27 (owner decision; Xcode 27 is not on it yet).
@@ -44,6 +43,7 @@
 - German public channels send no IDR frames (open GOP): with Apple's player, segments start on recovery-point I-frames.
 - Both libmpvs may be in one Apple process (media_kit links Mpv); the plugin calls only the chosen one, and mpv's ObjC class names may warn twice.
 - Linux CI hang: the app blocks at player start in the system libmpv while its Lua scripts start; CI runs integration on the own engine.
+- Local journeys on the system libmpv fail at playback (main too): use `just test-integration-gerdmpv`; Linux's mini window has no ratio lock (GTK).
 - The own Linux libmpv is built in an Ubuntu 24.04 container and must need at most glibc 2.39; the build fails otherwise.
 - The own Linux libmpv decodes with VA-API through the DRM render node only (X11 is GPL-only in mpv, 24.04's Wayland is too old).
 - The Android TV banner per launcher alias is not in Android's alias docs; if the Shield ignores it, the banner stays the wordmark.
