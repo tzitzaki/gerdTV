@@ -73,6 +73,7 @@
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
+  "choose": "Choose",
   "clear": "Clear",
   "close": "Close",
   "continueWatching": "Continue watching",
@@ -306,6 +307,35 @@
       }
     }
   },
+  "record": "Record",
+  "recordNow": "Record now",
+  "recordingConflict": "“{title}” starts recording in a minute; then playback stops (the account allows no more streams).",
+  "@recordingConflict": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingDeleteConfirm": "Delete the recording “{title}” and its file?",
+  "@recordingDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingDone": "Recorded",
+  "recordingFailed": "Failed",
+  "recordingPlanned": "Recording planned",
+  "recordingRunning": "Recording",
+  "recordingScheduled": "Planned",
+  "recordingSkip": "Skip",
+  "recordingSkipped": "Skipped",
+  "recordings": "Recordings",
+  "recordingsAppFolders": "This device has no folder picker: gerdTV's own folder on a drive (deleted when gerdTV is uninstalled).",
+  "recordingsEmpty": "No recordings yet. Record from a programme in the guide, or in the player.",
+  "recordingsFolder": "Recordings folder",
   "remove": "Remove",
   "rename": "Rename",
   "renameHint": "Name (empty: the provider's)",
@@ -390,6 +420,7 @@
   "settingsKeywordsOverlay": "player banner overlay transparency opacity translucent",
   "settingsKeywordsPremiumize": "debrid premiumize cloud",
   "settingsKeywordsProfiles": "profile account provider switch add another",
+  "settingsKeywordsRecordings": "recording dvr folder record",
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsSubtitles": "opensubtitles subtitles srt download key",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",

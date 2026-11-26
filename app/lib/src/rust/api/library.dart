@@ -332,7 +332,8 @@ abstract class Library implements RustOpaqueInterface {
     required String place,
   });
 
-  /// Starts a recording into a new file at `path` (desktop).
+  /// Starts a recording into a new file at `path` (desktop). Async: the recording's task needs the bridge's tokio
+  /// runtime (a sync call has none, and spawning there aborted the app).
   Future<void> startRecordingPath({
     required PlatformInt64 id,
     required String path,

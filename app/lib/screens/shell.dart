@@ -16,6 +16,7 @@ import 'browse_screen.dart';
 import 'guide_screen.dart';
 import 'premiumize_screen.dart';
 import 'section_search.dart';
+import 'recordings_screen.dart';
 import 'settings_screen.dart';
 
 /// A section of the navigation.
@@ -170,6 +171,7 @@ class _ShellState extends State<Shell> {
     final section = _section;
     final body = Column(
       children: [
+        RecordingConflict(session: s),
         ListenableBuilder(
           listenable: s,
           builder: (context, _) {

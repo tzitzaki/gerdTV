@@ -26,13 +26,13 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 11. TMDB: started 19:47
 12. Simkl import, ids for Simkl and Trakt: started 20:05
 13. OpenSubtitles: started 20:23 (API definition read: Api-Key always; 5 downloads a day without login; login token for the user's quota)
-14. Recordings (first prove that an alarm can start the core on Android)
-15. Cast and AirPlay (Spike C first)
+14. Recordings: done 21:20 (Android while closed: a notification that starts it when opened; the start by an alarm alone is a device check)
+15. Cast and AirPlay: started 21:20
 16. Wrap-up
 
 ## State
-Steps 0–13 done 20:37 (Simkl import tested on the mock only: no client id registered yet) (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: the watchdog fix, then step 14 (recordings). Open questions: none blocking.
+Steps 0–14 done 21:20 (Simkl import tested on the mock only: no client id registered yet) (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 15 (Cast, AirPlay). Open questions: none blocking.
 Step 10: core committed, app side written 23:17 (not committed), integration running; then step 11 (TMDB: read its terms first).
 Found 23:37: an episode's end is reported twice, the stream reopened in between (the watchdog reopening a finished VOD?). To check after step 10.
 Resumed 19:36 (idle 00:23–19:35, my mistake). Step 10: fixing the journey's ambiguous long press.
@@ -40,3 +40,4 @@ Step 11 live 19:54: 20 real movies, 18 matched by the panel's id, 0 by name, 2 u
 Found 20:27: the watchdog stays Playing after a VOD's end, counts a stall after 18 s and reopens near the end (up to 6 times, each a provider connection). Fix next, after step 13's integration run: State::Ended.
 Watchdog fix done 20:49 (harness 9 passed, 1 min 41 s; integration green).
 Step 14 core committed 20:52; next: the app's scheduler (services/recordings.dart), programme sheet, list, folder.
+Step 15 prep 20:57: oxicast 0.0.5 read from its source (MIT/Apache-2.0; rustls ring + rustls-native-certs; its testing feature has no mock device: Cast stays a device check; accepts any device certificate, as Cast needs).

@@ -24,6 +24,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
 import '../platform/platform_bridge.dart';
+import '../services/recordings.dart' show canRecord;
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
@@ -394,6 +395,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (canRecord && _current.kind == ItemKind.live)
+                      ListTile(
+                        key: const Key('player.record'),
+                        leading: const Icon(Icons.fiber_manual_record_outlined),
+                        title: Text(l10n.recordNow),
+                        onTap: () {
+                          unawaited(
+                            widget.session.recordings.recordNow(_current),
+                          );
+                          Navigator.of(context).pop();
+                        },
+                      ),
                     ListTile(
                       title: Text(l10n.pictureFormat),
                       trailing: DropdownButton<PictureFormat>(

@@ -30,6 +30,7 @@ import '../src/rust/api/subtitles.dart';
 import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
+import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
 import 'secrets.dart';
@@ -165,6 +166,9 @@ class Session extends ChangeNotifier {
     _watchedOf = null;
     watchedChanged.value++;
   }
+
+  /// Recordings (services/recordings.dart); its timer starts with the first profile.
+  late final recordings = Recordings(this);
 
   /// The countdown to the next episode (the player shows it).
   late final nextUp = NextUp((item) => unawaited(play(item)));
@@ -534,6 +538,7 @@ class Session extends ChangeNotifier {
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
+      if (canRecord) recordings.startTimer();
       unawaited(
         reminders?.watchLinux(library!),
       ); // Linux shows reminders itself while the app runs

@@ -54,7 +54,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Secrets (provider credentials, TMDB key, OpenSubtitles key and login, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage` (macOS: the login keychain through Apple's `security` tool, so updates don't ask for the keychain password, accepting that any of the user's programs can ask the tool too; Developer ID is a possible later step), are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
 - Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
-- Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.
+- Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via the foreground service while gerdTV runs and, closed, an exact-alarm notification that starts it when opened (a start by the alarm alone waits for a device check); none on iOS; 2 min lead, 10 min lag; at the account's limit the recording wins after a notice with Skip.
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
 - One branch and PR per session, features as commits, the wrap-up as its last commit; CI runs only the areas a change touches.
 - macOS releases ship a DMG for the first install and keep the zip for the in-app updater.

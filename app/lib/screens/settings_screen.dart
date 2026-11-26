@@ -26,7 +26,9 @@ import 'list_modes.dart';
 import 'player_settings.dart';
 import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
+import 'recordings_screen.dart';
 import 'subtitles_settings.dart';
+import '../services/recordings.dart' show canRecord;
 import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
@@ -404,6 +406,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+            ),
+          if (lib != null && canRecord)
+            SettingsEntry(
+              id: 'recordingsFolder',
+              title: l10n.recordingsFolder,
+              keywords: l10n.settingsKeywordsRecordings,
+              build: (_) => RecordingsFolderSetting(session: session),
             ),
           if (lib != null)
             SettingsEntry(

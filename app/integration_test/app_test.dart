@@ -738,6 +738,25 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: a reminder was set and cleared');
+    // Recording: the player's Record now writes the channel into the chosen folder; the TV section then lists it,
+    // and it stops and deletes from there.
+    final recDir = await Directory.systemTemp.createTemp('gerdtv-rec');
+    session.recordings.setFolder(recDir.path);
+    await tester.runAsync(() => session.recordings.recordNow(onChannel!));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 2)),
+    );
+    final recs = session.recordings.list();
+    expect(recs.single.state, 'recording');
+    await tester.runAsync(() => session.recordings.stop(recs.single.id));
+    final done = session.recordings.list().single;
+    expect(done.state, 'done');
+    expect(File(done.file).lengthSync(), greaterThan(0));
+    await tester.runAsync(() => session.recordings.delete(done));
+    expect(File(done.file).existsSync(), isFalse);
+    expect(session.recordings.list(), isEmpty);
+    await recDir.delete(recursive: true);
+    debugPrint('JOURNEY: a recording ran, stopped and was deleted');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));

@@ -7,6 +7,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../services/recordings.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
@@ -37,6 +38,13 @@ Future<void> showProgrammeSheet(
 
   // Future programmes: whether a reminder is set (the core keeps them by channel and start).
   final future = p.start > now;
+  // A recording of it already planned (by channel and the start with the lead).
+  var planned = session.recordings.list().any(
+    (r) =>
+        r.itemKey == channel.key &&
+        r.start == p.start - recordingLead.inSeconds &&
+        r.state != 'skipped',
+  );
   var reminded =
       future &&
       ((await session.library?.reminders()) ?? const <ReminderInfo>[]).any(
@@ -118,6 +126,27 @@ Future<void> showProgrammeSheet(
                         icon: const Icon(Icons.replay),
                         label: Text(l10n.programmeFromStart),
                         onPressed: () => fromArchive(sheet),
+                      ),
+                    // Recording: a programme still to come or running (not on iOS).
+                    if ((future || running) &&
+                        canRecord &&
+                        session.library != null)
+                      OutlinedButton.icon(
+                        key: const Key('programme.record'),
+                        icon: Icon(
+                          planned
+                              ? Icons.fiber_manual_record
+                              : Icons.fiber_manual_record_outlined,
+                        ),
+                        label: Text(
+                          planned ? l10n.recordingPlanned : l10n.record,
+                        ),
+                        onPressed: planned
+                            ? null
+                            : () async {
+                                await session.recordings.plan(channel, p);
+                                setSheet(() => planned = true);
+                              },
                       ),
                     if (future && session.library != null)
                       OutlinedButton.icon(

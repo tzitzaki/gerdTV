@@ -15,6 +15,8 @@ import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'details_screen.dart';
 import 'group_menus.dart';
+import 'recordings_screen.dart';
+import '../services/recordings.dart' show canRecord;
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'logo.dart';
@@ -119,6 +121,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               listenable: Listenable.merge([
                 session.favouritesChanged,
                 session.nowPlaying,
+                session.recordings,
               ]),
               builder: (context, _) => FutureBuilder<List<ItemInfo>>(
                 future: lib.favourites(
@@ -138,7 +141,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       ? null
                       : ContinueRow(session: session, kind: kind);
                   // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
-                  final header = Align(
+                  final sort = Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: SortButton(
                       value: _sort,
@@ -146,6 +149,29 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       onSelected: _setSort,
                     ),
                   );
+                  // TV: the recordings, once there are any, above the groups.
+                  final recordings =
+                      kind == ItemKind.live &&
+                      canRecord &&
+                      session.recordings.list().isNotEmpty;
+                  final header = !recordings
+                      ? sort
+                      : Column(
+                          children: [
+                            sort,
+                            ListTile(
+                              key: const Key('browse.recordings'),
+                              leading: const Icon(Icons.video_library_outlined),
+                              title: Text(l10n.recordings),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      RecordingsScreen(session: session),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
                   final skip = resume == null ? 1 : 2;
                   return ListView.builder(
                     itemCount: all.length + skip,

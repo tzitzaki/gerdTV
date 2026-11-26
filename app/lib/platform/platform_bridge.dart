@@ -93,6 +93,32 @@ class PlatformBridge {
     }
   }
 
+  /// Android: keeps the background service while a recording runs ([title]; null: none runs).
+  static Future<void> setRecording(String? title) =>
+      _android<void>('setRecording', {'title': title});
+
+  /// Android: the system's folder picker; the folder's tree URI, "" when cancelled, null without a picker.
+  static Future<String?> pickFolder() => _android<String>('pickFolder');
+
+  /// Android: a new file in a picked folder: its descriptor (handed to the core) and content URI.
+  static Future<({int fd, String uri})> createDocument(
+    String tree,
+    String name,
+  ) async {
+    final m = await channel.invokeMapMethod<String, Object?>('createDocument', {
+      'tree': tree,
+      'name': name,
+    });
+    return (fd: m!['fd']! as int, uri: m['uri']! as String);
+  }
+
+  static Future<bool> deleteDocument(String uri) async =>
+      await _android<bool>('deleteDocument', {'uri': uri}) ?? false;
+
+  /// Android: the app's own folder on each mounted drive (for TVs without a folder picker).
+  static Future<List<String>> appFolders() async =>
+      (await _android<List<Object?>>('appFolders'))?.cast<String>() ?? const [];
+
   static Future<bool> isTv() async => await _android<bool>('isTv') ?? false;
 
   /// The home screen entry that started gerdTV, once.

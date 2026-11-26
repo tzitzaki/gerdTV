@@ -495,8 +495,9 @@ impl Library {
             .collect())
     }
 
-    /// Starts a recording into a new file at `path` (desktop).
-    pub fn start_recording_path(&self, id: i64, path: String) -> Result<(), String> {
+    /// Starts a recording into a new file at `path` (desktop). Async: the recording's task needs the bridge's tokio
+    /// runtime (a sync call has none, and spawning there aborted the app).
+    pub async fn start_recording_path(&self, id: i64, path: String) -> Result<(), String> {
         let file = std::fs::File::create(&path).map_err(err)?;
         self.0.start_recording(id, file, &path).map_err(err)
     }
@@ -504,7 +505,7 @@ impl Library {
     /// Starts a recording into an open file descriptor from the system's folder picker (Android); this takes it over.
     /// `place`: the document's content URI, to play and delete it later.
     #[cfg(unix)]
-    pub fn start_recording_fd(&self, id: i64, fd: i32, place: String) -> Result<(), String> {
+    pub async fn start_recording_fd(&self, id: i64, fd: i32, place: String) -> Result<(), String> {
         use std::os::fd::FromRawFd;
         // SAFETY: Android's ParcelFileDescriptor.detachFd hands the descriptor over; nothing else closes it.
         let file = unsafe { std::fs::File::from_raw_fd(fd) };
