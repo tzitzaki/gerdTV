@@ -155,11 +155,14 @@ class Session extends ChangeNotifier {
       nextUp.cancel(); // sought back, or the next one opened
       return;
     }
-    _saveProgress(); // the 10 s timer may have missed the last seconds
-    if (it == null || lib == null || it.kind != ItemKind.episode) return;
+    // A connection lost for good also ends the file: only a real end counts. That one is saved as played to its
+    // length, so it is marked as watched (the core counts whole seconds; the last frame may be a few ms short).
+    final ended = ranToTheEnd(player.state.position, player.state.duration);
+    _saveProgress(ended: ended);
+    if (it == null || lib == null || it.kind != ItemKind.episode || !ended) {
+      return;
+    }
     if (lib.setting(key: settingAutoplayNext) == '0') return;
-    // A connection lost for good also ends the file: only a real end counts.
-    if (!ranToTheEnd(player.state.position, player.state.duration)) return;
     try {
       final next = await lib.nextEpisode(key: it.key);
       if (next != null && nowPlaying.value?.key == it.key) nextUp.start(next);
@@ -1114,7 +1117,7 @@ class Session extends ChangeNotifier {
 
   /// Continue watching: how far the playing movie or episode got (the core keeps it from 2 min, drops it at 95 %).
   /// Catch-up archives play as movies but aren't kept.
-  void _saveProgress() {
+  void _saveProgress({bool ended = false}) {
     final it = nowPlaying.value;
     final lib = library;
     if (it == null ||
@@ -1124,13 +1127,10 @@ class Session extends ChangeNotifier {
         it.key.startsWith('premiumize:')) {
       return;
     }
-    final pos = player.state.position.inSeconds;
+    final duration = player.state.duration.inSeconds;
+    final pos = ended ? duration : player.state.position.inSeconds;
     if (pos <= 0) return;
-    lib.saveProgress(
-      key: it.key,
-      position: pos,
-      duration: player.state.duration.inSeconds,
-    );
+    lib.saveProgress(key: it.key, position: pos, duration: duration);
     // The core marks it from 95 %; the check marks follow.
     if (!watched.contains(it.key) && lib.watchedKeys().contains(it.key)) {
       _reloadWatched();
