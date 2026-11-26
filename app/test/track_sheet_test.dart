@@ -1,8 +1,10 @@
-// New, because nothing owned the audio/subtitle choice: the button shows only when there is one (mpv's "auto" and
+// New, because nothing owned the audio/subtitle choice (and later the subtitles found online): the button shows only when there is one (mpv's "auto" and
 // "no" don't count), tracks are named by language, title and codec (or "Track n"), and a tap applies the track.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
+import 'package:gerdtv/player/track_prefs.dart';
 import 'package:gerdtv/screens/track_sheet.dart';
+import 'package:gerdtv/src/rust/api/subtitles.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -27,8 +29,34 @@ void main() {
     }
   });
 
+  test('the wishes become mpv properties, and no wish resets them', () {
+    for (final (audio, subtitle, alang, slang, sid) in [
+      ('de', 'en', 'de,deu,ger', 'en,eng', 'auto'),
+      ('', 'off', '', '', 'no'),
+      (null, 'klingon', '', '', 'auto'),
+    ]) {
+      final o = {
+        for (final o in trackOptions(audio: audio, subtitle: subtitle))
+          o.name: o.value,
+      };
+      expect((o['alang'], o['slang'], o['sid']), (alang, slang, sid));
+      expect((o['aid'], o['audio-delay'], o['sub-delay']), ('auto', '0', '0'));
+    }
+    expect(
+      trackLanguages.keys.every(
+        (l) => trackOptions(audio: l).first.value.length > 3,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleLook(size: '200').style.fontSize,
+      2 * subtitleLook().style.fontSize!,
+    );
+  });
+
   testWidgets('labels and picking', (tester) async {
     final picked = <String>[];
+    final delays = TrackDelays();
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -44,6 +72,9 @@ void main() {
                 current: const Track(audio: de),
                 onAudio: (a) => picked.add('audio ${a.id}'),
                 onSubtitle: (s) => picked.add('subtitle ${s.id}'),
+                onDelay: ({audioMs, subtitleMs}) async =>
+                    picked.add('delay $audioMs $subtitleMs'),
+                delays: delays,
               ),
               child: const Text('open'),
             ),
@@ -68,5 +99,69 @@ void main() {
     await tester.tap(find.byKey(const Key('track.subtitle.no')));
     await tester.pumpAndSettle();
     expect(picked, ['audio 2', 'subtitle no']);
+
+    // A delay step applies at once and keeps the sheet open; reopened, the sheet shows it.
+    picked.clear();
+    await open();
+    await tester.ensureVisible(find.byKey(const Key('delay.subtitle.less')));
+    await tester.tap(find.byKey(const Key('delay.audio.more')));
+    await tester.tap(find.byKey(const Key('delay.audio.more')));
+    await tester.tap(find.byKey(const Key('delay.subtitle.less')));
+    await tester.pump();
+    expect(picked, ['delay 50 null', 'delay 100 null', 'delay null -50']);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await open();
+    expect(find.text('100 ms'), findsOneWidget);
+    expect(find.text('-50 ms'), findsOneWidget);
+    expect(
+      find.byKey(const Key('track.find')),
+      findsNothing,
+      reason: 'no OpenSubtitles key',
+    );
   });
+
+  testWidgets(
+    'subtitles found online: a tap loads one, an error stays in its row',
+    (tester) async {
+      final loaded = <BigInt>[];
+      SubtitleInfo found(int id) => SubtitleInfo(
+        fileId: BigInt.from(id),
+        language: 'de',
+        release: 'Release $id',
+        hearingImpaired: id == 2,
+        translated: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showFoundSubtitles(
+                  context,
+                  found: Future.value([found(1), found(2)]),
+                  onPick: (s) async {
+                    if (s.fileId == BigInt.two) throw 'quota used up';
+                    loaded.add(s.fileId);
+                  },
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('de · for the hearing impaired'), findsOneWidget);
+      await tester.tap(find.text('Release 2'));
+      await tester.pumpAndSettle();
+      expect(find.text('quota used up'), findsOneWidget);
+      await tester.tap(find.text('Release 1'));
+      await tester.pumpAndSettle();
+      expect(loaded, [BigInt.one]);
+      expect(find.text('Release 1'), findsNothing, reason: 'the sheet closed');
+    },
+  );
 }

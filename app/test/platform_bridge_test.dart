@@ -89,6 +89,23 @@ void main() {
     },
   );
 
+  test('the Now Playing card goes to the Mac too, not to Linux', () async {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final calls = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(PlatformBridge.channel, (call) async {
+          calls.add('${defaultTargetPlatform.name} ${call.method}');
+          return null;
+        });
+    final bridge = PlatformBridge(pictureMode: ValueNotifier(false));
+    for (final p in [TargetPlatform.macOS, TargetPlatform.linux]) {
+      debugDefaultTargetPlatformOverride = p;
+      await bridge.clearNowPlaying();
+      await bridge.setPlaying(null); // the phones' audio session and service
+    }
+    expect(calls, ['macOS clearNowPlaying']);
+  });
+
   test(
     'openUrl hands the address to the phone side, false without one',
     () async {

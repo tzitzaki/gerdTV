@@ -7,10 +7,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Recordings: the start's notification to the minute while gerdTV is closed (services/recordings.dart). -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Reminders: re-scheduled after a reboot (flutter_local_notifications). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Updates: hand the downloaded APK to the system's installer (MainActivity.installApk). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Google Cast: finding devices by mDNS needs multicast packets (MainActivity's multicastLock). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Android TV's home screen: Play Next and the row of recent channels (TvHome.kt). -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <!-- Android TV (e.g. Nvidia Shield): no touchscreen needed; leanback optional, so phones install it too. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />

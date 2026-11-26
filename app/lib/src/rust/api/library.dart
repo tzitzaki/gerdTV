@@ -4,6 +4,7 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import 'cast.dart';
 import 'hls.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
@@ -11,7 +12,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'playback.dart';
 import 'tracking.dart';
 
-// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `to_core`
+// These functions are ignored because they are not marked as `pub`: `err`, `from_core`, `refs`, `search_for_subtitles`, `to_core`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`
 
 Future<List<ProfileInfo>> listProfiles({required String dir}) =>
@@ -54,6 +55,15 @@ abstract class Library implements RustOpaqueInterface {
   /// The buffer for an item: its override, else the profile's preset, else Balanced.
   BufferChoice bufferFor({required String key});
 
+  /// Casts a channel, movie or episode to `device` (gerdtv_core::cast): the provider's address first; live TV that
+  /// the device doesn't play then goes through gerdTV's own HLS on this device's network address.
+  Future<CastHandle> castStart({
+    required CastDeviceInfo device,
+    required String key,
+    required String title,
+    required String cacheDir,
+  });
+
   /// The catch-up URL of a programme on a live channel, or None (no archive, out of reach, not started, not
   /// Xtream Codes). Holds credentials: pass it straight to the player, never log or show it.
   String? catchupUrl({
@@ -68,14 +78,26 @@ abstract class Library implements RustOpaqueInterface {
     required String sort,
   });
 
+  /// Notes recordings that ended by themselves; how many still run.
+  int checkRecordings();
+
   /// The continue-watching row of a section: started, unfinished items, last watched first.
   Future<List<ResumeItem>> continueWatching({
     required List<ItemKind> kinds,
     required int limit,
   });
 
-  /// A movie's or series' details, from the panel when the page opens.
-  Future<ItemDetails> details({required String key});
+  /// A new group of the user's own; its category id.
+  Future<String> createGroup({required ItemKind kind, required String name});
+
+  Future<void> deleteGroup({required String category});
+
+  /// Forgets a recording (the app deletes its file).
+  Future<void> deleteRecording({required PlatformInt64 id});
+
+  /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
+  /// for what the panel leaves empty.
+  Future<ItemDetails> details({required String key, String? tmdbKey});
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});
@@ -138,6 +160,9 @@ abstract class Library implements RustOpaqueInterface {
   /// The channels mapped by hand, with their guide channel's name.
   Future<List<MappedChannel>> mappedChannels();
 
+  /// The episode after this one in its series; None after the last.
+  Future<ItemInfo?> nextEpisode({required String key});
+
   /// Now and next for each item key, in the same order.
   Future<List<NowNext>> nowNext({required List<String> keys});
 
@@ -159,6 +184,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Adaptive mode: one step more buffer for this item; returns the new choice.
   BufferChoice raiseBuffer({required String key});
 
+  /// The live channels played last, newest first (the Android TV home screen).
+  Future<List<ItemInfo>> recentChannels({required int limit});
+
   /// The section's newest searches, newest first (the field's suggestions while empty).
   List<String> recentSearches({required String section, required int limit});
 
@@ -174,6 +202,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
   void recordSearch({required String section, required String query});
 
+  /// Every recording, newest first, a running one with its size so far.
+  List<RecordingInfo> recordings();
+
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({
     required int daysAhead,
@@ -185,6 +216,16 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> removeGuideSource({required PlatformInt64 id});
 
+  /// Names a group; empty: the provider's name again, from the next sync.
+  Future<void> renameGroup({
+    required ItemKind kind,
+    required String category,
+    required String name,
+  });
+
+  /// Names an item; empty: the provider's name again.
+  Future<void> renameItem({required String key, required String name});
+
   /// Where to resume an item (seconds), if it was left part-way.
   int? resumePosition({required String key});
 
@@ -193,6 +234,14 @@ abstract class Library implements RustOpaqueInterface {
     required String key,
     required int position,
     required int duration,
+  });
+
+  /// Plans a recording of a channel (UTC seconds, lead and lag included); its id.
+  PlatformInt64 scheduleRecording({
+    required String itemKey,
+    required String title,
+    required PlatformInt64 start,
+    required PlatformInt64 stop,
   });
 
   /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
@@ -232,8 +281,27 @@ abstract class Library implements RustOpaqueInterface {
     required bool hidden,
   });
 
+  /// Adds an item to a group of the user's own, or removes it.
+  Future<void> setGroupMember({
+    required String category,
+    required String key,
+    required bool member,
+  });
+
+  /// The groups' order, top to bottom.
+  Future<void> setGroupOrder({
+    required ItemKind kind,
+    required List<String> ids,
+  });
+
   /// An extra source's own time offset in hours (applied by the next refresh).
   Future<void> setGuideOffset({required PlatformInt64 id, required int hours});
+
+  /// The order of an own group's items.
+  Future<void> setItemOrder({
+    required String category,
+    required List<String> keys,
+  });
 
   Future<void> setPreferHls({required String key, required bool hls});
 
@@ -241,8 +309,19 @@ abstract class Library implements RustOpaqueInterface {
 
   void setSetting({required String key, required String value});
 
+  /// Marks a movie or episode as watched or not.
+  void setWatched({required String key, required bool watched});
+
   /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
   String? setting({required String key});
+
+  /// Simkl's watched marks and paused positions since the last import (at most every 30 min unless `force`).
+  /// `token`: the stored JSON. None: not due or nothing changed.
+  Future<SimklImport?> simklImport({
+    required String clientId,
+    required String token,
+    required bool force,
+  });
 
   /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
   /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`; returns once the playlist has its
@@ -254,6 +333,24 @@ abstract class Library implements RustOpaqueInterface {
     required int windowSecs,
     required BigInt maxBytes,
   });
+
+  /// Starts a recording into an open file descriptor from the system's folder picker (Android); this takes it over.
+  /// `place`: the document's content URI, to play and delete it later.
+  Future<void> startRecordingFd({
+    required PlatformInt64 id,
+    required int fd,
+    required String place,
+  });
+
+  /// Starts a recording into a new file at `path` (desktop). Async: the recording's task needs the bridge's tokio
+  /// runtime (a sync call has none, and spawning there aborted the app).
+  Future<void> startRecordingPath({
+    required PlatformInt64 id,
+    required String path,
+  });
+
+  /// Stops a running recording, or skips a planned one.
+  Future<void> stopRecording({required PlatformInt64 id});
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});
@@ -279,6 +376,9 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
     required String query,
   });
+
+  /// Every watched movie's and episode's key, for the lists' check marks.
+  List<String> watchedKeys();
 }
 
 class CategoryInfo {
@@ -772,6 +872,62 @@ class ProgrammeInfo {
           episode == other.episode;
 }
 
+/// One recording; `state`: scheduled, recording, done, refused, failed or skipped.
+class RecordingInfo {
+  final PlatformInt64 id;
+  final String itemKey;
+  final String title;
+
+  /// UTC seconds, lead and lag included.
+  final PlatformInt64 start;
+  final PlatformInt64 stop;
+  final String state;
+
+  /// A path, or (Android) the document's content URI.
+  final String file;
+  final String message;
+  final BigInt bytes;
+
+  const RecordingInfo({
+    required this.id,
+    required this.itemKey,
+    required this.title,
+    required this.start,
+    required this.stop,
+    required this.state,
+    required this.file,
+    required this.message,
+    required this.bytes,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      itemKey.hashCode ^
+      title.hashCode ^
+      start.hashCode ^
+      stop.hashCode ^
+      state.hashCode ^
+      file.hashCode ^
+      message.hashCode ^
+      bytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecordingInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          itemKey == other.itemKey &&
+          title == other.title &&
+          start == other.start &&
+          stop == other.stop &&
+          state == other.state &&
+          file == other.file &&
+          message == other.message &&
+          bytes == other.bytes;
+}
+
 /// A reminder for a guide programme: the channel, start and stop (UTC seconds) and the title.
 class ReminderInfo {
   final String itemKey;
@@ -858,6 +1014,35 @@ class SearchPage {
           hits == other.hits &&
           counts == other.counts &&
           groups == other.groups;
+}
+
+/// What a Simkl import took; `token` is set when it had to be refreshed (store it).
+class SimklImport {
+  final int watched;
+  final int positions;
+  final int waiting;
+  final String? token;
+
+  const SimklImport({
+    required this.watched,
+    required this.positions,
+    required this.waiting,
+    this.token,
+  });
+
+  @override
+  int get hashCode =>
+      watched.hashCode ^ positions.hashCode ^ waiting.hashCode ^ token.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SimklImport &&
+          runtimeType == other.runtimeType &&
+          watched == other.watched &&
+          positions == other.positions &&
+          waiting == other.waiting &&
+          token == other.token;
 }
 
 enum SourceKind { xtream, m3UUrl, m3UFile }

@@ -82,6 +82,8 @@ pub struct TrackItem {
     pub show: String,
     pub season: u32,
     pub number: u32,
+    /// TMDB's id of the movie, or of an episode's series, when gerdTV knows it.
+    pub tmdb: Option<u64>,
 }
 
 /// Scrobbles `action` ("start", "pause", "stop") at `progress` (0–100). Returns the token JSON when it was
@@ -107,21 +109,49 @@ pub async fn track_scrobble(
         "pause" => core::Action::Pause,
         _ => core::Action::Stop,
     };
-    let w = if item.movie {
+    let w = watching(item);
+    core::scrobble(&c, &t, action, &w, progress)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(fresh.map(|n| n.to_json()))
+}
+
+/// Tells Simkl a movie or episode was marked as watched by hand (`watched`) or unmarked. Returns the token JSON when
+/// it was refreshed, else None.
+pub async fn simkl_history(
+    client_id: String,
+    token: String,
+    item: TrackItem,
+    watched: bool,
+) -> Result<Option<String>, String> {
+    let c = client("simkl", client_id, String::new())?;
+    let mut t =
+        core::Token::from_json(&token).ok_or("the stored token can't be read: link again")?;
+    let fresh = core::refresh(&c, &t).await.map_err(|e| e.to_string())?;
+    if let Some(n) = &fresh {
+        t = n.clone();
+    }
+    core::simkl_history(&c, &t, &watching(item), watched)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(fresh.map(|n| n.to_json()))
+}
+
+/// The core's view of an item (titles cleaned of the panel's decorations).
+fn watching(item: TrackItem) -> core::Watching {
+    if item.movie {
         let (title, year) = core::clean_title(&item.name);
         core::Watching::Movie {
             title,
             year: item.year.or(year),
+            tmdb: item.tmdb,
         }
     } else {
         core::Watching::Episode {
             show: core::clean_title(&item.show).0,
             season: item.season,
             number: item.number,
+            tmdb: item.tmdb,
         }
-    };
-    core::scrobble(&c, &t, action, &w, progress)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(fresh.map(|n| n.to_json()))
+    }
 }

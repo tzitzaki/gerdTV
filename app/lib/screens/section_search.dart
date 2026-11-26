@@ -21,6 +21,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'browse_screen.dart';
+import 'group_menus.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'programme_sheet.dart';
@@ -440,6 +441,8 @@ class _SectionSearchState extends State<SectionSearch> {
       onNearEnd: _model.loadMore,
       highlight: q,
       favourites: widget.session.favourites,
+      watched: widget.session.watched,
+      menu: (it) => itemMenu(context, widget.session, it),
       onFavourite: (it) {
         widget.session.toggleFavourite(it);
         setState(() {}); // the star changes at once

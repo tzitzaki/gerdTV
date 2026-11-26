@@ -138,6 +138,28 @@ class Reminders {
     );
   }
 
+  /// Android: a notification exactly at a recording's start, for when gerdTV is closed then; tapping it opens
+  /// gerdTV, whose scheduler starts the recording (services/recordings.dart). Elsewhere the app records while it runs.
+  Future<void> recordingAlarm(DateTime at, String title) async {
+    if (kIsWeb ||
+        !Platform.isAndroid ||
+        !_ready ||
+        at.isBefore(DateTime.now())) {
+      return;
+    }
+    await _askPermission();
+    await _plugin.zonedSchedule(
+      id: idFor('recording:$title', at.millisecondsSinceEpoch ~/ 1000),
+      scheduledDate: tz.TZDateTime.from(at.toUtc(), tz.UTC),
+      notificationDetails: _details,
+      // To the minute (USE_EXACT_ALARM in the manifest: gerdTV isn't in the Play Store, whose policy limits it).
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      title: title,
+      body: 'Recording: open gerdTV to start it',
+      payload: 'recording',
+    );
+  }
+
   /// Linux only: a timer for the soonest reminder while the app runs, which shows it then.
   Future<void> watchLinux(
     Library lib, [

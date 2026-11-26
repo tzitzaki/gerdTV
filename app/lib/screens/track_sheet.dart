@@ -8,6 +8,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../player/track_prefs.dart';
+import '../src/rust/api/subtitles.dart';
 
 /// The stream's own tracks (mpv's "auto" and "no" left out).
 List<T> realTracks<T>(List<T> tracks, String Function(T) id) => [
@@ -45,6 +47,9 @@ Future<void> showTrackSheet(
   required Track current,
   required ValueChanged<AudioTrack> onAudio,
   required ValueChanged<SubtitleTrack> onSubtitle,
+  Future<void> Function({int? audioMs, int? subtitleMs})? onDelay,
+  TrackDelays? delays,
+  VoidCallback? onFind,
 }) {
   final l10n = AppLocalizations.of(context);
   final audio = realTracks(tracks.audio, (a) => a.id);
@@ -112,10 +117,175 @@ Future<void> showTrackSheet(
                     () => onSubtitle(s),
                   ),
               ],
+              // OpenSubtitles (with the user's key, for movies and episodes in mpv).
+              if (onFind != null)
+                ListTile(
+                  key: const Key('track.find'),
+                  leading: const Icon(Icons.search),
+                  title: Text(l10n.subtitlesFind),
+                  onTap: () => pick(onFind),
+                ),
+              if (onDelay != null && delays != null) ...[
+                _DelayRow(
+                  id: 'audio',
+                  label: l10n.audioDelay,
+                  value: delays.audio,
+                  onChanged: (ms) => onDelay(audioMs: delays.audio = ms),
+                ),
+                if (subs.isNotEmpty)
+                  _DelayRow(
+                    id: 'subtitle',
+                    label: l10n.subtitleDelay,
+                    value: delays.subtitle,
+                    onChanged: (ms) =>
+                        onDelay(subtitleMs: delays.subtitle = ms),
+                  ),
+              ],
             ],
           ),
         ),
       );
     },
   );
+}
+
+/// "Audio delay  −  100 ms  +": buttons rather than a slider, so a D-pad reaches them; the sheet stays open.
+class _DelayRow extends StatefulWidget {
+  const _DelayRow({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+  final String id;
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_DelayRow> createState() => _DelayRowState();
+}
+
+class _DelayRowState extends State<_DelayRow> {
+  late int _ms = widget.value;
+
+  void _step(int by) {
+    setState(() => _ms += by);
+    widget.onChanged(_ms);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ListTile(
+      title: Text(widget.label),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: Key('delay.${widget.id}.less'),
+            tooltip: l10n.delayEarlier,
+            icon: const Icon(Icons.remove),
+            onPressed: () => _step(-50),
+          ),
+          Text('$_ms ms'),
+          IconButton(
+            key: Key('delay.${widget.id}.more'),
+            tooltip: l10n.delayLater,
+            icon: const Icon(Icons.add),
+            onPressed: () => _step(50),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// OpenSubtitles' results for what plays; a tap downloads one and shows it. Errors (the day's quota, a refused key)
+/// show in the sheet as OpenSubtitles words them.
+Future<void> showFoundSubtitles(
+  BuildContext context, {
+  required Future<List<SubtitleInfo>> found,
+  required Future<void> Function(SubtitleInfo) onPick,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) {
+    final l10n = AppLocalizations.of(context);
+    return SafeArea(
+      child: FutureBuilder<List<SubtitleInfo>>(
+        future: found,
+        builder: (context, snap) {
+          final list = snap.data;
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Text(
+                    l10n.subtitlesFind,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (snap.hasError)
+                  ListTile(title: Text('${snap.error}'))
+                else if (list == null)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: LinearProgressIndicator(),
+                  )
+                else if (list.isEmpty)
+                  ListTile(title: Text(l10n.subtitlesNone))
+                else
+                  for (final s in list) _FoundRow(subtitle: s, onPick: onPick),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  },
+);
+
+class _FoundRow extends StatefulWidget {
+  const _FoundRow({required this.subtitle, required this.onPick});
+  final SubtitleInfo subtitle;
+  final Future<void> Function(SubtitleInfo) onPick;
+
+  @override
+  State<_FoundRow> createState() => _FoundRowState();
+}
+
+class _FoundRowState extends State<_FoundRow> {
+  bool _busy = false;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final s = widget.subtitle;
+    return ListTile(
+      key: Key('found.${s.fileId}'),
+      enabled: !_busy,
+      title: Text(s.release, maxLines: 2, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        _error ??
+            [
+              s.language,
+              if (s.hearingImpaired) l10n.subtitlesHearingImpaired,
+              if (s.translated) l10n.subtitlesTranslated,
+            ].join(' · '),
+      ),
+      onTap: () async {
+        setState(() => _busy = true);
+        try {
+          await widget.onPick(s);
+          if (context.mounted) Navigator.of(context).pop();
+        } catch (e) {
+          if (mounted) setState(() => _error = '$e');
+        }
+        if (mounted) setState(() => _busy = false);
+      },
+    );
+  }
 }

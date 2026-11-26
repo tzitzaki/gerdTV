@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `client`
+// These functions are ignored because they are not marked as `pub`: `client`, `watching`
 
 Future<TrackDeviceCode> trackDeviceStart({
   required String service,
@@ -49,6 +49,20 @@ Future<String?> trackScrobble({
   action: action,
   item: item,
   progress: progress,
+);
+
+/// Tells Simkl a movie or episode was marked as watched by hand (`watched`) or unmarked. Returns the token JSON when
+/// it was refreshed, else None.
+Future<String?> simklHistory({
+  required String clientId,
+  required String token,
+  required TrackItem item,
+  required bool watched,
+}) => RustLib.instance.api.crateApiTrackingSimklHistory(
+  clientId: clientId,
+  token: token,
+  item: item,
+  watched: watched,
 );
 
 class TrackDeviceCode {
@@ -96,6 +110,9 @@ class TrackItem {
   final int season;
   final int number;
 
+  /// TMDB's id of the movie, or of an episode's series, when gerdTV knows it.
+  final BigInt? tmdb;
+
   const TrackItem({
     required this.movie,
     required this.name,
@@ -103,6 +120,7 @@ class TrackItem {
     required this.show_,
     required this.season,
     required this.number,
+    this.tmdb,
   });
 
   @override
@@ -112,7 +130,8 @@ class TrackItem {
       year.hashCode ^
       show_.hashCode ^
       season.hashCode ^
-      number.hashCode;
+      number.hashCode ^
+      tmdb.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -124,7 +143,8 @@ class TrackItem {
           year == other.year &&
           show_ == other.show_ &&
           season == other.season &&
-          number == other.number;
+          number == other.number &&
+          tmdb == other.tmdb;
 }
 
 /// One poll: `token` (the JSON to store) once confirmed, `failed` when it stopped, `slow_down` to wait 5 s more.

@@ -15,7 +15,14 @@ const FORMAT: &str = "gerdtv-user-data";
 const VERSION: u32 = 1;
 
 /// Settings the app derives from the provider on every sync; not user choices, so not exported.
-const DERIVED_SETTINGS: &[&str] = &["xc_time_offset", "m3u_tvg_url"];
+const DERIVED_SETTINGS: &[&str] = &[
+    "xc_time_offset",
+    "m3u_tvg_url",
+    "account_expires",
+    "account_limit",
+    "simkl_since",
+    "simkl_checked",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 struct File {
@@ -41,6 +48,61 @@ struct File {
     hidden_groups: Vec<HiddenGroup>,
     #[serde(default)]
     search_history: Vec<Search>,
+    #[serde(default)]
+    watched: Vec<Watched>,
+    #[serde(default)]
+    own_groups: Vec<OwnGroup>,
+    #[serde(default)]
+    own_group_items: Vec<OwnGroupItem>,
+    #[serde(default)]
+    group_prefs: Vec<GroupPref>,
+    #[serde(default)]
+    item_names: Vec<ItemName>,
+}
+
+/// The user's own groups, their items, and own names and order (groups.rs).
+#[derive(Debug, Serialize, Deserialize)]
+struct OwnGroup {
+    id: String,
+    kind: i64,
+    name: String,
+    position: i64,
+    deleted: bool,
+    updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OwnGroupItem {
+    group: String,
+    key: String,
+    position: i64,
+    deleted: bool,
+    updated_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GroupPref {
+    kind: i64,
+    category: String,
+    name: String,
+    position: Option<i64>,
+    updated_at: i64,
+}
+
+/// Without the provider's name, which this device's catalogue knows.
+#[derive(Debug, Serialize, Deserialize)]
+struct ItemName {
+    key: String,
+    name: String,
+    updated_at: i64,
+}
+
+/// A movie or episode marked as watched, or unmarked again.
+#[derive(Debug, Serialize, Deserialize)]
+struct Watched {
+    key: String,
+    watched: bool,
+    updated_at: i64,
 }
 
 /// Where a movie or episode was left (seconds).
@@ -126,6 +188,9 @@ pub struct ImportCounts {
     pub resume: usize,
     pub hidden_groups: usize,
     pub search_history: usize,
+    pub watched: usize,
+    pub own_groups: usize,
+    pub own_names: usize,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -261,6 +326,69 @@ pub fn export(conn: &Connection) -> rusqlite::Result<String> {
                 })
             },
         )?,
+        watched: rows(
+            conn,
+            "SELECT key, watched, updated_at FROM watched ORDER BY key",
+            |r| {
+                Ok(Watched {
+                    key: r.get(0)?,
+                    watched: r.get(1)?,
+                    updated_at: r.get(2)?,
+                })
+            },
+        )?,
+        own_groups: rows(
+            conn,
+            "SELECT id, kind, name, position, deleted, updated_at FROM custom_groups ORDER BY id",
+            |r| {
+                Ok(OwnGroup {
+                    id: r.get(0)?,
+                    kind: r.get(1)?,
+                    name: r.get(2)?,
+                    position: r.get(3)?,
+                    deleted: r.get(4)?,
+                    updated_at: r.get(5)?,
+                })
+            },
+        )?,
+        own_group_items: rows(
+            conn,
+            "SELECT group_id, item_key, position, deleted, updated_at FROM custom_group_items
+             ORDER BY group_id, item_key",
+            |r| {
+                Ok(OwnGroupItem {
+                    group: r.get(0)?,
+                    key: r.get(1)?,
+                    position: r.get(2)?,
+                    deleted: r.get(3)?,
+                    updated_at: r.get(4)?,
+                })
+            },
+        )?,
+        group_prefs: rows(
+            conn,
+            "SELECT kind, category, name, position, updated_at FROM group_prefs ORDER BY kind, category",
+            |r| {
+                Ok(GroupPref {
+                    kind: r.get(0)?,
+                    category: r.get(1)?,
+                    name: r.get(2)?,
+                    position: r.get(3)?,
+                    updated_at: r.get(4)?,
+                })
+            },
+        )?,
+        item_names: rows(
+            conn,
+            "SELECT key, name, updated_at FROM item_prefs ORDER BY key",
+            |r| {
+                Ok(ItemName {
+                    key: r.get(0)?,
+                    name: r.get(1)?,
+                    updated_at: r.get(2)?,
+                })
+            },
+        )?,
     };
     Ok(serde_json::to_string_pretty(&file).expect("plain data serialises"))
 }
@@ -353,6 +481,46 @@ pub fn import(conn: &mut Connection, json: &str) -> Result<ImportCounts, UserDat
             params![h.section, h.query, h.updated_at],
         )?;
     }
+    for w in &file.watched {
+        n.watched += tx.execute(
+            "INSERT INTO watched (key, watched, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET watched = ?2, updated_at = ?3 WHERE ?3 > updated_at",
+            params![w.key, w.watched, w.updated_at],
+        )?;
+    }
+    for g in &file.own_groups {
+        n.own_groups += tx.execute(
+            "INSERT INTO custom_groups (id, kind, name, position, deleted, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT (id) DO UPDATE SET name = ?3, position = ?4, deleted = ?5, updated_at = ?6
+             WHERE ?6 > updated_at",
+            params![g.id, g.kind, g.name, g.position, g.deleted, g.updated_at],
+        )?;
+    }
+    for i in &file.own_group_items {
+        n.own_groups += tx.execute(
+            "INSERT INTO custom_group_items (group_id, item_key, position, deleted, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (group_id, item_key) DO UPDATE SET position = ?3, deleted = ?4, updated_at = ?5
+             WHERE ?5 > updated_at",
+            params![i.group, i.key, i.position, i.deleted, i.updated_at],
+        )?;
+    }
+    for g in &file.group_prefs {
+        n.own_names += tx.execute(
+            "INSERT INTO group_prefs (kind, category, name, position, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (kind, category) DO UPDATE SET name = ?3, position = ?4, updated_at = ?5
+             WHERE ?5 > updated_at",
+            params![g.kind, g.category, g.name, g.position, g.updated_at],
+        )?;
+    }
+    for i in &file.item_names {
+        n.own_names += tx.execute(
+            "INSERT INTO item_prefs (key, name, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (key) DO UPDATE SET name = ?2, updated_at = ?3 WHERE ?3 > updated_at",
+            params![i.key, i.name, i.updated_at],
+        )?;
+    }
+    crate::groups::apply(&tx)?; // imported names and order show at once (an undone name with the next sync)
     // The app keeps the newest 20 searches per section (db::record_search); an import must not grow past that.
     tx.execute(
         "DELETE FROM search_history WHERE rowid NOT IN (SELECT rowid FROM (SELECT rowid, row_number() OVER
@@ -384,7 +552,12 @@ mod tests {
                 ('builtin', 1, 110);
              INSERT INTO resume VALUES ('movie:7', 1200, 5400, 170);
              INSERT INTO hidden_groups VALUES (0, '12', 180);
-             INSERT INTO search_history VALUES ('live', 'sport', 190);",
+             INSERT INTO search_history VALUES ('live', 'sport', 190);
+             INSERT INTO watched VALUES ('movie:7', 1, 200), ('movie:8', 0, 210);
+             INSERT INTO custom_groups VALUES ('ab', 0, 'Mine', 0, 0, 220);
+             INSERT INTO custom_group_items VALUES ('ab', 'live:1', 0, 0, 230), ('ab', 'live:2', 1, 1, 240);
+             INSERT INTO group_prefs VALUES (0, '12', 'News', NULL, 250);
+             INSERT INTO item_prefs VALUES ('live:1', 'One', '', 260);",
         )
         .unwrap();
     }
@@ -413,6 +586,9 @@ mod tests {
             resume: 1,
             hidden_groups: 1,
             search_history: 1,
+            watched: 2,
+            own_groups: 3,
+            own_names: 2,
         };
         assert_eq!(n, want);
         assert_eq!(export(&b).unwrap(), json, "a round trip is lossless");

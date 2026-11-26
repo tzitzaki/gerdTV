@@ -6,6 +6,7 @@
 // extracted): Simkl's device login needs only gerdTV's client id, a public identifier, given to release builds as
 // --dart-define=GERDTV_SIMKL_CLIENT_ID; Trakt's needs a client secret too, so each user links their own Trakt app
 // (its id and secret typed in Settings, kept in the device's secure storage like the tokens).
+// From Simkl, watched marks and paused positions also come in (importSimkl), and marks made by hand go out (history).
 // Debugging: a failed scrobble only prints "tracking: <service> <action>: <reason>" to the debug log; playback
 // never waits for it.
 
@@ -106,6 +107,49 @@ class Tracking extends ChangeNotifier {
       if (apps.containsKey(s.id)) await setApp(s, null);
     }
     _profile = null;
+  }
+
+  /// Simkl's watched marks and paused positions (core: watch_import.rs): after each sync, at most every 30 min
+  /// (Simkl's rule), or at once with [force] (the settings button). Returns what it took, null when Simkl isn't
+  /// linked, wasn't due or had nothing new. Never throws: a failure is in the debug log.
+  Future<SimklImport?> importSimkl(Library lib, {bool force = false}) async {
+    final s = services.firstWhere((s) => s.id == 'simkl');
+    final token = tokens[s.id];
+    final c = client(s);
+    if (token == null || c == null) return null;
+    try {
+      final n = await lib.simklImport(
+        clientId: c.$1,
+        token: token,
+        force: force,
+      );
+      if (n?.token case final fresh?) await link(s, fresh);
+      return n;
+    } catch (e) {
+      debugPrint('tracking: simkl import: $e');
+      return null;
+    }
+  }
+
+  /// A movie or episode marked as watched by hand, or unmarked, goes to Simkl's history. Never throws.
+  Future<void> history(Library lib, String key, bool watched) async {
+    final s = services.firstWhere((s) => s.id == 'simkl');
+    final token = tokens[s.id];
+    final c = client(s);
+    if (token == null || c == null) return;
+    try {
+      final item = await lib.trackItem(key: key);
+      if (item == null) return;
+      final fresh = await simklHistory(
+        clientId: c.$1,
+        token: token,
+        item: item,
+        watched: watched,
+      );
+      if (fresh != null) await link(s, fresh);
+    } catch (e) {
+      debugPrint('tracking: simkl history: $e');
+    }
   }
 
   /// Tells every linked service [action] ("start", "pause", "stop") for [key] at [progress] (0–100); items that

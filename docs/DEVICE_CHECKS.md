@@ -21,6 +21,11 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 - Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
+- Media keys: with gerdTV playing, the keyboard's play/pause and Control Center pause and resume it, also with another app in front.
+- Recordings: Record on a programme writes a .ts into Settings → Playback → Recordings folder; TV → Recordings plays and deletes it.
+- Cast: tune sheet → Cast to a device lists the Shield; a channel and a movie play there; the bar's play/pause and Stop work.
+- Deinterlacing on: an interlaced HD channel shows no combed edges and still plays smoothly; off again: as before.
+- Subtitles online (with your OpenSubtitles key): Find subtitles online lists German ones for a movie; a tap shows them in the picture.
 
 ## iPhone and iPad
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
@@ -33,6 +38,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - iPad: the floating window works over split view; live rewinds 20 min (timeshift 30 min in Settings → Playback) and Live returns.
 - Trailer: a movie's page plays its trailer muted after 2 s; Trailer plays it with sound (if not, note YouTube's error number).
 - Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
+- Cast: the local network prompt comes once, then Cast to a device lists devices (Bonjour); casting a movie works.
 
 ## Android phone
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
@@ -42,6 +48,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Logo: picking another logo in Settings → Appearance changes the launcher icon within a few seconds, and gerdTV keeps running.
 - Voice search: the mic in TV's search field opens Google's speech prompt; the spoken words become the search.
 - Swipe: left edge closes a page; fast sideways switches section (not on Guide); player: seek, right half volume, left half brightness.
+- Cast: the local network prompt comes once, then Cast to a device lists the Shield; casting a channel works.
+- Languages: Settings → Playback → Audio language German picks the German track of a two-language movie.
 
 ## Shield
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
@@ -58,3 +66,12 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
 - Your data: Export says Downloads/gerdtv-….json; Import opens a file picker that reaches that file (if none opens, note the error shown).
+- Recordings: a recording keeps running with the screen off; its folder: the system picker, or without one a USB drive's gerdTV folder.
+- Recordings while closed: a planned one shows a notification at its start; opening gerdTV from it starts the recording.
+- Cast: Cast to a device lists Chromecast devices (multicast); a channel plays there via the provider or gerdTV's own stream.
+- Refresh rate on: a 50 fps channel switches the TV to 50 Hz (black for a moment), a 24 fps movie to 24 Hz, Stop goes back.
+- Home screen: Play Next shows a movie left part-way and goes when you remove it there; the gerdTV row shows channels; OK plays.
+- Remote: the last-channel key and Backspace go to the channel before and back; CH+ and CH− zap (if the remote has them).
+- Own groups: holding a channel → Add to a group → New group; the group sits above the provider's, also in the guide; rename and move work.
+- Next episode: an episode played to its end counts down 10 s to the next one; Cancel keeps it; the episode gets its check mark.
+- Picture format: the tune sheet's Zoom fills a 4:3 channel's black bars; it stays for that channel after a restart.

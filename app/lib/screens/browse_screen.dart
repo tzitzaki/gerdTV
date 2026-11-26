@@ -14,6 +14,9 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'details_screen.dart';
+import 'group_menus.dart';
+import 'recordings_screen.dart';
+import '../services/recordings.dart' show canRecord;
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'logo.dart';
@@ -45,8 +48,14 @@ void openItem(
   } else if (item.kind == ItemKind.movie && page) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            MovieScreen(library: session.library!, movie: item, onPlay: play),
+        builder: (_) => MovieScreen(
+          library: session.library!,
+          movie: item,
+          onPlay: play,
+          isWatched: () => session.watched.contains(item.key),
+          onWatched: () => session.toggleWatched(item),
+          tmdbKey: session.tmdbKey,
+        ),
       ),
     );
   } else {
@@ -112,6 +121,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               listenable: Listenable.merge([
                 session.favouritesChanged,
                 session.nowPlaying,
+                session.recordings,
               ]),
               builder: (context, _) => FutureBuilder<List<ItemInfo>>(
                 future: lib.favourites(
@@ -131,7 +141,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       ? null
                       : ContinueRow(session: session, kind: kind);
                   // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
-                  final header = Align(
+                  final sort = Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: SortButton(
                       value: _sort,
@@ -139,6 +149,29 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       onSelected: _setSort,
                     ),
                   );
+                  // TV: the recordings, once there are any, above the groups.
+                  final recordings =
+                      kind == ItemKind.live &&
+                      canRecord &&
+                      session.recordings.list().isNotEmpty;
+                  final header = !recordings
+                      ? sort
+                      : Column(
+                          children: [
+                            sort,
+                            ListTile(
+                              key: const Key('browse.recordings'),
+                              leading: const Icon(Icons.video_library_outlined),
+                              title: Text(l10n.recordings),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      RecordingsScreen(session: session),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
                   final skip = resume == null ? 1 : 2;
                   return ListView.builder(
                     itemCount: all.length + skip,
@@ -146,26 +179,43 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       if (row == 0) return header;
                       if (resume != null && row == 1) return resume;
                       final i = row - skip;
-                      return ListTile(
+                      void open() => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ItemsScreen(
+                            session: session,
+                            kind: kind,
+                            group: all[i],
+                            favourites: n > 0 && i == 0,
+                          ),
+                        ),
+                      );
+                      final favourites = n > 0 && i == 0;
+                      final menu = favourites
+                          ? null
+                          : () => showGroupMenu(
+                              context,
+                              session,
+                              kind,
+                              all[i],
+                              list,
+                            );
+                      final tile = ListTile(
                         key: n > 0 && i == 0
                             ? const Key('browse.favourites')
                             : null,
                         leading: n > 0 && i == 0
                             ? const Icon(Icons.star)
+                            : isOwnGroup(all[i].id)
+                            ? const Icon(Icons.folder_outlined)
                             : null,
                         title: Text(all[i].name),
                         trailing: Text('${all[i].count}'),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ItemsScreen(
-                              session: session,
-                              kind: kind,
-                              group: all[i],
-                              favourites: n > 0 && i == 0,
-                            ),
-                          ),
-                        ),
+                        onTap: open,
+                        onLongPress: menu,
                       );
+                      return menu == null
+                          ? tile
+                          : LongOk(onTap: open, onLong: menu, child: tile);
                     },
                   );
                 },
@@ -319,6 +369,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     super.initState();
     _guideSeen = widget.session.guideGeneration;
     widget.session.addListener(_onSession);
+    widget.session.orderChanged.addListener(_reload);
     _tick = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshNowNext(),
@@ -329,6 +380,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   @override
   void dispose() {
     widget.session.removeListener(_onSession);
+    widget.session.orderChanged.removeListener(_reload);
     _tick?.cancel();
     _search.dispose();
     _searchFocus.dispose();
@@ -340,6 +392,27 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _guideSeen = widget.session.guideGeneration;
       _refreshNowNext();
     }
+  }
+
+  bool get _own => isOwnGroup(widget.group.id);
+
+  /// A name, the order or the own groups changed: the same stretch again, so the list stays where it is.
+  Future<void> _reload() async {
+    if (widget.favourites || _loading) return;
+    final sort = _sort;
+    final again = await widget.session.library!.items(
+      kind: widget.kind,
+      category: widget.group.id,
+      sort: sort.value,
+      limit: _items.length < page ? page : _items.length,
+      offset: 0,
+    );
+    if (!mounted || sort != _sort) return;
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(again);
+    });
   }
 
   Future<void> _nowNextFor(List<ItemInfo> items) async {
@@ -441,11 +514,15 @@ class _ItemsScreenState extends State<ItemsScreen> {
           section: sectionOf(widget.kind),
           controller: _search,
           focus: _searchFocus,
-          // The Favourites group spans several groups: its search covers the section.
-          group: widget.favourites ? null : widget.group,
-          child: ValueListenableBuilder<int>(
-            valueListenable: widget.session.favouritesChanged,
-            builder: (context, _, _) => ItemsView(
+          // The Favourites group and own groups span several groups: their search covers the section.
+          group: widget.favourites || _own ? null : widget.group,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([
+              widget.session.favouritesChanged,
+              widget.session.watchedChanged,
+            ]),
+            builder: (context, _) => ItemsView(
+              watched: widget.session.watched,
               mode: _mode,
               // In Favourites, an unstarred item leaves the list at once.
               items: widget.favourites
@@ -460,6 +537,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
               onNearEnd: _more,
               favourites: widget.session.favourites,
               onFavourite: widget.session.toggleFavourite,
+              menu: (it) => itemMenu(
+                context,
+                widget.session,
+                it,
+                // Moving shows only in the group's own order.
+                group: _own && _sort == ListSort.provider
+                    ? (
+                        id: widget.group.id,
+                        keys: [for (final i in _items) i.key],
+                      )
+                    : null,
+              ),
               onTap: (it) => openItem(
                 context,
                 widget.session,
@@ -492,7 +581,7 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
   Session get session => widget.session;
   ItemInfo get series => widget.series;
   late final Future<ItemDetails?> _details = session.library!
-      .details(key: series.key)
+      .details(key: series.key, tmdbKey: session.tmdbKey)
       .then<ItemDetails?>((d) => d)
       .catchError((Object _) => null);
   late final Future<List<ItemInfo>> _episodes = session.library!.episodes(
@@ -548,9 +637,14 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
                 }
                 return SliverList.builder(
                   itemCount: eps.length,
-                  itemBuilder: (context, i) => ItemTile(
-                    item: eps[i],
-                    onTap: () => openItem(context, session, eps[i]),
+                  itemBuilder: (context, i) => ValueListenableBuilder<int>(
+                    valueListenable: session.watchedChanged,
+                    builder: (context, _, _) => ItemTile(
+                      item: eps[i],
+                      onTap: () => openItem(context, session, eps[i]),
+                      watched: session.watched.contains(eps[i].key),
+                      onWatched: () => session.toggleWatched(eps[i]),
+                    ),
                   ),
                 );
               },

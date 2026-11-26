@@ -100,11 +100,15 @@ pub enum Watching {
     Movie {
         title: String,
         year: Option<u32>,
+        /// TMDB's id when gerdTV knows it (tmdb.rs): both services match by id before the title.
+        tmdb: Option<u64>,
     },
     Episode {
         show: String,
         season: u32,
         number: u32,
+        /// The show's TMDB id.
+        tmdb: Option<u64>,
     },
 }
 
@@ -117,6 +121,8 @@ pub struct TrackInfo {
     pub show: String,
     pub season: u32,
     pub number: u32,
+    /// TMDB's id of the movie, or of an episode's series, when the tmdb cache has it.
+    pub tmdb: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -362,18 +368,221 @@ pub async fn refresh(c: &Client, t: &Token) -> Result<Option<Token>> {
 /// The scrobble body both services read (Simkl's follows Trakt's).
 pub fn scrobble_body(w: &Watching, progress: f64) -> Value {
     let progress = (progress.clamp(0.0, 100.0) * 100.0).round() / 100.0;
-    match w {
-        Watching::Movie { title, year } => {
+    let mut body = match w {
+        Watching::Movie { title, year, .. } => {
             json!({ "progress": progress, "movie": { "title": title, "year": year } })
         }
         Watching::Episode {
             show,
             season,
             number,
+            ..
         } => json!({
             "progress": progress, "show": { "title": show },
             "episode": { "season": season, "number": number }
         }),
+    };
+    let (what, tmdb) = match w {
+        Watching::Movie { tmdb, .. } => ("movie", tmdb),
+        Watching::Episode { tmdb, .. } => ("show", tmdb),
+    };
+    if let Some(id) = tmdb {
+        body[what]["ids"] = json!({ "tmdb": id });
+    }
+    body
+}
+
+/// Simkl's GET with its query and the token; the JSON answer.
+async fn simkl_get(c: &Client, t: &Token, path: &str, query: &[(&str, String)]) -> Result<Value> {
+    let res = http()
+        .get(format!("{}{path}", c.base))
+        .query(&simkl_query(c))
+        .query(query)
+        .bearer_auth(&t.access)
+        .send()
+        .await
+        .map_err(|e| TrackError::Network(e.without_url().to_string()))?;
+    let status = res.status().as_u16();
+    if status != 200 {
+        return Err(TrackError::Http("Simkl", status));
+    }
+    let bytes = res
+        .bytes()
+        .await
+        .map_err(|e| TrackError::Network(e.without_url().to_string()))?;
+    serde_json::from_slice(&bytes).map_err(|_| TrackError::Parse("Simkl"))
+}
+
+/// One movie, or one episode of a show, as Simkl tells it; `at` in UTC seconds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Seen {
+    pub watching: Watching,
+    pub at: i64,
+}
+
+/// A movie or episode paused part-way: `percent` 0–100.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Paused {
+    pub watching: Watching,
+    pub percent: f64,
+    pub at: i64,
+}
+
+/// What changed at Simkl since `since` (its activity time, as it sent it; empty: everything).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Changes {
+    pub seen: Vec<Seen>,
+    pub paused: Vec<Paused>,
+    /// The activity time to pass as `since` next time.
+    pub all: String,
+}
+
+/// "2026-05-08T14:23:11Z" (Simkl's times are UTC, Z-suffixed, fractions possible) as UTC seconds; 0 otherwise.
+fn utc(s: &str) -> i64 {
+    let n = |r: std::ops::Range<usize>| s.get(r)?.parse::<i64>().ok();
+    let (Some(y), Some(m), Some(d), Some(h), Some(mi), Some(se)) =
+        (n(0..4), n(5..7), n(8..10), n(11..13), n(14..16), n(17..19))
+    else {
+        return 0;
+    };
+    if !s.ends_with('Z') || !(1..=12).contains(&m) {
+        return 0;
+    }
+    // Days since 1970-01-01 of the civil date (Howard Hinnant's days_from_civil).
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * ((m + 9) % 12) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    days * 86_400 + h * 3600 + mi * 60 + se
+}
+
+fn tmdb_of(v: &Value) -> Option<u64> {
+    let id = &v["ids"]["tmdb"];
+    id.as_u64().or_else(|| id.as_str()?.parse().ok())
+}
+
+fn movie_of(v: &Value) -> Watching {
+    Watching::Movie {
+        title: v["title"].as_str().unwrap_or_default().to_string(),
+        year: v["year"].as_u64().map(|y| y as u32),
+        tmdb: tmdb_of(v),
+    }
+}
+
+/// Simkl's watched movies and episodes and paused playbacks since `since`, by its rules: activities first, and
+/// nothing more when they haven't moved (api.simkl.org, "Sync"). None: nothing changed.
+pub async fn simkl_changes(c: &Client, t: &Token, since: &str) -> Result<Option<Changes>> {
+    let activities = simkl_get(c, t, "/sync/activities", &[]).await?;
+    let all = activities["all"].as_str().unwrap_or_default().to_string();
+    if all == since && !since.is_empty() {
+        return Ok(None);
+    }
+    let from: Vec<(&str, String)> = if since.is_empty() {
+        vec![]
+    } else {
+        vec![("date_from", since.to_string())]
+    };
+    let mut out = Changes {
+        all,
+        ..Default::default()
+    };
+    let movies = simkl_get(c, t, "/sync/all-items/movies/completed", &from).await?;
+    for m in movies["movies"].as_array().into_iter().flatten() {
+        out.seen.push(Seen {
+            watching: movie_of(&m["movie"]),
+            at: utc(m["last_watched_at"].as_str().unwrap_or_default()),
+        });
+    }
+    // Episodes: only with these three modifiers, also of completed shows (Simkl's guide, "Useful query params").
+    let mut query = from.clone();
+    query.extend([
+        ("extended", "full".to_string()),
+        ("episode_watched_at", "yes".to_string()),
+        ("include_all_episodes", "original".to_string()),
+    ]);
+    let shows = simkl_get(c, t, "/sync/all-items/shows", &query).await?;
+    for s in shows["shows"].as_array().into_iter().flatten() {
+        let show = &s["show"];
+        for season in s["seasons"].as_array().into_iter().flatten() {
+            for e in season["episodes"].as_array().into_iter().flatten() {
+                let at = e["watched_at"].as_str().map_or(0, utc);
+                if at == 0 {
+                    continue; // not watched
+                }
+                out.seen.push(Seen {
+                    watching: Watching::Episode {
+                        show: show["title"].as_str().unwrap_or_default().to_string(),
+                        season: season["number"].as_u64().unwrap_or(0) as u32,
+                        number: e["number"].as_u64().unwrap_or(0) as u32,
+                        tmdb: tmdb_of(show),
+                    },
+                    at,
+                });
+            }
+        }
+    }
+    let playback = simkl_get(c, t, "/sync/playback", &[]).await?;
+    for p in playback.as_array().into_iter().flatten() {
+        let at = ["paused_at", "watched_at"]
+            .iter()
+            .find_map(|k| p[*k].as_str())
+            .map_or(0, utc);
+        let watching = if p["movie"].is_object() {
+            movie_of(&p["movie"])
+        } else {
+            let e = &p["episode"];
+            Watching::Episode {
+                show: p["show"]["title"].as_str().unwrap_or_default().to_string(),
+                season: e["season"].as_u64().unwrap_or(0) as u32,
+                number: e["number"].as_u64().or(e["episode"].as_u64()).unwrap_or(0) as u32,
+                tmdb: tmdb_of(&p["show"]),
+            }
+        };
+        if let Some(percent) = p["progress"].as_f64() {
+            out.paused.push(Paused {
+                watching,
+                percent,
+                at,
+            });
+        }
+    }
+    Ok(Some(out))
+}
+
+/// A movie or episode marked as watched by hand (or unmarked) goes to Simkl's history too.
+pub async fn simkl_history(c: &Client, t: &Token, w: &Watching, watched: bool) -> Result<()> {
+    let ids = |title: &str, tmdb: &Option<u64>| match tmdb {
+        Some(id) => json!({ "title": title, "ids": { "tmdb": id } }),
+        None => json!({ "title": title }),
+    };
+    let body = match w {
+        Watching::Movie { title, year, tmdb } => {
+            let mut m = ids(title, tmdb);
+            m["year"] = json!(year);
+            json!({ "movies": [m] })
+        }
+        Watching::Episode {
+            show,
+            season,
+            number,
+            tmdb,
+        } => {
+            let mut s = ids(show, tmdb);
+            s["seasons"] = json!([{ "number": season, "episodes": [{ "number": number }] }]);
+            json!({ "shows": [s] })
+        }
+    };
+    let path = if watched {
+        "/sync/history"
+    } else {
+        "/sync/history/remove"
+    };
+    let (status, _) = post(c, path, body, Some(&t.access)).await?;
+    match status {
+        200..=299 => Ok(()),
+        s => Err(TrackError::Http("Simkl", s)),
     }
 }
 
@@ -428,6 +637,7 @@ mod tests {
         let m = Watching::Movie {
             title: "Inception".into(),
             year: Some(2010),
+            tmdb: None,
         };
         assert_eq!(
             scrobble_body(&m, 12.3456),
@@ -437,12 +647,20 @@ mod tests {
             show: "Dark".into(),
             season: 1,
             number: 3,
+            tmdb: Some(70523),
         };
         assert_eq!(
             scrobble_body(&e, 120.0)["episode"],
             json!({ "season": 1, "number": 3 })
         );
         assert_eq!(scrobble_body(&e, 120.0)["progress"], 100.0);
+        assert_eq!(
+            scrobble_body(&e, 1.0)["show"]["ids"],
+            json!({ "tmdb": 70523 })
+        );
+        assert_eq!(utc("1970-01-02T00:00:01Z"), 86_401);
+        assert_eq!(utc("2026-05-08T14:23:11.512Z"), 1_778_250_191);
+        assert_eq!(utc("yesterday"), 0);
     }
 
     #[tokio::test]
@@ -482,6 +700,7 @@ mod tests {
             let w = Watching::Movie {
                 title: "Inception".into(),
                 year: Some(2010),
+                tmdb: None,
             };
             scrobble(&c, &new, Action::Start, &w, 0.0).await.unwrap();
             scrobble(&c, &new, Action::Stop, &w, 91.0).await.unwrap();

@@ -6,12 +6,14 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/cast.dart';
 import 'api/hls.dart';
 import 'api/library.dart';
 import 'api/logos.dart';
 import 'api/playback.dart';
 import 'api/premiumize.dart';
 import 'api/simple.dart';
+import 'api/subtitles.dart';
 import 'api/tracking.dart';
 import 'api/update.dart';
 
@@ -31,6 +33,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   });
 
   CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_CastHandlePtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle;
+
+  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_LibraryPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary;
 
@@ -41,6 +47,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_WatchdogPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog;
+
+  @protected
+  CastHandle
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    dynamic raw,
+  );
 
   @protected
   Library
@@ -61,6 +73,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CastHandle
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    dynamic raw,
+  );
+
+  @protected
   Library
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     dynamic raw,
@@ -75,6 +93,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Watchdog
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
+    dynamic raw,
+  );
+
+  @protected
+  CastHandle
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
     dynamic raw,
   );
 
@@ -106,6 +130,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BufferPreset dco_decode_box_autoadd_buffer_preset(dynamic raw);
 
   @protected
+  CastDeviceInfo dco_decode_box_autoadd_cast_device_info(dynamic raw);
+
+  @protected
   double dco_decode_box_autoadd_f_64(dynamic raw);
 
   @protected
@@ -119,6 +146,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReminderInfo dco_decode_box_autoadd_reminder_info(dynamic raw);
+
+  @protected
+  SimklImport dco_decode_box_autoadd_simkl_import(dynamic raw);
 
   @protected
   TrackItem dco_decode_box_autoadd_track_item(dynamic raw);
@@ -137,6 +167,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BufferPreset dco_decode_buffer_preset(dynamic raw);
+
+  @protected
+  CastDeviceInfo dco_decode_cast_device_info(dynamic raw);
 
   @protected
   CategoryInfo dco_decode_category_info(dynamic raw);
@@ -185,6 +218,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<CastDeviceInfo> dco_decode_list_cast_device_info(dynamic raw);
 
   @protected
   List<CategoryInfo> dco_decode_list_category_info(dynamic raw);
@@ -244,10 +280,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ProgrammeInfo> dco_decode_list_programme_info(dynamic raw);
 
   @protected
+  List<RecordingInfo> dco_decode_list_recording_info(dynamic raw);
+
+  @protected
   List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
 
   @protected
   List<ResumeItem> dco_decode_list_resume_item(dynamic raw);
+
+  @protected
+  List<SubtitleInfo> dco_decode_list_subtitle_info(dynamic raw);
 
   @protected
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
@@ -278,6 +320,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
+
+  @protected
+  SimklImport? dco_decode_opt_box_autoadd_simkl_import(dynamic raw);
 
   @protected
   TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw);
@@ -313,6 +358,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo dco_decode_programme_info(dynamic raw);
 
   @protected
+  RecordingInfo dco_decode_recording_info(dynamic raw);
+
+  @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
 
   @protected
@@ -322,7 +370,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SearchPage dco_decode_search_page(dynamic raw);
 
   @protected
+  SimklImport dco_decode_simkl_import(dynamic raw);
+
+  @protected
   SourceKind dco_decode_source_kind(dynamic raw);
+
+  @protected
+  SubtitleInfo dco_decode_subtitle_info(dynamic raw);
 
   @protected
   SyncSummary dco_decode_sync_summary(dynamic raw);
@@ -335,6 +389,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrackPoll dco_decode_track_poll(dynamic raw);
+
+  @protected
+  int dco_decode_u_16(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -358,6 +415,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WatchdogCommand dco_decode_watchdog_command(dynamic raw);
 
   @protected
+  CastHandle
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Library
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     SseDeserializer deserializer,
@@ -376,6 +439,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CastHandle
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Library
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     SseDeserializer deserializer,
@@ -390,6 +459,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Watchdog
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CastHandle
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
     SseDeserializer deserializer,
   );
 
@@ -423,6 +498,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CastDeviceInfo sse_decode_box_autoadd_cast_device_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
 
   @protected
@@ -442,6 +522,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SimklImport sse_decode_box_autoadd_simkl_import(SseDeserializer deserializer);
+
+  @protected
   TrackItem sse_decode_box_autoadd_track_item(SseDeserializer deserializer);
 
   @protected
@@ -458,6 +541,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BufferPreset sse_decode_buffer_preset(SseDeserializer deserializer);
+
+  @protected
+  CastDeviceInfo sse_decode_cast_device_info(SseDeserializer deserializer);
 
   @protected
   CategoryInfo sse_decode_category_info(SseDeserializer deserializer);
@@ -506,6 +592,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<CastDeviceInfo> sse_decode_list_cast_device_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<CategoryInfo> sse_decode_list_category_info(
@@ -577,12 +668,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<RecordingInfo> sse_decode_list_recording_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ReminderInfo> sse_decode_list_reminder_info(
     SseDeserializer deserializer,
   );
 
   @protected
   List<ResumeItem> sse_decode_list_resume_item(SseDeserializer deserializer);
+
+  @protected
+  List<SubtitleInfo> sse_decode_list_subtitle_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<WatchdogCommand> sse_decode_list_watchdog_command(
@@ -617,6 +718,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo? sse_decode_opt_box_autoadd_programme_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SimklImport? sse_decode_opt_box_autoadd_simkl_import(
     SseDeserializer deserializer,
   );
 
@@ -658,6 +764,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
 
   @protected
+  RecordingInfo sse_decode_recording_info(SseDeserializer deserializer);
+
+  @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
 
   @protected
@@ -667,7 +776,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
 
   @protected
+  SimklImport sse_decode_simkl_import(SseDeserializer deserializer);
+
+  @protected
   SourceKind sse_decode_source_kind(SseDeserializer deserializer);
+
+  @protected
+  SubtitleInfo sse_decode_subtitle_info(SseDeserializer deserializer);
 
   @protected
   SyncSummary sse_decode_sync_summary(SseDeserializer deserializer);
@@ -680,6 +795,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrackPoll sse_decode_track_poll(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -704,6 +822,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    CastHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     Library self,
     SseSerializer serializer,
@@ -725,6 +850,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    CastHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     Library self,
     SseSerializer serializer,
@@ -741,6 +873,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWatchdog(
     Watchdog self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    CastHandle self,
     SseSerializer serializer,
   );
 
@@ -778,6 +917,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_cast_device_info(
+    CastDeviceInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
 
   @protected
@@ -805,6 +950,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_simkl_import(
+    SimklImport self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_track_item(
     TrackItem self,
     SseSerializer serializer,
@@ -827,6 +978,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_buffer_preset(BufferPreset self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_cast_device_info(
+    CastDeviceInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_category_info(CategoryInfo self, SseSerializer serializer);
@@ -881,6 +1038,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_cast_device_info(
+    List<CastDeviceInfo> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_category_info(
@@ -979,6 +1142,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_recording_info(
+    List<RecordingInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_reminder_info(
     List<ReminderInfo> self,
     SseSerializer serializer,
@@ -987,6 +1156,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_resume_item(
     List<ResumeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_subtitle_info(
+    List<SubtitleInfo> self,
     SseSerializer serializer,
   );
 
@@ -1036,6 +1211,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_simkl_import(
+    SimklImport? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_track_item(
     TrackItem? self,
     SseSerializer serializer,
@@ -1075,6 +1256,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_recording_info(RecordingInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);
 
   @protected
@@ -1084,7 +1268,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);
 
   @protected
+  void sse_encode_simkl_import(SimklImport self, SseSerializer serializer);
+
+  @protected
   void sse_encode_source_kind(SourceKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_subtitle_info(SubtitleInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_sync_summary(SyncSummary self, SseSerializer serializer);
@@ -1100,6 +1290,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_track_poll(TrackPoll self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -1130,6 +1323,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
 class RustLibWire implements BaseWire {
   RustLibWire.fromExternalLibrary(ExternalLibrary lib);
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+        ptr,
+      );
 
   void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
@@ -1186,6 +1395,16 @@ external RustLibWasmModule get wasmModule;
 @JS()
 @anonymous
 extension type RustLibWasmModule._(JSObject _) implements JSObject {
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCastHandle(
+    int ptr,
+  );
+
   external void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLibrary(
     int ptr,

@@ -28,13 +28,18 @@ class AvPlatformPlayer extends PlatformPlayer {
   final ValueNotifier<bool> pip = ValueNotifier(false);
 
   /// Opens [url] with [bufferSecs] of forward buffer (the channel's preset).
-  Future<void> openUrl(String url, {required int bufferSecs}) async {
+  Future<void> openUrl(
+    String url, {
+    required int bufferSecs,
+    String userAgent = '',
+  }) async {
     _update(
       const PlayerState().copyWith(volume: state.volume, rate: state.rate),
     );
     textureId.value = await _channel.invokeMethod<int>('open', {
       'url': url,
       'bufferSecs': bufferSecs.toDouble(),
+      'userAgent': userAgent,
     });
     // The native side makes a new AVPlayer per open, at full volume.
     if (state.volume != 100) await setVolume(state.volume);

@@ -103,6 +103,8 @@ pub struct Details {
     pub backdrop: String,
     /// The YouTube video id of the trailer (panels send an id or a whole YouTube URL).
     pub trailer: String,
+    /// The panel's TMDB id, which spares TMDB a search (tmdb.rs).
+    pub tmdb_id: Option<u64>,
 }
 
 /// A YouTube video id from what panels put into `youtube_trailer`: the id itself, or a watch, short, embed or
@@ -141,6 +143,7 @@ fn details(info: &Value) -> Details {
             .map(text)
             .unwrap_or_else(|| text(&info["backdrop_path"])),
         trailer: trailer_id(&text(&info["youtube_trailer"])),
+        tmdb_id: num(&info["tmdb_id"]).or_else(|| num(&info["tmdb"])),
     }
 }
 

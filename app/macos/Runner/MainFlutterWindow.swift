@@ -1,10 +1,12 @@
 import Cocoa
 import FlutterMacOS
+import MediaPlayer
 
 // The "gerdtv/platform" channel on macOS: setLogo(name, png) sets the Dock icon for this run (Dart sends it again at
 // every start). The Finder icon stays the bundled one: changing the app bundle would break its code signature.
 // setMenuBar(enabled, labels) turns the menu bar mode on or off (Settings → Playback, app/lib/platform/menu_bar.dart);
-// its menu calls back "menuBar" with "toggle" or "stop".
+// its menu calls back "menuBar" with "toggle" or "stop". nowPlaying(…) and clearNowPlaying drive the media keys and
+// Control Center (NowPlaying below), which call back "mediaCommand" with "play" or "pause".
 class MainFlutterWindow: NSWindow {
   private var channel: FlutterMethodChannel?
 
@@ -30,6 +32,7 @@ class MainFlutterWindow: NSWindow {
     channel = FlutterMethodChannel(
       name: "gerdtv/platform", binaryMessenger: flutterViewController.engine.binaryMessenger)
     MenuBar.shared.channel = channel
+    NowPlaying.shared.channel = channel
     channel?.setMethodCallHandler { call, result in
       if call.method == "setMenuBar", let args = call.arguments as? [String: Any] {
         MenuBar.shared.configure(
@@ -40,12 +43,73 @@ class MainFlutterWindow: NSWindow {
       {
         NSApp.applicationIconImage = NSImage(data: png.data)
         result(nil)
+      } else if call.method == "nowPlaying", let args = call.arguments as? [String: Any] {
+        NowPlaying.shared.show(args)
+        result(nil)
+      } else if call.method == "clearNowPlaying" {
+        NowPlaying.shared.clear()
+        result(nil)
       } else {
         result(FlutterMethodNotImplemented)
       }
     }
 
     super.awakeFromNib()
+  }
+}
+
+/// The media keys and Control Center's Now Playing: what plays, with play/pause only (owner decision), as on iOS
+/// (app/ios/Runner/AppDelegate.swift; Dart: app/lib/services/media_card.dart).
+/// Debugging: keys that reach another app mean macOS thinks that one plays; unlike iOS, macOS goes by playbackState.
+final class NowPlaying {
+  static let shared = NowPlaying()
+  var channel: FlutterMethodChannel?
+  private var playing = false
+  private var registered = false
+
+  func show(_ args: [String: Any]) {
+    register()
+    playing = args["playing"] as? Bool ?? false
+    let live = args["live"] as? Bool ?? false
+    var info: [String: Any] = [
+      MPMediaItemPropertyTitle: args["title"] as? String ?? "",
+      MPMediaItemPropertyArtist: args["subtitle"] as? String ?? "",
+      MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
+      MPNowPlayingInfoPropertyIsLiveStream: live,
+      MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
+    ]
+    if !live, let duration = args["duration"] as? Double, duration > 0 {
+      info[MPMediaItemPropertyPlaybackDuration] = duration
+      info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = args["position"] as? Double ?? 0
+    }
+    if let path = args["artwork"] as? String, let image = NSImage(contentsOfFile: path) {
+      info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+    }
+    MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
+  }
+
+  func clear() {
+    MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    MPNowPlayingInfoCenter.default().playbackState = .stopped
+  }
+
+  /// With the first stream, so gerdTV doesn't take the keys before it plays anything.
+  private func register() {
+    guard !registered else { return }
+    registered = true
+    let commands = MPRemoteCommandCenter.shared()
+    commands.playCommand.addTarget { [weak self] _ in self?.send("play") ?? .commandFailed }
+    commands.pauseCommand.addTarget { [weak self] _ in self?.send("pause") ?? .commandFailed }
+    commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+      guard let self else { return .commandFailed }
+      return self.send(self.playing ? "pause" : "play")
+    }
+  }
+
+  private func send(_ action: String) -> MPRemoteCommandHandlerStatus {
+    DispatchQueue.main.async { self.channel?.invokeMethod("mediaCommand", arguments: action) }
+    return .success
   }
 }
 

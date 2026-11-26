@@ -15,7 +15,7 @@
 use crate::m3u;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub type Result<T> = rusqlite::Result<T>;
 
@@ -177,6 +177,28 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE epg_channels ADD COLUMN filled INTEGER NOT NULL DEFAULT 0;
      UPDATE epg_sources SET offset_hours = coalesce((SELECT CAST(value AS INTEGER) FROM settings
         WHERE key = 'guide_offset_hours'), 0) WHERE builtin = 0;",
+    // 10 → 11: movies and episodes seen to the end (user data). An unmark is stored too (watched = 0), so it wins
+    // over an older mark from an import or from Simkl.
+    // The user's own groups, names and group order (groups.rs, user data); removed ones stay as deleted = 1. And
+    // TMDB's answers per item (tmdb.rs, a cache: kept 30 days, not exported), and episodes Simkl knows as watched
+    // whose series hasn't been opened yet (watch_import.rs; applied when it is), and the recordings of this device
+    // (recorder.rs; not exported: their files are here).
+    "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE custom_groups (id TEXT PRIMARY KEY, kind INTEGER NOT NULL, name TEXT NOT NULL,
+        position INTEGER NOT NULL, deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+     CREATE TABLE custom_group_items (group_id TEXT NOT NULL, item_key TEXT NOT NULL, position INTEGER NOT NULL,
+        deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (group_id, item_key));
+     CREATE TABLE group_prefs (kind INTEGER NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+        position INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (kind, category));
+     CREATE TABLE item_prefs (key TEXT PRIMARY KEY, name TEXT NOT NULL, provider_name TEXT NOT NULL DEFAULT '',
+        updated_at INTEGER NOT NULL);
+     CREATE TABLE tmdb (key TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at INTEGER NOT NULL);
+     CREATE TABLE waiting_watched (series TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL, PRIMARY KEY (series, season, episode));
+     CREATE TABLE recordings (id INTEGER PRIMARY KEY, item_key TEXT NOT NULL, title TEXT NOT NULL,
+        start INTEGER NOT NULL, stop INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'scheduled',
+        file TEXT NOT NULL DEFAULT '', message TEXT NOT NULL DEFAULT '', bytes INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 
@@ -233,19 +255,76 @@ pub fn open(path: &Path) -> Result<Connection> {
         std::fs::copy(path, &backup)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     }
-    let from = current;
     while current < SCHEMA_VERSION {
-        conn.execute_batch(MIGRATIONS[(current - 1) as usize])?;
+        migrate_step(&conn, current, MIGRATIONS[(current - 1) as usize])?;
         current += 1;
     }
-    if from < 6 {
-        reindex(&conn)?; // migration 6 added empty search indexes
+    if path != Path::new(":memory:") {
+        prune_backups(&conn, path);
     }
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
-        [current.to_string()],
-    )?;
     Ok(conn)
+}
+
+/// One migration step with its version number, all or nothing: after a crash or an error halfway the next start finds
+/// the version it left, not a half-changed schema whose ALTERs would fail a second time.
+fn migrate_step(conn: &Connection, from: i64, sql: &str) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(sql)?;
+    if from == 5 {
+        reindex(&tx)?; // step 5 → 6 added empty search indexes
+    }
+    tx.execute(
+        "INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1",
+        [(from + 1).to_string()],
+    )?;
+    tx.commit()
+}
+
+/// The backups of the database at `path` (`<name>.db.bak-<unix seconds>`, nothing else), oldest first.
+pub fn backups(path: &Path) -> Vec<PathBuf> {
+    let Some(prefix) = path
+        .file_name()
+        .map(|n| format!("{}.bak-", n.to_string_lossy()))
+    else {
+        return Vec::new();
+    };
+    let mut found: Vec<(u64, PathBuf)> = path
+        .parent()
+        .and_then(|dir| std::fs::read_dir(dir).ok())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let at = name.strip_prefix(&prefix)?;
+            // Digits only: parse() alone would also take "+5".
+            let digits = at.bytes().all(|b| b.is_ascii_digit());
+            Some((at.parse().ok().filter(|_| digits)?, e.path()))
+        })
+        .collect();
+    found.sort();
+    found.into_iter().map(|(_, p)| p).collect()
+}
+
+/// Deletes all but the newest backup (owner decision), and only while the opened database is sound: a damaged one may
+/// need an older copy. Nothing to prune costs one directory listing; the check runs only before a deletion.
+fn prune_backups(conn: &Connection, path: &Path) {
+    let all = backups(path);
+    let Some((_newest, old)) = all.split_last().filter(|(_, old)| !old.is_empty()) else {
+        return;
+    };
+    let sound = conn
+        .query_row("PRAGMA quick_check(1)", [], |r| r.get::<_, String>(0))
+        .is_ok_and(|r| r == "ok");
+    if !sound {
+        tracing::warn!("database check failed, all backups kept");
+        return;
+    }
+    for p in old {
+        if let Err(e) = std::fs::remove_file(p) {
+            tracing::warn!("old database backup not deleted: {e}"); // tried again at the next start
+        }
+    }
 }
 
 /// Fills `folded` from the stored names (after migration 6); the tvg-names follow with the next sync.
@@ -271,6 +350,17 @@ fn index_item(conn: &Connection, rowid: i64, fresh: bool, name: &str, alt: &str)
     conn.prepare_cached("INSERT INTO items_fts (rowid, name, alt) VALUES (?1, ?2, ?3)")?
         .execute(params![rowid, name, alt])?;
     Ok(())
+}
+
+/// Changes an item's name with its search index (the user's own name, groups.rs).
+pub fn rename_item(conn: &Connection, key: &str, name: &str) -> Result<()> {
+    let alt = clean_name(name);
+    let rowid: i64 = conn.query_row(
+        "UPDATE items SET name = ?2, folded = ?3 WHERE key = ?1 RETURNING rowid",
+        params![key, name, fold(&alt)],
+        |r| r.get(0),
+    )?;
+    index_item(conn, rowid, false, name, &alt)
 }
 
 fn unix_now() -> i64 {
@@ -496,6 +586,7 @@ impl<'c> Sync<'c> {
                 params![*kind as i64, id, name, i as i64],
             )?;
         }
+        crate::groups::apply(&self.tx)?;
         self.tx.commit()?;
         Ok(removed)
     }
@@ -1146,10 +1237,11 @@ pub const RESUME_FROM_SECS: u32 = 120;
 pub const FINISHED_AT: f64 = 0.95;
 
 /// Remembers how far a movie or episode played. Under 2 min nothing is kept (zapping through isn't "started"), from
-/// 95 % it counts as finished and leaves continue watching.
+/// 95 % it counts as finished: it leaves continue watching and is marked as watched.
 pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32) -> Result<()> {
     if duration > 0 && position as f64 >= duration as f64 * FINISHED_AT {
         conn.execute("DELETE FROM resume WHERE key = ?1", [key])?;
+        set_watched(conn, key, true)?;
     } else if position >= RESUME_FROM_SECS {
         conn.execute(
             "INSERT INTO resume (key, position, duration, updated_at) VALUES (?1, ?2, ?3, ?4)
@@ -1158,6 +1250,58 @@ pub fn save_progress(conn: &Connection, key: &str, position: u32, duration: u32)
         )?;
     }
     Ok(())
+}
+
+/// Marks a movie or episode as watched or not (by hand, or at 95 %).
+pub fn set_watched(conn: &Connection, key: &str, watched: bool) -> Result<()> {
+    conn.execute(
+        "INSERT INTO watched (key, watched, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT (key) DO UPDATE SET watched = ?2, updated_at = ?3",
+        params![key, watched, unix_now()],
+    )?;
+    Ok(())
+}
+
+/// Every watched item's key (the lists' check marks).
+pub fn watched_keys(conn: &Connection) -> Result<Vec<String>> {
+    let mut st = conn.prepare_cached("SELECT key FROM watched WHERE watched = 1")?;
+    let rows = st.query_map([], |r| r.get(0))?;
+    rows.collect()
+}
+
+/// The episode after `key`: the next season and episode number of its series, skipping the same episode in another
+/// quality. Xtream Codes episodes share their series' key as category; an M3U group may hold several shows, so there
+/// the name before "S01E02" has to match too. None: the last one, or not a numbered episode.
+pub fn next_episode(conn: &Connection, key: &str) -> Result<Option<Hit>> {
+    let mut st = conn.prepare_cached(
+        "SELECT e.key, e.kind, e.name, e.category, e.logo, e.number, e.archive_days, cur.name
+         FROM items cur JOIN items e ON e.kind = 2 AND e.category = cur.category
+         WHERE cur.key = ?1 AND cur.kind = 2 AND (e.season, e.episode) > (cur.season, cur.episode)
+         ORDER BY e.season, e.episode, e.position",
+    )?;
+    let mut rows = st.query([key])?;
+    while let Some(r) = rows.next()? {
+        let hit = Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: String::new(),
+        };
+        let current: String = r.get(7)?;
+        if hit.category.starts_with("series:") || show_of(&hit.name) == show_of(&current) {
+            return Ok(Some(hit));
+        }
+    }
+    Ok(None)
+}
+
+/// "DE | Dark S01E02 HD" → "dark": what two episodes of one show share in an M3U group.
+fn show_of(name: &str) -> String {
+    fold(&clean_name(m3u::before_episode(name)))
 }
 
 /// Where to resume an item (seconds), if it was left part-way.
@@ -1208,6 +1352,29 @@ pub fn touch_recent(conn: &Connection, key: &str) -> Result<()> {
         params![key, unix_now()],
     )?;
     Ok(())
+}
+
+/// The live channels played last, newest first (hidden groups left out), for the Android TV home screen.
+pub fn recent_channels(conn: &Connection, limit: usize) -> Result<Vec<Hit>> {
+    let mut st = conn.prepare_cached(&format!(
+        "SELECT i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
+         FROM recents r JOIN items i ON i.key = r.key
+         WHERE i.kind = 0 {} ORDER BY r.updated_at DESC, r.rowid DESC LIMIT ?1",
+        visible_and(conn, "i")?
+    ))?;
+    let rows = st.query_map([limit as i64], |r| {
+        Ok(Hit {
+            key: r.get(0)?,
+            kind: Kind::from_i64(r.get(1)?),
+            name: r.get(2)?,
+            category: r.get(3)?,
+            logo: r.get(4)?,
+            number: r.get(5)?,
+            archive_days: r.get(6)?,
+            group: String::new(),
+        })
+    })?;
+    rows.collect()
 }
 
 /// Every favourite's key (the lists' stars).
@@ -1598,6 +1765,9 @@ http://h.example.invalid/live/alice/s3cret/403.ts
                 "{pos}/{dur}"
             );
         }
+        assert_eq!(watched_keys(&c).unwrap(), ["movie:201"], "95 % marks it");
+        set_watched(&c, "movie:201", false).unwrap();
+        assert!(watched_keys(&c).unwrap().is_empty());
         save_progress(&c, "episode:301", 900, 2700).unwrap();
         let row = continue_watching(&c, &[Kind::Movie, Kind::Episode], 10).unwrap();
         assert_eq!(
@@ -1606,6 +1776,36 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         );
         assert_eq!((row[0].1, row[0].2), (900, 2700));
         assert!(continue_watching(&c, &[Kind::Live], 10).unwrap().is_empty());
+    }
+
+    /// The next episode stays in its show, and the same episode in another quality is not the next one.
+    #[test]
+    fn next_episode_follows_the_numbers_of_its_show() {
+        let mut c = db();
+        let list = "#EXTM3U
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E01 HD\nhttp://h.example.invalid/series/a/b/1.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E01 4K\nhttp://h.example.invalid/series/a/b/2.mkv
+#EXTINF:-1 group-title=\"S\",Other S01E02\nhttp://h.example.invalid/series/a/b/3.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S01E02 HD\nhttp://h.example.invalid/series/a/b/4.mkv
+#EXTINF:-1 group-title=\"S\",DE | Dark S02E01 HD\nhttp://h.example.invalid/series/a/b/5.mkv
+";
+        import_m3u(&mut c, list.as_bytes(), &["a", "b"]).unwrap();
+        for (from, want) in [
+            (1, Some(4)),
+            (2, Some(4)),
+            (4, Some(5)),
+            (5, None), // the last one
+            (3, None), // another show's episodes follow it in the group
+        ] {
+            assert_eq!(
+                next_episode(&c, &format!("episode:{from}"))
+                    .unwrap()
+                    .map(|h| h.key),
+                want.map(|n| format!("episode:{n}")),
+                "after {from}"
+            );
+        }
+        assert!(next_episode(&c, "movie:201").unwrap().is_none());
     }
 
     #[test]
@@ -1629,7 +1829,16 @@ http://h.example.invalid/live/alice/s3cret/403.ts
         Sync::add_items(&mut c, Kind::Episode, &[ep]).unwrap();
         set_favourite(&c, "live:102", true).unwrap();
         assert_eq!(search(&c, "maus", &[], None, 10, 0).unwrap().len(), 2);
+        for key in ["live:101", "live:102", "movie:201"] {
+            touch_recent(&c, key).unwrap();
+        }
+        let recent = |c: &Connection| -> Vec<String> {
+            let hits = recent_channels(c, 10).unwrap();
+            hits.into_iter().map(|h| h.key).collect()
+        };
+        assert_eq!(recent(&c), ["live:102", "live:101"], "channels only");
         set_group_hidden(&c, Kind::Live, "DE | Regional", true).unwrap();
+        assert_eq!(recent(&c), ["live:101"]);
         set_group_hidden(&c, Kind::Series, "k", true).unwrap();
         assert!(
             search(&c, "munchen", &[], None, 10, 0).unwrap().is_empty(),
@@ -1772,8 +1981,21 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             .count();
         assert_eq!(backups, 1);
         drop(c);
-        // Opening again migrates nothing and makes no new backup.
+        // Opening again migrates nothing, makes no new backup, and clears the profile's older ones (earlier
+        // migrations'), but nothing that isn't exactly one of its backups.
+        for other in [
+            "p.db.bak-100",
+            "p.db.bak-99",
+            "q.db.bak-100",
+            "p.db.bak-mine",
+        ] {
+            std::fs::write(dir.join(other), "x").unwrap();
+        }
         drop(open(&path).unwrap());
+        assert!(!dir.join("p.db.bak-100").exists() && !dir.join("p.db.bak-99").exists());
+        assert!(dir.join("q.db.bak-100").exists() && dir.join("p.db.bak-mine").exists());
+        std::fs::remove_file(dir.join("q.db.bak-100")).unwrap();
+        std::fs::remove_file(dir.join("p.db.bak-mine")).unwrap();
         let backups = std::fs::read_dir(&dir)
             .unwrap()
             .filter(|e| {
@@ -1786,6 +2008,32 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             .count();
         assert_eq!(backups, 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A migration that fails halfway leaves the version and tables as they were, so the next start runs it again.
+    #[test]
+    fn a_failed_migration_changes_nothing() {
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch(SCHEMA).unwrap();
+        c.execute("INSERT INTO meta VALUES ('schema', '1')", [])
+            .unwrap();
+        assert!(
+            migrate_step(
+                &c,
+                1,
+                "CREATE TABLE half (a); ALTER TABLE missing ADD COLUMN b;"
+            )
+            .is_err()
+        );
+        let (tables, version): (i64, String) = c
+            .query_row(
+                "SELECT (SELECT count(*) FROM sqlite_master WHERE name = 'half'),
+                    (SELECT value FROM meta WHERE key = 'schema')",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((tables, version.as_str()), (0, "1"));
     }
 
     #[test]

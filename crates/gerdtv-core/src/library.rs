@@ -12,6 +12,8 @@
 
 use crate::db::{self, Hit, ImportStats, Kind, Sort};
 use crate::epg;
+use crate::groups;
+use crate::tmdb;
 use crate::xtream::{self, Account, XcError, Xtream};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -27,6 +29,22 @@ pub enum SourceKind {
     M3uUrl,
     /// M3U from a local file: `server` is the file path; no secrets.
     M3uFile,
+}
+
+/// One recording as the list shows it; `state`: scheduled, recording, done, refused, failed or skipped.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecordingRow {
+    pub id: i64,
+    pub item_key: String,
+    pub title: String,
+    pub start: i64,
+    pub stop: i64,
+    pub state: String,
+    /// Where it was written: a path, or (Android) the document's content URI.
+    pub file: String,
+    /// Why it ended early, if it did.
+    pub message: String,
+    pub bytes: u64,
 }
 
 /// A profile's non-secret settings (one provider).
@@ -56,6 +74,10 @@ pub enum LibraryError {
     Io(#[from] std::io::Error),
     #[error("no profile {0}")]
     NoProfile(String),
+    #[error(transparent)]
+    Track(#[from] crate::tracking::TrackError),
+    #[error(transparent)]
+    Cast(#[from] crate::cast::CastError),
     #[error("this profile needs {0} secret(s)")]
     Secrets(usize),
 }
@@ -129,6 +151,9 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
             db::fnv1a(&format!("{}{}{}", p.name, p.server, now())) & 0xffff_ffff
         );
     }
+    // Sent as an HTTP header: printable ASCII only, or the clients could not be built from it.
+    p.user_agent.retain(|c| (' '..='~').contains(&c));
+    p.user_agent = p.user_agent.trim().to_string();
     p.updated_at = now();
     match all.iter_mut().find(|x| x.id == p.id) {
         Some(x) => *x = p.clone(),
@@ -138,13 +163,16 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
     Ok(p)
 }
 
-/// Removes a profile and its database (inside the app's own folder; the app confirms first).
+/// Removes a profile, its database and the database's backups (inside the app's own folder; the app confirms first).
 pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     let mut all = load_profiles(dir)?;
     all.retain(|p| p.id != id);
     store_profiles(dir, &all)?;
     for suffix in ["", "-wal", "-shm"] {
         let _ = std::fs::remove_file(db_path(dir, id).with_extension(format!("db{suffix}")));
+    }
+    for backup in db::backups(&db_path(dir, id)) {
+        let _ = std::fs::remove_file(backup);
     }
     Ok(())
 }
@@ -179,7 +207,9 @@ pub const GROUP_HITS: usize = 5;
 /// One open profile: its database and, for Xtream Codes, its client.
 pub struct Library {
     profile: Profile,
-    conn: Mutex<Connection>,
+    pub(crate) conn: Mutex<Connection>,
+    /// Running recordings by id (recorder.rs); each holds a provider connection.
+    recording: Mutex<std::collections::HashMap<i64, crate::recorder::Recording>>,
     secrets: Vec<String>,
     xc: Option<Xtream>,
 }
@@ -207,6 +237,7 @@ impl Library {
         Ok(Library {
             profile,
             conn: Mutex::new(conn),
+            recording: Mutex::default(),
             secrets,
             xc,
         })
@@ -327,6 +358,12 @@ impl Library {
                 let stats = xtream::write(&mut self.conn.lock().unwrap(), &f)?;
                 // Catch-up URLs name the start in the server's local time.
                 self.set_setting(SETTING_XC_OFFSET, &f.account.time_offset.to_string())?;
+                let expires = f.account.expires.map(|e| e.to_string());
+                self.set_setting(SETTING_ACCOUNT_EXPIRES, &expires.unwrap_or_default())?;
+                self.set_setting(
+                    SETTING_ACCOUNT_LIMIT,
+                    &f.account.max_connections.to_string(),
+                )?;
                 Ok(SyncResult {
                     stats,
                     account: Some(f.account),
@@ -363,15 +400,49 @@ impl Library {
         }
     }
 
-    /// Categories of a kind in `sort` order (provider order or by name), with their item counts (empty ones and the
-    /// ones the user hid left out).
+    /// The user's own groups in their order, then the categories of a kind in `sort` order (provider order or by
+    /// name), with their item counts (of the provider's, empty ones and the ones the user hid left out).
     pub fn categories(&self, kind: Kind, sort: Sort) -> Result<Vec<Category>> {
-        Ok(self
-            .all_categories(kind, sort)?
+        let own = groups::list(&self.conn.lock().unwrap(), kind)?;
+        let provider = self.all_categories(kind, sort)?;
+        Ok(own
             .into_iter()
-            .filter(|(_, hidden)| !hidden)
-            .map(|(c, _)| c)
+            .map(|(id, name, count)| Category { id, name, count })
+            .chain(provider.into_iter().filter(|(_, h)| !h).map(|(c, _)| c))
             .collect())
+    }
+
+    pub fn create_group(&self, kind: Kind, name: &str) -> Result<String> {
+        Ok(groups::create(&self.conn.lock().unwrap(), kind, name)?)
+    }
+
+    pub fn delete_group(&self, category: &str) -> Result<()> {
+        Ok(groups::delete(&self.conn.lock().unwrap(), category)?)
+    }
+
+    pub fn rename_group(&self, kind: Kind, category: &str, name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        Ok(groups::rename_group(&conn, kind, category, name)?)
+    }
+
+    pub fn rename_item(&self, key: &str, name: &str) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::rename_item(&mut conn, key, name)?)
+    }
+
+    pub fn set_group_order(&self, kind: Kind, ids: &[String]) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::set_group_order(&mut conn, kind, ids)?)
+    }
+
+    pub fn set_group_member(&self, category: &str, key: &str, member: bool) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        Ok(groups::set_member(&conn, category, key, member)?)
+    }
+
+    pub fn set_item_order(&self, category: &str, keys: &[String]) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        Ok(groups::set_item_order(&mut conn, category, keys)?)
     }
 
     /// Every non-empty category of a kind with whether the user hid it (Settings → Hidden groups).
@@ -442,6 +513,9 @@ impl Library {
         offset: usize,
     ) -> Result<Vec<Hit>> {
         let conn = self.conn.lock().unwrap();
+        if category.starts_with(groups::CUSTOM) {
+            return Ok(groups::items(&conn, category, sort, limit, offset)?);
+        }
         let mut stmt = conn.prepare_cached(&format!(
             "SELECT key, kind, name, category, logo, number, archive_days FROM items
              WHERE kind = ?1 AND category = ?2 ORDER BY {} LIMIT ?3 OFFSET ?4",
@@ -506,6 +580,224 @@ impl Library {
         Ok(db::favourites(&self.conn.lock().unwrap(), kinds, sort)?)
     }
 
+    /// Simkl's watched marks and paused positions since the last import (watch_import.rs), at most every 30 minutes
+    /// (Simkl's polling rule for apps; `force` for the user's button). None: not due, or nothing changed there.
+    pub async fn simkl_import(
+        &self,
+        c: &crate::tracking::Client,
+        t: &crate::tracking::Token,
+        force: bool,
+    ) -> Result<Option<crate::watch_import::Imported>> {
+        let last: i64 = self
+            .setting(SETTING_SIMKL_CHECKED)?
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        if !force && now() - last < 1800 {
+            return Ok(None);
+        }
+        let since = self.setting(SETTING_SIMKL_SINCE)?.unwrap_or_default();
+        let changes = crate::tracking::simkl_changes(c, t, &since).await?;
+        self.set_setting(SETTING_SIMKL_CHECKED, &now().to_string())?;
+        let Some(changes) = changes else {
+            return Ok(None);
+        };
+        let n = crate::watch_import::apply(&mut self.conn.lock().unwrap(), &changes)?;
+        // Saved only after everything applied: a failure fetches the same slice again next time (Simkl's advice).
+        self.set_setting(SETTING_SIMKL_SINCE, &changes.all)?;
+        Ok(Some(n))
+    }
+
+    /// Plans a recording of a channel from `start` to `stop` (UTC seconds, lead and lag already added); its id.
+    pub fn schedule_recording(
+        &self,
+        item_key: &str,
+        title: &str,
+        start: i64,
+        stop: i64,
+    ) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO recordings (item_key, title, start, stop, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![item_key, title, start, stop, now()],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Every recording, newest start first; a running one with its bytes so far.
+    pub fn recordings(&self) -> Result<Vec<RecordingRow>> {
+        let running = self.recording.lock().unwrap();
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare(
+            "SELECT id, item_key, title, start, stop, state, file, message, bytes FROM recordings
+             ORDER BY start DESC, id DESC",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok(RecordingRow {
+                id: r.get(0)?,
+                item_key: r.get(1)?,
+                title: r.get(2)?,
+                start: r.get(3)?,
+                stop: r.get(4)?,
+                state: r.get(5)?,
+                file: r.get(6)?,
+                message: r.get(7)?,
+                bytes: r.get::<_, i64>(8)? as u64,
+            })
+        })?;
+        let mut out: Vec<RecordingRow> = rows.collect::<rusqlite::Result<_>>()?;
+        for row in &mut out {
+            if let Some(r) = running.get(&row.id) {
+                row.bytes = r.status().bytes;
+            }
+        }
+        Ok(out)
+    }
+
+    /// Starts recording `id` into `file` (created by the app: a path, or an Android file descriptor) until its stop.
+    /// `place`: what to show and play later (the path, or the document's content URI).
+    pub fn start_recording(&self, id: i64, file: std::fs::File, place: &str) -> Result<()> {
+        let (key, stop): (String, i64) = self.conn.lock().unwrap().query_row(
+            "SELECT item_key, stop FROM recordings WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        let url = self.stream_url(&key, "ts")?;
+        let rec = crate::recorder::Recording::start(url, &self.profile.user_agent, file, stop)?;
+        self.recording.lock().unwrap().insert(id, rec);
+        self.conn.lock().unwrap().execute(
+            "UPDATE recordings SET state = 'recording', file = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, place, now()],
+        )?;
+        Ok(())
+    }
+
+    /// Notes recordings that ended by themselves (stop time, refused, disk full); call now and then. Returns how many
+    /// still run (the app keeps its process alive meanwhile).
+    pub fn check_recordings(&self) -> Result<usize> {
+        let mut running = self.recording.lock().unwrap();
+        let ended: Vec<(i64, crate::recorder::Status)> = running
+            .iter()
+            .map(|(id, r)| (*id, r.status()))
+            .filter(|(_, s)| s.ended != crate::recorder::Ended::Running)
+            .collect();
+        for (id, s) in ended {
+            running.remove(&id);
+            self.note_ended(id, &s)?;
+        }
+        Ok(running.len())
+    }
+
+    fn note_ended(&self, id: i64, s: &crate::recorder::Status) -> Result<()> {
+        use crate::recorder::Ended;
+        let (state, message) = match &s.ended {
+            Ended::Done | Ended::Running => ("done", String::new()),
+            Ended::Refused(code) => ("refused", crate::hls::refusal_message(*code)),
+            Ended::Failed(why) => ("failed", why.clone()),
+        };
+        self.conn.lock().unwrap().execute(
+            "UPDATE recordings SET state = ?2, message = ?3, bytes = ?4, updated_at = ?5 WHERE id = ?1",
+            params![id, state, message, s.bytes as i64, now()],
+        )?;
+        Ok(())
+    }
+
+    /// Stops a running recording now (the file keeps what it has), or marks a planned one skipped.
+    pub async fn stop_recording(&self, id: i64) -> Result<()> {
+        let rec = self.recording.lock().unwrap().remove(&id);
+        match rec {
+            Some(r) => {
+                let s = r.stop().await;
+                self.note_ended(id, &s)?;
+            }
+            None => {
+                self.conn.lock().unwrap().execute(
+                    "UPDATE recordings SET state = 'skipped', updated_at = ?2 WHERE id = ?1 AND state = 'scheduled'",
+                    params![id, now()],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Forgets a recording (its file is the app's to delete: it may be a document of the system's picker).
+    pub async fn delete_recording(&self, id: i64) -> Result<()> {
+        // Taken out first: the map's lock must not be held while the recording winds down.
+        let rec = self.recording.lock().unwrap().remove(&id);
+        if let Some(r) = rec {
+            r.stop().await;
+        }
+        self.conn
+            .lock()
+            .unwrap()
+            .execute("DELETE FROM recordings WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// Casts a channel, movie or episode (cast.rs): the provider's address first, gerdTV's own HLS for live TV the
+    /// device doesn't play from there.
+    pub async fn cast_start(
+        &self,
+        d: &crate::cast::Device,
+        key: &str,
+        title: &str,
+        cache_dir: &Path,
+    ) -> Result<crate::cast::Casting> {
+        let item = self.item(key)?.ok_or_else(|| {
+            crate::cast::CastError::Refused("it isn't in the catalogue any more".into())
+        })?;
+        let live = item.kind == Kind::Live;
+        let provider_hls = if live {
+            let url = self.stream_url(key, "m3u8")?;
+            url.split('?')
+                .next()
+                .unwrap_or("")
+                .ends_with(".m3u8")
+                .then_some(url)
+        } else {
+            None
+        };
+        let file = self.stream_url(key, "ts")?;
+        Ok(crate::cast::start(
+            d,
+            live,
+            provider_hls,
+            file,
+            title,
+            &self.profile.user_agent,
+            cache_dir,
+        )
+        .await?)
+    }
+
+    pub fn set_watched(&self, key: &str, watched: bool) -> Result<()> {
+        Ok(db::set_watched(&self.conn.lock().unwrap(), key, watched)?)
+    }
+
+    pub fn watched_keys(&self) -> Result<Vec<String>> {
+        Ok(db::watched_keys(&self.conn.lock().unwrap())?)
+    }
+
+    /// The episode after `key` (db::next_episode). An Xtream Codes series is asked first: its episodes are dropped by
+    /// every sync and new ones may be out; without an answer the stored ones count.
+    pub async fn next_episode(&self, key: &str) -> Result<Option<Hit>> {
+        let series: Option<String> = self
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT category FROM items WHERE key = ?1 AND kind = 2",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(series) = series.filter(|s| s.starts_with("series:"))
+            && let Err(e) = self.episodes(&series).await
+        {
+            tracing::warn!("next episode: {e}");
+        }
+        Ok(db::next_episode(&self.conn.lock().unwrap(), key)?)
+    }
+
     pub fn save_progress(&self, key: &str, position: u32, duration: u32) -> Result<()> {
         Ok(db::save_progress(
             &self.conn.lock().unwrap(),
@@ -531,6 +823,10 @@ impl Library {
         Ok(db::touch_recent(&self.conn.lock().unwrap(), key)?)
     }
 
+    pub fn recent_channels(&self, limit: usize) -> Result<Vec<Hit>> {
+        Ok(db::recent_channels(&self.conn.lock().unwrap(), limit)?)
+    }
+
     pub fn favourite_keys(&self) -> Result<Vec<String>> {
         Ok(db::favourite_keys(&self.conn.lock().unwrap())?)
     }
@@ -553,7 +849,9 @@ impl Library {
                 .and_then(|i| i.parse().ok()),
         ) {
             let items = xc.episodes(id).await?;
-            db::Sync::add_items(&mut self.conn.lock().unwrap(), Kind::Episode, &items)?;
+            let mut conn = self.conn.lock().unwrap();
+            db::Sync::add_items(&mut conn, Kind::Episode, &items)?;
+            crate::watch_import::apply_waiting(&conn, series_key)?;
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
@@ -580,7 +878,9 @@ impl Library {
         let conn = self.conn.lock().unwrap();
         Ok(conn
             .query_row(
-                "SELECT i.kind, i.name, i.year, coalesce(s.name, ''), coalesce(i.season, 0), coalesce(i.episode, 0)
+                "SELECT i.kind, i.name, i.year, coalesce(s.name, ''), coalesce(i.season, 0), coalesce(i.episode, 0),
+                    (SELECT json_extract(t.data, '$.id') FROM tmdb t
+                     WHERE t.key = CASE i.kind WHEN 1 THEN i.key ELSE i.category END)
                  FROM items i LEFT JOIN items s ON s.key = i.category WHERE i.key = ?1 AND i.kind IN (1, 2)",
                 [key],
                 |r| {
@@ -591,24 +891,63 @@ impl Library {
                         show: r.get(3)?,
                         season: r.get(4)?,
                         number: r.get(5)?,
+                        tmdb: r.get::<_, Option<i64>>(6)?.map(|i| i as u64),
                     })
                 },
             )
             .optional()?)
     }
 
+    /// What OpenSubtitles is asked for an item: TMDB's id when known, else the cleaned title and year; an episode
+    /// as its show with season and number. None for anything but a movie or episode.
+    pub fn subtitle_search(
+        &self,
+        key: &str,
+        languages: &str,
+    ) -> Result<Option<crate::opensubtitles::Search>> {
+        Ok(self.track_info(key)?.map(|t| {
+            let (title, year) =
+                crate::tracking::clean_title(if t.movie { &t.name } else { &t.show });
+            crate::opensubtitles::Search {
+                tmdb: t.tmdb,
+                title,
+                year: t.year.or(year),
+                episode: (!t.movie).then_some((t.season, t.number)),
+                languages: languages.to_string(),
+            }
+        }))
+    }
+
     /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
     /// for other kinds and for M3U sources, which have none.
-    pub async fn details(&self, key: &str) -> Result<xtream::Details> {
-        let Some(xc) = &self.xc else {
-            return Ok(xtream::Details::default());
-        };
+    pub async fn details(&self, key: &str, tmdb: Option<&tmdb::Tmdb>) -> Result<xtream::Details> {
         let id = |prefix| key.strip_prefix(prefix).and_then(|i| i.parse::<u64>().ok());
-        Ok(match (id("movie:"), id("series:")) {
-            (Some(id), _) => xc.vod_details(id).await?,
-            (_, Some(id)) => xc.series_details(id).await?,
+        let panel = match (&self.xc, id("movie:"), id("series:")) {
+            (Some(xc), Some(id), _) => xc.vod_details(id).await?,
+            (Some(xc), _, Some(id)) => xc.series_details(id).await?,
             _ => xtream::Details::default(),
-        })
+        };
+        // TMDB fills what the panel left empty (M3U profiles: everything). Its failure leaves the panel's page.
+        let Some(t) = tmdb else { return Ok(panel) };
+        let Some(item) = self
+            .item(key)?
+            .filter(|i| matches!(i.kind, Kind::Movie | Kind::Series))
+        else {
+            return Ok(panel);
+        };
+        let wanted = tmdb::Wanted {
+            key,
+            name: &item.name,
+            series: item.kind == Kind::Series,
+            id: panel.tmdb_id,
+        };
+        match t.details(&self.conn, &wanted).await {
+            Ok(more) => Ok(tmdb::merge(panel, more)),
+            Err(e) => {
+                tracing::warn!("{e}");
+                Ok(panel)
+            }
+        }
     }
 
     /// The URL to play an item (live: `.ts` by default, `m3u8` when the watchdog asks; VOD: its container).
@@ -731,6 +1070,13 @@ pub const SETTING_GUIDE_OFFSET: &str = "guide_offset_hours";
 pub const SETTING_M3U_TVG: &str = "m3u_tvg_url";
 /// Xtream Codes: the server's clock against UTC in seconds (from the last sync), for catch-up URLs.
 pub const SETTING_XC_OFFSET: &str = "xc_time_offset";
+/// Xtream Codes: when the account ends (unix seconds, empty = never) and how many streams it may play at once, as the
+/// last sync read them, so Settings can show them before the next one.
+pub const SETTING_ACCOUNT_EXPIRES: &str = "account_expires";
+pub const SETTING_ACCOUNT_LIMIT: &str = "account_limit";
+/// Simkl: its activity time of the last import (passed back as `date_from`) and when it was last asked.
+pub const SETTING_SIMKL_SINCE: &str = "simkl_since";
+pub const SETTING_SIMKL_CHECKED: &str = "simkl_checked";
 
 /// One guide source as Settings → Guide shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -1255,13 +1601,22 @@ mod tests {
         assert_ne!(a.id, b.id);
         let mut renamed = a.clone();
         renamed.name = "Renamed".into();
+        // Pasted text may carry a line break or an emoji, which no HTTP header takes (the client would not build).
+        renamed.user_agent = " VLC/3.0\r\nX: y \u{1F600}".into();
         save_profile(&dir, renamed).unwrap();
         let all = load_profiles(&dir).unwrap();
         assert_eq!(
             all.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
             ["Renamed", "Test"]
         );
+        std::fs::create_dir_all(dir.join("profiles")).unwrap();
+        let backup = |id: &str| dir.join("profiles").join(format!("{id}.db.bak-100"));
+        std::fs::write(backup(&a.id), "x").unwrap();
+        std::fs::write(backup(&b.id), "x").unwrap();
+        assert_eq!(all[0].user_agent, "VLC/3.0X: y");
+        Xtream::new("http://h.invalid", "u", "p", Some(&all[0].user_agent));
         delete_profile(&dir, &b.id).unwrap();
+        assert!(backup(&a.id).exists() && !backup(&b.id).exists());
         assert_eq!(load_profiles(&dir).unwrap().len(), 1);
         assert!(
             !std::fs::read_to_string(dir.join("profiles.json"))
@@ -1399,6 +1754,11 @@ mod tests {
         let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
         let r = lib.sync().await.unwrap();
         assert_eq!(r.account.unwrap().max_connections, 2);
+        // Kept for Settings, but not exported: another device reads its own.
+        let kept = |k: &str| lib.setting(k).unwrap();
+        assert_eq!(kept(SETTING_ACCOUNT_EXPIRES).as_deref(), Some("4102444800"));
+        assert_eq!(kept(SETTING_ACCOUNT_LIMIT).as_deref(), Some("2"));
+        assert!(!lib.export_user_data().unwrap().contains("account_"));
 
         let cats = lib.categories(Kind::Live, Sort::Provider).unwrap();
         assert!(!cats.is_empty() && cats.iter().all(|c| c.count > 0));
@@ -1580,6 +1940,8 @@ mod tests {
         let eps = lib.episodes(&series).await.unwrap();
         let t = lib.track_info(&eps[0].key).unwrap().unwrap();
         assert!(!t.movie && !t.show.is_empty() && t.season > 0 && t.number > 0);
+        let next = lib.next_episode(&eps[0].key).await.unwrap();
+        assert_eq!(next.as_ref(), eps.get(1), "the series' next one");
         assert!(
             lib.track_info(&archive.key).unwrap().is_none(),
             "live: nothing to track"
@@ -1589,6 +1951,64 @@ mod tests {
         drop(lib);
         let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
         assert_eq!(lib.categories(Kind::Live, Sort::Provider).unwrap(), cats);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Recordings of a profile: one records through the provider until stopped, a planned one is skipped, and a
+    /// recording that reaches its stop time ends by itself; the list keeps each one's state and size.
+    #[tokio::test]
+    async fn recordings_run_and_end() {
+        let mock = MockXc::start(200, 4).await;
+        let dir = tempdir("rec");
+        let p = save_profile(&dir, profile(SourceKind::Xtream, &mock.base())).unwrap();
+        let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
+        lib.sync().await.unwrap();
+        let cats = lib.categories(Kind::Live, Sort::Provider).unwrap();
+        let channel = lib
+            .items(Kind::Live, &cats[0].id, Sort::Provider, 1, 0)
+            .unwrap()
+            .remove(0);
+        let file = |name: &str| {
+            let path = dir.join(name);
+            (std::fs::File::create(&path).unwrap(), path)
+        };
+        let t = now();
+        let manual = lib
+            .schedule_recording(&channel.key, "Now", t, t + 600)
+            .unwrap();
+        let planned = lib
+            .schedule_recording(&channel.key, "Later", t + 3600, t + 7200)
+            .unwrap();
+        let short = lib
+            .schedule_recording(&channel.key, "Short", t, t + 2)
+            .unwrap();
+        let (f, path) = file("now.ts");
+        lib.start_recording(manual, f, &path.to_string_lossy())
+            .unwrap();
+        let (f, short_path) = file("short.ts");
+        lib.start_recording(short, f, &short_path.to_string_lossy())
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        assert_eq!(
+            lib.check_recordings().unwrap(),
+            1,
+            "the short one ended by itself"
+        );
+        lib.stop_recording(manual).await.unwrap();
+        lib.stop_recording(planned).await.unwrap();
+        let rows = lib.recordings().unwrap();
+        let state = |id: i64| rows.iter().find(|r| r.id == id).unwrap();
+        assert_eq!(state(manual).state, "done");
+        assert!(
+            state(manual).bytes > 0
+                && state(manual).bytes == std::fs::metadata(&path).unwrap().len()
+        );
+        assert_eq!(
+            (state(short).state.as_str(), state(planned).state.as_str()),
+            ("done", "skipped")
+        );
+        lib.delete_recording(planned).await.unwrap();
+        assert_eq!(lib.recordings().unwrap().len(), 2);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

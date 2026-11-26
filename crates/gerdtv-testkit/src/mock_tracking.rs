@@ -2,6 +2,8 @@
 //!   Trakt: POST /oauth/device/code, /oauth/device/token (400 while pending), /oauth/token (refresh)
 //!   Simkl: POST /oauth2/device, /oauth2/token (device_code or refresh_token grant; error names while pending)
 //!   both:  POST /scrobble/start|pause|stop with `Authorization: Bearer <token>`, recorded for the test
+//!   Simkl: GET /sync/activities, /sync/all-items/movies/completed, /sync/all-items/shows, /sync/playback (answers
+//!   set by `set_sync`; `date_from` is recorded), POST /sync/history and /sync/history/remove (recorded)
 //! The code is confirmed by `confirm()`; `reset()` starts the next service's link from scratch.
 
 use crate::http::{self, Handler, Request, Server};
@@ -16,6 +18,10 @@ struct State {
     confirmed: bool,
     issued: Vec<String>,
     scrobbles: Vec<Value>,
+    /// path → answer for Simkl's sync GETs.
+    sync: std::collections::HashMap<String, Value>,
+    /// Every sync GET as "path?date_from", and every history POST as "path body".
+    calls: Vec<String>,
 }
 
 pub struct MockTracking {
@@ -55,6 +61,25 @@ impl MockTracking {
 
     pub fn reset(&self) {
         self.state.lock().unwrap().confirmed = false;
+    }
+
+    /// Simkl's sync answers: activities' `all`, the completed movies, the shows and the playbacks.
+    pub fn set_sync(&self, all: &str, movies: Value, shows: Value, playback: Value) {
+        let mut s = self.state.lock().unwrap();
+        s.sync
+            .insert("/sync/activities".into(), json!({ "all": all }));
+        s.sync.insert(
+            "/sync/all-items/movies/completed".into(),
+            json!({ "movies": movies }),
+        );
+        s.sync
+            .insert("/sync/all-items/shows".into(), json!({ "shows": shows }));
+        s.sync.insert("/sync/playback".into(), playback);
+    }
+
+    /// The sync calls seen, in order.
+    pub fn calls(&self) -> Vec<String> {
+        self.state.lock().unwrap().calls.clone()
     }
 
     /// The scrobble bodies received, in order.
@@ -102,6 +127,24 @@ fn answer(req: &Request, s: &mut State) -> (u16, Value) {
             _ if s.confirmed => (200, issue(s)),
             _ => (400, json!({ "error": "authorization_pending" })),
         },
+        p if p.starts_with("/sync/") => {
+            let auth = req.header("authorization").unwrap_or_default();
+            if !s.issued.iter().any(|t| auth == format!("Bearer {t}")) || !client_ok {
+                return (401, Value::Null);
+            }
+            if p.starts_with("/sync/history") {
+                s.calls.push(format!("{p} {body}"));
+                return (201, json!({ "added": {}, "not_found": {} }));
+            }
+            s.calls.push(format!(
+                "{p}?{}",
+                http::decode(req.param("date_from").unwrap_or(""))
+            ));
+            match s.sync.get(p) {
+                Some(v) => (200, v.clone()),
+                None => (404, Value::Null),
+            }
+        }
         p if p.starts_with("/scrobble/") => {
             let auth = req.header("authorization").unwrap_or_default();
             if !s.issued.iter().any(|t| auth == format!("Bearer {t}")) {

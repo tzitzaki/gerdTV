@@ -85,7 +85,8 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
         result(FlutterError(code: "url", message: "not a URL", details: nil))
         return
       }
-      result(open(url, buffer: args["bufferSecs"] as? Double ?? 0))
+      result(open(
+        url, buffer: args["bufferSecs"] as? Double ?? 0, userAgent: args["userAgent"] as? String ?? ""))
     case "play":
       player?.play()
       result(nil)
@@ -142,9 +143,11 @@ public final class GerdtvAvPlayerPlugin: NSObject, FlutterPlugin, FlutterTexture
 
   // MARK: playback
 
-  private func open(_ url: URL, buffer: Double) -> Int64 {
+  private func open(_ url: URL, buffer: Double, userAgent: String) -> Int64 {
     stop()
-    let item = AVPlayerItem(url: url)
+    // The profile's own User-Agent (Settings → Account) counts when the provider's HLS is played directly.
+    let options = userAgent.isEmpty ? nil : [AVURLAssetHTTPUserAgentKey: userAgent]
+    let item = AVPlayerItem(asset: AVURLAsset(url: url, options: options))
     item.preferredForwardBufferDuration = buffer
     let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
       kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,

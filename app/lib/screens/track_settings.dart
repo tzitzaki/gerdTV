@@ -27,6 +27,9 @@ class TrackSettings extends StatefulWidget {
 class _TrackSettingsState extends State<TrackSettings> {
   String? _error;
   bool _busy = false;
+
+  /// What the last import by hand took.
+  String? _imported;
   final _id = TextEditingController();
   final _secret = TextEditingController();
 
@@ -87,7 +90,7 @@ class _TrackSettingsState extends State<TrackSettings> {
     final s = widget.service;
     final tracking = widget.session.tracking;
     if (tracking.linked(s)) {
-      return ListTile(
+      final linked = ListTile(
         key: Key('track.${s.id}.linked'),
         leading: const Icon(Icons.check_circle_outline),
         title: Text(l10n.trackLinked(s.label)),
@@ -101,6 +104,31 @@ class _TrackSettingsState extends State<TrackSettings> {
           },
           child: Text(l10n.premiumizeUnlink),
         ),
+      );
+      if (s.id != 'simkl') return linked;
+      // Simkl: its watched marks also come here (after each update, or now).
+      return Column(
+        children: [
+          linked,
+          ListTile(
+            key: const Key('track.simkl.import'),
+            leading: const Icon(Icons.download_outlined),
+            title: Text(l10n.simklImport),
+            subtitle: Text(_imported ?? l10n.simklImportHint),
+            enabled: !_busy,
+            onTap: () async {
+              setState(() => _busy = true);
+              final n = await widget.session.importSimkl(force: true);
+              if (!mounted) return;
+              setState(() {
+                _busy = false;
+                _imported = n == null
+                    ? l10n.simklImportNothing
+                    : l10n.simklImported(n.watched + n.waiting, n.positions);
+              });
+            },
+          ),
+        ],
       );
     }
     final link = ListTile(

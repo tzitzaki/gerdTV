@@ -39,6 +39,31 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var playing = false
+    private var multicast: android.net.wifi.WifiManager.MulticastLock? = null
+    private var playingTitle = ""
+    /// The running recording's title, or null.
+    private var recording: String? = null
+    /// The Dart call waiting for the folder picker's answer.
+    private var picking: MethodChannel.Result? = null
+
+    /// The foreground service runs while something plays or records.
+    private fun updateService() {
+        val title = if (playing) playingTitle else recording ?: ""
+        val service = Intent(this, PlaybackService::class.java).putExtra("title", title)
+        if (playing || recording != null) startForegroundServiceCompat(service) else stopService(service)
+    }
+
+    @Suppress("DEPRECATION") // FlutterActivity is no ComponentActivity: no Activity Result API here
+    private fun pickFolder(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        if (intent.resolveActivity(packageManager) == null) {
+            result.success(null)
+            return
+        }
+        picking?.success(null)
+        picking = result
+        startActivityForResult(intent, FOLDER_REQUEST)
+    }
 
     /// Leaving the app floats the picture (Dart decides: lib/player/floating.dart).
     private var floating = false
@@ -54,11 +79,49 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "setPlaying" -> {
                         playing = call.argument<Boolean>("playing") ?: false
-                        val title = call.argument<String>("title") ?: ""
-                        val service = Intent(this, PlaybackService::class.java).putExtra("title", title)
-                        if (playing) startForegroundServiceCompat(service) else stopService(service)
+                        playingTitle = call.argument<String>("title") ?: ""
+                        updateService()
                         result.success(null)
                     }
+                    // A recording runs: the service keeps the process alive also with nothing playing (it's started
+                    // while the app is in front, which Android allows; a recording must not freeze in the background).
+                    "setRecording" -> {
+                        recording = call.argument<String>("title")
+                        updateService()
+                        result.success(null)
+                    }
+                    // The recordings folder: the system's folder picker (null: none on this device, e.g. some TVs).
+                    "pickFolder" -> pickFolder(result)
+                    // A new file in the picked folder: its descriptor (Rust takes it over) and content URI.
+                    "createDocument" -> {
+                        try {
+                            val tree = android.net.Uri.parse(call.argument<String>("tree"))
+                            val parent = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+                                tree, android.provider.DocumentsContract.getTreeDocumentId(tree),
+                            )
+                            val doc = android.provider.DocumentsContract.createDocument(
+                                contentResolver, parent, "video/mp2t", call.argument<String>("name") ?: "recording.ts",
+                            ) ?: throw java.io.IOException("the folder refused a new file")
+                            val fd = contentResolver.openFileDescriptor(doc, "w")!!.detachFd()
+                            result.success(mapOf("fd" to fd, "uri" to doc.toString()))
+                        } catch (e: Exception) {
+                            result.error("folder", e.message, null)
+                        }
+                    }
+                    "deleteDocument" -> {
+                        val ok = try {
+                            android.provider.DocumentsContract.deleteDocument(
+                                contentResolver, android.net.Uri.parse(call.argument<String>("uri")),
+                            )
+                        } catch (e: Exception) {
+                            false
+                        }
+                        result.success(ok)
+                    }
+                    // Without a picker: the app's own folder on each mounted drive (USB too); deleted on uninstall.
+                    "appFolders" -> result.success(
+                        getExternalFilesDirs(android.os.Environment.DIRECTORY_MOVIES).filterNotNull().map { it.path },
+                    )
                     "nowPlaying" -> {
                         PlaybackService.show(
                             PlaybackService.Card(
@@ -70,6 +133,52 @@ class MainActivity : FlutterActivity() {
                                 durationMs = ((call.argument<Double>("duration") ?: 0.0) * 1000).toLong(),
                             )
                         )
+                        result.success(null)
+                    }
+                    // Cast discovery (mDNS in the core): Android drops multicast packets unless an app holds this.
+                    "multicastLock" -> {
+                        if (call.argument<Boolean>("on") == true) {
+                            if (multicast == null) {
+                                val wifi = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE)
+                                    as android.net.wifi.WifiManager
+                                multicast = wifi.createMulticastLock("gerdTV cast").apply { acquire() }
+                            }
+                        } else {
+                            multicast?.release()
+                            multicast = null
+                        }
+                        result.success(null)
+                    }
+                    "isTv" -> result.success(isTv())
+                    "takeOpenItem" -> {
+                        result.success(openItem(intent))
+                        intent.removeExtra(TvHome.EXTRA_ITEM)
+                    }
+                    "tvHome" -> {
+                        val profile = call.argument<String>("profile") ?: ""
+                        val resume = call.argument<List<Map<String, Any?>>>("resume") ?: emptyList()
+                        val channels = call.argument<List<Map<String, Any?>>>("channels") ?: emptyList()
+                        // The launcher's database, off the UI thread and one update at a time.
+                        tvHomeThread.execute { TvHome.update(applicationContext, profile, resume, channels) }
+                        result.success(null)
+                    }
+                    // TV only: the display's modes, the current one first (app/lib/player/frame_rate.dart).
+                    "displayModes" -> result.success(
+                        if (isTv()) {
+                            val current = display().mode
+                            (listOf(current) + display().supportedModes.filter { m -> m.modeId != current.modeId }).map { m ->
+                                mapOf(
+                                    "id" to m.modeId, "width" to m.physicalWidth, "height" to m.physicalHeight,
+                                    "rate" to m.refreshRate.toDouble(),
+                                )
+                            }
+                        } else emptyList()
+                    )
+                    // 0: the system's own choice again.
+                    "setDisplayMode" -> {
+                        window.attributes = window.attributes.apply {
+                            preferredDisplayModeId = call.argument<Int>("id") ?: 0
+                        }
                         result.success(null)
                     }
                     "clearNowPlaying" -> {
@@ -199,6 +308,18 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FOLDER_REQUEST) {
+            val tree = data?.data.takeIf { resultCode == RESULT_OK }
+            // Kept across restarts: recordings are written there later, also after a reboot.
+            tree?.let {
+                contentResolver.takePersistableUriPermission(
+                    it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            picking?.success(tree?.toString() ?: "")
+            picking = null
+            return
+        }
         if (requestCode != VOICE_REQUEST) return
         val text = if (resultCode == RESULT_OK) {
             data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -206,6 +327,24 @@ class MainActivity : FlutterActivity() {
         listening?.success(text)
         listening = null
     }
+
+    private val tvHomeThread = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /// What a home screen entry asks for (TvHome), or null for a plain start.
+    private fun openItem(intent: Intent): Map<String, String>? {
+        val key = intent.getStringExtra(TvHome.EXTRA_ITEM) ?: return null
+        return mapOf("profile" to (intent.getStringExtra(TvHome.EXTRA_PROFILE) ?: ""), "key" to key)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openItem(intent)?.let { channel?.invokeMethod("openItem", it) }
+    }
+
+    private fun isTv() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+    @Suppress("DEPRECATION") // Activity.getDisplay needs Android 11
+    private fun display() = windowManager.defaultDisplay
 
     private fun startForegroundServiceCompat(intent: Intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
@@ -234,5 +373,6 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val VOICE_REQUEST = 7301
+        const val FOLDER_REQUEST = 7302
     }
 }

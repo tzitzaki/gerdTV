@@ -15,6 +15,7 @@
 //! last import, counts and error; a channel shows "No guide" when it has no row in item_epg.
 
 use crate::db::clean_name;
+use crate::groups::PROVIDER_NAME;
 use quick_xml::events::Event;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::HashMap;
@@ -389,7 +390,9 @@ struct Wanted {
 
 impl Wanted {
     fn load(conn: &Connection) -> Result<Wanted> {
-        let mut st = conn.prepare("SELECT epg_id, name FROM items WHERE kind = 0")?;
+        let mut st = conn.prepare(&format!(
+            "SELECT epg_id, {PROVIDER_NAME} FROM items WHERE kind = 0"
+        ))?;
         let mut w = Wanted {
             ids: Default::default(),
             names: HashMap::new(),
@@ -733,9 +736,9 @@ fn match_open(tx: &rusqlite::Transaction, after: i64) -> Result<()> {
         }
     }
     let open = || -> Result<Vec<(String, String)>> {
-        let mut st = tx.prepare(
-            "SELECT key, name FROM items WHERE kind = 0 AND key NOT IN (SELECT item_key FROM item_epg)",
-        )?;
+        let mut st = tx.prepare(&format!(
+            "SELECT key, {PROVIDER_NAME} FROM items WHERE kind = 0 AND key NOT IN (SELECT item_key FROM item_epg)",
+        ))?;
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<_>>()
     };
@@ -761,9 +764,9 @@ fn match_open(tx: &rusqlite::Transaction, after: i64) -> Result<()> {
     // Twins: a matched item of the same name (and no other country) lends its channel to the unmatched ones.
     let mut twins: HashMap<String, Vec<(String, Option<String>)>> = HashMap::new();
     {
-        let mut st = tx.prepare(
-            "SELECT i.name, e.channel FROM item_epg e JOIN items i ON i.key = e.item_key ORDER BY i.position",
-        )?;
+        let mut st = tx.prepare(&format!(
+            "SELECT {PROVIDER_NAME}, e.channel FROM item_epg e JOIN items ON items.key = e.item_key ORDER BY items.position",
+        ))?;
         let mut rows = st.query([])?;
         while let Some(r) = rows.next()? {
             let name: String = r.get(0)?;
@@ -988,9 +991,11 @@ fn likeness(a: &[String], b: &[String]) -> f64 {
 /// one's. The user confirms one with a tap: nothing is mapped by itself (owner decision).
 pub fn suggest(conn: &Connection, item_key: &str, limit: usize) -> Result<Vec<(String, String)>> {
     let Some(name) = conn
-        .query_row("SELECT name FROM items WHERE key = ?1", [item_key], |r| {
-            r.get::<_, String>(0)
-        })
+        .query_row(
+            &format!("SELECT {PROVIDER_NAME} FROM items WHERE key = ?1"),
+            [item_key],
+            |r| r.get::<_, String>(0),
+        )
         .optional()?
     else {
         return Ok(vec![]);

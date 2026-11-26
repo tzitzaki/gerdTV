@@ -396,3 +396,66 @@ async fn live_guide_gaps() {
     }
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// TMDB with the real key (GERDTV_TMDB_KEY): a well-known film matches by name and year, and of the first 20
+/// movies of the real panel it prints how many TMDB matched (by the panel's id or by name). Counts only.
+#[tokio::test]
+#[ignore = "needs a real account and TMDB key: just test-live"]
+async fn live_tmdb_matching() {
+    use gerdtv_core::tmdb::{BASE, Tmdb, Wanted};
+    let t = Tmdb::new(BASE, &env("GERDTV_TMDB_KEY"));
+    let dir = std::env::temp_dir().join(format!("gerdtv-live-tmdb-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let cache = std::sync::Mutex::new(db::open(&dir.join("tmdb.db")).unwrap());
+    let known = Wanted {
+        key: "movie:known",
+        name: "EN - Inception (2010) 4K",
+        series: false,
+        id: None,
+    };
+    let d = t.details(&cache, &known).await.expect("tmdb");
+    assert_eq!(d.tmdb_id, Some(27205), "Inception (2010)");
+
+    let xc = Xtream::new(
+        &env("GERDTV_XC_SERVER"),
+        &env("GERDTV_XC_USER"),
+        &env("GERDTV_XC_PASS"),
+        None,
+    );
+    let movies: Vec<_> = xc
+        .streams(Kind::Movie)
+        .await
+        .expect("movies")
+        .into_iter()
+        .take(20)
+        .collect();
+    let (mut by_id, mut by_name) = (0, 0);
+    let start = Instant::now();
+    for m in &movies {
+        let id = m
+            .key
+            .strip_prefix("movie:")
+            .and_then(|i| i.parse().ok())
+            .unwrap();
+        let panel = xc.vod_details(id).await.unwrap_or_default();
+        let w = Wanted {
+            key: &m.key,
+            name: &m.name,
+            series: false,
+            id: panel.tmdb_id,
+        };
+        let found = t.details(&cache, &w).await.expect("tmdb").tmdb_id.is_some();
+        match (panel.tmdb_id.is_some(), found) {
+            (true, _) => by_id += 1,
+            (false, true) => by_name += 1,
+            _ => {}
+        }
+    }
+    println!(
+        "tmdb: {} movies, {by_id} by the panel's id, {by_name} by name, {} unmatched, {} ms",
+        movies.len(),
+        movies.len() - by_id - by_name,
+        start.elapsed().as_millis()
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}

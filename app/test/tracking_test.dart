@@ -20,6 +20,7 @@ class _Library implements Library {
           show_: '',
           season: 0,
           number: 0,
+          tmdb: null,
         )
       : null;
 
@@ -61,6 +62,11 @@ void main() {
       expect(core.scrobbles.skip(1), ['trakt stop 91', 'simkl stop 91']);
       expect(secrets.services['simkl.p1'], '{"access":"fresh"}');
       expect(secrets.services['trakt-app.p1'], '["my-id","my-secret"]');
+
+      // A mark by hand goes to Simkl's history; live TV sends nothing.
+      await t.history(lib, 'movie:1', true);
+      await t.history(lib, 'live:1', true);
+      expect(core.history, ['true Inception']);
 
       await t.scrobble(lib, 'live:1', 'start', 0);
       expect(core.scrobbles, hasLength(3), reason: 'live TV is not tracked');

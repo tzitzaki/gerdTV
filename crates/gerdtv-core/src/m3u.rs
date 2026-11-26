@@ -174,6 +174,15 @@ fn attributes(s: &str) -> Vec<(&str, &str)> {
 
 /// `… S01E02 …` / `s1e2` / `S01 E02` → (season, episode).
 pub fn episode_of(name: &str) -> Option<(u32, u32)> {
+    find_episode(name).map(|(_, numbers)| numbers)
+}
+
+/// The name up to its `S01E02`, or all of it.
+pub fn before_episode(name: &str) -> &str {
+    find_episode(name).map_or(name, |(at, _)| &name[..at])
+}
+
+fn find_episode(name: &str) -> Option<(usize, (u32, u32))> {
     let b = name.as_bytes();
     for i in 0..b.len() {
         if !(b[i] == b'S' || b[i] == b's') || (i > 0 && b[i - 1].is_ascii_alphanumeric()) {
@@ -187,7 +196,7 @@ pub fn episode_of(name: &str) -> Option<(u32, u32)> {
         if matches!(b.get(j), Some(b'E') | Some(b'e'))
             && let Some((e, _)) = digits(b, j + 1)
         {
-            return Some((s, e));
+            return Some((i, (s, e)));
         }
     }
     None

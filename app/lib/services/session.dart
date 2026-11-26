@@ -3,6 +3,7 @@
 // Plain ChangeNotifier (docs/DECISIONS.md: no state-management packages).
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -16,14 +17,21 @@ import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
 import '../player/av_player.dart';
 import '../player/floating.dart';
+import '../player/frame_rate.dart';
+import '../player/next_up.dart';
+import '../player/picture.dart';
 import '../player/switch_player.dart';
+import '../player/track_prefs.dart';
 import '../screens/app_logo.dart';
 import '../player/watchdog_adapter.dart';
 import '../src/rust/api/hls.dart';
 import '../src/rust/api/library.dart';
+import '../src/rust/api/subtitles.dart';
 import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
+import 'casting.dart';
+import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
 import 'secrets.dart';
@@ -95,9 +103,14 @@ class Session extends ChangeNotifier {
     return _favourites;
   }
 
-  /// A group was hidden or shown again: every list reloads (as after a sync).
+  /// Bumped by [groupsChanged] only: an open group reloads its items (a sync leaves it as it is).
+  final orderChanged = ValueNotifier<int>(0);
+
+  /// A group was hidden or shown again, or the user's own groups, names or order changed: every list reloads (as after
+  /// a sync).
   void groupsChanged() {
     generation++;
+    orderChanged.value++;
     favouritesChanged.value++; // the Favourites group and continue watching may lose or regain items
     notifyListeners();
   }
@@ -112,6 +125,81 @@ class Session extends ChangeNotifier {
         ? {...favourites, item.key}
         : ({...favourites}..remove(item.key));
     favouritesChanged.value++;
+  }
+
+  /// Bumped when an item is marked as watched or unmarked: the check marks rebuild.
+  final watchedChanged = ValueNotifier<int>(0);
+  Set<String> _watched = const {};
+  Library? _watchedOf;
+
+  /// The open profile's watched movies and episodes (read once per profile, then kept here).
+  Set<String> get watched {
+    final lib = library;
+    if (lib != null && !identical(lib, _watchedOf)) {
+      _watchedOf = lib;
+      _watched = lib.watchedKeys().toSet();
+    }
+    return _watched;
+  }
+
+  void toggleWatched(ItemInfo item) {
+    final lib = library;
+    if (lib == null) return;
+    final on = !watched.contains(item.key);
+    lib.setWatched(key: item.key, watched: on);
+    _reloadWatched();
+    unawaited(tracking.history(lib, item.key, on));
+  }
+
+  /// Simkl's news, then the check marks and continue watching follow.
+  Future<SimklImport?> importSimkl({bool force = false}) async {
+    final lib = library;
+    if (lib == null) return null;
+    final n = await tracking.importSimkl(lib, force: force);
+    if (n != null && identical(lib, library)) {
+      _reloadWatched();
+      favouritesChanged.value++; // continue watching reloads with it
+    }
+    return n;
+  }
+
+  void _reloadWatched() {
+    _watchedOf = null;
+    watchedChanged.value++;
+  }
+
+  /// Google Cast (services/casting.dart).
+  late final casting = Casting(this);
+
+  /// Recordings (services/recordings.dart); its timer starts with the first profile.
+  late final recordings = Recordings(this);
+
+  /// The countdown to the next episode (the player shows it).
+  late final nextUp = NextUp((item) => unawaited(play(item)));
+  static const settingAutoplayNext = 'autoplay_next';
+
+  /// The player ran to the end: an episode is followed by its next one, unless that is switched off.
+  Future<void> _onCompleted(bool done) async {
+    final it = nowPlaying.value;
+    final lib = library;
+    if (!done) {
+      nextUp.cancel(); // sought back, or the next one opened
+      return;
+    }
+    // A connection lost for good also ends the file: only a real end counts. That one is saved as played to its
+    // length, so it is marked as watched (the core counts whole seconds; the last frame may be a few ms short).
+    final ended = ranToTheEnd(player.state.position, player.state.duration);
+    _saveProgress(ended: ended);
+    if (it == null || lib == null || it.kind != ItemKind.episode || !ended) {
+      return;
+    }
+    if (lib.setting(key: settingAutoplayNext) == '0') return;
+    try {
+      final next = await lib.nextEpisode(key: it.key);
+      if (next != null && nowPlaying.value?.key == it.key) nextUp.start(next);
+    } catch (e) {
+      debugPrint('next episode: $e');
+    }
   }
 
   /// True while the guide downloads and imports (Settings → Guide shows it; lists keep their old now/next).
@@ -238,6 +326,11 @@ class Session extends ChangeNotifier {
 
   /// The channels Up/Down switch through in the player: the group (or guide rows) the channel was opened from.
   List<ItemInfo> zapList = const [];
+
+  /// The live channel played before the current (or last) one: the player's "last channel". A movie in between or
+  /// Stop doesn't change it.
+  ItemInfo? lastChannel;
+  ItemInfo? _channel;
 
   /// What is playing right now, or null. Playback only ends by Stop or by starting another stream (owner decision):
   /// leaving the player screen keeps it running, shown by the now-playing bar in the shell.
@@ -391,6 +484,7 @@ class Session extends ChangeNotifier {
     if (s == null && p.source != SourceKind.m3UFile) return false;
     if (library != null) await stopPlayback();
     zapList = const [];
+    lastChannel = _channel = null;
     if (!await _open(p, s ?? const [])) return false;
     final dir = await _dir();
     setAppSetting(dir: dir, key: settingLastProfile, value: p.id);
@@ -404,6 +498,25 @@ class Session extends ChangeNotifier {
     generation++;
     unawaited(sync()); // cache first, then refresh in the background
     return true;
+  }
+
+  /// Changes what the open profile's provider sees as the player ("" = the default). Reopens the profile, because its
+  /// connections carry the old one, which ends what plays.
+  Future<void> setUserAgent(String value) async {
+    final p = profile!;
+    final saved = await saveProfile(
+      dir: await _dir(),
+      profile: ProfileInfo(
+        id: p.id,
+        name: p.name,
+        source: p.source,
+        server: p.server,
+        userAgent: value,
+        maxConnections: p.maxConnections,
+      ),
+    );
+    profiles = [for (final q in profiles) q.id == saved.id ? saved : q];
+    await openProfile(saved);
   }
 
   /// Whether [p] opens without asking.
@@ -420,9 +533,16 @@ class Session extends ChangeNotifier {
       );
       profile = p;
       premiumizeToken = await secrets.readService(p.id, 'premiumize');
+      tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
+      subtitlesKey = await secrets.readService(_appSecrets, 'opensubtitles');
+      _subtitlesLogin = await secrets.readService(
+        _appSecrets,
+        'opensubtitles-login',
+      );
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
+      if (canRecord) recordings.startTimer();
       unawaited(
         reminders?.watchLinux(library!),
       ); // Linux shows reminders itself while the app runs
@@ -485,6 +605,7 @@ class Session extends ChangeNotifier {
       notifyListeners();
     }
     await refreshGuide();
+    await importSimkl();
   }
 
   /// Refreshes the guide sources that are missing or too old (12 h; 6 h for a few; or all, always, with [force]: "Refresh now").
@@ -549,17 +670,24 @@ class Session extends ChangeNotifier {
     if (nowPlaying.value?.key == item.key) {
       return; // reopening the player for the running stream: keep it going
     }
+    nextUp.cancel();
     _saveProgress(); // the one playing until now
     _track('stop');
     _progressTimer ??= Timer.periodic(
       const Duration(seconds: 10),
       (_) => _saveProgress(),
     );
+    if (item.kind == ItemKind.live && item.key != _channel?.key) {
+      lastChannel = _channel;
+      _channel = item;
+    }
     lib.touchRecent(key: item.key);
     nowPlaying.value = item;
     _playingKey = item.key;
+    _loadPictureFormat();
     await _start(item, lib);
     _track('start', item: item);
+    unawaited(_matchFrameRate(item));
   }
 
   /// Trakt and Simkl for the open profile (services/tracking.dart).
@@ -591,6 +719,99 @@ class Session extends ChangeNotifier {
     }
   }
 
+  /// The user's own TMDB key (app-wide, not per provider), null when none is set: movie and series pages then show
+  /// the panel's facts only.
+  String? tmdbKey;
+
+  Future<void> setTmdbKey(String? key) async {
+    final k = key?.trim();
+    await secrets.writeService(
+      _appSecrets,
+      'tmdb',
+      k == null || k.isEmpty ? null : k,
+    );
+    tmdbKey = k == null || k.isEmpty ? null : k;
+    notifyListeners();
+  }
+
+  /// OpenSubtitles (app-wide, the user's own): the API key, and optionally a login for the account's download quota
+  /// (without one, a free key allows 5 a day). The login's token is kept for this run only: logging in is
+  /// rate-limited (core: opensubtitles.rs).
+  String? subtitlesKey;
+  String? _subtitlesLogin; // JSON [username, password]
+  String? _subtitlesToken;
+
+  bool get hasSubtitlesLogin => _subtitlesLogin != null;
+
+  Future<void> setSubtitlesKey(String? key) async {
+    final k = key?.trim();
+    subtitlesKey = k == null || k.isEmpty ? null : k;
+    await secrets.writeService(_appSecrets, 'opensubtitles', subtitlesKey);
+    notifyListeners();
+  }
+
+  /// Checks the login with OpenSubtitles first (throws its reason); null removes it.
+  Future<void> setSubtitlesLogin(String? user, String? password) async {
+    _subtitlesToken = null;
+    if (user == null || user.trim().isEmpty) {
+      _subtitlesLogin = null;
+    } else {
+      _subtitlesToken = await subsLogin(
+        key: subtitlesKey ?? '',
+        username: user.trim(),
+        password: password ?? '',
+      );
+      _subtitlesLogin = jsonEncode([user.trim(), password ?? '']);
+    }
+    await secrets.writeService(
+      _appSecrets,
+      'opensubtitles-login',
+      _subtitlesLogin,
+    );
+    notifyListeners();
+  }
+
+  /// Subtitles for what plays (a movie or episode): in the preferred subtitle language, else the app's and English.
+  Future<List<SubtitleInfo>> findSubtitles(String appLanguage) async {
+    final lib = library, key = subtitlesKey, it = nowPlaying.value;
+    if (lib == null || key == null || it == null) return const [];
+    final wish = lib.setting(key: settingSubtitleLanguage);
+    final languages = trackLanguages.containsKey(wish)
+        ? wish!
+        : {appLanguage, 'en'}.join(',');
+    return subsSearch(
+      library_: lib,
+      key: key,
+      itemKey: it.key,
+      languages: languages,
+    );
+  }
+
+  /// Downloads a found subtitle and shows it in mpv (logged in first, once per run, when there is a login).
+  Future<void> loadSubtitle(SubtitleInfo s) async {
+    final key = subtitlesKey;
+    if (key == null) return;
+    if (_subtitlesToken == null && _subtitlesLogin != null) {
+      final login = (jsonDecode(_subtitlesLogin!) as List).cast<String>();
+      _subtitlesToken = await subsLogin(
+        key: key,
+        username: login[0],
+        password: login[1],
+      );
+    }
+    final path = await subsDownload(
+      key: key,
+      token: _subtitlesToken,
+      fileId: s.fileId,
+      dir: '${(await getTemporaryDirectory()).path}/subtitles',
+    );
+    // Added as a track of its own and selected; gone with the next start.
+    await (_mpv.platform as NativePlayer).command(['sub-add', path, 'select']);
+  }
+
+  /// The owner of app-wide secrets in secure storage (profile secrets carry the profile's id there).
+  static const _appSecrets = 'app';
+
   /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
   String? premiumizeToken;
 
@@ -613,6 +834,7 @@ class Session extends ChangeNotifier {
     _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = item.key;
+    _loadPictureFormat();
     bufferRaisedTo.value = null;
     timeshiftWindow.value = 0;
     final choice = lib.bufferFor(key: item.key);
@@ -623,8 +845,90 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: const [],
+      extraOptions: [..._trackOptions(lib), ...await _deinterlaceOptions(lib)],
     );
+  }
+
+  /// The profile's audio and subtitle languages, set (or put back) before each start.
+  List<MpvOption> _trackOptions(Library? lib) {
+    delays = TrackDelays();
+    return trackOptions(
+      audio: lib?.setting(key: settingAudioLanguage),
+      subtitle: lib?.setting(key: settingSubtitleLanguage),
+    );
+  }
+
+  int _displayMode = 0;
+
+  /// Android TV, when switched on: the display's refresh rate follows the stream, once mpv knows its frame rate.
+  Future<void> _matchFrameRate(ItemInfo item) async {
+    if (defaultTargetPlatform != TargetPlatform.android ||
+        library?.setting(key: settingMatchFrameRate) != '1') {
+      return;
+    }
+    final modes = await PlatformBridge.displayModes();
+    if (modes.isEmpty) return;
+    // Up to 30 s: a slow channel with a big buffer takes a while to its first frame.
+    for (var i = 0; i < 60; i++) {
+      if (nowPlaying.value?.key != item.key) return;
+      final fps =
+          double.tryParse(
+            await (_mpv.platform as NativePlayer).getProperty('container-fps'),
+          ) ??
+          0;
+      if (fps > 0 && player.state.position > Duration.zero) {
+        final mode = displayModeFor(fps, modes, modes.first);
+        if (mode != null) {
+          _displayMode = mode.id;
+          await platform.setDisplayMode(mode.id);
+        }
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  /// Deinterlacing for the next start. Nothing is touched until it was on once; from then on, off restores the
+  /// decoder the video controller chose (read before the first change).
+  Future<List<MpvOption>> _deinterlaceOptions(Library? lib) async {
+    final on = lib?.setting(key: settingDeinterlace) == '1';
+    if (!on && _defaultHwdec == null) return const [];
+    _defaultHwdec ??= await (mpvPlayer.platform as NativePlayer).getProperty(
+      'hwdec',
+    );
+    return deinterlaceOptions(on: on, defaultHwdec: _defaultHwdec!);
+  }
+
+  String? _defaultHwdec;
+
+  /// The running item's picture format (player/picture.dart), remembered per item.
+  final pictureFormat = ValueNotifier(PictureFormat.fit);
+
+  void _loadPictureFormat() => pictureFormat.value = PictureFormat.parse(
+    library?.setting(key: PictureFormat.settingFor(_playingKey ?? '')),
+  );
+
+  void setPictureFormat(PictureFormat f) {
+    final key = _playingKey;
+    if (key == null) return;
+    library?.setSetting(
+      key: PictureFormat.settingFor(key),
+      value: f == PictureFormat.fit ? '' : f.name,
+    );
+    pictureFormat.value = f;
+  }
+
+  /// The delays of what plays, as the track sheet shows them.
+  TrackDelays delays = TrackDelays();
+
+  /// Audio or subtitles later (positive) or earlier, in milliseconds, for what plays now; the next start is at 0 again.
+  Future<void> setDelay({int? audioMs, int? subtitleMs}) async {
+    if (audioMs != null) {
+      await adapter.setProperty('audio-delay', '${audioMs / 1000}');
+    }
+    if (subtitleMs != null) {
+      await adapter.setProperty('sub-delay', '${subtitleMs / 1000}');
+    }
   }
 
   /// Plays a programme from the channel's catch-up archive, from its start (false when there is none: no archive,
@@ -650,6 +954,7 @@ class Session extends ChangeNotifier {
     _mpvPip(true);
     nowPlaying.value = item;
     _playingKey = channel.key;
+    _loadPictureFormat();
     final choice = lib.bufferFor(key: channel.key);
     bufferRaisedTo.value = null;
     timeshiftWindow.value =
@@ -661,7 +966,8 @@ class Session extends ChangeNotifier {
       customSeconds: choice.seconds,
       adaptive: false,
       preferHls: false,
-      extraOptions: const [],
+      extraOptions: [..._trackOptions(lib), ...await _deinterlaceOptions(lib)],
+      userAgent: profile?.userAgent ?? '',
     );
     return true;
   }
@@ -762,7 +1068,10 @@ class Session extends ChangeNotifier {
     final s = player.stream;
     _floatSubs = [
       s.playing.listen((_) => _updateFloating()),
-      s.completed.listen((_) => _updateFloating()),
+      s.completed.listen((done) {
+        _updateFloating();
+        unawaited(_onCompleted(done));
+      }),
       s.position.listen((_) => _updateFloating()),
     ];
     adapter.failure.addListener(_updateFloating);
@@ -794,19 +1103,23 @@ class Session extends ChangeNotifier {
       bitrate: bitrate > 0 ? bitrate : null,
       adaptive: lib.setting(key: settingAdaptive) == '1',
       preferHls: live && lib.preferHls(key: item.key),
+      userAgent: profile?.userAgent ?? '',
       start: switch (live ? null : lib.resumePosition(key: item.key)) {
         final secs? => Duration(seconds: secs),
         null => null,
       },
-      extraOptions: live && shift > 0
-          ? timeshiftOptions(
-              windowSeconds: shift,
-              bitrateBps: bitrate > 0 ? BigInt.from(bitrate) : null,
-              // The back buffer's disk budget: a quarter of this. A free-space query per platform is a follow-up.
-              freeDiskBytes: BigInt.from(isDesktop ? 16000000000 : 4000000000),
-              cacheDir: await _timeshiftDir(),
-            )
-          : const [],
+      extraOptions: [
+        ..._trackOptions(lib),
+        ...await _deinterlaceOptions(lib),
+        if (live && shift > 0)
+          ...timeshiftOptions(
+            windowSeconds: shift,
+            bitrateBps: bitrate > 0 ? BigInt.from(bitrate) : null,
+            // The back buffer's disk budget: a quarter of this. A free-space query per platform is a follow-up.
+            freeDiskBytes: BigInt.from(isDesktop ? 16000000000 : 4000000000),
+            cacheDir: await _timeshiftDir(),
+          ),
+      ],
     );
   }
 
@@ -861,7 +1174,11 @@ class Session extends ChangeNotifier {
     onAvPlayer.value = true;
     adapter.target.value =
         choice.seconds; // the player's "Buffer x / target" readout
-    await av.openUrl(url, bufferSecs: choice.seconds);
+    await av.openUrl(
+      url,
+      bufferSecs: choice.seconds,
+      userAgent: profile?.userAgent ?? '',
+    );
     // The safety net: AVPlayer waits silently (no error) on a stream it can't decode. Not playing 15 s after the
     // start, unpaused, the channel goes to mpv for this run.
     final from = av.state.position;
@@ -932,7 +1249,7 @@ class Session extends ChangeNotifier {
 
   /// Continue watching: how far the playing movie or episode got (the core keeps it from 2 min, drops it at 95 %).
   /// Catch-up archives play as movies but aren't kept.
-  void _saveProgress() {
+  void _saveProgress({bool ended = false}) {
     final it = nowPlaying.value;
     final lib = library;
     if (it == null ||
@@ -942,20 +1259,26 @@ class Session extends ChangeNotifier {
         it.key.startsWith('premiumize:')) {
       return;
     }
-    final pos = player.state.position.inSeconds;
+    final duration = player.state.duration.inSeconds;
+    final pos = ended ? duration : player.state.position.inSeconds;
     if (pos <= 0) return;
-    lib.saveProgress(
-      key: it.key,
-      position: pos,
-      duration: player.state.duration.inSeconds,
-    );
+    lib.saveProgress(key: it.key, position: pos, duration: duration);
+    // The core marks it from 95 %; the check marks follow.
+    if (!watched.contains(it.key) && lib.watchedKeys().contains(it.key)) {
+      _reloadWatched();
+    }
   }
 
   /// The only way playback ends besides starting another stream.
   Future<void> stopPlayback() async {
+    nextUp.cancel();
     _saveProgress();
     _track('stop');
     _playingKey = null;
+    if (_displayMode != 0) {
+      _displayMode = 0;
+      unawaited(platform.setDisplayMode(0));
+    }
     nowPlaying.value = null;
     timeshiftWindow.value = 0;
     await _useMpv();

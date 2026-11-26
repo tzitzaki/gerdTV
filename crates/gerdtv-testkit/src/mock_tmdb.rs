@@ -114,12 +114,7 @@ fn answer(req: &Request) -> (u16, Value) {
             json!({"status_code": 7, "status_message": "Invalid API key: You must be granted a valid key."}),
         );
     }
-    let query = fold(
-        &req.param("query")
-            .unwrap_or("")
-            .replace('+', " ")
-            .replace("%20", " "),
-    );
+    let query = fold(&http::decode(req.param("query").unwrap_or("")));
     let year: Option<u32> = req
         .param("year")
         .or(req.param("first_air_date_year"))

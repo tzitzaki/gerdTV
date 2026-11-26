@@ -3,17 +3,23 @@
 //! the thin `gerdtv-api` crate (flutter_rust_bridge). Bootstrap state: just the version and a greeting that proves the
 //! Dart → Rust call path works end to end.
 
+pub mod cast;
 pub mod db;
 pub mod epg;
+pub mod groups;
 pub mod hls;
 pub mod library;
 pub mod logos;
 pub mod m3u;
+pub mod opensubtitles;
 pub mod playback;
 pub mod premiumize;
+pub mod recorder;
+pub mod tmdb;
 pub mod tracking;
 pub mod update;
 pub mod userdata;
+pub mod watch_import;
 pub mod xtream;
 
 /// The core's version, the same as the workspace version (set by each wrap-up release).
