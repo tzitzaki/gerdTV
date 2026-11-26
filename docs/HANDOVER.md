@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261126.63: the features other players have: watched marks, next episode, tracks, picture, recordings, Cast, TMDB, Simkl, OpenSubtitles.
+- Version 0.261127.65: OpenSubtitles logins work for VIP accounts (calls go to the host the login names). Before, 0.261126.63: the features other players have.
 - Also: own groups and names, Android TV home screen and refresh rate, macOS media keys, account expiry, User-Agent; AirPlay is still open.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
