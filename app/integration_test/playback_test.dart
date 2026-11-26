@@ -93,7 +93,8 @@ void main() {
         // mpv keeps the choice past media_kit's own open.
         expect(await native.getProperty('alang'), 'de,deu,ger');
         expect(await native.getProperty('options/sid'), 'no');
-        expect(await native.getProperty('deinterlace'), 'auto');
+        // mpv 0.36 (media_kit's on Apple and Android) has no "auto" and keeps the "yes" set before it (picture.dart).
+        expect(await native.getProperty('deinterlace'), anyOf('auto', 'yes'));
         expect(await native.getProperty('user-agent'), 'Player/1.0');
         await adapter.play(
           ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',

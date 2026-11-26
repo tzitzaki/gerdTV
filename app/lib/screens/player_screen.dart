@@ -397,6 +397,42 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ListTile(
+                      title: Text(
+                        l10n.bufferThisChannel,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    BufferPicker(
+                      value: current,
+                      onChanged: (c) {
+                        lib.setChannelBuffer(
+                          key: key,
+                          preset: c.preset,
+                          customSeconds: c.seconds,
+                        );
+                        widget.session.applyBuffer(c.preset, c.seconds);
+                        setSheet(() {});
+                      },
+                    ),
+                    if (lib.hasChannelBuffer(key: key))
+                      TextButton(
+                        key: const Key('buffer.default'),
+                        onPressed: () {
+                          lib.setChannelBuffer(
+                            key: key,
+                            preset: null,
+                            customSeconds: 0,
+                          );
+                          final d = lib.bufferFor(key: key);
+                          widget.session.applyBuffer(d.preset, d.seconds);
+                          setSheet(() {});
+                        },
+                        child: Text(
+                          '${l10n.bufferUseDefault} (${presetLabel(l10n, lib.bufferFor(key: key))})',
+                        ),
+                      ),
+                    // Below the channel's buffer, which the sheet is named after (the Mac's small window shows it first).
                     if (castable(_current))
                       ListTile(
                         key: const Key('player.cast'),
@@ -440,41 +476,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ],
                       ),
                     ),
-                    ListTile(
-                      title: Text(
-                        l10n.bufferThisChannel,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    BufferPicker(
-                      value: current,
-                      onChanged: (c) {
-                        lib.setChannelBuffer(
-                          key: key,
-                          preset: c.preset,
-                          customSeconds: c.seconds,
-                        );
-                        widget.session.applyBuffer(c.preset, c.seconds);
-                        setSheet(() {});
-                      },
-                    ),
-                    if (lib.hasChannelBuffer(key: key))
-                      TextButton(
-                        key: const Key('buffer.default'),
-                        onPressed: () {
-                          lib.setChannelBuffer(
-                            key: key,
-                            preset: null,
-                            customSeconds: 0,
-                          );
-                          final d = lib.bufferFor(key: key);
-                          widget.session.applyBuffer(d.preset, d.seconds);
-                          setSheet(() {});
-                        },
-                        child: Text(
-                          '${l10n.bufferUseDefault} (${presetLabel(l10n, lib.bufferFor(key: key))})',
-                        ),
-                      ),
                   ],
                 ),
               ),
