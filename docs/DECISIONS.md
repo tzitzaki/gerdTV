@@ -14,12 +14,12 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Apple platforms: mpv plays everything by default (its own frames feed iOS PiP); AVPlayer over the core's local HLS is a Settings choice for live, applied at the next start.
 - Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).
 - Channel lists: four display modes (compact list, list, tiles, large tiles) per section, with a quick toggle in the list bar.
-- One TV section (lists or guide, switched and remembered); Premiumize is a section after Series while linked; a channel's long hold opens a menu.
+- One TV section (lists or guide, switched and remembered); Premiumize is a section after Series while linked; a long hold on a channel, movie, series or group opens a menu.
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
-- Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
+- Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, the menu behind a long press or a long OK.
 - Swipe on phones: from the left edge back, sideways between sections (not on the guide), and in the player media_kit's seek, volume and brightness swipes (the player's volume; brightness on the left half; switchable).
 - Theme: dark by default, or light or the system's; orange by default among eight accent presets; neutral surfaces by default (tinted on request); pure black on request; app-wide.
 - Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).

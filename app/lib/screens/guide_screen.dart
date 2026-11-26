@@ -15,6 +15,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'browse_screen.dart';
+import 'group_menus.dart';
 import 'guide_math.dart';
 import 'list_modes.dart';
 import 'logo.dart';
@@ -376,6 +377,7 @@ class _GuideScreenState extends State<GuideScreen> {
               channels: List.of(_channels),
             ),
             onFavourite: () => widget.session.toggleFavourite(c),
+            extra: itemMenu(this.context, widget.session, c),
           );
           return InkWell(
             key: Key('guide.channel.${c.key}'),

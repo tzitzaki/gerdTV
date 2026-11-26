@@ -677,9 +677,32 @@ void main() {
           (w.key! as ValueKey<String>).value.startsWith('item.star.'),
     );
     await tapReady(tester, star);
+    // A channel's menu puts it into a new group of the user's own, which then shows above the provider's.
+    await tester.longPress(find.byType(ItemRow).hitTestable().first);
+    await tapReady(tester, find.byKey(const Key('channel.addToGroup')));
+    await tapReady(tester, find.byKey(const Key('menu.group.new')));
+    await waitFor(tester, find.byKey(const Key('name.field')));
+    await tester.enterText(find.byKey(const Key('name.field')), 'My group');
+    await tapReady(tester, find.byKey(const Key('name.save')));
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
     await tester.pageBack();
     await tester.pumpAndSettle();
     await waitFor(tester, find.byKey(const Key('browse.favourites')));
+    await tapReady(tester, find.text('My group'));
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
+    expect(find.byType(ItemRow), findsOneWidget);
+    await tester.pageBack();
+    await waitFor(
+      tester,
+      find.byKey(const Key('browse.favourites')).hitTestable(),
+    );
+    // Its menu deletes it again (the guide below starts with the first group, which it would be).
+    // (The group's page slides out with the name as its title: its row, once settled.)
+    await tester.pumpAndSettle();
+    await tester.longPress(find.widgetWithText(ListTile, 'My group'));
+    await tapReady(tester, find.byKey(const Key('menu.delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('My group'), findsNothing);
     debugPrint('JOURNEY: a favourite shows in its group');
 
     // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.

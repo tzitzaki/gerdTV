@@ -99,9 +99,14 @@ class Session extends ChangeNotifier {
     return _favourites;
   }
 
-  /// A group was hidden or shown again: every list reloads (as after a sync).
+  /// Bumped by [groupsChanged] only: an open group reloads its items (a sync leaves it as it is).
+  final orderChanged = ValueNotifier<int>(0);
+
+  /// A group was hidden or shown again, or the user's own groups, names or order changed: every list reloads (as after
+  /// a sync).
   void groupsChanged() {
     generation++;
+    orderChanged.value++;
     favouritesChanged.value++; // the Favourites group and continue watching may lose or regain items
     notifyListeners();
   }

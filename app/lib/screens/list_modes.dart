@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'group_menus.dart' show MenuEntry;
 import 'logo.dart';
 import 'search_text.dart';
 
@@ -168,6 +169,7 @@ class ItemsView extends StatelessWidget {
     this.favourites = const {},
     this.onFavourite,
     this.watched = const {},
+    this.menu,
   });
   final ListMode mode;
   final List<ItemInfo> items;
@@ -187,6 +189,9 @@ class ItemsView extends StatelessWidget {
   /// The watched movies' and episodes' keys (a check mark).
   final Set<String> watched;
 
+  /// An item's further menu entries (own groups, own names); with them every kind's long hold opens the menu.
+  final List<MenuEntry> Function(ItemInfo)? menu;
+
   @override
   Widget build(BuildContext context) {
     final count = items.length + (loading ? 1 : 0);
@@ -199,7 +204,7 @@ class ItemsView extends StatelessWidget {
       final it = items[i];
       final nn = nowNext[it.key];
       final fav = onFavourite == null ? null : () => onFavourite!(it);
-      final hold = fav == null || it.kind != ItemKind.live
+      final hold = fav == null || (it.kind != ItemKind.live && menu == null)
           ? fav
           : () => showChannelMenu(
               context,
@@ -207,6 +212,7 @@ class ItemsView extends StatelessWidget {
               favourite: favourites.contains(it.key),
               onWatch: () => onTap(it),
               onFavourite: fav,
+              extra: menu?.call(it) ?? const [],
             );
       final cellWidget = switch (mode) {
         ListMode.compact || ListMode.list => ItemRow(
@@ -391,8 +397,10 @@ Future<void> showChannelMenu(
   required bool favourite,
   required VoidCallback onWatch,
   required VoidCallback onFavourite,
+  List<MenuEntry> extra = const [],
 }) => showModalBottomSheet<void>(
   context: context,
+  isScrollControlled: true,
   builder: (context) {
     final l10n = AppLocalizations.of(context);
     Widget entry(String key, IconData icon, String label, VoidCallback run) =>
@@ -425,6 +433,7 @@ Future<void> showChannelMenu(
               favourite ? l10n.favouriteRemove : l10n.favouriteAdd,
               onFavourite,
             ),
+            for (final e in extra) entry(e.key, e.icon, e.label, e.run),
           ],
         ),
       ),

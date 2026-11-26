@@ -14,6 +14,7 @@ import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'details_screen.dart';
+import 'group_menus.dart';
 import 'item_tile.dart';
 import 'list_modes.dart';
 import 'logo.dart';
@@ -151,26 +152,43 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       if (row == 0) return header;
                       if (resume != null && row == 1) return resume;
                       final i = row - skip;
-                      return ListTile(
+                      void open() => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ItemsScreen(
+                            session: session,
+                            kind: kind,
+                            group: all[i],
+                            favourites: n > 0 && i == 0,
+                          ),
+                        ),
+                      );
+                      final favourites = n > 0 && i == 0;
+                      final menu = favourites
+                          ? null
+                          : () => showGroupMenu(
+                              context,
+                              session,
+                              kind,
+                              all[i],
+                              list,
+                            );
+                      final tile = ListTile(
                         key: n > 0 && i == 0
                             ? const Key('browse.favourites')
                             : null,
                         leading: n > 0 && i == 0
                             ? const Icon(Icons.star)
+                            : isOwnGroup(all[i].id)
+                            ? const Icon(Icons.folder_outlined)
                             : null,
                         title: Text(all[i].name),
                         trailing: Text('${all[i].count}'),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ItemsScreen(
-                              session: session,
-                              kind: kind,
-                              group: all[i],
-                              favourites: n > 0 && i == 0,
-                            ),
-                          ),
-                        ),
+                        onTap: open,
+                        onLongPress: menu,
                       );
+                      return menu == null
+                          ? tile
+                          : LongOk(onTap: open, onLong: menu, child: tile);
                     },
                   );
                 },
@@ -324,6 +342,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     super.initState();
     _guideSeen = widget.session.guideGeneration;
     widget.session.addListener(_onSession);
+    widget.session.orderChanged.addListener(_reload);
     _tick = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshNowNext(),
@@ -334,6 +353,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   @override
   void dispose() {
     widget.session.removeListener(_onSession);
+    widget.session.orderChanged.removeListener(_reload);
     _tick?.cancel();
     _search.dispose();
     _searchFocus.dispose();
@@ -345,6 +365,27 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _guideSeen = widget.session.guideGeneration;
       _refreshNowNext();
     }
+  }
+
+  bool get _own => isOwnGroup(widget.group.id);
+
+  /// A name, the order or the own groups changed: the same stretch again, so the list stays where it is.
+  Future<void> _reload() async {
+    if (widget.favourites || _loading) return;
+    final sort = _sort;
+    final again = await widget.session.library!.items(
+      kind: widget.kind,
+      category: widget.group.id,
+      sort: sort.value,
+      limit: _items.length < page ? page : _items.length,
+      offset: 0,
+    );
+    if (!mounted || sort != _sort) return;
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(again);
+    });
   }
 
   Future<void> _nowNextFor(List<ItemInfo> items) async {
@@ -446,8 +487,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
           section: sectionOf(widget.kind),
           controller: _search,
           focus: _searchFocus,
-          // The Favourites group spans several groups: its search covers the section.
-          group: widget.favourites ? null : widget.group,
+          // The Favourites group and own groups span several groups: their search covers the section.
+          group: widget.favourites || _own ? null : widget.group,
           child: ListenableBuilder(
             listenable: Listenable.merge([
               widget.session.favouritesChanged,
@@ -469,6 +510,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
               onNearEnd: _more,
               favourites: widget.session.favourites,
               onFavourite: widget.session.toggleFavourite,
+              menu: (it) => itemMenu(
+                context,
+                widget.session,
+                it,
+                // Moving shows only in the group's own order.
+                group: _own && _sort == ListSort.provider
+                    ? (
+                        id: widget.group.id,
+                        keys: [for (final i in _items) i.key],
+                      )
+                    : null,
+              ),
               onTap: (it) => openItem(
                 context,
                 widget.session,

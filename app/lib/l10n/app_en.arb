@@ -91,6 +91,10 @@
   "favouriteRemove": "Remove from favourites",
   "favourites": "Favourites",
   "goLive": "Live",
+  "groupAdd": "Add to a group",
+  "groupDelete": "Delete this group",
+  "groupNew": "New group",
+  "groupRemove": "Remove from this group",
   "guideAddUrl": "Extra XMLTV URL",
   "guideCommunity": "Community guides",
   "guideCommunityAdd": "Add a community guide",
@@ -199,6 +203,9 @@
   "menuBarPlayPause": "Play/Pause",
   "menuBarQuit": "Quit gerdTV",
   "miniPlayer": "Mini player",
+  "moveDown": "Move down",
+  "moveTop": "Move to the top",
+  "moveUp": "Move up",
   "mute": "Mute",
   "navGuide": "Guide",
   "navLive": "TV",
@@ -300,9 +307,12 @@
     }
   },
   "remove": "Remove",
+  "rename": "Rename",
+  "renameHint": "Name (empty: the provider's)",
   "restartToApply": "Close gerdTV and open it again to apply the change.",
   "restore": "Full size",
   "retry": "Retry",
+  "save": "Save",
   "searchAllGroups": "All groups {count}",
   "@searchAllGroups": {
     "placeholders": {
