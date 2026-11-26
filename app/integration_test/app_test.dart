@@ -602,8 +602,7 @@ void main() {
         .value!
         .id;
     await tester.enterText(guideField, 'sport');
-    await waitFor(tester, find.byType(ItemRow));
-    await waitFor(tester, programmeHit);
+    await waitFor(tester, find.byType(ItemRow)); // channels first
     await tester.tap(find.byKey(const Key('search.thisGroup')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 300)),

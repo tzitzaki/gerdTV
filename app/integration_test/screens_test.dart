@@ -304,20 +304,9 @@ void main() {
       await checkScreen(tester, form, 'guide-sheet', size);
       await tester.tapAt(const Offset(10, 10)); // the sheet's barrier closes it
       await settle(tester);
-      // The guide's search: channels and programmes instead of the grid.
+      // The guide's search: channels first (the programmes follow below them), instead of the grid.
       await tester.enterText(find.byKey(const Key('search.guide')), 'sport');
-      await waitFor(
-        tester,
-        find
-            .byWidgetPredicate(
-              (w) =>
-                  w.key is ValueKey<String> &&
-                  (w.key! as ValueKey<String>).value.startsWith(
-                    'search.programme.',
-                  ),
-            )
-            .hitTestable(),
-      );
+      await waitFor(tester, find.byType(ItemRow).hitTestable());
       await checkScreen(tester, form, 'search-guide', size);
       await tester.tap(find.byKey(const Key('search.clear')));
       await settle(tester);

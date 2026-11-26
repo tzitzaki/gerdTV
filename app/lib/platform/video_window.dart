@@ -104,7 +104,7 @@ class VideoWindow {
     w.aspectRatio = 0;
     await write(playerKey, formatWindowSize(w.contentSize.toSize()));
     final browse = parseWindowSize(await read(browseKey));
-    if (browse != null) w.setSize(browse.toNative(), true);
+    if (browse != null) w.setSize(browse.toNative(), Platform.isMacOS);
   }
 
   /// Locks the ratio and sizes the content to [width] at it, within the screen.
@@ -128,13 +128,16 @@ class VideoWindow {
         screen.height * 0.9 - extra.height,
       ),
     );
-    w.aspectRatio = ratio;
+    // Lock after the resize: GTK applies the aspect hint to programmatic resizes too, so a lock from the old ratio
+    // would bend the new size. Linux resizes without animation (GTK doesn't animate it).
+    w.aspectRatio = 0;
     w.setSize(
       ui.Size(
         target.width + extra.width,
         target.height + extra.height,
       ).toNative(),
-      animate,
+      animate && Platform.isMacOS,
     );
+    w.aspectRatio = ratio;
   }
 }

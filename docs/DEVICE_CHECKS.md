@@ -18,7 +18,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
 - Updates: Settings → About → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
-- Install and restart: gerdTV quits and starts again on the new version within seconds; no `gerdTV.previous.app` is left in Applications.
+- Install and restart: gerdTV restarts on the new version within seconds; no `gerdTV.previous.app` in Applications, and the zip is gone from Downloads.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
 - Your data: Export saves a JSON file where the dialog says; Import of that file on another Mac adds the favourites and reminders.
 

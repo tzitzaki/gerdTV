@@ -6,6 +6,7 @@
 // Debug hints: if the window doesn't move to the front on macOS, check isVisibleOnAllWorkspaces; if nothing
 // happens at all, WindowManager.instance.getCurrent() returned null (called before the first frame).
 
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:window_manager/window_manager.dart' as wm;
@@ -26,7 +27,7 @@ class MiniWindow {
   }
 
   /// Shrinks into mini mode at the picture's [ratio] (width / height; 16:9 before a picture is known), remembering the
-  /// current bounds. Resizing keeps the ratio.
+  /// current bounds.
   void enter([double ratio = 16 / 9]) {
     if (isMini) return;
     final w = _window;
@@ -35,8 +36,10 @@ class MiniWindow {
     w.isAlwaysOnTop = true;
     w.isVisibleOnAllWorkspaces = true; // macOS: follows the user across Spaces
     w.minimumSize = ui.Size(miniWidth / 2, miniWidth / 2 / ratio).toNative();
-    w.aspectRatio = ratio;
     w.setSize(ui.Size(miniWidth, miniWidth / ratio).toNative(), false);
+    // Resizing keeps the ratio on macOS. Not on Linux: GTK measures the hint against the frame from before the title
+    // bar was hidden and bends the mini window (480 wide came out 392).
+    if (Platform.isMacOS) w.aspectRatio = ratio;
   }
 
   /// Grows back to the remembered bounds.
