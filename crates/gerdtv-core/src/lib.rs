@@ -12,6 +12,7 @@ pub mod logos;
 pub mod m3u;
 pub mod playback;
 pub mod premiumize;
+pub mod tmdb;
 pub mod tracking;
 pub mod update;
 pub mod userdata;

@@ -141,6 +141,7 @@ abstract class RustLibApi extends BaseApi {
   Future<ItemDetails> crateApiLibraryLibraryDetails({
     required Library that,
     required String key,
+    String? tmdbKey,
   });
 
   Future<List<ItemInfo>> crateApiLibraryLibraryEpisodes({
@@ -985,6 +986,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<ItemDetails> crateApiLibraryLibraryDetails({
     required Library that,
     required String key,
+    String? tmdbKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -995,6 +997,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(key, serializer);
+          sse_encode_opt_String(tmdbKey, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1007,7 +1010,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibraryDetailsConstMeta,
-        argValues: [that, key],
+        argValues: [that, key, tmdbKey],
         apiImpl: this,
       ),
     );
@@ -1016,7 +1019,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibraryDetailsConstMeta =>
       const TaskConstMeta(
         debugName: "Library_details",
-        argNames: ["that", "key"],
+        argNames: ["that", "key", "tmdbKey"],
       );
 
   @override
@@ -7359,9 +7362,12 @@ class LibraryImpl extends RustOpaque implements Library {
   Future<void> deleteGroup({required String category}) => RustLib.instance.api
       .crateApiLibraryLibraryDeleteGroup(that: this, category: category);
 
-  /// A movie's or series' details, from the panel when the page opens.
-  Future<ItemDetails> details({required String key}) =>
-      RustLib.instance.api.crateApiLibraryLibraryDetails(that: this, key: key);
+  /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
+  /// for what the panel leaves empty.
+  Future<ItemDetails> details({required String key, String? tmdbKey}) => RustLib
+      .instance
+      .api
+      .crateApiLibraryLibraryDetails(that: this, key: key, tmdbKey: tmdbKey);
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey}) => RustLib

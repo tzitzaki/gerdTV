@@ -55,3 +55,5 @@ flutter:
     - assets/licences/
     # The macOS update swap, run after the app quits (lib/platform/mac_install.dart).
     - assets/update/
+    # TMDB's approved logo for the attribution in About (its SVG "Primary short (blue)", rendered unaltered at 4x).
+    - assets/tmdb/

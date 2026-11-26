@@ -55,6 +55,10 @@ String accountLine(
   ].join(' · ');
 }
 
+/// TMDB's required notice (its API terms, "Attribution"), word for word: not translated.
+const tmdbNotice =
+    'This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session, this.focus});
   final Session session;
@@ -256,6 +260,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keywords: l10n.settingsKeywordsPremiumize,
               build: (_) => PremiumizeSettings(session: session),
             ),
+          SettingsEntry(
+            id: 'tmdb',
+            section: 'TMDB',
+            title: l10n.tmdbKey,
+            keywords: l10n.settingsKeywordsTmdb,
+            build: (_) => Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.space * 2,
+                vertical: Tokens.space,
+              ),
+              child: TextFormField(
+                key: const Key('settings.tmdbKey'),
+                initialValue: session.tmdbKey ?? '',
+                obscureText: true,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: l10n.tmdbKey,
+                  helperText: l10n.tmdbKeyHint,
+                  helperMaxLines: 4,
+                ),
+                onFieldSubmitted: session.setTmdbKey,
+              ),
+            ),
+          ),
           if (lib != null)
             for (final t in trackServices)
               SettingsEntry(
@@ -522,6 +550,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: l10n.updateCheck,
             keywords: l10n.settingsKeywordsUpdates,
             build: (_) => const UpdateSettings(),
+          ),
+          // TMDB's terms: its logo, less prominent than gerdTV's, and its notice word for word.
+          SettingsEntry(
+            id: 'tmdbAttribution',
+            title: 'TMDB',
+            keywords: l10n.settingsKeywordsTmdb,
+            build: (_) => ListTile(
+              key: const Key('settings.tmdbAttribution'),
+              title: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Image.asset('assets/tmdb/tmdb.png', height: 14),
+              ),
+              subtitle: const Text(tmdbNotice),
+            ),
           ),
           SettingsEntry(
             id: 'licences',

@@ -393,6 +393,7 @@
   "settingsKeywordsRemove": "logout delete sign out",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",
   "settingsKeywordsTimeshift": "pause rewind live",
+  "settingsKeywordsTmdb": "tmdb movie database posters plot cast key",
   "settingsKeywordsTracking": "trakt simkl tracking scrobble watched history",
   "settingsKeywordsTracks": "language subtitles audio size sync",
   "settingsKeywordsUnmatched": "mapping epg",
@@ -483,6 +484,8 @@
     }
   },
   "timeshiftOff": "Off",
+  "tmdbKey": "TMDB API key",
+  "tmdbKeyHint": "Optional, your own (themoviedb.org → Settings → API): movie and series pages get what the provider leaves out. Press Enter to save; empty removes it.",
   "trackAutomatic": "Automatic",
   "trackClientId": "Client ID",
   "trackClientSecret": "Client secret",

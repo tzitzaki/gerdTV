@@ -238,8 +238,12 @@ class MovieScreen extends StatefulWidget {
     required this.onPlay,
     this.isWatched,
     this.onWatched,
+    this.tmdbKey,
   });
   final Library library;
+
+  /// The user's TMDB key: TMDB fills what the panel leaves empty.
+  final String? tmdbKey;
   final ItemInfo movie;
 
   /// Opens the player (the caller's route, so the player keeps its usual way in).
@@ -255,7 +259,7 @@ class MovieScreen extends StatefulWidget {
 
 class _MovieScreenState extends State<MovieScreen> {
   late final Future<ItemDetails?> _details = widget.library
-      .details(key: widget.movie.key)
+      .details(key: widget.movie.key, tmdbKey: widget.tmdbKey)
       .then<ItemDetails?>((d) => d)
       .catchError((Object _) => null); // no details: title and Play still work
   @override

@@ -13,6 +13,7 @@
 use crate::db::{self, Hit, ImportStats, Kind, Sort};
 use crate::epg;
 use crate::groups;
+use crate::tmdb;
 use crate::xtream::{self, Account, XcError, Xtream};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -682,16 +683,34 @@ impl Library {
 
     /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
     /// for other kinds and for M3U sources, which have none.
-    pub async fn details(&self, key: &str) -> Result<xtream::Details> {
-        let Some(xc) = &self.xc else {
-            return Ok(xtream::Details::default());
-        };
+    pub async fn details(&self, key: &str, tmdb: Option<&tmdb::Tmdb>) -> Result<xtream::Details> {
         let id = |prefix| key.strip_prefix(prefix).and_then(|i| i.parse::<u64>().ok());
-        Ok(match (id("movie:"), id("series:")) {
-            (Some(id), _) => xc.vod_details(id).await?,
-            (_, Some(id)) => xc.series_details(id).await?,
+        let panel = match (&self.xc, id("movie:"), id("series:")) {
+            (Some(xc), Some(id), _) => xc.vod_details(id).await?,
+            (Some(xc), _, Some(id)) => xc.series_details(id).await?,
             _ => xtream::Details::default(),
-        })
+        };
+        // TMDB fills what the panel left empty (M3U profiles: everything). Its failure leaves the panel's page.
+        let Some(t) = tmdb else { return Ok(panel) };
+        let Some(item) = self
+            .item(key)?
+            .filter(|i| matches!(i.kind, Kind::Movie | Kind::Series))
+        else {
+            return Ok(panel);
+        };
+        let wanted = tmdb::Wanted {
+            key,
+            name: &item.name,
+            series: item.kind == Kind::Series,
+            id: panel.tmdb_id,
+        };
+        match t.details(&self.conn, &wanted).await {
+            Ok(more) => Ok(tmdb::merge(panel, more)),
+            Err(e) => {
+                tracing::warn!("{e}");
+                Ok(panel)
+            }
+        }
     }
 
     /// The URL to play an item (live: `.ts` by default, `m3u8` when the watchdog asks; VOD: its container).

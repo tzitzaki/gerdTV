@@ -24,15 +24,16 @@ Started 20:43. One PR, one release at the end. Progress: each step gets its star
 9. Android TV home row: started 22:56
 10. Custom groups, names, order: started 23:12 (extends #62's long-hold menu)
 11. TMDB: started 19:47
-12. Simkl import, ids for Simkl and Trakt
+12. Simkl import, ids for Simkl and Trakt: started 20:05
 13. OpenSubtitles (read its docs first: key and login model, quotas, terms; the Download page needs the Api-Key header always, the login names whose quota)
 14. Recordings (first prove that an alarm can start the core on Android)
 15. Cast and AirPlay (Spike C first)
 16. Wrap-up
 
 ## State
-Steps 0–10 done 19:47 (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
-features append to it. Next: step 11 (TMDB; tmdb.rs written, not yet registered). Open questions: none blocking.
+Steps 0–11 done 20:05 (step 8 compiles for Android, 3 min 51 s; step 7's Swift is not compiled: no Mac here, no CI per commit) (integration 8 min 21 s; step 4: no languages for Apple's player, it reports none). Migration 11 is unreleased: later
+features append to it. Next: step 12 (Simkl). Open questions: none blocking.
 Step 10: core committed, app side written 23:17 (not committed), integration running; then step 11 (TMDB: read its terms first).
 Found 23:37: an episode's end is reported twice, the stream reopened in between (the watchdog reopening a finished VOD?). To check after step 10.
 Resumed 19:36 (idle 00:23–19:35, my mistake). Step 10: fixing the journey's ambiguous long press.
+Step 11 live 19:54: 20 real movies, 18 matched by the panel's id, 0 by name, 2 unmatched (6.2 s).

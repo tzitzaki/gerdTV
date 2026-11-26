@@ -179,7 +179,8 @@ const MIGRATIONS: &[&str] = &[
         WHERE key = 'guide_offset_hours'), 0) WHERE builtin = 0;",
     // 10 → 11: movies and episodes seen to the end (user data). An unmark is stored too (watched = 0), so it wins
     // over an older mark from an import or from Simkl.
-    // The user's own groups, names and group order (groups.rs, user data); removed ones stay as deleted = 1.
+    // The user's own groups, names and group order (groups.rs, user data); removed ones stay as deleted = 1. And
+    // TMDB's answers per item (tmdb.rs, a cache: kept 30 days, not exported).
     "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);
      CREATE TABLE custom_groups (id TEXT PRIMARY KEY, kind INTEGER NOT NULL, name TEXT NOT NULL,
         position INTEGER NOT NULL, deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL);
@@ -188,7 +189,8 @@ const MIGRATIONS: &[&str] = &[
      CREATE TABLE group_prefs (kind INTEGER NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
         position INTEGER, updated_at INTEGER NOT NULL, PRIMARY KEY (kind, category));
      CREATE TABLE item_prefs (key TEXT PRIMARY KEY, name TEXT NOT NULL, provider_name TEXT NOT NULL DEFAULT '',
-        updated_at INTEGER NOT NULL);",
+        updated_at INTEGER NOT NULL);
+     CREATE TABLE tmdb (key TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 

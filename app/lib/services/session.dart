@@ -507,6 +507,7 @@ class Session extends ChangeNotifier {
       );
       profile = p;
       premiumizeToken = await secrets.readService(p.id, 'premiumize');
+      tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
@@ -684,6 +685,24 @@ class Session extends ChangeNotifier {
       pause ? await adapter.pause() : await adapter.resume();
     }
   }
+
+  /// The user's own TMDB key (app-wide, not per provider), null when none is set: movie and series pages then show
+  /// the panel's facts only.
+  String? tmdbKey;
+
+  Future<void> setTmdbKey(String? key) async {
+    final k = key?.trim();
+    await secrets.writeService(
+      _appSecrets,
+      'tmdb',
+      k == null || k.isEmpty ? null : k,
+    );
+    tmdbKey = k == null || k.isEmpty ? null : k;
+    notifyListeners();
+  }
+
+  /// The owner of app-wide secrets in secure storage (profile secrets carry the profile's id there).
+  static const _appSecrets = 'app';
 
   /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
   String? premiumizeToken;

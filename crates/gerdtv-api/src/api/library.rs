@@ -409,9 +409,17 @@ impl Library {
             }))
     }
 
-    /// A movie's or series' details, from the panel when the page opens.
-    pub async fn details(&self, key: String) -> Result<ItemDetails, String> {
-        let d = self.0.details(&key).await.map_err(err)?;
+    /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
+    /// for what the panel leaves empty.
+    pub async fn details(
+        &self,
+        key: String,
+        tmdb_key: Option<String>,
+    ) -> Result<ItemDetails, String> {
+        let tmdb = tmdb_key
+            .filter(|k| !k.trim().is_empty())
+            .map(|k| gerdtv_core::tmdb::Tmdb::new(gerdtv_core::tmdb::BASE, &k));
+        let d = self.0.details(&key, tmdb.as_ref()).await.map_err(err)?;
         Ok(ItemDetails {
             plot: d.plot,
             genre: d.genre,

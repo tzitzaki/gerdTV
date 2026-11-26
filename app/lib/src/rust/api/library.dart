@@ -79,8 +79,9 @@ abstract class Library implements RustOpaqueInterface {
 
   Future<void> deleteGroup({required String category});
 
-  /// A movie's or series' details, from the panel when the page opens.
-  Future<ItemDetails> details({required String key});
+  /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
+  /// for what the panel leaves empty.
+  Future<ItemDetails> details({required String key, String? tmdbKey});
 
   /// A series' episodes in order (Xtream Codes fetches them now; M3U has them already).
   Future<List<ItemInfo>> episodes({required String seriesKey});

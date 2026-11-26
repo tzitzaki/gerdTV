@@ -52,6 +52,7 @@ void openItem(
           onPlay: play,
           isWatched: () => session.watched.contains(item.key),
           onWatched: () => session.toggleWatched(item),
+          tmdbKey: session.tmdbKey,
         ),
       ),
     );
@@ -554,7 +555,7 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
   Session get session => widget.session;
   ItemInfo get series => widget.series;
   late final Future<ItemDetails?> _details = session.library!
-      .details(key: series.key)
+      .details(key: series.key, tmdbKey: session.tmdbKey)
       .then<ItemDetails?>((d) => d)
       .catchError((Object _) => null);
   late final Future<List<ItemInfo>> _episodes = session.library!.episodes(

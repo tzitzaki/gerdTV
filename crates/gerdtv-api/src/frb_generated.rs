@@ -543,6 +543,7 @@ fn wire__crate__api__library__Library_details_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Library>,
             >>::sse_decode(&mut deserializer);
             let api_key = <String>::sse_decode(&mut deserializer);
+            let api_tmdb_key = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
@@ -564,9 +565,12 @@ fn wire__crate__api__library__Library_details_impl(
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let output_ok =
-                            crate::api::library::Library::details(&*api_that_guard, api_key)
-                                .await?;
+                        let output_ok = crate::api::library::Library::details(
+                            &*api_that_guard,
+                            api_key,
+                            api_tmdb_key,
+                        )
+                        .await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
