@@ -24,6 +24,14 @@ ui.Size fitToRatio(double width, double ratio, ui.Size screen) {
   return ui.Size(w.roundToDouble(), h.roundToDouble());
 }
 
+/// The ratio the window follows: a [forced] aspect (the item's picture format 16:9 or 4:3), else the stream's
+/// [width] / [height]; null until both sides are known.
+double? windowRatio(double? forced, int? width, int? height) =>
+    forced ??
+    (width != null && height != null && width > 0 && height > 0
+        ? width / height
+        : null);
+
 /// "1280x720" ↔ Size; null for anything else (a value from an older version, hand edits).
 ui.Size? parseWindowSize(String? s) {
   final p = s?.split('x');

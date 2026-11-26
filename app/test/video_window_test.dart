@@ -22,6 +22,14 @@ void main() {
     });
   });
 
+  test('a forced aspect wins over the stream; unknown sizes give none', () {
+    expect(windowRatio(null, 1920, 1080), 16 / 9);
+    expect(windowRatio(4 / 3, 1920, 1080), 4 / 3); // picture format 4:3
+    expect(windowRatio(16 / 9, null, null), 16 / 9);
+    expect(windowRatio(null, 1920, null), isNull);
+    expect(windowRatio(null, 0, 1080), isNull);
+  });
+
   test('stored sizes round-trip; anything else is ignored', () {
     expect(
       parseWindowSize(formatWindowSize(const Size(1280, 720))),

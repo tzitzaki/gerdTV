@@ -170,6 +170,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (VideoWindow.supported) {
       _widthSub = session.player.stream.width.listen((_) => _followPicture());
       _heightSub = session.player.stream.height.listen((_) => _followPicture());
+      session.pictureFormat.addListener(_followPicture);
       _followPicture(); // a stream already playing (opened from the bar)
     }
     session.pipFailure.addListener(_showPipFailure);
@@ -344,12 +345,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_panel) _loadNowNext(_channels);
   }
 
-  /// The picture's ratio, null until mpv (or AVPlayer) reported both sides.
-  double? get _pictureRatio {
-    final s = widget.session.player.state;
-    final (w, h) = (s.width, s.height);
-    return w != null && h != null && w > 0 && h > 0 ? w / h : null;
-  }
+  /// The picture's ratio: the item's forced aspect (picture format 16:9 or 4:3), else the stream's, null until mpv
+  /// (or AVPlayer) reported both sides.
+  double? get _pictureRatio => windowRatio(
+    widget.session.pictureFormat.value.aspect,
+    widget.session.player.state.width,
+    widget.session.player.state.height,
+  );
 
   void _followPicture() {
     final ratio = _pictureRatio;
@@ -406,6 +408,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _bufferSub?.cancel();
     _widthSub?.cancel();
     _heightSub?.cancel();
+    widget.session.pictureFormat.removeListener(_followPicture);
     if (_miniWindow.isMini) {
       _miniWindow.exit();
       widget.session.pictureMode.value = false;
