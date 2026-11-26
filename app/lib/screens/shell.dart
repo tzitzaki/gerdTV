@@ -66,6 +66,7 @@ class _ShellState extends State<Shell> {
       f.dispose();
     }
     _settingsFocus.dispose();
+    _guideGroup.dispose();
     super.dispose();
   }
 
@@ -93,16 +94,22 @@ class _ShellState extends State<Shell> {
     setState(() => _guide = guide);
   }
 
-  Widget _search(SearchSection s, Widget child) => SectionSearch(
-    key: ValueKey(s),
-    session: widget.session,
-    section: s,
-    controller: _queries[s]!,
-    focus: _focus[s],
-    onJump: _jump,
-    action: _page == ShellPage.tv ? _tvView() : null,
-    child: child,
-  );
+  /// The group the guide shows: its search can be limited to it (a chip; it starts wide).
+  final _guideGroup = ValueNotifier<CategoryInfo?>(null);
+
+  Widget _search(SearchSection s, Widget child, {CategoryInfo? group}) =>
+      SectionSearch(
+        key: ValueKey(s),
+        session: widget.session,
+        section: s,
+        group: group,
+        startInGroup: false,
+        controller: _queries[s]!,
+        focus: _focus[s],
+        onJump: _jump,
+        action: _page == ShellPage.tv ? _tvView() : null,
+        child: child,
+      );
 
   /// TV: the channel lists or the guide.
   Widget _tvView() {
@@ -160,7 +167,12 @@ class _ShellState extends State<Shell> {
     final page = switch (_page) {
       ShellPage.tv =>
         _guide
-            ? _search(SearchSection.guide, GuideScreen(session: s))
+            ? ValueListenableBuilder(
+                valueListenable: _guideGroup,
+                builder: (context, group, guide) =>
+                    _search(SearchSection.guide, guide!, group: group),
+                child: GuideScreen(session: s, group: _guideGroup),
+              )
             : browse(SearchSection.live, ItemKind.live),
       ShellPage.movies => browse(SearchSection.movies, ItemKind.movie),
       ShellPage.series => browse(SearchSection.series, ItemKind.series),

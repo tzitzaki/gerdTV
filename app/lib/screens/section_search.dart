@@ -1,9 +1,11 @@
 // Search inside a section (docs/SPEC.md, Search): Live TV, Movies, Series and the Guide each have one field on top.
 // While it is empty the section looks as always ([SectionSearch.child]); typing replaces that with the results:
 // - Live TV, Movies, Series: matching groups on top (one tap opens them), then the items in the section's list mode
-//   with the matched text in bold and each item's group. Live TV adds 5 programmes and "Show all".
-// - Inside a group ([SectionSearch.group]): only that group, with an "All groups" chip that widens to the section.
-// - Guide: programmes, running and upcoming first, then "Earlier".
+//   with the matched text in bold and each item's group.
+// - TV (lists and guide): channels, then programmes by currency: "Live now", "Upcoming" (5 each and "Show all" in the
+//   lists, all of them in the guide), and "Show earlier" loads the ended ones on demand.
+// - With a group ([SectionSearch.group]): chips "All groups" and the group switch between the section and that group
+//   (programmes follow). Inside a group the search starts in it; the guide passes its shown group and starts wide.
 // - A line "Also in Movies 3 · Series 2" jumps to another section with the same query ([SectionSearch.onJump]).
 // The core does the matching and ranking (gerdtv-core db.rs `search`); answers to older keystrokes are dropped
 // (SearchModel). Enter opens the top result. An empty, focused field lists the section's recent searches (those
@@ -34,7 +36,9 @@ List<ItemKind> sectionKinds(SearchSection s) => switch (s) {
   SearchSection.live => const [ItemKind.live],
   SearchSection.movies => const [ItemKind.movie],
   SearchSection.series => const [ItemKind.series, ItemKind.episode],
-  SearchSection.guide => const [],
+  SearchSection.guide => const [
+    ItemKind.live,
+  ], // the guide lists channels first too
 };
 
 SearchSection sectionOf(ItemKind k) => switch (k) {
@@ -59,6 +63,7 @@ class SectionSearch extends StatefulWidget {
     required this.child,
     this.focus,
     this.group,
+    this.startInGroup = true,
     this.onJump,
     this.action,
   });
@@ -69,8 +74,11 @@ class SectionSearch extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode? focus;
 
-  /// Inside a group: search only it (until the "All groups" chip widens to the section).
+  /// The group the chips can limit the search to (inside a group, or the guide's shown group).
   final CategoryInfo? group;
+
+  /// Whether the search starts limited to [group] (inside a group) or covers the section (the guide).
+  final bool startInGroup;
 
   /// The "Also in" line: switch to another section with this query. Null: no line (inside a group).
   final void Function(SearchSection section, String query)? onJump;
@@ -98,12 +106,15 @@ class _SectionSearchState extends State<SectionSearch> {
       limit: SearchModel.pageSize,
       offset: offset,
     ),
-    category: widget.group?.id,
+    category: widget.startInGroup ? widget.group?.id : null,
   );
   late final FocusNode _focus = widget.focus ?? FocusNode();
   String _asked = '';
-  List<ProgrammeHit> _programmes = const [];
-  List<ProgrammeHit> _earlier = const [];
+  List<ProgrammeHit> _live = const [];
+  List<ProgrammeHit> _upcoming = const [];
+
+  /// Null until "Show earlier" was tapped for this query.
+  List<ProgrammeHit>? _earlier;
   List<String> _recent = const [];
 
   /// Android with a speech recognizer installed: the mic shows in the empty field.
@@ -114,7 +125,6 @@ class _SectionSearchState extends State<SectionSearch> {
   /// search), each hit shows its group. Loaded once; a group missing here (an episode's series) shows none.
   final Map<(ItemKind, String), String> _groupNames = {};
 
-  bool get _items => widget.section != SearchSection.guide;
   bool get _withProgrammes =>
       widget.section == SearchSection.live ||
       widget.section == SearchSection.guide;
@@ -161,6 +171,21 @@ class _SectionSearchState extends State<SectionSearch> {
     super.dispose();
   }
 
+  /// The guide showed another group: a search limited to the old one moves along.
+  @override
+  void didUpdateWidget(SectionSearch old) {
+    super.didUpdateWidget(old);
+    if (widget.group?.id != old.group?.id && _model.category != null) {
+      _setCategory(widget.group?.id);
+    }
+  }
+
+  /// The chips: the section or the group; the programmes follow.
+  void _setCategory(String? category) {
+    _model.setCategory(category);
+    _findProgrammes(widget.controller.text);
+  }
+
   /// Every change of the text (typing, type-to-search, a recent search, the "Also in" jump) runs the search once.
   void _onText() {
     if (widget.controller.text == _asked) return;
@@ -170,7 +195,7 @@ class _SectionSearchState extends State<SectionSearch> {
 
   void _search() {
     final q = _asked = widget.controller.text;
-    if (_items) _model.set(q);
+    _model.set(q);
     if (_withProgrammes) _findProgrammes(q);
   }
 
@@ -186,7 +211,7 @@ class _SectionSearchState extends State<SectionSearch> {
 
   /// What is on for the live hits (the list mode's now/next lines).
   Future<void> _onResults() async {
-    if (widget.section != SearchSection.live || _model.hits.isEmpty) return;
+    if (!_withProgrammes || _model.hits.isEmpty) return;
     final keys = [for (final h in _model.hits) h.key];
     final rows = await widget.session.library!.nowNext(keys: keys);
     if (!mounted) return;
@@ -197,29 +222,40 @@ class _SectionSearchState extends State<SectionSearch> {
     });
   }
 
-  /// Answers to an older query are dropped (the field moved on), like the item search's sequence numbers.
+  /// Answers to an older query are dropped (the field moved on), like the item search's sequence numbers. Live and
+  /// upcoming are asked at once; the ended ones only from "Show earlier".
   Future<void> _findProgrammes(String q) async {
     final lib = widget.session.library;
+    _earlier = null;
     if (lib == null || q.trim().isEmpty) {
-      _programmes = const [];
-      _earlier = const [];
+      _live = const [];
+      _upcoming = const [];
       return; // the build that follows the text change shows the section again
     }
-    final hits = await lib.searchProgrammes(
-      query: q,
-      limit: _programmeLimit,
-      earlier: false,
-    );
-    final earlier = await lib.searchProgrammes(
-      query: q,
-      limit: _programmeLimit,
-      earlier: true,
-    );
-    if (mounted && q == widget.controller.text) {
+    final category = _model.category;
+    final live = await _programmesOf(q, ProgrammeWhen.live);
+    final upcoming = await _programmesOf(q, ProgrammeWhen.upcoming);
+    if (mounted && q == widget.controller.text && category == _model.category) {
       setState(() {
-        _programmes = hits;
-        _earlier = earlier;
+        _live = live;
+        _upcoming = upcoming;
       });
+    }
+  }
+
+  Future<List<ProgrammeHit>> _programmesOf(String q, ProgrammeWhen when) =>
+      widget.session.library!.searchProgrammes(
+        query: q,
+        limit: _programmeLimit,
+        when: when,
+        category: _model.category,
+      );
+
+  Future<void> _showEarlier() async {
+    final q = widget.controller.text;
+    final earlier = await _programmesOf(q, ProgrammeWhen.earlier);
+    if (mounted && q == widget.controller.text) {
+      setState(() => _earlier = earlier);
     }
   }
 
@@ -259,13 +295,14 @@ class _SectionSearchState extends State<SectionSearch> {
 
   /// Enter: the first item, else the first group, else the first programme's channel.
   void _openTop() {
-    if (_items && _model.hits.isNotEmpty) {
+    final programmes = [..._live, ..._upcoming];
+    if (_model.hits.isNotEmpty) {
       _openItem(_model.hits.first);
-    } else if (_items && _model.groups.isNotEmpty) {
+    } else if (_model.groups.isNotEmpty) {
       _openGroup(_model.groups.first);
-    } else if (_programmes.isNotEmpty) {
+    } else if (programmes.isNotEmpty) {
       _remember();
-      openItem(context, widget.session, _programmes.first.item);
+      openItem(context, widget.session, programmes.first.item);
     }
   }
 
@@ -295,7 +332,8 @@ class _SectionSearchState extends State<SectionSearch> {
     );
   }
 
-  String _hint(AppLocalizations l10n) => widget.group != null
+  String _hint(AppLocalizations l10n) =>
+      widget.group != null && _model.category != null
       ? l10n.searchHintGroup(widget.group!.name)
       : switch (widget.section) {
           SearchSection.live => l10n.searchHintLive,
@@ -374,18 +412,7 @@ class _SectionSearchState extends State<SectionSearch> {
               ? (_recent.isEmpty ? widget.child : _recentList(l10n))
               : ListenableBuilder(
                   listenable: _model,
-                  builder: (context, _) => _items
-                      ? _itemResults(l10n)
-                      : CustomScrollView(
-                          slivers: programmeSlivers(
-                            context,
-                            l10n,
-                            _programmes,
-                            _earlier,
-                            onTap: _openProgramme,
-                            empty: l10n.searchNoResults(q),
-                          ),
-                        ),
+                  builder: (context, _) => _itemResults(l10n),
                 ),
         ),
       ],
@@ -419,8 +446,9 @@ class _SectionSearchState extends State<SectionSearch> {
     final nothing =
         _model.hits.isEmpty &&
         _model.groups.isEmpty &&
-        _programmes.isEmpty &&
-        _earlier.isEmpty;
+        _live.isEmpty &&
+        _upcoming.isEmpty &&
+        (_earlier?.isEmpty ?? true);
     final others = widget.onJump == null
         ? const <(SearchSection, int)>[]
         : [
@@ -429,7 +457,10 @@ class _SectionSearchState extends State<SectionSearch> {
               SearchSection.movies,
               SearchSection.series,
             ])
-              if (s != widget.section && _countOf(s) > 0) (s, _countOf(s)),
+              // The guide's channels are TV's: no jump to TV from it.
+              if (s != sectionOf(sectionKinds(widget.section).first) &&
+                  _countOf(s) > 0)
+                (s, _countOf(s)),
           ];
     final all = _countOf(widget.section);
     return ItemsView(
@@ -451,13 +482,19 @@ class _SectionSearchState extends State<SectionSearch> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: Tokens.space),
               child: Wrap(
+                spacing: Tokens.space,
                 children: [
-                  FilterChip(
+                  ChoiceChip(
                     key: const Key('search.allGroups'),
                     label: Text(l10n.searchAllGroups(all)),
                     selected: _model.category == null,
-                    onSelected: (on) =>
-                        _model.setCategory(on ? null : widget.group!.id),
+                    onSelected: (_) => _setCategory(null),
+                  ),
+                  ChoiceChip(
+                    key: const Key('search.thisGroup'),
+                    label: Text(widget.group!.name),
+                    selected: _model.category != null,
+                    onSelected: (_) => _setCategory(widget.group!.id),
                   ),
                 ],
               ),
@@ -488,31 +525,29 @@ class _SectionSearchState extends State<SectionSearch> {
           ),
       ],
       trailing: [
-        if (widget.section == SearchSection.live &&
-            (_programmes.isNotEmpty || _earlier.isNotEmpty))
+        if (_withProgrammes)
           ...programmeSlivers(
             context,
             l10n,
-            _programmes.take(_programmesInline).toList(),
-            const [],
+            _live,
+            _upcoming,
+            _earlier,
             onTap: _openProgramme,
-            header: l10n.searchProgrammes,
-            showAll:
-                _programmes.length > _programmesInline || _earlier.isNotEmpty
-                ? (
-                    l10n.searchShowAll(_programmes.length + _earlier.length),
-                    () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => ProgrammeResultsScreen(
-                          query: q,
-                          programmes: _programmes,
-                          earlier: _earlier,
-                          onTap: _openProgramme,
-                        ),
-                      ),
-                    ),
-                  )
+            inline: widget.section == SearchSection.live
+                ? _programmesInline
                 : null,
+            showAll: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProgrammeResultsScreen(
+                  query: q,
+                  live: _live,
+                  upcoming: _upcoming,
+                  loadEarlier: () => _programmesOf(q, ProgrammeWhen.earlier),
+                  onTap: _openProgramme,
+                ),
+              ),
+            ),
+            onEarlier: _showEarlier,
           ),
         if (others.isNotEmpty)
           SliverToBoxAdapter(
@@ -538,17 +573,19 @@ class _SectionSearchState extends State<SectionSearch> {
   }
 }
 
-/// Programme hits as slivers: an optional [header] (with a [showAll] button), the programmes (title, channel, when),
-/// then under "Earlier" the ended ones. [empty] is shown when there are none.
+/// Programme hits as slivers: "Live now" and "Upcoming" (each its first [inline] rows, all with null), a "Show all"
+/// button when that cut something ([showAll]), then the ended ones under "Earlier" once loaded ([earlier] not null),
+/// or a "Show earlier" button that loads them ([onEarlier]).
 List<Widget> programmeSlivers(
   BuildContext context,
   AppLocalizations l10n,
-  List<ProgrammeHit> programmes,
-  List<ProgrammeHit> earlier, {
+  List<ProgrammeHit> live,
+  List<ProgrammeHit> upcoming,
+  List<ProgrammeHit>? earlier, {
   required void Function(ProgrammeHit) onTap,
-  String? header,
-  (String, VoidCallback)? showAll,
-  String? empty,
+  int? inline,
+  VoidCallback? showAll,
+  VoidCallback? onEarlier,
 }) {
   final locale = Localizations.localeOf(context).toLanguageTag();
   final text = Theme.of(context).textTheme;
@@ -559,66 +596,91 @@ List<Widget> programmeSlivers(
     subtitle: '${h.item.name} · ${programmeWhen(l10n, locale, h.programme)}',
     onTap: () => onTap(h),
   );
-  return [
-    if (header != null)
+  List<Widget> group(String key, String header, List<ProgrammeHit> hits) => [
+    if (hits.isNotEmpty) ...[
       SliverToBoxAdapter(
         child: ListTile(
+          key: Key('search.$key'),
           title: Text(header, style: text.titleSmall),
-          trailing: showAll == null
-              ? null
-              : TextButton(
-                  key: const Key('search.programmes.all'),
-                  onPressed: showAll.$2,
-                  child: Text(showAll.$1),
-                ),
         ),
       ),
-    if (programmes.isEmpty && earlier.isEmpty && empty != null)
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(Tokens.space * 3),
-          child: Center(child: Text(empty)),
-        ),
+      SliverList.list(
+        children: [for (final h in hits.take(inline ?? hits.length)) row(h)],
       ),
-    SliverList.list(children: [for (final h in programmes) row(h)]),
-    if (earlier.isNotEmpty) ...[
-      SliverToBoxAdapter(
-        child: ListTile(
-          key: const Key('search.earlier'),
-          title: Text(l10n.searchEarlier, style: text.titleSmall),
-        ),
-      ),
-      SliverList.list(children: [for (final h in earlier) row(h)]),
     ],
+  ];
+  final cut =
+      inline != null && (live.length > inline || upcoming.length > inline);
+  Widget button(String key, String label, VoidCallback onPressed) =>
+      SliverToBoxAdapter(
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Tokens.space),
+            child: TextButton(
+              key: Key(key),
+              onPressed: onPressed,
+              child: Text(label),
+            ),
+          ),
+        ),
+      );
+  return [
+    ...group('programmes.live', l10n.searchLiveNow, live),
+    ...group('programmes.upcoming', l10n.searchUpcoming, upcoming),
+    if (cut && showAll != null)
+      button(
+        'search.programmes.all',
+        l10n.searchShowAll(live.length + upcoming.length),
+        showAll,
+      ),
+    if (earlier != null)
+      ...group('earlier', l10n.searchEarlier, earlier)
+    else if (onEarlier != null)
+      button('search.showEarlier', l10n.searchShowEarlier, onEarlier),
   ];
 }
 
-/// Live TV's "Show all": every programme hit, running and upcoming, then Earlier.
-class ProgrammeResultsScreen extends StatelessWidget {
+/// Live TV's "Show all": every live and upcoming programme hit, and the ended ones on demand.
+class ProgrammeResultsScreen extends StatefulWidget {
   const ProgrammeResultsScreen({
     super.key,
     required this.query,
-    required this.programmes,
-    required this.earlier,
+    required this.live,
+    required this.upcoming,
+    required this.loadEarlier,
     required this.onTap,
   });
   final String query;
-  final List<ProgrammeHit> programmes;
-  final List<ProgrammeHit> earlier;
+  final List<ProgrammeHit> live;
+  final List<ProgrammeHit> upcoming;
+  final Future<List<ProgrammeHit>> Function() loadEarlier;
   final void Function(ProgrammeHit) onTap;
+
+  @override
+  State<ProgrammeResultsScreen> createState() => _ProgrammeResultsScreenState();
+}
+
+class _ProgrammeResultsScreenState extends State<ProgrammeResultsScreen> {
+  List<ProgrammeHit>? _earlier;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text('${l10n.searchProgrammes} · $query')),
+      appBar: AppBar(title: Text('${l10n.searchProgrammes} · ${widget.query}')),
       body: CustomScrollView(
         slivers: programmeSlivers(
           context,
           l10n,
-          programmes,
-          earlier,
-          onTap: onTap,
+          widget.live,
+          widget.upcoming,
+          _earlier,
+          onTap: widget.onTap,
+          onEarlier: () async {
+            final earlier = await widget.loadEarlier();
+            if (mounted) setState(() => _earlier = earlier);
+          },
         ),
       ),
     );

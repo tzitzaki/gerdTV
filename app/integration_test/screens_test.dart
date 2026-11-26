@@ -304,7 +304,7 @@ void main() {
       await checkScreen(tester, form, 'guide-sheet', size);
       await tester.tapAt(const Offset(10, 10)); // the sheet's barrier closes it
       await settle(tester);
-      // The guide's search: programmes instead of the grid.
+      // The guide's search: channels and programmes instead of the grid.
       await tester.enterText(find.byKey(const Key('search.guide')), 'sport');
       await waitFor(
         tester,

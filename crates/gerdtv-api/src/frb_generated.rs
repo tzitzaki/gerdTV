@@ -2011,7 +2011,8 @@ fn wire__crate__api__library__Library_search_programmes_impl(
             >>::sse_decode(&mut deserializer);
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
-            let api_earlier = <bool>::sse_decode(&mut deserializer);
+            let api_when = <crate::api::library::ProgrammeWhen>::sse_decode(&mut deserializer);
+            let api_category = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -2033,7 +2034,8 @@ fn wire__crate__api__library__Library_search_programmes_impl(
                         &*api_that_guard,
                         api_query,
                         api_limit,
-                        api_earlier,
+                        api_when,
+                        api_category,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -5354,6 +5356,19 @@ impl SseDecode for crate::api::library::ProgrammeInfo {
     }
 }
 
+impl SseDecode for crate::api::library::ProgrammeWhen {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::library::ProgrammeWhen::Live,
+            1 => crate::api::library::ProgrammeWhen::Upcoming,
+            2 => crate::api::library::ProgrammeWhen::Earlier,
+            _ => unreachable!("Invalid variant for ProgrammeWhen: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::library::ReminderInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -6385,6 +6400,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::library::ProgrammeInfo>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::library::ProgrammeWhen {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Live => 0.into_dart(),
+            Self::Upcoming => 1.into_dart(),
+            Self::Earlier => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::library::ProgrammeWhen
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::library::ProgrammeWhen>
+    for crate::api::library::ProgrammeWhen
+{
+    fn into_into_dart(self) -> crate::api::library::ProgrammeWhen {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::library::ReminderInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -7315,6 +7352,23 @@ impl SseEncode for crate::api::library::ProgrammeInfo {
         <String>::sse_encode(self.desc, serializer);
         <String>::sse_encode(self.category, serializer);
         <String>::sse_encode(self.episode, serializer);
+    }
+}
+
+impl SseEncode for crate::api::library::ProgrammeWhen {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::library::ProgrammeWhen::Live => 0,
+                crate::api::library::ProgrammeWhen::Upcoming => 1,
+                crate::api::library::ProgrammeWhen::Earlier => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

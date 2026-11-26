@@ -311,6 +311,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo dco_decode_programme_info(dynamic raw);
 
   @protected
+  ProgrammeWhen dco_decode_programme_when(dynamic raw);
+
+  @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
 
   @protected
@@ -654,6 +657,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
+
+  @protected
+  ProgrammeWhen sse_decode_programme_when(SseDeserializer deserializer);
 
   @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
@@ -1071,6 +1077,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_programme_when(ProgrammeWhen self, SseSerializer serializer);
 
   @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);

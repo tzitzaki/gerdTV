@@ -1004,14 +1004,16 @@ impl Library {
         &self,
         query: &str,
         limit: usize,
-        earlier: bool,
+        when: epg::When,
+        category: Option<&str>,
     ) -> Result<Vec<(epg::Programme, Hit)>> {
         Ok(epg::search(
             &self.conn.lock().unwrap(),
             query,
             now(),
             limit,
-            earlier,
+            when,
+            category,
         )?)
     }
 
@@ -1485,7 +1487,9 @@ mod tests {
             !lib.unmatched_channels(100, 0, "").unwrap().is_empty(),
             "channels without epg id stay unmatched"
         );
-        let hits = lib.search_programmes("sport", 5, false).unwrap();
+        let hits = lib
+            .search_programmes("sport", 5, epg::When::Upcoming, None)
+            .unwrap();
         assert!(!hits.is_empty());
         // The profile's guide offset shifts every imported time.
         let w = lib.guide_window(&live, 0, i64::MAX).unwrap();

@@ -12,7 +12,6 @@ import 'package:gerdtv/platform/mini_window.dart';
 import 'package:gerdtv/screens/app_logo.dart';
 import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/programme_sheet.dart';
-import 'package:gerdtv/screens/section_search.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
@@ -385,7 +384,7 @@ void main() {
         )
         .first;
     await tester.scrollUntilVisible(
-      find.byKey(const Key('search.programmes.all')),
+      find.byKey(const Key('search.showEarlier')),
       400,
       scrollable: results,
       maxScrolls: 60,
@@ -470,50 +469,38 @@ void main() {
     await waitFor(tester, liveField.hitTestable());
 
     debugPrint('JOURNEY: catch-up played a past programme');
-    // "Show all" lists every programme hit: ended ones under "Earlier", after the running and upcoming ones (missed
-    // shows aren't pushed out by what's still to come). The field still holds "sport", whose ended programmes exist
-    // in the mock guide; the group is built only once scrolled to.
+    // Live now and Upcoming come first; "Show earlier" loads the ended ones under "Earlier" (missed shows on demand,
+    // never mixed into what's on). The field still holds "sport", whose ended programmes exist in the mock guide;
+    // the button is built only once scrolled to.
     await waitFor(
       tester,
       find.byType(ItemRow),
     ); // the results load after the player closed
-    final showAll = find.byKey(const Key('search.programmes.all'));
-    await tester.scrollUntilVisible(
-      showAll,
-      400,
-      scrollable: find
-          .ancestor(
-            of: find.byType(ItemRow).first,
-            matching: find.byType(Scrollable),
-          )
-          .first,
-      maxScrolls: 60,
-    );
-    await tapReady(tester, showAll);
-    await waitFor(tester, find.byType(ProgrammeResultsScreen));
-    final programmeList = find
-        .descendant(
-          of: find.byType(ProgrammeResultsScreen),
+    final resultList = find
+        .ancestor(
+          of: find.byType(ItemRow).first,
           matching: find.byType(Scrollable),
         )
         .first;
+    expect(find.byKey(const Key('search.earlier')), findsNothing);
+    final showEarlier = find.byKey(const Key('search.showEarlier'));
     await tester.scrollUntilVisible(
-      find.byKey(const Key('search.earlier')),
+      showEarlier,
       400,
-      scrollable: programmeList,
+      scrollable: resultList,
       maxScrolls: 60,
     );
+    await tapReady(tester, showEarlier);
+    await waitFor(tester, find.byKey(const Key('search.earlier')));
     expect(
       find.descendant(
-        of: programmeList,
+        of: resultList,
         matching: find.textContaining(
           RegExp(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) |\d\d:\d\d–'),
         ),
       ),
       findsWidgets,
     );
-    await tester.pageBack();
-    await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search lists ended programmes under Earlier');
     // "Also in": Movies with the same query; a typo still finds movies; each section keeps its own query.
@@ -603,12 +590,34 @@ void main() {
     );
     await tester.pageBack();
     await tester.pumpAndSettle();
-    // The guide's field lists programmes instead of the grid.
+    // The guide's field lists channels, then programmes, instead of the grid; it starts across all groups, and the
+    // group chip limits it to the guide's shown group.
     await tapReady(tester, find.byKey(const Key('tv.guide')));
     final guideField = find.byKey(const Key('search.guide'));
     await waitFor(tester, guideField.hitTestable());
+    final guideGroup = tester
+        .widget<DropdownButton<CategoryInfo>>(
+          find.byKey(const Key('guide.group')),
+        )
+        .value!
+        .id;
     await tester.enterText(guideField, 'sport');
+    await waitFor(tester, find.byType(ItemRow));
     await waitFor(tester, programmeHit);
+    await tester.tap(find.byKey(const Key('search.thisGroup')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widgetList<ItemRow>(find.byType(ItemRow))
+          .every((r) => r.item.category == guideGroup),
+      isTrue,
+      reason: 'the chip keeps the guide group only',
+    );
+    await tester.tap(find.byKey(const Key('search.allGroups')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('search.clear')));
     await tester.pump();
     expect(lib.setting(key: 'tv_view'), 'guide', reason: 'remembered');

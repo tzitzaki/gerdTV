@@ -205,12 +205,13 @@ abstract class Library implements RustOpaqueInterface {
     required int offset,
   });
 
-  /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
-  /// the ended ones, most recent first.
+  /// Programmes whose title, sub-title, description or channel name match, title hits first: running or upcoming
+  /// soonest first, or the ended ones most recent first; `category` limits them to one group's channels.
   Future<List<ProgrammeHit>> searchProgrammes({
     required String query,
     required int limit,
-    required bool earlier,
+    required ProgrammeWhen when,
+    String? category,
   });
 
   void setBitrate({required String key, required BigInt bps});
@@ -771,6 +772,9 @@ class ProgrammeInfo {
           category == other.category &&
           episode == other.episode;
 }
+
+/// Which programmes a search lists (core `epg::When`): running, still to come, or ended.
+enum ProgrammeWhen { live, upcoming, earlier }
 
 /// A reminder for a guide programme: the channel, start and stop (UTC seconds) and the title.
 class ReminderInfo {

@@ -871,30 +871,54 @@ pub fn programme(conn: &Connection, id: i64) -> Result<Option<Programme>> {
     .optional()
 }
 
-/// Programme search for the global search: (programme, the live item that shows it, ready to play). Running and
-/// upcoming programmes soonest first, or with `earlier` the ones that have ended, most recent first: two groups
-/// with their own limit, so a missed show isn't pushed out by everything still to come (owner decision).
+/// Which programmes a search lists: the running ones, the ones still to come, or the ended ones. Each is its own
+/// group with its own limit, so a missed show isn't pushed out by everything still to come (owner decision).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum When {
+    Live,
+    Upcoming,
+    Earlier,
+}
+
+/// Programme search for the global search: (programme, the live item that shows it, ready to play). A programme
+/// matches by its title, sub-title or description, or by the name of its channel ("tnt 4" lists what runs on
+/// TNT Sports 4). Order: title hits, then channel hits, then description-only hits; within each soonest first (Earlier:
+/// most recent first). `category` keeps only channels of that group (the search of one group).
+/// Debugging: a channel's programmes missing here usually means it has no guide match (item_epg).
 pub fn search(
     conn: &Connection,
     input: &str,
     now: i64,
     limit: usize,
-    earlier: bool,
+    when: When,
+    category: Option<&str>,
 ) -> Result<Vec<(Programme, crate::db::Hit)>> {
     let Some(q) = crate::db::fts_query(input) else {
         return Ok(vec![]);
     };
+    // The same words limited to title and sub-title, for the first tier.
+    let titled = format!("{{title sub_title}} : ({q})");
+    let (window, order) = match when {
+        When::Live => ("p.start <= ?2 AND p.stop > ?2", "ASC"),
+        When::Upcoming => ("p.start > ?2", "ASC"),
+        When::Earlier => ("p.stop <= ?2", "DESC"),
+    };
+    // Guide channels whose item name matches (items_fts shares its rowid with items).
+    let channels = "SELECT e.channel FROM item_epg e JOIN items c ON c.key = e.item_key
+                    WHERE c.rowid IN (SELECT rowid FROM items_fts WHERE items_fts MATCH ?1)";
     let mut st = conn.prepare_cached(&format!(
-        "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days
+        "SELECT {COLS}, i.key, i.kind, i.name, i.category, i.logo, i.number, i.archive_days,
+                CASE WHEN p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?4) THEN 0
+                     WHEN p.channel IN ({channels}) THEN 1 ELSE 2 END AS tier
          FROM programmes p
-         JOIN items i ON i.key = (SELECT item_key FROM item_epg e WHERE e.channel = p.channel LIMIT 1)
-         WHERE p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) AND (p.stop < ?2) = {} {}
-         ORDER BY p.start {} LIMIT ?3",
-        earlier as i32,
+         JOIN items i ON i.key = (SELECT e.item_key FROM item_epg e JOIN items g ON g.key = e.item_key
+                                  WHERE e.channel = p.channel AND (?5 IS NULL OR g.category = ?5) LIMIT 1)
+         WHERE (p.id IN (SELECT rowid FROM programmes_fts WHERE programmes_fts MATCH ?1) OR p.channel IN ({channels}))
+           AND {window} {}
+         ORDER BY tier, p.start {order} LIMIT ?3",
         crate::db::visible_and(conn, "i")?,
-        if earlier { "DESC" } else { "ASC" }
     ))?;
-    st.query_map(params![q, now, limit as i64], |r| {
+    st.query_map(params![q, now, limit as i64, titled, category], |r| {
         Ok((
             row(r)?,
             crate::db::Hit {
@@ -1205,17 +1229,54 @@ mod tests {
             programme(&c, w[0][0].id).unwrap().unwrap().title,
             "Sport <live>"
         );
-        // Programme search, umlaut-insensitive, with the item that shows it.
-        let hits = search(&c, "munchen", now, 10, false).unwrap();
+        // Programme search, umlaut-insensitive, with the item that shows it; running now = Live, not Upcoming.
+        let titles = |q: &str, at: i64, when: When, group: Option<&str>| -> Vec<String> {
+            search(&c, q, at, 10, when, group)
+                .unwrap()
+                .into_iter()
+                .map(|(p, _)| p.title)
+                .collect()
+        };
+        let hits = search(&c, "munchen", now, 10, When::Live, None).unwrap();
         assert_eq!(
             (hits.len(), hits[0].0.title.as_str()),
             (1, "Tagesschau & Wetter")
         );
         assert!(hits[0].1.key == "live:1" || hits[0].1.key == "live:3");
-        // Three hours later it has ended: it is in the "earlier" group, not among the running and upcoming.
+        assert!(titles("munchen", now, When::Upcoming, None).is_empty());
+        // Three hours later it has ended: only in the Earlier group.
         let later = now + 3 * 3600;
-        assert!(search(&c, "munchen", later, 10, false).unwrap().is_empty());
-        assert_eq!(search(&c, "munchen", later, 10, true).unwrap().len(), 1);
+        assert!(titles("munchen", later, When::Live, None).is_empty());
+        assert_eq!(titles("munchen", later, When::Earlier, None).len(), 1);
+        // The channel's name finds its programmes ("ARD HD" is a matched item of ard.de).
+        assert_eq!(
+            titles("ard hd", now, When::Live, None),
+            ["Tagesschau & Wetter"]
+        );
+        assert_eq!(
+            titles("ard hd", now, When::Upcoming, None),
+            ["Sport <live>"]
+        );
+        // Tiers: a title hit comes before a description-only hit that starts earlier.
+        c.execute(
+            "INSERT INTO programmes (channel, start, stop, title, sub_title, descr, category, episode, icon, source)
+             VALUES ('ard.de', ?1, ?2, 'Wetter', '', 'Mit Sport', '', '', '', 1)",
+            params![now + 600, now + 1200],
+        )
+        .unwrap();
+        c.execute(
+            "INSERT INTO programmes_fts (rowid, title, sub_title, descr)
+             VALUES (last_insert_rowid(), 'Wetter', '', 'Mit Sport')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(
+            titles("sport", now, When::Upcoming, None),
+            ["Sport <live>", "Wetter"]
+        );
+        // One group's search keeps only its channels (the playlist has no groups: every item is in "").
+        assert_eq!(titles("sport", now, When::Upcoming, Some("")).len(), 2);
+        assert!(titles("sport", now, When::Upcoming, Some("Kids")).is_empty());
         // Manual mapping wins and survives a rebuild; unmatched lists the rest.
         assert_eq!(
             unmatched(&c, 10, 0, "").unwrap(),

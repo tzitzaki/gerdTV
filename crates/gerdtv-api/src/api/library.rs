@@ -30,6 +30,13 @@ fn from_core(k: CoreKind) -> ItemKind {
     }
 }
 
+/// Which programmes a search lists (core `epg::When`): running, still to come, or ended.
+pub enum ProgrammeWhen {
+    Live,
+    Upcoming,
+    Earlier,
+}
+
 pub enum SourceKind {
     Xtream,
     M3uUrl,
@@ -809,17 +816,23 @@ impl Library {
         Ok(self.0.programme(id).map_err(err)?.map(Into::into))
     }
 
-    /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
-    /// the ended ones, most recent first.
+    /// Programmes whose title, sub-title, description or channel name match, title hits first: running or upcoming
+    /// soonest first, or the ended ones most recent first; `category` limits them to one group's channels.
     pub fn search_programmes(
         &self,
         query: String,
         limit: u32,
-        earlier: bool,
+        when: ProgrammeWhen,
+        category: Option<String>,
     ) -> Result<Vec<ProgrammeHit>, String> {
+        let when = match when {
+            ProgrammeWhen::Live => gerdtv_core::epg::When::Live,
+            ProgrammeWhen::Upcoming => gerdtv_core::epg::When::Upcoming,
+            ProgrammeWhen::Earlier => gerdtv_core::epg::When::Earlier,
+        };
         Ok(self
             .0
-            .search_programmes(&query, limit as usize, earlier)
+            .search_programmes(&query, limit as usize, when, category.as_deref())
             .map_err(err)?
             .into_iter()
             .map(|(p, hit)| ProgrammeHit {

@@ -285,6 +285,7 @@
   "searchHintLive": "Search channels and programmes",
   "searchHintMovies": "Search movies",
   "searchHintSeries": "Search series and episodes",
+  "searchLiveNow": "Live now",
   "searchNoResults": "Nothing found for “{query}”.",
   "@searchNoResults": {
     "placeholders": {
@@ -303,6 +304,8 @@
       }
     }
   },
+  "searchShowEarlier": "Show earlier",
+  "searchUpcoming": "Upcoming",
   "searchVoice": "Search by voice",
   "secondsShort": "{seconds} s",
   "@secondsShort": {
