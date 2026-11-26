@@ -248,6 +248,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ProgrammeInfo> dco_decode_list_programme_info(dynamic raw);
 
   @protected
+  List<RecordingInfo> dco_decode_list_recording_info(dynamic raw);
+
+  @protected
   List<ReminderInfo> dco_decode_list_reminder_info(dynamic raw);
 
   @protected
@@ -321,6 +324,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo dco_decode_programme_info(dynamic raw);
+
+  @protected
+  RecordingInfo dco_decode_recording_info(dynamic raw);
 
   @protected
   ReminderInfo dco_decode_reminder_info(dynamic raw);
@@ -596,6 +602,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<RecordingInfo> sse_decode_list_recording_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ReminderInfo> sse_decode_list_reminder_info(
     SseDeserializer deserializer,
   );
@@ -685,6 +696,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProgrammeInfo sse_decode_programme_info(SseDeserializer deserializer);
+
+  @protected
+  RecordingInfo sse_decode_recording_info(SseDeserializer deserializer);
 
   @protected
   ReminderInfo sse_decode_reminder_info(SseDeserializer deserializer);
@@ -1020,6 +1034,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_recording_info(
+    List<RecordingInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_reminder_info(
     List<ReminderInfo> self,
     SseSerializer serializer,
@@ -1126,6 +1146,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_programme_info(ProgrammeInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_recording_info(RecordingInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_reminder_info(ReminderInfo self, SseSerializer serializer);

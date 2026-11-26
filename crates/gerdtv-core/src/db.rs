@@ -181,7 +181,8 @@ const MIGRATIONS: &[&str] = &[
     // over an older mark from an import or from Simkl.
     // The user's own groups, names and group order (groups.rs, user data); removed ones stay as deleted = 1. And
     // TMDB's answers per item (tmdb.rs, a cache: kept 30 days, not exported), and episodes Simkl knows as watched
-    // whose series hasn't been opened yet (watch_import.rs; applied when it is).
+    // whose series hasn't been opened yet (watch_import.rs; applied when it is), and the recordings of this device
+    // (recorder.rs; not exported: their files are here).
     "CREATE TABLE watched (key TEXT PRIMARY KEY, watched INTEGER NOT NULL, updated_at INTEGER NOT NULL);
      CREATE TABLE custom_groups (id TEXT PRIMARY KEY, kind INTEGER NOT NULL, name TEXT NOT NULL,
         position INTEGER NOT NULL, deleted INTEGER NOT NULL, updated_at INTEGER NOT NULL);
@@ -193,7 +194,11 @@ const MIGRATIONS: &[&str] = &[
         updated_at INTEGER NOT NULL);
      CREATE TABLE tmdb (key TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at INTEGER NOT NULL);
      CREATE TABLE waiting_watched (series TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL, PRIMARY KEY (series, season, episode));",
+        updated_at INTEGER NOT NULL, PRIMARY KEY (series, season, episode));
+     CREATE TABLE recordings (id INTEGER PRIMARY KEY, item_key TEXT NOT NULL, title TEXT NOT NULL,
+        start INTEGER NOT NULL, stop INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'scheduled',
+        file TEXT NOT NULL DEFAULT '', message TEXT NOT NULL DEFAULT '', bytes INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL);",
 ];
 const SCHEMA_VERSION: i64 = 1 + MIGRATIONS.len() as i64;
 

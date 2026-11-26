@@ -610,9 +610,19 @@ mod tests {
             ),
             (false, vec![Playing, EndOfFile], vec![], State::Ended),
             // A film that ended stays ended: no stall, no reopening near its end (each one a provider connection).
-            (false, [vec![Playing, EndOfFile], ticks(60)].concat(), vec![], State::Ended),
+            (
+                false,
+                [vec![Playing, EndOfFile], ticks(60)].concat(),
+                vec![],
+                State::Ended,
+            ),
             // Sought back from the end, it plays again and is watched over as before.
-            (false, vec![Playing, EndOfFile, Position(1000)], vec![], State::Playing),
+            (
+                false,
+                vec![Playing, EndOfFile, Position(1000)],
+                vec![],
+                State::Playing,
+            ),
             (
                 true,
                 vec![Error("x".into())],

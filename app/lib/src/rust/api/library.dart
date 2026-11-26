@@ -68,6 +68,9 @@ abstract class Library implements RustOpaqueInterface {
     required String sort,
   });
 
+  /// Notes recordings that ended by themselves; how many still run.
+  int checkRecordings();
+
   /// The continue-watching row of a section: started, unfinished items, last watched first.
   Future<List<ResumeItem>> continueWatching({
     required List<ItemKind> kinds,
@@ -78,6 +81,9 @@ abstract class Library implements RustOpaqueInterface {
   Future<String> createGroup({required ItemKind kind, required String name});
 
   Future<void> deleteGroup({required String category});
+
+  /// Forgets a recording (the app deletes its file).
+  Future<void> deleteRecording({required PlatformInt64 id});
 
   /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
   /// for what the panel leaves empty.
@@ -186,6 +192,9 @@ abstract class Library implements RustOpaqueInterface {
   /// Remembers a search whose result the user opened; `section` is "live", "movies", "series" or "guide".
   void recordSearch({required String section, required String query});
 
+  /// Every recording, newest first, a running one with its size so far.
+  List<RecordingInfo> recordings();
+
   /// Downloads and imports every source, keeping `days_ahead` days (7 desktop, 3 phone and TV) and 2 back.
   Future<List<GuideSourceInfo>> refreshGuide({
     required int daysAhead,
@@ -215,6 +224,14 @@ abstract class Library implements RustOpaqueInterface {
     required String key,
     required int position,
     required int duration,
+  });
+
+  /// Plans a recording of a channel (UTC seconds, lead and lag included); its id.
+  PlatformInt64 scheduleRecording({
+    required String itemKey,
+    required String title,
+    required PlatformInt64 start,
+    required PlatformInt64 stop,
   });
 
   /// Search as the user types: a section (`kinds`; empty = all kinds), or one group of it (`category`).
@@ -306,6 +323,23 @@ abstract class Library implements RustOpaqueInterface {
     required int windowSecs,
     required BigInt maxBytes,
   });
+
+  /// Starts a recording into an open file descriptor from the system's folder picker (Android); this takes it over.
+  /// `place`: the document's content URI, to play and delete it later.
+  Future<void> startRecordingFd({
+    required PlatformInt64 id,
+    required int fd,
+    required String place,
+  });
+
+  /// Starts a recording into a new file at `path` (desktop).
+  Future<void> startRecordingPath({
+    required PlatformInt64 id,
+    required String path,
+  });
+
+  /// Stops a running recording, or skips a planned one.
+  Future<void> stopRecording({required PlatformInt64 id});
 
   /// The play URL (holds credentials: pass it straight to the player, never log or show it).
   String streamUrl({required String key, required bool preferHls});
@@ -825,6 +859,62 @@ class ProgrammeInfo {
           desc == other.desc &&
           category == other.category &&
           episode == other.episode;
+}
+
+/// One recording; `state`: scheduled, recording, done, refused, failed or skipped.
+class RecordingInfo {
+  final PlatformInt64 id;
+  final String itemKey;
+  final String title;
+
+  /// UTC seconds, lead and lag included.
+  final PlatformInt64 start;
+  final PlatformInt64 stop;
+  final String state;
+
+  /// A path, or (Android) the document's content URI.
+  final String file;
+  final String message;
+  final BigInt bytes;
+
+  const RecordingInfo({
+    required this.id,
+    required this.itemKey,
+    required this.title,
+    required this.start,
+    required this.stop,
+    required this.state,
+    required this.file,
+    required this.message,
+    required this.bytes,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      itemKey.hashCode ^
+      title.hashCode ^
+      start.hashCode ^
+      stop.hashCode ^
+      state.hashCode ^
+      file.hashCode ^
+      message.hashCode ^
+      bytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecordingInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          itemKey == other.itemKey &&
+          title == other.title &&
+          start == other.start &&
+          stop == other.stop &&
+          state == other.state &&
+          file == other.file &&
+          message == other.message &&
+          bytes == other.bytes;
 }
 
 /// A reminder for a guide programme: the channel, start and stop (UTC seconds) and the title.

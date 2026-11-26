@@ -13,6 +13,7 @@ pub mod m3u;
 pub mod opensubtitles;
 pub mod playback;
 pub mod premiumize;
+pub mod recorder;
 pub mod tmdb;
 pub mod tracking;
 pub mod update;

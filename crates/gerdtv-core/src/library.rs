@@ -31,6 +31,22 @@ pub enum SourceKind {
     M3uFile,
 }
 
+/// One recording as the list shows it; `state`: scheduled, recording, done, refused, failed or skipped.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecordingRow {
+    pub id: i64,
+    pub item_key: String,
+    pub title: String,
+    pub start: i64,
+    pub stop: i64,
+    pub state: String,
+    /// Where it was written: a path, or (Android) the document's content URI.
+    pub file: String,
+    /// Why it ended early, if it did.
+    pub message: String,
+    pub bytes: u64,
+}
+
 /// A profile's non-secret settings (one provider).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Profile {
@@ -190,6 +206,8 @@ pub const GROUP_HITS: usize = 5;
 pub struct Library {
     profile: Profile,
     pub(crate) conn: Mutex<Connection>,
+    /// Running recordings by id (recorder.rs); each holds a provider connection.
+    recording: Mutex<std::collections::HashMap<i64, crate::recorder::Recording>>,
     secrets: Vec<String>,
     xc: Option<Xtream>,
 }
@@ -217,6 +235,7 @@ impl Library {
         Ok(Library {
             profile,
             conn: Mutex::new(conn),
+            recording: Mutex::default(),
             secrets,
             xc,
         })
@@ -584,6 +603,132 @@ impl Library {
         // Saved only after everything applied: a failure fetches the same slice again next time (Simkl's advice).
         self.set_setting(SETTING_SIMKL_SINCE, &changes.all)?;
         Ok(Some(n))
+    }
+
+    /// Plans a recording of a channel from `start` to `stop` (UTC seconds, lead and lag already added); its id.
+    pub fn schedule_recording(
+        &self,
+        item_key: &str,
+        title: &str,
+        start: i64,
+        stop: i64,
+    ) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO recordings (item_key, title, start, stop, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![item_key, title, start, stop, now()],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Every recording, newest start first; a running one with its bytes so far.
+    pub fn recordings(&self) -> Result<Vec<RecordingRow>> {
+        let running = self.recording.lock().unwrap();
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare(
+            "SELECT id, item_key, title, start, stop, state, file, message, bytes FROM recordings
+             ORDER BY start DESC, id DESC",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok(RecordingRow {
+                id: r.get(0)?,
+                item_key: r.get(1)?,
+                title: r.get(2)?,
+                start: r.get(3)?,
+                stop: r.get(4)?,
+                state: r.get(5)?,
+                file: r.get(6)?,
+                message: r.get(7)?,
+                bytes: r.get::<_, i64>(8)? as u64,
+            })
+        })?;
+        let mut out: Vec<RecordingRow> = rows.collect::<rusqlite::Result<_>>()?;
+        for row in &mut out {
+            if let Some(r) = running.get(&row.id) {
+                row.bytes = r.status().bytes;
+            }
+        }
+        Ok(out)
+    }
+
+    /// Starts recording `id` into `file` (created by the app: a path, or an Android file descriptor) until its stop.
+    /// `place`: what to show and play later (the path, or the document's content URI).
+    pub fn start_recording(&self, id: i64, file: std::fs::File, place: &str) -> Result<()> {
+        let (key, stop): (String, i64) = self.conn.lock().unwrap().query_row(
+            "SELECT item_key, stop FROM recordings WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        let url = self.stream_url(&key, "ts")?;
+        let rec = crate::recorder::Recording::start(url, &self.profile.user_agent, file, stop)?;
+        self.recording.lock().unwrap().insert(id, rec);
+        self.conn.lock().unwrap().execute(
+            "UPDATE recordings SET state = 'recording', file = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, place, now()],
+        )?;
+        Ok(())
+    }
+
+    /// Notes recordings that ended by themselves (stop time, refused, disk full); call now and then. Returns how many
+    /// still run (the app keeps its process alive meanwhile).
+    pub fn check_recordings(&self) -> Result<usize> {
+        let mut running = self.recording.lock().unwrap();
+        let ended: Vec<(i64, crate::recorder::Status)> = running
+            .iter()
+            .map(|(id, r)| (*id, r.status()))
+            .filter(|(_, s)| s.ended != crate::recorder::Ended::Running)
+            .collect();
+        for (id, s) in ended {
+            running.remove(&id);
+            self.note_ended(id, &s)?;
+        }
+        Ok(running.len())
+    }
+
+    fn note_ended(&self, id: i64, s: &crate::recorder::Status) -> Result<()> {
+        use crate::recorder::Ended;
+        let (state, message) = match &s.ended {
+            Ended::Done | Ended::Running => ("done", String::new()),
+            Ended::Refused(code) => ("refused", crate::hls::refusal_message(*code)),
+            Ended::Failed(why) => ("failed", why.clone()),
+        };
+        self.conn.lock().unwrap().execute(
+            "UPDATE recordings SET state = ?2, message = ?3, bytes = ?4, updated_at = ?5 WHERE id = ?1",
+            params![id, state, message, s.bytes as i64, now()],
+        )?;
+        Ok(())
+    }
+
+    /// Stops a running recording now (the file keeps what it has), or marks a planned one skipped.
+    pub async fn stop_recording(&self, id: i64) -> Result<()> {
+        let rec = self.recording.lock().unwrap().remove(&id);
+        match rec {
+            Some(r) => {
+                let s = r.stop().await;
+                self.note_ended(id, &s)?;
+            }
+            None => {
+                self.conn.lock().unwrap().execute(
+                    "UPDATE recordings SET state = 'skipped', updated_at = ?2 WHERE id = ?1 AND state = 'scheduled'",
+                    params![id, now()],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Forgets a recording (its file is the app's to delete: it may be a document of the system's picker).
+    pub async fn delete_recording(&self, id: i64) -> Result<()> {
+        // Taken out first: the map's lock must not be held while the recording winds down.
+        let rec = self.recording.lock().unwrap().remove(&id);
+        if let Some(r) = rec {
+            r.stop().await;
+        }
+        self.conn
+            .lock()
+            .unwrap()
+            .execute("DELETE FROM recordings WHERE id = ?1", [id])?;
+        Ok(())
     }
 
     pub fn set_watched(&self, key: &str, watched: bool) -> Result<()> {
@@ -1768,6 +1913,64 @@ mod tests {
         drop(lib);
         let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
         assert_eq!(lib.categories(Kind::Live, Sort::Provider).unwrap(), cats);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Recordings of a profile: one records through the provider until stopped, a planned one is skipped, and a
+    /// recording that reaches its stop time ends by itself; the list keeps each one's state and size.
+    #[tokio::test]
+    async fn recordings_run_and_end() {
+        let mock = MockXc::start(200, 4).await;
+        let dir = tempdir("rec");
+        let p = save_profile(&dir, profile(SourceKind::Xtream, &mock.base())).unwrap();
+        let lib = Library::open(&dir, &p.id, vec![USER.into(), PASS.into()]).unwrap();
+        lib.sync().await.unwrap();
+        let cats = lib.categories(Kind::Live, Sort::Provider).unwrap();
+        let channel = lib
+            .items(Kind::Live, &cats[0].id, Sort::Provider, 1, 0)
+            .unwrap()
+            .remove(0);
+        let file = |name: &str| {
+            let path = dir.join(name);
+            (std::fs::File::create(&path).unwrap(), path)
+        };
+        let t = now();
+        let manual = lib
+            .schedule_recording(&channel.key, "Now", t, t + 600)
+            .unwrap();
+        let planned = lib
+            .schedule_recording(&channel.key, "Later", t + 3600, t + 7200)
+            .unwrap();
+        let short = lib
+            .schedule_recording(&channel.key, "Short", t, t + 2)
+            .unwrap();
+        let (f, path) = file("now.ts");
+        lib.start_recording(manual, f, &path.to_string_lossy())
+            .unwrap();
+        let (f, short_path) = file("short.ts");
+        lib.start_recording(short, f, &short_path.to_string_lossy())
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        assert_eq!(
+            lib.check_recordings().unwrap(),
+            1,
+            "the short one ended by itself"
+        );
+        lib.stop_recording(manual).await.unwrap();
+        lib.stop_recording(planned).await.unwrap();
+        let rows = lib.recordings().unwrap();
+        let state = |id: i64| rows.iter().find(|r| r.id == id).unwrap();
+        assert_eq!(state(manual).state, "done");
+        assert!(
+            state(manual).bytes > 0
+                && state(manual).bytes == std::fs::metadata(&path).unwrap().len()
+        );
+        assert_eq!(
+            (state(short).state.as_str(), state(planned).state.as_str()),
+            ("done", "skipped")
+        );
+        lib.delete_recording(planned).await.unwrap();
+        assert_eq!(lib.recordings().unwrap().len(), 2);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

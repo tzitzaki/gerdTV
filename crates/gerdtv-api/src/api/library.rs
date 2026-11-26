@@ -131,6 +131,21 @@ pub struct ItemDetails {
     pub trailer: String,
 }
 
+/// One recording; `state`: scheduled, recording, done, refused, failed or skipped.
+pub struct RecordingInfo {
+    pub id: i64,
+    pub item_key: String,
+    pub title: String,
+    /// UTC seconds, lead and lag included.
+    pub start: i64,
+    pub stop: i64,
+    pub state: String,
+    /// A path, or (Android) the document's content URI.
+    pub file: String,
+    pub message: String,
+    pub bytes: u64,
+}
+
 /// What a Simkl import took; `token` is set when it had to be refreshed (store it).
 pub struct SimklImport {
     pub watched: u32,
@@ -442,6 +457,74 @@ impl Library {
         languages: &str,
     ) -> Result<Option<gerdtv_core::opensubtitles::Search>, String> {
         self.0.subtitle_search(key, languages).map_err(err)
+    }
+
+    /// Plans a recording of a channel (UTC seconds, lead and lag included); its id.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn schedule_recording(
+        &self,
+        item_key: String,
+        title: String,
+        start: i64,
+        stop: i64,
+    ) -> Result<i64, String> {
+        self.0
+            .schedule_recording(&item_key, &title, start, stop)
+            .map_err(err)
+    }
+
+    /// Every recording, newest first, a running one with its size so far.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn recordings(&self) -> Result<Vec<RecordingInfo>, String> {
+        Ok(self
+            .0
+            .recordings()
+            .map_err(err)?
+            .into_iter()
+            .map(|r| RecordingInfo {
+                id: r.id,
+                item_key: r.item_key,
+                title: r.title,
+                start: r.start,
+                stop: r.stop,
+                state: r.state,
+                file: r.file,
+                message: r.message,
+                bytes: r.bytes,
+            })
+            .collect())
+    }
+
+    /// Starts a recording into a new file at `path` (desktop).
+    pub fn start_recording_path(&self, id: i64, path: String) -> Result<(), String> {
+        let file = std::fs::File::create(&path).map_err(err)?;
+        self.0.start_recording(id, file, &path).map_err(err)
+    }
+
+    /// Starts a recording into an open file descriptor from the system's folder picker (Android); this takes it over.
+    /// `place`: the document's content URI, to play and delete it later.
+    #[cfg(unix)]
+    pub fn start_recording_fd(&self, id: i64, fd: i32, place: String) -> Result<(), String> {
+        use std::os::fd::FromRawFd;
+        // SAFETY: Android's ParcelFileDescriptor.detachFd hands the descriptor over; nothing else closes it.
+        let file = unsafe { std::fs::File::from_raw_fd(fd) };
+        self.0.start_recording(id, file, &place).map_err(err)
+    }
+
+    /// Notes recordings that ended by themselves; how many still run.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn check_recordings(&self) -> Result<u32, String> {
+        self.0.check_recordings().map(|n| n as u32).map_err(err)
+    }
+
+    /// Stops a running recording, or skips a planned one.
+    pub async fn stop_recording(&self, id: i64) -> Result<(), String> {
+        self.0.stop_recording(id).await.map_err(err)
+    }
+
+    /// Forgets a recording (the app deletes its file).
+    pub async fn delete_recording(&self, id: i64) -> Result<(), String> {
+        self.0.delete_recording(id).await.map_err(err)
     }
 
     /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).

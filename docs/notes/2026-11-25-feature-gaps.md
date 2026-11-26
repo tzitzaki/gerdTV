@@ -39,3 +39,4 @@ Resumed 19:36 (idle 00:23–19:35, my mistake). Step 10: fixing the journey's am
 Step 11 live 19:54: 20 real movies, 18 matched by the panel's id, 0 by name, 2 unmatched (6.2 s).
 Found 20:27: the watchdog stays Playing after a VOD's end, counts a stall after 18 s and reopens near the end (up to 6 times, each a provider connection). Fix next, after step 13's integration run: State::Ended.
 Watchdog fix done 20:49 (harness 9 passed, 1 min 41 s; integration green).
+Step 14 core committed 20:52; next: the app's scheduler (services/recordings.dart), programme sheet, list, folder.
