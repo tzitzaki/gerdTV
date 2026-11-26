@@ -64,6 +64,20 @@ class FakeCore implements RustLibApi {
     return scrobbleRefresh;
   }
 
+  /// Simkl history calls as "watched key", and the token they return (a refresh).
+  final history = <String>[];
+
+  @override
+  Future<String?> crateApiTrackingSimklHistory({
+    required String clientId,
+    required String token,
+    required TrackItem item,
+    required bool watched,
+  }) async {
+    history.add('$watched ${item.name}');
+    return null;
+  }
+
   @override
   String crateApiUpdateReleasePage() =>
       'https://example.invalid/releases/latest';

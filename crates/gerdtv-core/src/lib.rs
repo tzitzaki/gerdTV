@@ -16,6 +16,7 @@ pub mod tmdb;
 pub mod tracking;
 pub mod update;
 pub mod userdata;
+pub mod watch_import;
 pub mod xtream;
 
 /// The core's version, the same as the workspace version (set by each wrap-up release).

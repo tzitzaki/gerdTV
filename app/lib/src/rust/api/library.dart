@@ -288,6 +288,14 @@ abstract class Library implements RustOpaqueInterface {
   /// A profile setting (None = never set). Keys: "buffer_preset", "adaptive_buffer", "timeshift_secs".
   String? setting({required String key});
 
+  /// Simkl's watched marks and paused positions since the last import (at most every 30 min unless `force`).
+  /// `token`: the stored JSON. None: not due or nothing changed.
+  Future<SimklImport?> simklImport({
+    required String clientId,
+    required String token,
+    required bool force,
+  });
+
   /// Apple platforms, live channels: reads the channel's TS into a local HLS for AVPlayer (gerdtv_core::hls) with
   /// `window_secs` of timeshift, at most `max_bytes` on disk under `cache_dir`; returns once the playlist has its
   /// first segments. Fails (with the message to show) when the provider sends HLS already, refuses the stream,
@@ -905,6 +913,35 @@ class SearchPage {
           hits == other.hits &&
           counts == other.counts &&
           groups == other.groups;
+}
+
+/// What a Simkl import took; `token` is set when it had to be refreshed (store it).
+class SimklImport {
+  final int watched;
+  final int positions;
+  final int waiting;
+  final String? token;
+
+  const SimklImport({
+    required this.watched,
+    required this.positions,
+    required this.waiting,
+    this.token,
+  });
+
+  @override
+  int get hashCode =>
+      watched.hashCode ^ positions.hashCode ^ waiting.hashCode ^ token.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SimklImport &&
+          runtimeType == other.runtimeType &&
+          watched == other.watched &&
+          positions == other.positions &&
+          waiting == other.waiting &&
+          token == other.token;
 }
 
 enum SourceKind { xtream, m3UUrl, m3UFile }

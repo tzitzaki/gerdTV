@@ -106,28 +106,6 @@ fn fold(s: &str) -> String {
         .replace('ß', "ss")
 }
 
-/// A query value as TMDB reads it: `+` and percent escapes (UTF-8, as clients send umlauts) decoded.
-fn decode(raw: &str) -> String {
-    let b = raw.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        match b[i] {
-            b'+' => out.push(b' '),
-            b'%' if i + 2 < b.len() => match u8::from_str_radix(&raw[i + 1..i + 3], 16) {
-                Ok(v) => {
-                    out.push(v);
-                    i += 2;
-                }
-                Err(_) => out.push(b'%'),
-            },
-            c => out.push(c),
-        }
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 fn answer(req: &Request) -> (u16, Value) {
     let bearer = req.header("authorization") == Some(&format!("Bearer {KEY}"));
     if req.param("api_key") != Some(KEY) && !bearer {
@@ -136,7 +114,7 @@ fn answer(req: &Request) -> (u16, Value) {
             json!({"status_code": 7, "status_message": "Invalid API key: You must be granted a valid key."}),
         );
     }
-    let query = fold(&decode(req.param("query").unwrap_or("")));
+    let query = fold(&http::decode(req.param("query").unwrap_or("")));
     let year: Option<u32> = req
         .param("year")
         .or(req.param("first_air_date_year"))

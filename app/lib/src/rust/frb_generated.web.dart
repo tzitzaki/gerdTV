@@ -121,6 +121,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReminderInfo dco_decode_box_autoadd_reminder_info(dynamic raw);
 
   @protected
+  SimklImport dco_decode_box_autoadd_simkl_import(dynamic raw);
+
+  @protected
   TrackItem dco_decode_box_autoadd_track_item(dynamic raw);
 
   @protected
@@ -280,6 +283,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ProgrammeInfo? dco_decode_opt_box_autoadd_programme_info(dynamic raw);
 
   @protected
+  SimklImport? dco_decode_opt_box_autoadd_simkl_import(dynamic raw);
+
+  @protected
   TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw);
 
   @protected
@@ -320,6 +326,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SearchPage dco_decode_search_page(dynamic raw);
+
+  @protected
+  SimklImport dco_decode_simkl_import(dynamic raw);
 
   @protected
   SourceKind dco_decode_source_kind(dynamic raw);
@@ -440,6 +449,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReminderInfo sse_decode_box_autoadd_reminder_info(
     SseDeserializer deserializer,
   );
+
+  @protected
+  SimklImport sse_decode_box_autoadd_simkl_import(SseDeserializer deserializer);
 
   @protected
   TrackItem sse_decode_box_autoadd_track_item(SseDeserializer deserializer);
@@ -621,6 +633,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SimklImport? sse_decode_opt_box_autoadd_simkl_import(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   TrackItem? sse_decode_opt_box_autoadd_track_item(
     SseDeserializer deserializer,
   );
@@ -665,6 +682,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SearchPage sse_decode_search_page(SseDeserializer deserializer);
+
+  @protected
+  SimklImport sse_decode_simkl_import(SseDeserializer deserializer);
 
   @protected
   SourceKind sse_decode_source_kind(SseDeserializer deserializer);
@@ -801,6 +821,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_reminder_info(
     ReminderInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_simkl_import(
+    SimklImport self,
     SseSerializer serializer,
   );
 
@@ -1036,6 +1062,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_simkl_import(
+    SimklImport? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_track_item(
     TrackItem? self,
     SseSerializer serializer,
@@ -1082,6 +1114,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_search_page(SearchPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_simkl_import(SimklImport self, SseSerializer serializer);
 
   @protected
   void sse_encode_source_kind(SourceKind self, SseSerializer serializer);

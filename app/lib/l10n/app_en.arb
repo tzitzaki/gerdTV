@@ -444,6 +444,20 @@
   "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
   "setupXtream": "Xtream Codes",
+  "simklImport": "Import from Simkl now",
+  "simklImportHint": "Watched movies and episodes, and where you paused, come from Simkl after each update.",
+  "simklImportNothing": "Nothing new at Simkl.",
+  "simklImported": "{watched} watched, {positions} positions taken over",
+  "@simklImported": {
+    "placeholders": {
+      "watched": {
+        "type": "int"
+      },
+      "positions": {
+        "type": "int"
+      }
+    }
+  },
   "sortAdded": "Recently added",
   "sortNameAsc": "Name A–Z",
   "sortNameDesc": "Name Z–A",

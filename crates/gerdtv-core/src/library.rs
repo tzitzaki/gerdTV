@@ -58,6 +58,8 @@ pub enum LibraryError {
     Io(#[from] std::io::Error),
     #[error("no profile {0}")]
     NoProfile(String),
+    #[error(transparent)]
+    Track(#[from] crate::tracking::TrackError),
     #[error("this profile needs {0} secret(s)")]
     Secrets(usize),
 }
@@ -187,7 +189,7 @@ pub const GROUP_HITS: usize = 5;
 /// One open profile: its database and, for Xtream Codes, its client.
 pub struct Library {
     profile: Profile,
-    conn: Mutex<Connection>,
+    pub(crate) conn: Mutex<Connection>,
     secrets: Vec<String>,
     xc: Option<Xtream>,
 }
@@ -557,6 +559,33 @@ impl Library {
         Ok(db::favourites(&self.conn.lock().unwrap(), kinds, sort)?)
     }
 
+    /// Simkl's watched marks and paused positions since the last import (watch_import.rs), at most every 30 minutes
+    /// (Simkl's polling rule for apps; `force` for the user's button). None: not due, or nothing changed there.
+    pub async fn simkl_import(
+        &self,
+        c: &crate::tracking::Client,
+        t: &crate::tracking::Token,
+        force: bool,
+    ) -> Result<Option<crate::watch_import::Imported>> {
+        let last: i64 = self
+            .setting(SETTING_SIMKL_CHECKED)?
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        if !force && now() - last < 1800 {
+            return Ok(None);
+        }
+        let since = self.setting(SETTING_SIMKL_SINCE)?.unwrap_or_default();
+        let changes = crate::tracking::simkl_changes(c, t, &since).await?;
+        self.set_setting(SETTING_SIMKL_CHECKED, &now().to_string())?;
+        let Some(changes) = changes else {
+            return Ok(None);
+        };
+        let n = crate::watch_import::apply(&mut self.conn.lock().unwrap(), &changes)?;
+        // Saved only after everything applied: a failure fetches the same slice again next time (Simkl's advice).
+        self.set_setting(SETTING_SIMKL_SINCE, &changes.all)?;
+        Ok(Some(n))
+    }
+
     pub fn set_watched(&self, key: &str, watched: bool) -> Result<()> {
         Ok(db::set_watched(&self.conn.lock().unwrap(), key, watched)?)
     }
@@ -637,7 +666,9 @@ impl Library {
                 .and_then(|i| i.parse().ok()),
         ) {
             let items = xc.episodes(id).await?;
-            db::Sync::add_items(&mut self.conn.lock().unwrap(), Kind::Episode, &items)?;
+            let mut conn = self.conn.lock().unwrap();
+            db::Sync::add_items(&mut conn, Kind::Episode, &items)?;
+            crate::watch_import::apply_waiting(&conn, series_key)?;
         }
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
@@ -664,7 +695,9 @@ impl Library {
         let conn = self.conn.lock().unwrap();
         Ok(conn
             .query_row(
-                "SELECT i.kind, i.name, i.year, coalesce(s.name, ''), coalesce(i.season, 0), coalesce(i.episode, 0)
+                "SELECT i.kind, i.name, i.year, coalesce(s.name, ''), coalesce(i.season, 0), coalesce(i.episode, 0),
+                    (SELECT json_extract(t.data, '$.id') FROM tmdb t
+                     WHERE t.key = CASE i.kind WHEN 1 THEN i.key ELSE i.category END)
                  FROM items i LEFT JOIN items s ON s.key = i.category WHERE i.key = ?1 AND i.kind IN (1, 2)",
                 [key],
                 |r| {
@@ -675,6 +708,7 @@ impl Library {
                         show: r.get(3)?,
                         season: r.get(4)?,
                         number: r.get(5)?,
+                        tmdb: r.get::<_, Option<i64>>(6)?.map(|i| i as u64),
                     })
                 },
             )
@@ -837,6 +871,9 @@ pub const SETTING_XC_OFFSET: &str = "xc_time_offset";
 /// last sync read them, so Settings can show them before the next one.
 pub const SETTING_ACCOUNT_EXPIRES: &str = "account_expires";
 pub const SETTING_ACCOUNT_LIMIT: &str = "account_limit";
+/// Simkl: its activity time of the last import (passed back as `date_from`) and when it was last asked.
+pub const SETTING_SIMKL_SINCE: &str = "simkl_since";
+pub const SETTING_SIMKL_CHECKED: &str = "simkl_checked";
 
 /// One guide source as Settings → Guide shows it.
 #[derive(Debug, Clone, PartialEq)]

@@ -131,6 +131,14 @@ pub struct ItemDetails {
     pub trailer: String,
 }
 
+/// What a Simkl import took; `token` is set when it had to be refreshed (store it).
+pub struct SimklImport {
+    pub watched: u32,
+    pub positions: u32,
+    pub waiting: u32,
+    pub token: Option<String>,
+}
+
 pub struct ItemInfo {
     pub key: String,
     pub kind: ItemKind,
@@ -393,6 +401,39 @@ impl Library {
             .collect())
     }
 
+    /// Simkl's watched marks and paused positions since the last import (at most every 30 min unless `force`).
+    /// `token`: the stored JSON. None: not due or nothing changed.
+    pub async fn simkl_import(
+        &self,
+        client_id: String,
+        token: String,
+        force: bool,
+    ) -> Result<Option<SimklImport>, String> {
+        let c = gerdtv_core::tracking::Client {
+            service: gerdtv_core::tracking::Service::Simkl,
+            base: gerdtv_core::tracking::Service::Simkl.base().to_string(),
+            client_id,
+            client_secret: String::new(),
+        };
+        let mut t = gerdtv_core::tracking::Token::from_json(&token)
+            .ok_or("the stored token can't be read: link again")?;
+        let fresh = gerdtv_core::tracking::refresh(&c, &t).await.map_err(err)?;
+        if let Some(n) = &fresh {
+            t = n.clone();
+        }
+        Ok(self
+            .0
+            .simkl_import(&c, &t, force)
+            .await
+            .map_err(err)?
+            .map(|n| SimklImport {
+                watched: n.watched as u32,
+                positions: n.positions as u32,
+                waiting: n.waiting as u32,
+                token: fresh.map(|f| f.to_json()),
+            }))
+    }
+
     /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
     pub fn track_item(&self, key: String) -> Result<Option<super::tracking::TrackItem>, String> {
         Ok(self
@@ -406,6 +447,7 @@ impl Library {
                 show: t.show,
                 season: t.season,
                 number: t.number,
+                tmdb: t.tmdb,
             }))
     }
 

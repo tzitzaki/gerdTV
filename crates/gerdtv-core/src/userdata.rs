@@ -20,6 +20,8 @@ const DERIVED_SETTINGS: &[&str] = &[
     "m3u_tvg_url",
     "account_expires",
     "account_limit",
+    "simkl_since",
+    "simkl_checked",
 ];
 
 #[derive(Debug, Serialize, Deserialize)]

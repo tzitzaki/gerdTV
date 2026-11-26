@@ -139,8 +139,24 @@ class Session extends ChangeNotifier {
   }
 
   void toggleWatched(ItemInfo item) {
-    library?.setWatched(key: item.key, watched: !watched.contains(item.key));
+    final lib = library;
+    if (lib == null) return;
+    final on = !watched.contains(item.key);
+    lib.setWatched(key: item.key, watched: on);
     _reloadWatched();
+    unawaited(tracking.history(lib, item.key, on));
+  }
+
+  /// Simkl's news, then the check marks and continue watching follow.
+  Future<SimklImport?> importSimkl({bool force = false}) async {
+    final lib = library;
+    if (lib == null) return null;
+    final n = await tracking.importSimkl(lib, force: force);
+    if (n != null && identical(lib, library)) {
+      _reloadWatched();
+      favouritesChanged.value++; // continue watching reloads with it
+    }
+    return n;
   }
 
   void _reloadWatched() {
@@ -573,6 +589,7 @@ class Session extends ChangeNotifier {
       notifyListeners();
     }
     await refreshGuide();
+    await importSimkl();
   }
 
   /// Refreshes the guide sources that are missing or too old (12 h; 6 h for a few; or all, always, with [force]: "Refresh now").
