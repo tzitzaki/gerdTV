@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../player/frame_rate.dart';
 import '../screens/app_logo.dart';
 
 class PlatformBridge {
@@ -50,6 +51,9 @@ class PlatformBridge {
         pip.value = call.arguments == true;
       } else if (call.method == 'pipRestore') {
         onPipRestore?.call();
+      } else if (call.method == 'openItem') {
+        final m = call.arguments as Map;
+        onOpenItem?.call(m['profile'] as String, m['key'] as String);
       } else if (call.method == 'mediaCommand') {
         onMediaCommand?.call(call.arguments as String);
       } else if (call.method == 'menuBar') {
@@ -58,7 +62,7 @@ class PlatformBridge {
     });
   }
 
-  /// Android and iOS: the Now Playing card (lib/services/media_card.dart). [artwork] is a local file; seconds.
+  /// Android, iOS and macOS: the Now Playing card (lib/services/media_card.dart). [artwork] is a local file; seconds.
   Future<void> nowPlaying({
     required String title,
     required String subtitle,
@@ -75,15 +79,103 @@ class PlatformBridge {
     'position': position,
     'duration': duration,
     'live': live,
+  }, mac: true);
+
+  /// An entry of the Android TV home screen was picked while gerdTV runs (services/tv_home.dart).
+  static void Function(String profile, String key)? onOpenItem;
+
+  static Future<T?> _android<T>(String method, [Object? args]) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return null;
+    try {
+      return await channel.invokeMethod<T>(method, args);
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Android: keeps the background service while a recording runs ([title]; null: none runs).
+  static Future<void> setRecording(String? title) =>
+      _android<void>('setRecording', {'title': title});
+
+  /// Android: the system's folder picker; the folder's tree URI, "" when cancelled, null without a picker.
+  static Future<String?> pickFolder() => _android<String>('pickFolder');
+
+  /// Android: a new file in a picked folder: its descriptor (handed to the core) and content URI.
+  static Future<({int fd, String uri})> createDocument(
+    String tree,
+    String name,
+  ) async {
+    final m = await channel.invokeMapMethod<String, Object?>('createDocument', {
+      'tree': tree,
+      'name': name,
+    });
+    return (fd: m!['fd']! as int, uri: m['uri']! as String);
+  }
+
+  static Future<bool> deleteDocument(String uri) async =>
+      await _android<bool>('deleteDocument', {'uri': uri}) ?? false;
+
+  /// Android: the app's own folder on each mounted drive (for TVs without a folder picker).
+  static Future<List<String>> appFolders() async =>
+      (await _android<List<Object?>>('appFolders'))?.cast<String>() ?? const [];
+
+  static Future<bool> isTv() async => await _android<bool>('isTv') ?? false;
+
+  /// The home screen entry that started gerdTV, once.
+  static Future<({String profile, String key})?> takeOpenItem() async {
+    final m = await _android<Map<Object?, Object?>>('takeOpenItem');
+    return m == null
+        ? null
+        : (profile: m['profile']! as String, key: m['key']! as String);
+  }
+
+  static Future<void> updateTvHome({
+    required String profile,
+    required List<Map<String, Object?>> resume,
+    required List<Map<String, Object?>> channels,
+  }) => _android<void>('tvHome', {
+    'profile': profile,
+    'resume': resume,
+    'channels': channels,
   });
 
-  /// Stop: the card goes.
-  Future<void> clearNowPlaying() => _mobile('clearNowPlaying', const {});
+  /// Android TV: the display's modes, the current one first; empty elsewhere.
+  static Future<List<DisplayMode>> displayModes() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return const [];
+    try {
+      final modes = await channel.invokeListMethod<Map<Object?, Object?>>(
+        'displayModes',
+      );
+      return [
+        for (final m in modes ?? const <Map<Object?, Object?>>[])
+          (
+            id: m['id']! as int,
+            width: m['width']! as int,
+            height: m['height']! as int,
+            rate: m['rate']! as double,
+          ),
+      ];
+    } on MissingPluginException {
+      return const [];
+    }
+  }
 
-  Future<void> _mobile(String method, Map<String, Object?> args) async {
+  /// Android TV: asks for a display mode; 0 is the system's own choice.
+  Future<void> setDisplayMode(int id) => _mobile('setDisplayMode', {'id': id});
+
+  /// Stop: the card goes.
+  Future<void> clearNowPlaying() =>
+      _mobile('clearNowPlaying', const {}, mac: true);
+
+  Future<void> _mobile(
+    String method,
+    Map<String, Object?> args, {
+    bool mac = false,
+  }) async {
     if (kIsWeb ||
         !(defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS)) {
+            defaultTargetPlatform == TargetPlatform.iOS ||
+            (mac && defaultTargetPlatform == TargetPlatform.macOS))) {
       return;
     }
     try {

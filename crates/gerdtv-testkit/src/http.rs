@@ -216,3 +216,25 @@ pub async fn get(url: &str) -> (u16, String, Vec<u8>) {
         .unwrap_or(0);
     (status, head, all[end..].to_vec())
 }
+
+/// A query value as servers read it: `+` and percent escapes (UTF-8, as clients send umlauts and `:`) decoded.
+pub fn decode(raw: &str) -> String {
+    let b = raw.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'+' => out.push(b' '),
+            b'%' if i + 2 < b.len() => match u8::from_str_radix(&raw[i + 1..i + 3], 16) {
+                Ok(v) => {
+                    out.push(v);
+                    i += 2;
+                }
+                Err(_) => out.push(b'%'),
+            },
+            c => out.push(c),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}

@@ -548,6 +548,26 @@ impl LocalHls {
         max_secs: f64,
         max_bytes: u64,
     ) -> io::Result<LocalHls> {
+        Self::start_on(
+            [127, 0, 0, 1].into(),
+            upstream,
+            user_agent,
+            dir,
+            max_secs,
+            max_bytes,
+        )
+        .await
+    }
+
+    /// The same on `bind`: a Cast device needs this device's network address (cast.rs), while it casts only.
+    pub async fn start_on(
+        bind: std::net::IpAddr,
+        upstream: String,
+        user_agent: &str,
+        dir: PathBuf,
+        max_secs: f64,
+        max_bytes: u64,
+    ) -> io::Result<LocalHls> {
         crate::xtream::ensure_tls_provider();
         let client = reqwest::Client::builder()
             .user_agent(if user_agent.is_empty() {
@@ -562,7 +582,7 @@ impl LocalHls {
             window: Window::new(dir.clone(), max_secs, max_bytes)?,
             status: Status::default(),
         }));
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let listener = TcpListener::bind((bind, 0)).await?;
         let url = format!("http://{}/{token}/index.m3u8", listener.local_addr()?);
         tracing::info!("local HLS on {url}");
         let serve = tokio::spawn(serve(listener, token, shared.clone()));
@@ -761,8 +781,10 @@ async fn answer(mut stream: TcpStream, token: String, shared: Arc<Mutex<Shared>>
     let reply = match found {
         Some((kind, body)) => {
             let mut r = format!(
+                // CORS: Cast's receiver plays HLS in a web player, which may only read it with this header; the path
+                // token, not the origin, is what keeps others out.
                 "HTTP/1.1 200 OK\r\ncontent-type: {kind}\r\ncontent-length: {}\r\ncache-control: no-cache\r\n\
-                 connection: close\r\n\r\n",
+                 access-control-allow-origin: *\r\nconnection: close\r\n\r\n",
                 body.len()
             )
             .into_bytes();
@@ -910,6 +932,9 @@ mod tests {
             "0".repeat(32).as_str(),
         );
         assert_eq!(get(&wrong).await.0, 404, "a guessed token gets nothing");
+        // Cast's receiver reads it from a web player: the CORS header must be there.
+        let r = reqwest::get(hls.url()).await.unwrap();
+        assert_eq!(r.headers()["access-control-allow-origin"], "*");
         assert_eq!(get(&hls.url().replace("index.m3u8", "999.ts")).await.0, 404);
         assert_eq!(server.stats().live_ts, 1, "one provider connection");
         hls.stop();

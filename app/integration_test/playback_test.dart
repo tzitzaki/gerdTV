@@ -5,6 +5,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gerdtv/player/picture.dart';
+import 'package:gerdtv/player/track_prefs.dart';
 import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
@@ -76,10 +78,29 @@ void main() {
           }
         });
 
+        // A profile's own User-Agent lasts until the next start, which puts mpv's default back.
+        final native = player.platform as NativePlayer;
+        final mpvDefault = await native.getProperty('user-agent');
+        await adapter.play(
+          ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
+          live: true,
+          userAgent: 'Player/1.0',
+          extraOptions: [
+            ...trackOptions(audio: 'de', subtitle: subtitlesOff),
+            ...deinterlaceOptions(on: true, defaultHwdec: 'no'),
+          ],
+        );
+        // mpv keeps the choice past media_kit's own open.
+        expect(await native.getProperty('alang'), 'de,deu,ger');
+        expect(await native.getProperty('options/sid'), 'no');
+        // mpv 0.36 (media_kit's on Apple and Android) has no "auto" and keeps the "yes" set before it (picture.dart).
+        expect(await native.getProperty('deinterlace'), anyOf('auto', 'yes'));
+        expect(await native.getProperty('user-agent'), 'Player/1.0');
         await adapter.play(
           ({required hls}) => '$faultServer/live/ch1.${hls ? 'm3u8' : 'ts'}',
           live: true,
         );
+        expect(await native.getProperty('user-agent'), mpvDefault);
         // Balanced: mpv waits for 8 s of cache before starting.
         final wait = await (player.platform as NativePlayer).getProperty(
           'cache-pause-wait',

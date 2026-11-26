@@ -138,6 +138,29 @@ pub struct ItemDetails {
     pub trailer: String,
 }
 
+/// One recording; `state`: scheduled, recording, done, refused, failed or skipped.
+pub struct RecordingInfo {
+    pub id: i64,
+    pub item_key: String,
+    pub title: String,
+    /// UTC seconds, lead and lag included.
+    pub start: i64,
+    pub stop: i64,
+    pub state: String,
+    /// A path, or (Android) the document's content URI.
+    pub file: String,
+    pub message: String,
+    pub bytes: u64,
+}
+
+/// What a Simkl import took; `token` is set when it had to be refreshed (store it).
+pub struct SimklImport {
+    pub watched: u32,
+    pub positions: u32,
+    pub waiting: u32,
+    pub token: Option<String>,
+}
+
 pub struct ItemInfo {
     pub key: String,
     pub kind: ItemKind,
@@ -400,6 +423,118 @@ impl Library {
             .collect())
     }
 
+    /// Simkl's watched marks and paused positions since the last import (at most every 30 min unless `force`).
+    /// `token`: the stored JSON. None: not due or nothing changed.
+    pub async fn simkl_import(
+        &self,
+        client_id: String,
+        token: String,
+        force: bool,
+    ) -> Result<Option<SimklImport>, String> {
+        let c = gerdtv_core::tracking::Client {
+            service: gerdtv_core::tracking::Service::Simkl,
+            base: gerdtv_core::tracking::Service::Simkl.base().to_string(),
+            client_id,
+            client_secret: String::new(),
+        };
+        let mut t = gerdtv_core::tracking::Token::from_json(&token)
+            .ok_or("the stored token can't be read: link again")?;
+        let fresh = gerdtv_core::tracking::refresh(&c, &t).await.map_err(err)?;
+        if let Some(n) = &fresh {
+            t = n.clone();
+        }
+        Ok(self
+            .0
+            .simkl_import(&c, &t, force)
+            .await
+            .map_err(err)?
+            .map(|n| SimklImport {
+                watched: n.watched as u32,
+                positions: n.positions as u32,
+                waiting: n.waiting as u32,
+                token: fresh.map(|f| f.to_json()),
+            }))
+    }
+
+    /// OpenSubtitles' search for an item (not for the app: api::subtitles calls it).
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn search_for_subtitles(
+        &self,
+        key: &str,
+        languages: &str,
+    ) -> Result<Option<gerdtv_core::opensubtitles::Search>, String> {
+        self.0.subtitle_search(key, languages).map_err(err)
+    }
+
+    /// Plans a recording of a channel (UTC seconds, lead and lag included); its id.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn schedule_recording(
+        &self,
+        item_key: String,
+        title: String,
+        start: i64,
+        stop: i64,
+    ) -> Result<i64, String> {
+        self.0
+            .schedule_recording(&item_key, &title, start, stop)
+            .map_err(err)
+    }
+
+    /// Every recording, newest first, a running one with its size so far.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn recordings(&self) -> Result<Vec<RecordingInfo>, String> {
+        Ok(self
+            .0
+            .recordings()
+            .map_err(err)?
+            .into_iter()
+            .map(|r| RecordingInfo {
+                id: r.id,
+                item_key: r.item_key,
+                title: r.title,
+                start: r.start,
+                stop: r.stop,
+                state: r.state,
+                file: r.file,
+                message: r.message,
+                bytes: r.bytes,
+            })
+            .collect())
+    }
+
+    /// Starts a recording into a new file at `path` (desktop). Async: the recording's task needs the bridge's tokio
+    /// runtime (a sync call has none, and spawning there aborted the app).
+    pub async fn start_recording_path(&self, id: i64, path: String) -> Result<(), String> {
+        let file = std::fs::File::create(&path).map_err(err)?;
+        self.0.start_recording(id, file, &path).map_err(err)
+    }
+
+    /// Starts a recording into an open file descriptor from the system's folder picker (Android); this takes it over.
+    /// `place`: the document's content URI, to play and delete it later.
+    #[cfg(unix)]
+    pub async fn start_recording_fd(&self, id: i64, fd: i32, place: String) -> Result<(), String> {
+        use std::os::fd::FromRawFd;
+        // SAFETY: Android's ParcelFileDescriptor.detachFd hands the descriptor over; nothing else closes it.
+        let file = unsafe { std::fs::File::from_raw_fd(fd) };
+        self.0.start_recording(id, file, &place).map_err(err)
+    }
+
+    /// Notes recordings that ended by themselves; how many still run.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn check_recordings(&self) -> Result<u32, String> {
+        self.0.check_recordings().map(|n| n as u32).map_err(err)
+    }
+
+    /// Stops a running recording, or skips a planned one.
+    pub async fn stop_recording(&self, id: i64) -> Result<(), String> {
+        self.0.stop_recording(id).await.map_err(err)
+    }
+
+    /// Forgets a recording (the app deletes its file).
+    pub async fn delete_recording(&self, id: i64) -> Result<(), String> {
+        self.0.delete_recording(id).await.map_err(err)
+    }
+
     /// What Trakt and Simkl get told for a movie or episode (None: nothing to track).
     pub fn track_item(&self, key: String) -> Result<Option<super::tracking::TrackItem>, String> {
         Ok(self
@@ -413,12 +548,21 @@ impl Library {
                 show: t.show,
                 season: t.season,
                 number: t.number,
+                tmdb: t.tmdb,
             }))
     }
 
-    /// A movie's or series' details, from the panel when the page opens.
-    pub async fn details(&self, key: String) -> Result<ItemDetails, String> {
-        let d = self.0.details(&key).await.map_err(err)?;
+    /// A movie's or series' details, from the panel when the page opens; with the user's TMDB key also from TMDB,
+    /// for what the panel leaves empty.
+    pub async fn details(
+        &self,
+        key: String,
+        tmdb_key: Option<String>,
+    ) -> Result<ItemDetails, String> {
+        let tmdb = tmdb_key
+            .filter(|k| !k.trim().is_empty())
+            .map(|k| gerdtv_core::tmdb::Tmdb::new(gerdtv_core::tmdb::BASE, &k));
+        let d = self.0.details(&key, tmdb.as_ref()).await.map_err(err)?;
         Ok(ItemDetails {
             plot: d.plot,
             genre: d.genre,
@@ -505,6 +649,76 @@ impl Library {
         self.0.save_progress(&key, position, duration).map_err(err)
     }
 
+    /// A new group of the user's own; its category id.
+    pub fn create_group(&self, kind: ItemKind, name: String) -> Result<String, String> {
+        self.0.create_group(to_core(kind), &name).map_err(err)
+    }
+
+    pub fn delete_group(&self, category: String) -> Result<(), String> {
+        self.0.delete_group(&category).map_err(err)
+    }
+
+    /// Names a group; empty: the provider's name again, from the next sync.
+    pub fn rename_group(
+        &self,
+        kind: ItemKind,
+        category: String,
+        name: String,
+    ) -> Result<(), String> {
+        self.0
+            .rename_group(to_core(kind), &category, &name)
+            .map_err(err)
+    }
+
+    /// Names an item; empty: the provider's name again.
+    pub fn rename_item(&self, key: String, name: String) -> Result<(), String> {
+        self.0.rename_item(&key, &name).map_err(err)
+    }
+
+    /// The groups' order, top to bottom.
+    pub fn set_group_order(&self, kind: ItemKind, ids: Vec<String>) -> Result<(), String> {
+        self.0.set_group_order(to_core(kind), &ids).map_err(err)
+    }
+
+    /// Adds an item to a group of the user's own, or removes it.
+    pub fn set_group_member(
+        &self,
+        category: String,
+        key: String,
+        member: bool,
+    ) -> Result<(), String> {
+        self.0
+            .set_group_member(&category, &key, member)
+            .map_err(err)
+    }
+
+    /// The order of an own group's items.
+    pub fn set_item_order(&self, category: String, keys: Vec<String>) -> Result<(), String> {
+        self.0.set_item_order(&category, &keys).map_err(err)
+    }
+
+    /// Marks a movie or episode as watched or not.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_watched(&self, key: String, watched: bool) -> Result<(), String> {
+        self.0.set_watched(&key, watched).map_err(err)
+    }
+
+    /// Every watched movie's and episode's key, for the lists' check marks.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn watched_keys(&self) -> Result<Vec<String>, String> {
+        self.0.watched_keys().map_err(err)
+    }
+
+    /// The episode after this one in its series; None after the last.
+    pub async fn next_episode(&self, key: String) -> Result<Option<ItemInfo>, String> {
+        Ok(self
+            .0
+            .next_episode(&key)
+            .await
+            .map_err(err)?
+            .map(Into::into))
+    }
+
     /// Where to resume an item (seconds), if it was left part-way.
     #[flutter_rust_bridge::frb(sync)]
     pub fn resume_position(&self, key: String) -> Result<Option<u32>, String> {
@@ -528,6 +742,17 @@ impl Library {
                 position,
                 duration,
             })
+            .collect())
+    }
+
+    /// The live channels played last, newest first (the Android TV home screen).
+    pub fn recent_channels(&self, limit: u32) -> Result<Vec<ItemInfo>, String> {
+        Ok(self
+            .0
+            .recent_channels(limit as usize)
+            .map_err(err)?
+            .into_iter()
+            .map(Into::into)
             .collect())
     }
 
@@ -731,6 +956,23 @@ impl Library {
         Ok(crate::api::hls::LocalHlsStream(std::sync::Mutex::new(
             stream,
         )))
+    }
+
+    /// Casts a channel, movie or episode to `device` (gerdtv_core::cast): the provider's address first; live TV that
+    /// the device doesn't play then goes through gerdTV's own HLS on this device's network address.
+    pub async fn cast_start(
+        &self,
+        device: crate::api::cast::CastDeviceInfo,
+        key: String,
+        title: String,
+        cache_dir: String,
+    ) -> Result<crate::api::cast::CastHandle, String> {
+        let casting = self
+            .0
+            .cast_start(&device.device()?, &key, &title, &PathBuf::from(cache_dir))
+            .await
+            .map_err(err)?;
+        Ok(crate::api::cast::CastHandle(casting))
     }
 
     // The guide (logic: gerdtv_core::epg). Settings → Guide, now/next in lists, the grid and programme search.
@@ -943,7 +1185,10 @@ impl Library {
             + n.guide_urls
             + n.resume
             + n.hidden_groups
-            + n.search_history)
+            + n.search_history
+            + n.watched
+            + n.own_groups
+            + n.own_names)
     }
 
     pub fn set_reminder(&self, reminder: ReminderInfo, on: bool) -> Result<(), String> {

@@ -26,6 +26,14 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(title), findsOneWidget);
         // The form scrolls (logo on top): bring Connect into the 800×600 test window first.
+        // Connect shows without scrolling in the Mac's default window (800 × 600, the tests' size too). English only:
+        // the wider test font wraps the longer German texts, so there the form scrolls.
+        if (locale.languageCode == 'en') {
+          expect(
+            find.byKey(const Key('setup.connect')).hitTestable(),
+            findsOneWidget,
+          );
+        }
         await tester.ensureVisible(find.byKey(const Key('setup.connect')));
         await tester.tap(find.byKey(const Key('setup.connect')));
         await tester.pumpAndSettle();

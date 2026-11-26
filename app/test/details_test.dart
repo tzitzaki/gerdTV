@@ -33,7 +33,7 @@ class _Library implements Library {
   final ItemDetails? answer;
 
   @override
-  Future<ItemDetails> details({required String key}) async =>
+  Future<ItemDetails> details({required String key, String? tmdbKey}) async =>
       answer ?? (throw 'no panel');
 
   @override

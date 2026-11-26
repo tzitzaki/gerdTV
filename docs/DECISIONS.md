@@ -14,12 +14,12 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Apple platforms: mpv plays everything by default (its own frames feed iOS PiP); AVPlayer over the core's local HLS is a Settings choice for live, applied at the next start.
 - Own libmpv builds for all platforms, bundled next to media_kit's, switchable in Settings (restart).
 - Channel lists: four display modes (compact list, list, tiles, large tiles) per section, with a quick toggle in the list bar.
-- One TV section (lists or guide, switched and remembered); Premiumize is a section after Series while linked; a channel's long hold opens a menu.
+- One TV section (lists or guide, switched and remembered); Premiumize is a section after Series while linked; a long hold on a channel, movie, series or group opens a menu.
 - Guide: grid, now/next in every list, mini-guide in the player, catch-up and reminders; 2 days back, 7 ahead (3 on phone/TV).
 - Reminders as system notifications via flutter_local_notifications 22.3.3 (23.x needs compileSdk 37) and timezone, 5 minutes ahead.
 - The guide's header is never empty: before a programme is focused it shows the first row's running programme.
 - Sort: provider order by default; groups by name, items also by number (live), year, date added and rating (movies, series); remembered per section; continue watching, episodes and search keep their own order.
-- Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, a long press, or a long OK.
+- Favourites: a Favourites group on top of each section's groups, in the section's item order; toggled by a star on every row and tile, the menu behind a long press or a long OK.
 - Swipe on phones: from the left edge back, sideways between sections (not on the guide), and in the player media_kit's seek, volume and brightness swipes (the player's volume; brightness on the left half; switchable).
 - Theme: dark by default, or light or the system's; orange by default among eight accent presets; neutral surfaces by default (tinted on request); pure black on request; app-wide.
 - Settings in five categories: Account (with Your data), Playback (with Stream health), TV guide, Appearance, About (with Updates).
@@ -51,10 +51,12 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
 - Missing guide data: community presets (epgshare01, free-epg, Rytec over plain HTTP as the one exception, Pluto TV, Samsung TV Plus, open-epg; third parties), none added by default; names match within a country (DE/AT/CH share), no automatic fuzzy matching, suggestions need a tap; programmes only for channels the profile has.
-- Secrets (provider credentials, TMDB key, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage` (macOS: the login keychain through Apple's `security` tool, so updates don't ask for the keychain password, accepting that any of the user's programs can ask the tool too; Developer ID is a possible later step), are held only in memory by the core, never in logs.
+- TMDB: opt-in with the user's own key (app-wide), asked per page and cached 30 days; attribution with TMDB's logo as a PNG rendered from its SVG (no SVG package).
+- OpenSubtitles: opt-in with the user's own key and optional login (app-wide); subtitles load into mpv only (not Apple's player).
+- Secrets (provider credentials, TMDB key, OpenSubtitles key and login, linked services' tokens per profile: Premiumize, Trakt, Simkl) live in `flutter_secure_storage` (macOS: the login keychain through Apple's `security` tool, so updates don't ask for the keychain password, accepting that any of the user's programs can ask the tool too; Developer ID is a possible later step), are held only in memory by the core, never in logs.
 - Google Cast crate: oxicast, wrapped behind gerdTV's own interface; no fake Cast receiver in the test kit (no extra TLS/protobuf test dependencies): Cast is checked by hand on the Shield, and only gerdTV's own logic around oxicast is unit-tested.
-- Casting: Google Cast from every platform in the core; AirPlay from Apple platforms via AVKit/AVPlayer.
-- Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via a foreground service, none on iOS.
+- Casting: Google Cast from every platform in the core (oxicast pinned exactly; the provider's address first, gerdTV's local HLS as live's fallback); AirPlay from Apple platforms via AVKit/AVPlayer, not built yet: it needs the local HLS on the network address while AirPlay is active (a [MAC] session with a receiver).
+- Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via the foreground service while gerdTV runs and, closed, an exact-alarm notification that starts it when opened (a start by the alarm alone waits for a device check); none on iOS; 2 min lead, 10 min lag; at the account's limit the recording wins after a notice with Skip.
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
 - One branch and PR per session, features as commits, the wrap-up as its last commit; CI runs only the areas a change touches; the draft PR is opened only once `just ready` is green (branch pushes start no CI), the wrap-up pushed right after.
 - macOS releases ship a DMG for the first install and keep the zip for the in-app updater.

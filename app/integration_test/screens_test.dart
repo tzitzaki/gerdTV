@@ -232,6 +232,23 @@ void main() {
       await tapReady(tester, find.byType(ItemRow));
       await waitFor(tester, find.byKey(const Key('player.banner')));
       await checkScreen(tester, form, 'player', size);
+      // The fullest top bar: a last channel to go back to, and behind live with its Live button.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await waitFor(tester, find.byKey(const Key('player.last')));
+      // Pausing a channel that hasn't started leaves nothing to be behind.
+      final started = DateTime.now().add(const Duration(seconds: 30));
+      while (session.player.state.position < const Duration(seconds: 1) ||
+          session.player.state.buffering) {
+        if (DateTime.now().isAfter(started)) fail('no playback');
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await waitFor(tester, find.byKey(const Key('player.behind')));
+      await checkScreen(tester, form, 'player-behind', size);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await waitFor(tester, find.byKey(const Key('player.panel')));
       await checkScreen(tester, form, 'player-channels', size);

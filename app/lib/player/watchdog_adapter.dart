@@ -84,6 +84,10 @@ class WatchdogAdapter {
     }
   }
 
+  /// One mpv property of the running stream (the next [play] sets its own).
+  Future<void> setProperty(String name, String value) =>
+      (player.platform as NativePlayer).setProperty(name, value);
+
   UrlFor? _urlFor;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _ticker;
@@ -103,6 +107,7 @@ class WatchdogAdapter {
     bool adaptive = false,
     bool preferHls = false,
     List<MpvOption> extraOptions = const [],
+    String userAgent = '',
     Duration? start,
   }) async {
     await stop();
@@ -114,6 +119,12 @@ class WatchdogAdapter {
     for (final o in extraOptions) {
       await native.setProperty(o.name, o.value);
     }
+    // One mpv plays everything and keeps its properties, so the profile's own User-Agent is set or put back to mpv's
+    // default ("libmpv") at every start.
+    await native.setProperty(
+      'user-agent',
+      userAgent.isEmpty ? 'libmpv' : userAgent,
+    );
     _watchdog = Watchdog(
       live: live,
       targetSeconds: target.value,

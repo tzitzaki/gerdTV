@@ -7,10 +7,13 @@
 // stale value usually means its widget read the value once in initState instead of in build.
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../platform/engine.dart';
+import '../player/frame_rate.dart';
+import '../player/picture.dart';
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
 import '../src/rust/api/playback.dart';
@@ -23,12 +26,41 @@ import 'list_modes.dart';
 import 'player_settings.dart';
 import 'player_screen.dart' show bufferReadoutSetting, playerGesturesSetting;
 import 'premiumize_screen.dart';
+import 'recordings_screen.dart';
+import 'subtitles_settings.dart';
+import '../services/recordings.dart' show canRecord;
+import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
 import 'settings_model.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
+
+/// What the provider says about the account, as the last sync stored it (gerdtv-core, SETTING_ACCOUNT_*): when it ends
+/// and how many streams it plays at once. Empty before the first sync and for M3U, which tells neither.
+String accountLine(
+  AppLocalizations l10n, {
+  required String? expires,
+  required String? limit,
+}) {
+  final ends = int.tryParse(expires ?? '');
+  final streams = int.tryParse(limit ?? '');
+  return [
+    if (ends != null)
+      l10n.accountExpires(
+        DateFormat.yMMMd(l10n.localeName)
+            .format(DateTime.fromMillisecondsSinceEpoch(ends * 1000)),
+      )
+    else if (streams != null)
+      l10n.accountNoExpiry,
+    if (streams != null) l10n.accountStreams(streams),
+  ].join(' · ');
+}
+
+/// TMDB's required notice (its API terms, "Attribution"), word for word: not translated.
+const tmdbNotice =
+    'This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session, this.focus});
@@ -100,13 +132,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.account_circle_outlined),
               title: Text(session.profile?.name ?? ''),
               subtitle: Text(
-                session.syncing
-                    ? l10n.syncing
-                    : session.syncError != null
-                    ? l10n.syncFailed(session.syncError!)
-                    : last == null
-                    ? ''
-                    : l10n.settingsLastSync(last.entries, last.categories),
+                [
+                  session.syncing
+                      ? l10n.syncing
+                      : session.syncError != null
+                      ? l10n.syncFailed(session.syncError!)
+                      : last == null
+                      ? ''
+                      : l10n.settingsLastSync(last.entries, last.categories),
+                  if (lib != null)
+                    accountLine(
+                      l10n,
+                      expires: lib.setting(key: 'account_expires'),
+                      limit: lib.setting(key: 'account_limit'),
+                    ),
+                ].where((s) => s.isNotEmpty).join('\n'),
               ),
             ),
           ),
@@ -168,6 +208,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: session.sync,
             ),
           ),
+          // What the provider sees as the player; some only serve players they know.
+          if (lib != null)
+            SettingsEntry(
+              id: 'userAgent',
+              section: provider,
+              title: l10n.userAgent,
+              keywords: l10n.settingsKeywordsUserAgent,
+              build: (_) => Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Tokens.space * 2,
+                  vertical: Tokens.space,
+                ),
+                // A new profile gets a new field, or the old one's text would stay in it.
+                child: TextFormField(
+                  key: Key('settings.userAgent.${session.profile?.id}'),
+                  initialValue: session.profile?.userAgent ?? '',
+                  decoration: InputDecoration(
+                    labelText: l10n.userAgent,
+                    helperText: l10n.userAgentHint,
+                    helperMaxLines: 3,
+                  ),
+                  autocorrect: false,
+                  onFieldSubmitted: session.setUserAgent,
+                ),
+              ),
+            ),
           // Your data: export and import the profile's user data (one JSON file).
           if (lib != null)
             SettingsEntry(
@@ -197,6 +263,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keywords: l10n.settingsKeywordsPremiumize,
               build: (_) => PremiumizeSettings(session: session),
             ),
+          SettingsEntry(
+            id: 'tmdb',
+            section: 'TMDB',
+            title: l10n.tmdbKey,
+            keywords: l10n.settingsKeywordsTmdb,
+            build: (_) => Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.space * 2,
+                vertical: Tokens.space,
+              ),
+              child: TextFormField(
+                key: const Key('settings.tmdbKey'),
+                initialValue: session.tmdbKey ?? '',
+                obscureText: true,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: l10n.tmdbKey,
+                  helperText: l10n.tmdbKeyHint,
+                  helperMaxLines: 4,
+                ),
+                onFieldSubmitted: session.setTmdbKey,
+              ),
+            ),
+          ),
+          SettingsEntry(
+            id: 'opensubtitles',
+            section: 'OpenSubtitles',
+            title: l10n.subtitlesKey,
+            keywords: l10n.settingsKeywordsSubtitles,
+            build: (_) => SubtitlesSettings(session: session),
+          ),
           if (lib != null)
             for (final t in trackServices)
               SettingsEntry(
@@ -245,6 +342,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'autoplayNext',
+              title: l10n.autoplayNext,
+              keywords: l10n.settingsKeywordsAutoplayNext,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.autoplayNext'),
+                  title: Text(l10n.autoplayNext),
+                  subtitle: Text(l10n.autoplayNextHint),
+                  value: lib.setting(key: Session.settingAutoplayNext) != '0',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: Session.settingAutoplayNext,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          // Works on TVs only (phones report no modes), which the hint says.
+          if (lib != null && defaultTargetPlatform == TargetPlatform.android)
+            SettingsEntry(
+              id: 'matchFrameRate',
+              title: l10n.matchFrameRate,
+              keywords: l10n.settingsKeywordsFrameRate,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.matchFrameRate'),
+                  title: Text(l10n.matchFrameRate),
+                  subtitle: Text(l10n.matchFrameRateHint),
+                  value: lib.setting(key: settingMatchFrameRate) == '1',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: settingMatchFrameRate,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'deinterlace',
+              title: l10n.deinterlace,
+              keywords: l10n.settingsKeywordsDeinterlace,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.deinterlace'),
+                  title: Text(l10n.deinterlace),
+                  subtitle: Text(l10n.deinterlaceHint),
+                  value: lib.setting(key: settingDeinterlace) == '1',
+                  onChanged: (on) {
+                    lib.setSetting(
+                      key: settingDeinterlace,
+                      value: on ? '1' : '0',
+                    );
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+          if (lib != null && canRecord)
+            SettingsEntry(
+              id: 'recordingsFolder',
+              title: l10n.recordingsFolder,
+              keywords: l10n.settingsKeywordsRecordings,
+              build: (_) => RecordingsFolderSetting(session: session),
+            ),
+          if (lib != null)
+            SettingsEntry(
+              id: 'tracks',
+              title: l10n.playerTracks,
+              keywords: l10n.settingsKeywordsTracks,
+              build: (_) => TrackPrefsSettings(library: lib),
             ),
           if (lib != null)
             SettingsEntry(
@@ -392,6 +567,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: l10n.updateCheck,
             keywords: l10n.settingsKeywordsUpdates,
             build: (_) => const UpdateSettings(),
+          ),
+          // TMDB's terms: its logo, less prominent than gerdTV's, and its notice word for word.
+          SettingsEntry(
+            id: 'tmdbAttribution',
+            title: 'TMDB',
+            keywords: l10n.settingsKeywordsTmdb,
+            build: (_) => ListTile(
+              key: const Key('settings.tmdbAttribution'),
+              title: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Image.asset('assets/tmdb/tmdb.png', height: 14),
+              ),
+              subtitle: const Text(tmdbNotice),
+            ),
           ),
           SettingsEntry(
             id: 'licences',

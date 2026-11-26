@@ -147,6 +147,8 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       case "stopPip":
         self.pip?.stopPictureInPicture()
         result(nil)
+      case "castDevices":
+        CastBrowser.shared.find(seconds: args["seconds"] as? Double ?? 3) { result($0) }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -310,5 +312,62 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   ) {
     channel.invokeMethod("pipRestore", arguments: nil)
     completionHandler(true)
+  }
+}
+
+/// Cast devices on the network through Apple's Bonjour browser (iOS: a plain mDNS socket would need Apple's multicast
+/// entitlement, which a re-signed build can't have). Each found service is resolved to its IPv4 address and port;
+/// Dart gets [{name, host, port}] and casts through the core like every other platform (lib/services/casting.dart).
+/// Debugging: nothing found and no prompt shown: NSLocalNetworkUsageDescription or NSBonjourServices is missing in
+/// Info.plist; a refused prompt is in Settings → Privacy → Local Network.
+final class CastBrowser: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
+  static let shared = CastBrowser()
+  private var browser: NetServiceBrowser?
+  private var services: [NetService] = []
+  private var found: [[String: Any]] = []
+
+  func find(seconds: Double, done: @escaping ([[String: Any]]) -> Void) {
+    browser?.stop()
+    services = []
+    found = []
+    let b = NetServiceBrowser()
+    b.delegate = self
+    browser = b
+    b.searchForServices(ofType: "_googlecast._tcp.", inDomain: "local.")
+    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+      b.stop()
+      done(self.found)
+    }
+  }
+
+  func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+    services.append(service)
+    service.delegate = self
+    service.resolve(withTimeout: 3)
+  }
+
+  func netServiceDidResolveAddress(_ sender: NetService) {
+    // The friendly name is the TXT record's "fn"; the service name is an id.
+    var name = sender.name
+    if let txt = sender.txtRecordData(),
+      let fn = NetService.dictionary(fromTXTRecord: txt)["fn"],
+      let s = String(data: fn, encoding: .utf8)
+    {
+      name = s
+    }
+    for data in sender.addresses ?? [] {
+      var storage = sockaddr_storage()
+      (data as NSData).getBytes(&storage, length: MemoryLayout<sockaddr_storage>.size)
+      guard storage.ss_family == sa_family_t(AF_INET) else { continue }
+      var addr = withUnsafePointer(to: &storage) {
+        $0.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
+      }
+      var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+      inet_ntop(AF_INET, &addr, &buf, socklen_t(INET_ADDRSTRLEN))
+      let host = String(cString: buf)
+      if !found.contains(where: { $0["host"] as? String == host }) {
+        found.append(["name": name, "host": host, "port": sender.port])
+      }
+    }
   }
 }

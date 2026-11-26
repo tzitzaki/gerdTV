@@ -9,6 +9,7 @@ license.workspace = true
 ed25519-dalek.workspace = true
 flate2.workspace = true
 lzma-rust2.workspace = true
+oxicast.workspace = true
 quick-xml.workspace = true
 reqwest.workspace = true
 rustls.workspace = true

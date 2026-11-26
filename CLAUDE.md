@@ -59,7 +59,7 @@ Prefer first-party (Dart/Flutter SDK, Rust std, platform SDKs) and the pre-appro
 - A change to behaviour, structure or process updates the owning doc in the same PR. Superseded text is replaced, never appended or marked old. No dates, quotes or history in docs: git keeps the past. A test checks that every path and `just` recipe named in a doc exists (`just test-docs`).
 - A task in flight has a note `docs/notes/YYYY-MM-DD-<topic>.md` (progress with start times, decisions, open questions), deleted in the PR that finishes the task.
 - HANDOVER.md is a list read on a phone, not a changelog: a few State lines, then owner decisions, owner one-off jobs, open work (including `[MAC]` and `[DEVICE]` tasks with exact steps), things to watch, ideas not chosen. One full-sentence item per line, at most 60 lines of 160 characters, no continuation lines (tested). When it's full, the oldest items go to the owner as questions.
-- DEVICE_CHECKS.md: one line per thing to look at on a real device, under its device and screen, same limits. Added by the PR that builds it, deleted once the owner has seen it.
+- DEVICE_CHECKS.md: one line per thing to look at on a real device, under its device and screen, at most 90 lines of 160 characters (tested). Added by the PR that builds it, deleted once the owner has seen it.
 
 ## Clock and status lines
 - `.claude/settings.json` hooks print `[HH:MM]` at session start, on every prompt and after every tool call. Every time written anywhere is the latest stamp or comes from `date`, never estimated. Every message to the owner starts with `[HH:MM]`.

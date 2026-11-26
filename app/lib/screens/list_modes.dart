@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
+import 'group_menus.dart' show MenuEntry;
 import 'logo.dart';
 import 'search_text.dart';
 
@@ -167,6 +168,8 @@ class ItemsView extends StatelessWidget {
     this.highlight,
     this.favourites = const {},
     this.onFavourite,
+    this.watched = const {},
+    this.menu,
   });
   final ListMode mode;
   final List<ItemInfo> items;
@@ -183,6 +186,12 @@ class ItemsView extends StatelessWidget {
   final Set<String> favourites;
   final void Function(ItemInfo)? onFavourite;
 
+  /// The watched movies' and episodes' keys (a check mark).
+  final Set<String> watched;
+
+  /// An item's further menu entries (own groups, own names); with them every kind's long hold opens the menu.
+  final List<MenuEntry> Function(ItemInfo)? menu;
+
   @override
   Widget build(BuildContext context) {
     final count = items.length + (loading ? 1 : 0);
@@ -195,7 +204,7 @@ class ItemsView extends StatelessWidget {
       final it = items[i];
       final nn = nowNext[it.key];
       final fav = onFavourite == null ? null : () => onFavourite!(it);
-      final hold = fav == null || it.kind != ItemKind.live
+      final hold = fav == null || (it.kind != ItemKind.live && menu == null)
           ? fav
           : () => showChannelMenu(
               context,
@@ -203,6 +212,7 @@ class ItemsView extends StatelessWidget {
               favourite: favourites.contains(it.key),
               onWatch: () => onTap(it),
               onFavourite: fav,
+              extra: menu?.call(it) ?? const [],
             );
       final cellWidget = switch (mode) {
         ListMode.compact || ListMode.list => ItemRow(
@@ -214,6 +224,7 @@ class ItemsView extends StatelessWidget {
           highlight: highlight,
           favourite: favourites.contains(it.key),
           onFavourite: fav,
+          watched: watched.contains(it.key),
           onHold: hold,
         ),
         _ => ItemCard(
@@ -224,6 +235,7 @@ class ItemsView extends StatelessWidget {
           highlight: highlight,
           favourite: favourites.contains(it.key),
           onFavourite: fav,
+          watched: watched.contains(it.key),
           onHold: hold,
         ),
       };
@@ -278,6 +290,7 @@ class ItemRow extends StatelessWidget {
     this.highlight,
     this.favourite = false,
     this.onFavourite,
+    this.watched = false,
     this.onHold,
   });
   final ItemInfo item;
@@ -285,6 +298,7 @@ class ItemRow extends StatelessWidget {
   final bool compact;
   final bool favourite;
   final VoidCallback? onFavourite;
+  final bool watched;
 
   /// A long press.
   final VoidCallback? onHold;
@@ -355,9 +369,20 @@ class ItemRow extends StatelessWidget {
                   ),
               ],
             ),
-      trailing: onFavourite == null
+      trailing: onFavourite == null && !watched
           ? null
-          : FavouriteStar(item: item, on: favourite, onPressed: onFavourite!),
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (watched) const WatchedMark(),
+                if (onFavourite != null)
+                  FavouriteStar(
+                    item: item,
+                    on: favourite,
+                    onPressed: onFavourite!,
+                  ),
+              ],
+            ),
       onTap: onTap,
       onLongPress: onHold,
     );
@@ -372,8 +397,10 @@ Future<void> showChannelMenu(
   required bool favourite,
   required VoidCallback onWatch,
   required VoidCallback onFavourite,
+  List<MenuEntry> extra = const [],
 }) => showModalBottomSheet<void>(
   context: context,
+  isScrollControlled: true,
   builder: (context) {
     final l10n = AppLocalizations.of(context);
     Widget entry(String key, IconData icon, String label, VoidCallback run) =>
@@ -406,6 +433,7 @@ Future<void> showChannelMenu(
               favourite ? l10n.favouriteRemove : l10n.favouriteAdd,
               onFavourite,
             ),
+            for (final e in extra) entry(e.key, e.icon, e.label, e.run),
           ],
         ),
       ),
@@ -512,6 +540,7 @@ class ItemCard extends StatefulWidget {
     this.highlight,
     this.favourite = false,
     this.onFavourite,
+    this.watched = false,
     this.onHold,
   });
   final ItemInfo item;
@@ -519,6 +548,7 @@ class ItemCard extends StatefulWidget {
   final bool large;
   final bool favourite;
   final VoidCallback? onFavourite;
+  final bool watched;
 
   /// A long press.
   final VoidCallback? onHold;
@@ -633,6 +663,12 @@ class _ItemCardState extends State<ItemCard> {
             ),
           ),
           ?star,
+          if (widget.watched)
+            const Positioned(
+              top: Tokens.space,
+              left: Tokens.space,
+              child: WatchedMark(),
+            ),
         ],
       );
     } else {
@@ -771,6 +807,25 @@ class SkeletonRow extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+/// Shown on watched movies and episodes; a dark plate keeps it readable on any poster.
+class WatchedMark extends StatelessWidget {
+  const WatchedMark({super.key});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: Color(0x99000000),
+      shape: BoxShape.circle,
+    ),
+    child: Icon(
+      Icons.check_circle,
+      size: 20,
+      color: Colors.white,
+      semanticLabel: AppLocalizations.of(context).watchedLabel,
     ),
   );
 }

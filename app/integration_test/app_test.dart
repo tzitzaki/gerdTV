@@ -247,6 +247,21 @@ void main() {
     // The buffer readout is off unless switched on (on: the guide's Watch below).
     expect(find.byKey(const Key('player.bufferReadout')), findsNothing);
     expect(session.nowPlaying.value!.key, session.zapList[i + 1].key);
+    // A remote's keys: last channel goes back and forth, CH- and CH+ step through the list.
+    for (final (key, at) in [
+      (LogicalKeyboardKey.backspace, i),
+      (LogicalKeyboardKey.backspace, i + 1),
+      (LogicalKeyboardKey.channelDown, i),
+      (LogicalKeyboardKey.channelUp, i + 1),
+    ]) {
+      // As an Android remote sends them (Linux has no channel keys to simulate).
+      await tester.sendKeyEvent(key, platform: 'android');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 500)),
+      );
+      await tester.pump();
+      expect(session.nowPlaying.value!.key, session.zapList[at].key);
+    }
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await waitFor(tester, find.byKey(const Key('player.panel')));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -406,6 +421,39 @@ void main() {
     debugPrint('JOURNEY: programme search played its channel');
     // Catch-up: a programme that ended on a channel with an archive (every 13th mock channel) plays from the archive.
     final lib = session.library!;
+    // An episode that plays to its end is marked as watched and counts down to the next one; Cancel keeps it away.
+    final episodes = await tester.runAsync(() async {
+      for (final g in await lib.categories(
+        kind: ItemKind.series,
+        sort: 'provider',
+      )) {
+        for (final s in await lib.items(
+          kind: ItemKind.series,
+          category: g.id,
+          sort: 'provider',
+          limit: 20,
+          offset: 0,
+        )) {
+          final eps = await lib.episodes(seriesKey: s.key);
+          if (eps.length > 1) return eps;
+        }
+      }
+      return null;
+    });
+    await tester.runAsync(() => session.play(episodes!.first));
+    await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
+    await tester.tap(find.byKey(const Key('nowPlaying.bar')));
+    await waitFor(tester, find.byKey(const Key('player.nextUp')));
+    expect(session.nextUp.value!.item.key, episodes![1].key);
+    expect(session.watched, contains(episodes.first.key));
+    await tapReady(tester, find.byKey(const Key('player.nextUp.cancel')));
+    await tester.pump();
+    expect(find.byKey(const Key('player.nextUp')), findsNothing);
+    expect(session.nowPlaying.value!.key, episodes.first.key);
+    await tapStop(tester);
+    await waitFor(tester, liveField.hitTestable());
+    debugPrint('JOURNEY: an episode ended, the next one was cancelled');
+
     final groups = await tester.runAsync(
       () => lib.categories(kind: ItemKind.live, sort: 'provider'),
     );
@@ -642,9 +690,32 @@ void main() {
           (w.key! as ValueKey<String>).value.startsWith('item.star.'),
     );
     await tapReady(tester, star);
+    // A channel's menu puts it into a new group of the user's own, which then shows above the provider's.
+    await tester.longPress(find.byType(ItemRow).hitTestable().first);
+    await tapReady(tester, find.byKey(const Key('channel.addToGroup')));
+    await tapReady(tester, find.byKey(const Key('menu.group.new')));
+    await waitFor(tester, find.byKey(const Key('name.field')));
+    await tester.enterText(find.byKey(const Key('name.field')), 'My group');
+    await tapReady(tester, find.byKey(const Key('name.save')));
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
     await tester.pageBack();
     await tester.pumpAndSettle();
     await waitFor(tester, find.byKey(const Key('browse.favourites')));
+    await tapReady(tester, find.text('My group'));
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
+    expect(find.byType(ItemRow), findsOneWidget);
+    await tester.pageBack();
+    await waitFor(
+      tester,
+      find.byKey(const Key('browse.favourites')).hitTestable(),
+    );
+    // Its menu deletes it again (the guide below starts with the first group, which it would be).
+    // (The group's page slides out with the name as its title: its row, once settled.)
+    await tester.pumpAndSettle();
+    await tester.longPress(find.widgetWithText(ListTile, 'My group'));
+    await tapReady(tester, find.byKey(const Key('menu.delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('My group'), findsNothing);
     debugPrint('JOURNEY: a favourite shows in its group');
 
     // Reminders: a programme that hasn't started gets Remind me; the reminder is stored, and a second tap clears it.
@@ -680,6 +751,25 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: a reminder was set and cleared');
+    // Recording: the player's Record now writes the channel into the chosen folder; the TV section then lists it,
+    // and it stops and deletes from there.
+    final recDir = await Directory.systemTemp.createTemp('gerdtv-rec');
+    session.recordings.setFolder(recDir.path);
+    await tester.runAsync(() => session.recordings.recordNow(onChannel!));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 2)),
+    );
+    final recs = session.recordings.list();
+    expect(recs.single.state, 'recording');
+    await tester.runAsync(() => session.recordings.stop(recs.single.id));
+    final done = session.recordings.list().single;
+    expect(done.state, 'done');
+    expect(File(done.file).lengthSync(), greaterThan(0));
+    await tester.runAsync(() => session.recordings.delete(done));
+    expect(File(done.file).existsSync(), isFalse);
+    expect(session.recordings.list(), isEmpty);
+    await recDir.delete(recursive: true);
+    debugPrint('JOURNEY: a recording ran, stopped and was deleted');
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));

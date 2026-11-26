@@ -16,10 +16,31 @@
   "accentRed": "Red",
   "accentTeal": "Teal",
   "accentViolet": "Violet",
+  "accountExpires": "Expires {date}",
+  "@accountExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "accountNoExpiry": "No expiry date",
+  "accountStreams": "{count, plural, =1{1 stream at once} other{{count} streams at once}}",
+  "@accountStreams": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "adaptiveBuffer": "Raise the buffer automatically",
   "adaptiveHint": "When a channel stutters more than 3 times in 10 minutes, its buffer goes up one step.",
   "add": "Add",
   "appTitle": "gerdTV",
+  "audioDelay": "Audio delay",
+  "audioLanguage": "Audio language",
+  "autoplayNext": "Play the next episode",
+  "autoplayNextHint": "After an episode, with a countdown you can cancel.",
   "back": "Back",
   "browseEmpty": "Nothing here yet. The first update may still be running; check Settings.",
   "bufferBalanced": "Balanced (about 8 s)",
@@ -52,6 +73,19 @@
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
+  "castNone": "No Cast device found on this network.",
+  "castNotice": "The device gets the provider's address, which includes your login.",
+  "castOn": "On {device}",
+  "@castOn": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "castSearch": "Search again",
+  "castTo": "Cast to a device",
+  "choose": "Choose",
   "clear": "Clear",
   "close": "Close",
   "continueWatching": "Continue watching",
@@ -59,6 +93,10 @@
   "dayToday": "Today",
   "dayTomorrow": "Tomorrow",
   "dayYesterday": "Yesterday",
+  "deinterlace": "Deinterlace",
+  "deinterlaceHint": "For combed edges on interlaced channels, from the next start. Decoding takes more power; not with Apple's player.",
+  "delayEarlier": "Earlier",
+  "delayLater": "Later",
   "detailsMinutes": "min",
   "detailsPlay": "Play",
   "episodesEmpty": "This series has no episodes.",
@@ -66,6 +104,10 @@
   "favouriteRemove": "Remove from favourites",
   "favourites": "Favourites",
   "goLive": "Live",
+  "groupAdd": "Add to a group",
+  "groupDelete": "Delete this group",
+  "groupNew": "New group",
+  "groupRemove": "Remove from this group",
   "guideAddUrl": "Extra XMLTV URL",
   "guideCommunity": "Community guides",
   "guideCommunityAdd": "Add a community guide",
@@ -151,6 +193,7 @@
   },
   "hiddenGroups": "Hidden groups",
   "hiddenGroupsHint": "Groups you tick disappear from the lists, search and the guide",
+  "lastChannel": "Last channel",
   "linkCodeHint": "Open this address on another device and enter the code:",
   "listModeCompact": "Compact list",
   "listModeLargeTiles": "Large tiles",
@@ -165,18 +208,36 @@
   "logoMonogram": "Monogram",
   "logoScreen": "TV screen",
   "logoSignal": "Signal",
+  "matchFrameRate": "Match the TV's refresh rate",
+  "matchFrameRateHint": "Android TV only, from the next start: smoother motion; the screen goes black for a moment when it switches.",
   "menuBar": "Keep in the menu bar when closed",
   "menuBarHint": "Closing the window or quitting from the Dock keeps gerdTV playing in the menu bar; its Quit ends it.",
   "menuBarOpen": "Open gerdTV",
   "menuBarPlayPause": "Play/Pause",
   "menuBarQuit": "Quit gerdTV",
   "miniPlayer": "Mini player",
+  "moveDown": "Move down",
+  "moveTop": "Move to the top",
+  "moveUp": "Move up",
   "mute": "Mute",
   "navGuide": "Guide",
   "navLive": "TV",
   "navMovies": "Movies",
   "navSeries": "Series",
   "navSettings": "Settings",
+  "nextEpisodeIn": "Next episode in {seconds} s",
+  "@nextEpisodeIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "nextEpisodePlay": "Play now",
+  "pictureFit": "Whole picture",
+  "pictureFormat": "Picture format",
+  "pictureStretch": "Stretch",
+  "pictureZoom": "Zoom",
   "playerAudio": "Audio",
   "playerChannels": "Channels",
   "playerEngine": "gerdTV player version",
@@ -258,10 +319,42 @@
       }
     }
   },
+  "record": "Record",
+  "recordNow": "Record now",
+  "recordingConflict": "“{title}” starts recording in a minute; then playback stops (the account allows no more streams).",
+  "@recordingConflict": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingDeleteConfirm": "Delete the recording “{title}” and its file?",
+  "@recordingDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "recordingDone": "Recorded",
+  "recordingFailed": "Failed",
+  "recordingPlanned": "Recording planned",
+  "recordingRunning": "Recording",
+  "recordingScheduled": "Planned",
+  "recordingSkip": "Skip",
+  "recordingSkipped": "Skipped",
+  "recordings": "Recordings",
+  "recordingsAppFolders": "This device has no folder picker: gerdTV's own folder on a drive (deleted when gerdTV is uninstalled).",
+  "recordingsEmpty": "No recordings yet. Record from a programme in the guide, or in the player.",
+  "recordingsFolder": "Recordings folder",
   "remove": "Remove",
+  "rename": "Rename",
+  "renameHint": "Name (empty: the provider's)",
   "restartToApply": "Close gerdTV and open it again to apply the change.",
   "restore": "Full size",
   "retry": "Retry",
+  "save": "Save",
   "searchAllGroups": "All groups {count}",
   "@searchAllGroups": {
     "placeholders": {
@@ -324,9 +417,12 @@
   "settingsHealth": "Stream health",
   "settingsKeywordsAccount": "profile login sync",
   "settingsKeywordsAdaptive": "buffer automatic",
+  "settingsKeywordsAutoplayNext": "autoplay series continue",
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsData": "export import backup favourites file transfer",
+  "settingsKeywordsDeinterlace": "interlaced combing picture",
   "settingsKeywordsEngine": "engine mpv ffmpeg libmpv decoder player",
+  "settingsKeywordsFrameRate": "hz fps judder refresh rate afr",
   "settingsKeywordsGestures": "swipe touch seek volume double tap",
   "settingsKeywordsGuideSources": "xmltv epg url",
   "settingsKeywordsHealth": "recovery watchdog errors",
@@ -339,12 +435,17 @@
   "settingsKeywordsOverlay": "player banner overlay transparency opacity translucent",
   "settingsKeywordsPremiumize": "debrid premiumize cloud",
   "settingsKeywordsProfiles": "profile account provider switch add another",
+  "settingsKeywordsRecordings": "recording dvr folder record",
   "settingsKeywordsRemove": "logout delete sign out",
+  "settingsKeywordsSubtitles": "opensubtitles subtitles srt download key",
   "settingsKeywordsTheme": "theme colour color accent dark light black oled",
   "settingsKeywordsTimeshift": "pause rewind live",
+  "settingsKeywordsTmdb": "tmdb movie database posters plot cast key",
   "settingsKeywordsTracking": "trakt simkl tracking scrobble watched history",
+  "settingsKeywordsTracks": "language subtitles audio size sync",
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
+  "settingsKeywordsUserAgent": "user agent player header",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -387,8 +488,23 @@
   "setupRequired": "Required",
   "setupServer": "Server address",
   "setupTitle": "Add your provider",
+  "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
   "setupXtream": "Xtream Codes",
+  "simklImport": "Import from Simkl now",
+  "simklImportHint": "Watched movies and episodes, and where you paused, come from Simkl after each update.",
+  "simklImportNothing": "Nothing new at Simkl.",
+  "simklImported": "{watched} watched, {positions} positions taken over",
+  "@simklImported": {
+    "placeholders": {
+      "watched": {
+        "type": "int"
+      },
+      "positions": {
+        "type": "int"
+      }
+    }
+  },
   "sortAdded": "Recently added",
   "sortNameAsc": "Name A–Z",
   "sortNameDesc": "Name Z–A",
@@ -399,6 +515,19 @@
   "sortYearAsc": "Oldest first",
   "sortYearDesc": "Newest first",
   "stop": "Stop",
+  "subtitleBackground": "Dark background behind subtitles",
+  "subtitleDelay": "Subtitle delay",
+  "subtitleLanguage": "Subtitle language",
+  "subtitleSize": "Subtitle size",
+  "subtitlesFind": "Find subtitles online",
+  "subtitlesHearingImpaired": "for the hearing impaired",
+  "subtitlesKey": "OpenSubtitles API key",
+  "subtitlesKeyHint": "Optional, your own (opensubtitles.com → API consumers): the player's subtitle button finds subtitles for movies and episodes. Press Enter to save; empty removes it.",
+  "subtitlesLoggedIn": "Logged in: your account's downloads count",
+  "subtitlesLogin": "Log in",
+  "subtitlesLoginHint": "Optional: your OpenSubtitles account's daily downloads instead of the key's 5.",
+  "subtitlesNone": "Nothing found.",
+  "subtitlesTranslated": "machine-translated",
   "syncFailed": "Update failed: {message}",
   "@syncFailed": {
     "placeholders": {
@@ -425,6 +554,9 @@
     }
   },
   "timeshiftOff": "Off",
+  "tmdbKey": "TMDB API key",
+  "tmdbKeyHint": "Optional, your own (themoviedb.org → Settings → API): movie and series pages get what the provider leaves out. Press Enter to save; empty removes it.",
+  "trackAutomatic": "Automatic",
   "trackClientId": "Client ID",
   "trackClientSecret": "Client secret",
   "trackHint": "Movies and episodes you watch are reported as you watch them; from 80 % they count as watched.",
@@ -484,6 +616,8 @@
   "updateNone": "gerdTV is up to date.",
   "updatePage": "Release page",
   "updateShowFolder": "Show in folder",
+  "userAgent": "User-Agent",
+  "userAgentHint": "What your provider sees as the player; empty for the default. Press Enter to apply: playback stops and the account reconnects.",
   "userDataExport": "Export your data",
   "userDataExportHint": "Favourites, history, hidden groups, reminders and settings of this profile, without the login",
   "userDataExportedTo": "Saved to {path}",
@@ -511,5 +645,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "watchedLabel": "Watched",
+  "watchedMark": "Mark as watched",
+  "watchedUnmark": "Mark as not watched"
 }
