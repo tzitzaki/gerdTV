@@ -481,7 +481,9 @@ class Session extends ChangeNotifier {
   /// secrets are missing (e.g. a new device with the profile list restored) or its database can't open.
   Future<bool> openProfile(ProfileInfo p, {bool? always}) async {
     final s = await secrets.read(p.id);
-    if (s == null && p.source != SourceKind.m3UFile) return false;
+    final noSecrets =
+        p.source == SourceKind.m3UFile || p.source == SourceKind.none;
+    if (s == null && !noSecrets) return false;
     if (library != null) await stopPlayback();
     zapList = const [];
     lastChannel = _channel = null;
@@ -537,6 +539,29 @@ class Session extends ChangeNotifier {
     profiles = [for (final q in profiles) q.id == saved.id ? saved : q];
     await openProfile(saved);
     return null;
+  }
+
+  /// Whether the open profile has a provider (setup can be skipped: Settings works, the browse sections stay hidden
+  /// until one is added).
+  bool get hasProvider => profile != null && profile!.source != SourceKind.none;
+
+  /// Setup's Skip: a profile without a provider, named [name], so all of Settings works (keys, look, Premiumize, a
+  /// profile from another device) before any provider is entered; Settings → Account adds one later (the edit form).
+  Future<void> skipSetup(String name) async {
+    final dir = await _dir();
+    final saved = await saveProfile(
+      dir: dir,
+      profile: ProfileInfo(
+        id: '',
+        name: name,
+        source: SourceKind.none,
+        server: '',
+        userAgent: '',
+      ),
+    );
+    profiles = [...profiles, saved];
+    setAppSetting(dir: dir, key: settingLastProfile, value: saved.id);
+    await _open(saved, const []);
   }
 
   /// Whether [p] opens without asking.
@@ -611,7 +636,7 @@ class Session extends ChangeNotifier {
 
   Future<void> sync() async {
     final lib = library;
-    if (lib == null || syncing) return;
+    if (lib == null || syncing || !hasProvider) return;
     syncing = true;
     syncError = null;
     notifyListeners();
@@ -636,7 +661,8 @@ class Session extends ChangeNotifier {
       const Duration(hours: 1),
       (_) => unawaited(refreshGuide()),
     );
-    if (lib == null) return;
+    // No provider: no channels, so no guide to match.
+    if (lib == null || !hasProvider) return;
     if (guideRefreshing) {
       // A source added meanwhile isn't in the running refresh: once more afterwards, else it waits up to 12 h.
       _guideAgain |= force;

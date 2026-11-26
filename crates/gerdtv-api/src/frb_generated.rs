@@ -7203,6 +7203,7 @@ impl SseDecode for crate::api::library::SourceKind {
             0 => crate::api::library::SourceKind::Xtream,
             1 => crate::api::library::SourceKind::M3uUrl,
             2 => crate::api::library::SourceKind::M3uFile,
+            3 => crate::api::library::SourceKind::None,
             _ => unreachable!("Invalid variant for SourceKind: {}", inner),
         };
     }
@@ -8458,6 +8459,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::SourceKind {
             Self::Xtream => 0.into_dart(),
             Self::M3uUrl => 1.into_dart(),
             Self::M3uFile => 2.into_dart(),
+            Self::None => 3.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -9471,6 +9473,7 @@ impl SseEncode for crate::api::library::SourceKind {
                 crate::api::library::SourceKind::Xtream => 0,
                 crate::api::library::SourceKind::M3uUrl => 1,
                 crate::api::library::SourceKind::M3uFile => 2,
+                crate::api::library::SourceKind::None => 3,
                 _ => {
                     unimplemented!("");
                 }

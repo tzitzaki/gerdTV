@@ -52,8 +52,9 @@ class _SetupScreenState extends State<SetupScreen> {
     super.initState();
     final p = widget.edit;
     if (p == null) return;
-    _name.text = p.name;
-    _xtream = p.source == SourceKind.xtream;
+    // A profile without a provider (setup skipped) gets its name from the provider it gets now.
+    if (p.source != SourceKind.none) _name.text = p.name;
+    _xtream = p.source != SourceKind.m3UUrl;
     _server.text = p.server;
     _userAgent.text = p.userAgent;
     // The login itself is only in secure storage; it fills in a moment later.
@@ -138,7 +139,8 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                     const SizedBox(height: Tokens.space * 2),
                     Text(
-                      widget.edit == null
+                      widget.edit == null ||
+                              widget.edit!.source == SourceKind.none
                           ? l10n.setupTitle
                           : l10n.setupEditTitle,
                       style: Theme.of(context).textTheme.headlineMedium,
@@ -230,6 +232,17 @@ class _SetupScreenState extends State<SetupScreen> {
                         ),
                       ),
                     ),
+                    // First run only (not when added from Settings): Settings works without a provider.
+                    if (widget.edit == null && !Navigator.of(context).canPop())
+                      TextButton(
+                        key: const Key('setup.skip'),
+                        onPressed: _busy
+                            ? null
+                            : () => widget.session.skipSetup(
+                                l10n.setupNoProvider,
+                              ),
+                        child: Text(l10n.setupSkip),
+                      ),
                     if (_busy)
                       const Padding(
                         padding: EdgeInsets.only(top: Tokens.space * 2),

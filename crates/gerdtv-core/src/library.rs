@@ -29,6 +29,8 @@ pub enum SourceKind {
     M3uUrl,
     /// M3U from a local file: `server` is the file path; no secrets.
     M3uFile,
+    /// No provider yet (setup skipped): Settings works, sync has nothing to fetch; Settings → Account adds one.
+    None,
 }
 
 /// One recording as the list shows it; `state`: scheduled, recording, done, refused, failed or skipped.
@@ -184,7 +186,7 @@ pub async fn check_login(p: &Profile, secrets: &[String]) -> Result<()> {
     let need = match p.source {
         SourceKind::Xtream => 2,
         SourceKind::M3uUrl => 1,
-        SourceKind::M3uFile => 0,
+        SourceKind::M3uFile | SourceKind::None => 0,
     };
     if secrets.len() < need {
         return Err(LibraryError::Secrets(need));
@@ -224,6 +226,7 @@ pub async fn check_login(p: &Profile, secrets: &[String]) -> Result<()> {
         SourceKind::M3uFile => {
             std::fs::metadata(&p.server)?;
         }
+        SourceKind::None => {}
     }
     Ok(())
 }
@@ -274,7 +277,7 @@ impl Library {
         let need = match profile.source {
             SourceKind::Xtream => 2,
             SourceKind::M3uUrl => 1,
-            SourceKind::M3uFile => 0,
+            SourceKind::M3uFile | SourceKind::None => 0,
         };
         if secrets.len() < need {
             return Err(LibraryError::Secrets(need));
@@ -448,6 +451,8 @@ impl Library {
                     account: None,
                 })
             }
+            // Nothing to fetch; the app doesn't ask either (Session.sync), this only keeps a stray call harmless.
+            SourceKind::None => Ok(SyncResult::default()),
         }
     }
 
@@ -1637,6 +1642,21 @@ mod tests {
             max_connections: None,
             updated_at: 0,
         }
+    }
+
+    /// Setup skipped: the profile opens without secrets (Settings works) and a sync fetches nothing.
+    #[tokio::test]
+    async fn a_profile_without_provider_opens_and_syncs_nothing() {
+        let dir = tempdir("none");
+        let p = save_profile(&dir, profile(SourceKind::None, "")).unwrap();
+        let lib = Library::open(&dir, &p.id, vec![]).unwrap();
+        assert_eq!(lib.sync().await.unwrap().stats.entries, 0);
+        assert!(
+            lib.categories(Kind::Live, Sort::Provider)
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

@@ -187,7 +187,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       key: const Key('settings.profileEdit'),
                       leading: const Icon(Icons.edit_outlined),
-                      title: Text(l10n.profileEdit),
+                      title: Text(
+                        session.hasProvider
+                            ? l10n.profileEdit
+                            : l10n.profileAddProvider,
+                      ),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => SetupScreen(
@@ -211,21 +215,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          SettingsEntry(
-            id: 'sync',
-            section: provider,
-            title: l10n.settingsSyncNow,
-            keywords: l10n.settingsKeywordsAccount,
-            build: (_) => ListTile(
-              key: const Key('settings.sync'),
-              leading: const Icon(Icons.sync),
-              title: Text(l10n.settingsSyncNow),
-              enabled: !session.syncing,
-              onTap: session.sync,
+          if (session.hasProvider)
+            SettingsEntry(
+              id: 'sync',
+              section: provider,
+              title: l10n.settingsSyncNow,
+              keywords: l10n.settingsKeywordsAccount,
+              build: (_) => ListTile(
+                key: const Key('settings.sync'),
+                leading: const Icon(Icons.sync),
+                title: Text(l10n.settingsSyncNow),
+                enabled: !session.syncing,
+                onTap: session.sync,
+              ),
             ),
-          ),
           // What the provider sees as the player; some only serve players they know.
-          if (lib != null)
+          if (lib != null && session.hasProvider)
             SettingsEntry(
               id: 'userAgent',
               section: provider,

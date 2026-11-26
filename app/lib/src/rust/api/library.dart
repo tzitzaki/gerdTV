@@ -1054,7 +1054,14 @@ class SimklImport {
           token == other.token;
 }
 
-enum SourceKind { xtream, m3UUrl, m3UFile }
+enum SourceKind {
+  xtream,
+  m3UUrl,
+  m3UFile,
+
+  /// No provider yet (setup skipped).
+  none,
+}
 
 class SyncSummary {
   final int entries;

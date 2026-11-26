@@ -2,7 +2,7 @@
 
 App-wide settings (`app_logo`, `theme_mode`, `theme_accent`, `theme_tinted`, `theme_black`) in `app.json` in the app-support folder, a flat string map rewritten atomically (`app_setting` in `crates/gerdtv-core/src/library.rs`).
 
-Profiles: their non-secret settings (name, source kind, server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
+Profiles: their non-secret settings (name, source kind (Xtream Codes, M3U URL, M3U file, or none yet when setup was skipped), server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
 
 One SQLite database per profile (`profiles/<id>.db`) (FTS5, WAL mode) in the platform's app-support folder; logos and posters in the cache folder (`logos/`, one file per URL named by its FNV-1a hash, `crates/gerdtv-core/src/logos.rs`). Schema and queries: `crates/gerdtv-core/src/db.rs`.
 

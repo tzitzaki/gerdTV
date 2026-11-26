@@ -34,6 +34,8 @@ pub enum SourceKind {
     Xtream,
     M3uUrl,
     M3uFile,
+    /// No provider yet (setup skipped).
+    None,
 }
 
 /// A profile's non-secret settings (secrets stay in the app's secure storage).
@@ -55,6 +57,7 @@ impl From<core::Profile> for ProfileInfo {
                 core::SourceKind::Xtream => SourceKind::Xtream,
                 core::SourceKind::M3uUrl => SourceKind::M3uUrl,
                 core::SourceKind::M3uFile => SourceKind::M3uFile,
+                core::SourceKind::None => SourceKind::None,
             },
             server: p.server,
             user_agent: p.user_agent,
@@ -95,6 +98,7 @@ impl From<ProfileInfo> for core::Profile {
                 SourceKind::Xtream => core::SourceKind::Xtream,
                 SourceKind::M3uUrl => core::SourceKind::M3uUrl,
                 SourceKind::M3uFile => core::SourceKind::M3uFile,
+                SourceKind::None => core::SourceKind::None,
             },
             server: profile.server,
             user_agent: profile.user_agent,
