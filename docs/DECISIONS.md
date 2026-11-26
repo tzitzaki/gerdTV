@@ -46,6 +46,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Linux CI runs the integration tests on gerdTV's own libmpv only (no Lua scripts to deadlock media_kit's start); the standard engine keeps the libmpv harness.
 - State management with `ChangeNotifier`/`ValueListenable`, navigation with `Navigator`/`Router`; images fetched and disk-cached by the core, shown with `Image.file`.
 - Native code only as small, commented Swift/Kotlin platform channels; no third-party native libraries.
+- Android renders with Skia over OpenGL ES (Impeller off): Impeller's Vulkan path garbles the Shield's picture; retest when Flutter removes the switch.
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.

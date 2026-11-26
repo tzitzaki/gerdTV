@@ -2,7 +2,8 @@
 // to build/logos/preview.png. Run it after changing a logo's drawing and commit the PNGs it writes. It lives outside
 // test/ so `flutter test` doesn't rewrite the icons on every run.
 //   Android: res/mipmap-*dpi/ic_launcher.png (the default logo) and ic_launcher_<logo>.png (the others), one launcher
-//            activity alias each (AndroidManifest.xml).
+//            activity alias each (AndroidManifest.xml); the TV banners res/drawable-xhdpi/banner.png and
+//            banner_<logo>.png (320 × 180, the logo large on its dark background; the Google TV home's wide tile).
 //   iOS:     Assets.xcassets/AppIcon.appiconset (the default) and AppIcon-<logo>.appiconset (alternate icons), each a
 //            single 1024 px image, which Xcode 14 and later scale for every size.
 //   macOS:   Assets.xcassets/AppIcon.appiconset, the default logo at every size Contents.json names, with a margin.
@@ -12,6 +13,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/screens/app_logo.dart';
+import 'package:gerdtv/theme.dart';
 
 const defaultLogo = AppLogo.gtv;
 
@@ -37,6 +39,62 @@ Future<void> iosSet(String dir, AppLogo logo) async {
   );
 }
 
+/// An Android TV banner: 320 × 180 (xhdpi), the logo without its tile on the tile's colour, scaled so its drawing
+/// (measured from the painted pixels, as each logo fills its square differently) takes 70 % of the height or 85 % of
+/// the width, whichever is reached first.
+Future<List<int>> banner(AppLogo logo) async {
+  const w = 320, h = 180, big = 512;
+  // The logo alone, large, to measure where it paints.
+  var recorder = PictureRecorder();
+  AppLogoPainter(
+    logo,
+    tile: false,
+  ).paint(Canvas(recorder), const Size.square(big * 1.0));
+  final drawn = await recorder.endRecording().toImage(big, big);
+  final rgba = (await drawn.toByteData(format: ImageByteFormat.rawRgba))!;
+  var (left, top, right, bottom) = (big, big, 0, 0);
+  for (var y = 0; y < big; y++) {
+    for (var x = 0; x < big; x++) {
+      if (rgba.getUint8((y * big + x) * 4 + 3) > 0) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+  final src = Rect.fromLTRB(
+    left.toDouble(),
+    top.toDouble(),
+    right + 1.0,
+    bottom + 1.0,
+  );
+  final scale = [
+    h * 0.7 / src.height,
+    w * 0.85 / src.width,
+  ].reduce((a, b) => a < b ? a : b);
+  final dst = Rect.fromCenter(
+    center: Offset(w / 2, h / 2),
+    width: src.width * scale,
+    height: src.height * scale,
+  );
+  recorder = PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+    Paint()..color = Tokens.ink,
+  );
+  canvas.drawImageRect(
+    drawn,
+    src,
+    dst,
+    Paint()..filterQuality = FilterQuality.high,
+  );
+  final image = await recorder.endRecording().toImage(w, h);
+  final png = await image.toByteData(format: ImageByteFormat.png);
+  return png!.buffer.asUint8List();
+}
+
 void main() {
   testWidgets('render launcher icons', (tester) async {
     await tester.runAsync(() async {
@@ -59,6 +117,15 @@ void main() {
         await write(
           '$res/ic_launcher.png',
           await renderLogoPng(defaultLogo, px),
+        );
+      }
+
+      // Android TV banners, one per launcher alias.
+      for (final logo in AppLogo.values) {
+        final name = logo == defaultLogo ? 'banner' : 'banner_${logo.name}';
+        await write(
+          'android/app/src/main/res/drawable-xhdpi/$name.png',
+          await banner(logo),
         );
       }
 

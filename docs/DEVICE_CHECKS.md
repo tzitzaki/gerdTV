@@ -45,7 +45,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Shield
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
-- Install and remote: gerdTV is in the launcher row with its banner; the D-pad reaches every section and field; Back leaves the player.
+- Install and remote: sharp text and edges (no grid or colour fringes), the wide logo banner on Home; the D-pad reaches every field; Back leaves the player.
 - Movie page: OK on a movie opens its page with the muted trailer; OK plays, Trailer plays it with sound, Back returns.
 - Live TV: a channel plays with picture and sound; hardware decoding keeps HD channels smooth.
 - PiP: Home while a channel plays shows it in a corner window over the launcher; it keeps playing until Stop.

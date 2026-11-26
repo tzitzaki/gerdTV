@@ -2,6 +2,7 @@
 
 ## State
 - Version 0.261126.64: the desktop player window keeps the picture's ratio, TV search lists channels then live and upcoming, Mac updates delete their download.
+- Android renders with Skia (Impeller off: garbled on the Shield; recheck when Flutter drops the switch); TV banners are wide logos now.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -24,7 +25,6 @@
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - Trakt/Simkl: import their watch progress into Continue watching (only scrobbling is built); match by ids once TMDB enrichment lands.
-- Apple minimums 27.0 once `macos-latest` runs macOS 27 (owner decision; Xcode 27 is not on it yet).
 - [DEVICE] Mac: on the first release with #61 (0.261125.62) allow the last prompts (Always Allow), restart; no prompt then or after the next update = fixed.
 - [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; black or a long freeze: send the log ("TextureHW: first picture").
 - Spike C and casting (oxicast), then AirPlay on Apple platforms.

@@ -314,6 +314,33 @@ fn arb_files_match_and_are_sorted() {
     }
 }
 
+/// Android TV: Impeller stays off (its Vulkan path garbled the Shield's picture; release builds ignore a backend choice),
+/// and every banner the manifest names is a wide 320 × 180 PNG rendered by `just logos` (the square icon looked lost on
+/// the Google TV home).
+#[test]
+fn android_renders_with_skia_and_has_wide_banners() {
+    let manifest = read("app/android/app/src/main/AndroidManifest.xml");
+    assert!(
+        manifest.contains(
+            "android:name=\"io.flutter.embedding.android.EnableImpeller\"\n            android:value=\"false\""
+        ),
+        "AndroidManifest.xml: EnableImpeller false"
+    );
+    let banners: Vec<&str> = manifest
+        .split("android:banner=\"@drawable/")
+        .skip(1)
+        .map(|rest| rest.split('"').next().unwrap())
+        .collect();
+    assert!(!banners.is_empty(), "the manifest names no banner");
+    for name in banners {
+        let path = format!("app/android/app/src/main/res/drawable-xhdpi/{name}.png");
+        let png = fs::read(repo_root().join(&path)).unwrap_or_else(|e| panic!("{path}: {e}"));
+        // The PNG header's IHDR chunk: width and height, big-endian, at bytes 16..24.
+        let size = |at: usize| u32::from_be_bytes(png[at..at + 4].try_into().unwrap());
+        assert_eq!((size(16), size(20)), (320, 180), "{path}");
+    }
+}
+
 /// Every platform shows the exact name "gerdTV" (lowercase `gerdtv` only for ids and binaries).
 #[test]
 fn platforms_show_the_name_gerdtv() {
