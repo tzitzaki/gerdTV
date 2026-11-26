@@ -54,6 +54,9 @@ jobs:
       - if: steps.need.outputs.any == 'true'
         name: System packages
         run: |
+          # The runner image's Microsoft package source isn't needed here, and its outage (403, unsigned) failed
+          # every apt-get update: only Ubuntu's archive is used.
+          grep -rl packages.microsoft.com /etc/apt/sources.list.d | xargs -r sudo rm -f
           sudo apt-get update -q
           sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
             libayatana-appindicator3-dev libsecret-1-dev xvfb xauth just jq gdb
@@ -260,6 +263,9 @@ jobs:
       - if: steps.linux.outputs.cache-hit != 'true'
         name: System packages and Flutter
         run: |
+          # The runner image's Microsoft package source isn't needed here, and its outage (403, unsigned) failed
+          # every apt-get update: only Ubuntu's archive is used.
+          grep -rl packages.microsoft.com /etc/apt/sources.list.d | xargs -r sudo rm -f
           sudo apt-get update -q
           sudo apt-get install -y -q clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev \
             libayatana-appindicator3-dev libsecret-1-dev
