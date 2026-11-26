@@ -76,6 +76,8 @@ pub enum LibraryError {
     NoProfile(String),
     #[error(transparent)]
     Track(#[from] crate::tracking::TrackError),
+    #[error(transparent)]
+    Cast(#[from] crate::cast::CastError),
     #[error("this profile needs {0} secret(s)")]
     Secrets(usize),
 }
@@ -729,6 +731,42 @@ impl Library {
             .unwrap()
             .execute("DELETE FROM recordings WHERE id = ?1", [id])?;
         Ok(())
+    }
+
+    /// Casts a channel, movie or episode (cast.rs): the provider's address first, gerdTV's own HLS for live TV the
+    /// device doesn't play from there.
+    pub async fn cast_start(
+        &self,
+        d: &crate::cast::Device,
+        key: &str,
+        title: &str,
+        cache_dir: &Path,
+    ) -> Result<crate::cast::Casting> {
+        let item = self.item(key)?.ok_or_else(|| {
+            crate::cast::CastError::Refused("it isn't in the catalogue any more".into())
+        })?;
+        let live = item.kind == Kind::Live;
+        let provider_hls = if live {
+            let url = self.stream_url(key, "m3u8")?;
+            url.split('?')
+                .next()
+                .unwrap_or("")
+                .ends_with(".m3u8")
+                .then_some(url)
+        } else {
+            None
+        };
+        let file = self.stream_url(key, "ts")?;
+        Ok(crate::cast::start(
+            d,
+            live,
+            provider_hls,
+            file,
+            title,
+            &self.profile.user_agent,
+            cache_dir,
+        )
+        .await?)
     }
 
     pub fn set_watched(&self, key: &str, watched: bool) -> Result<()> {

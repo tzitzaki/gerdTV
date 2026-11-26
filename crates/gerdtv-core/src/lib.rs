@@ -3,6 +3,7 @@
 //! the thin `gerdtv-api` crate (flutter_rust_bridge). Bootstrap state: just the version and a greeting that proves the
 //! Dart → Rust call path works end to end.
 
+pub mod cast;
 pub mod db;
 pub mod epg;
 pub mod groups;

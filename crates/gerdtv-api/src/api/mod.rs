@@ -1,3 +1,4 @@
+pub mod cast;
 pub mod hls;
 pub mod library;
 pub mod logos;

@@ -24,6 +24,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
 import '../platform/platform_bridge.dart';
+import '../services/casting.dart' show castable;
 import '../services/recordings.dart' show canRecord;
 import '../services/session.dart';
 import '../src/rust/api/library.dart';
@@ -33,6 +34,7 @@ import '../player/next_up.dart';
 import '../player/picture.dart';
 import '../player/track_prefs.dart';
 import 'buffer_picker.dart';
+import 'cast_ui.dart';
 import 'list_modes.dart';
 import 'track_sheet.dart';
 
@@ -395,6 +397,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (castable(_current))
+                      ListTile(
+                        key: const Key('player.cast'),
+                        leading: const Icon(Icons.cast),
+                        title: Text(l10n.castTo),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          showCastSheet(context, widget.session, _current);
+                        },
+                      ),
                     if (canRecord && _current.kind == ItemKind.live)
                       ListTile(
                         key: const Key('player.record'),

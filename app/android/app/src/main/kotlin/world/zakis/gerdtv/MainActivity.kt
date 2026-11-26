@@ -39,6 +39,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var playing = false
+    private var multicast: android.net.wifi.WifiManager.MulticastLock? = null
     private var playingTitle = ""
     /// The running recording's title, or null.
     private var recording: String? = null
@@ -132,6 +133,20 @@ class MainActivity : FlutterActivity() {
                                 durationMs = ((call.argument<Double>("duration") ?: 0.0) * 1000).toLong(),
                             )
                         )
+                        result.success(null)
+                    }
+                    // Cast discovery (mDNS in the core): Android drops multicast packets unless an app holds this.
+                    "multicastLock" -> {
+                        if (call.argument<Boolean>("on") == true) {
+                            if (multicast == null) {
+                                val wifi = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE)
+                                    as android.net.wifi.WifiManager
+                                multicast = wifi.createMulticastLock("gerdTV cast").apply { acquire() }
+                            }
+                        } else {
+                            multicast?.release()
+                            multicast = null
+                        }
                         result.success(null)
                     }
                     "isTv" -> result.success(isTv())

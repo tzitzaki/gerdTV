@@ -4,6 +4,7 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import 'cast.dart';
 import 'hls.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
@@ -53,6 +54,15 @@ abstract class Library implements RustOpaqueInterface {
 
   /// The buffer for an item: its override, else the profile's preset, else Balanced.
   BufferChoice bufferFor({required String key});
+
+  /// Casts a channel, movie or episode to `device` (gerdtv_core::cast): the provider's address first; live TV that
+  /// the device doesn't play then goes through gerdTV's own HLS on this device's network address.
+  Future<CastHandle> castStart({
+    required CastDeviceInfo device,
+    required String key,
+    required String title,
+    required String cacheDir,
+  });
 
   /// The catch-up URL of a programme on a live channel, or None (no archive, out of reach, not started, not
   /// Xtream Codes). Holds credentials: pass it straight to the player, never log or show it.

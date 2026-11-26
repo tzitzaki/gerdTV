@@ -951,6 +951,23 @@ impl Library {
         )))
     }
 
+    /// Casts a channel, movie or episode to `device` (gerdtv_core::cast): the provider's address first; live TV that
+    /// the device doesn't play then goes through gerdTV's own HLS on this device's network address.
+    pub async fn cast_start(
+        &self,
+        device: crate::api::cast::CastDeviceInfo,
+        key: String,
+        title: String,
+        cache_dir: String,
+    ) -> Result<crate::api::cast::CastHandle, String> {
+        let casting = self
+            .0
+            .cast_start(&device.device()?, &key, &title, &PathBuf::from(cache_dir))
+            .await
+            .map_err(err)?;
+        Ok(crate::api::cast::CastHandle(casting))
+    }
+
     // The guide (logic: gerdtv_core::epg). Settings → Guide, now/next in lists, the grid and programme search.
 
     /// The guide sources, the provider's first.

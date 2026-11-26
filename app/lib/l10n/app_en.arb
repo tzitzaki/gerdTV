@@ -73,6 +73,18 @@
   "bufferThisChannel": "Buffer for this channel",
   "bufferUseDefault": "Use the default",
   "cancel": "Cancel",
+  "castNone": "No Cast device found on this network.",
+  "castNotice": "The device gets the provider's address, which includes your login.",
+  "castOn": "On {device}",
+  "@castOn": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "castSearch": "Search again",
+  "castTo": "Cast to a device",
   "choose": "Choose",
   "clear": "Clear",
   "close": "Close",

@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Google Cast: finding devices on the local network (Bonjour) and casting to them; also AirPlay of gerdTV's
+	     local stream. iOS and macOS ask the user once. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>gerdTV finds Cast devices on your network and sends them what you choose to play.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_googlecast._tcp</string>
+	</array>
 	<!-- Sound (and Apple Picture-in-Picture) keep playing with the screen locked or in another app. -->
 	<key>UIBackgroundModes</key>
 	<array>

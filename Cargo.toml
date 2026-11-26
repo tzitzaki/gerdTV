@@ -26,6 +26,9 @@ rustls = { version = "0.23.46", default-features = false, features = ["ring", "s
 rusqlite = { version = "0.43.0", features = ["bundled"] }
 criterion = "0.8.2"
 libmpv2 = "7.0.1"
+# Google Cast (owner decision, Spike C): exact, as it is pre-1.0 and says breaking changes may come; its mDNS
+# discovery uses mdns-sd (pre-approved), not called on iOS (Apple's Bonjour browser there).
+oxicast = { version = "=0.0.5", default-features = false, features = ["discovery"] }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros", "signal"] }
 
 [workspace.lints.clippy]

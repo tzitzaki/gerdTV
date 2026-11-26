@@ -30,6 +30,7 @@ import '../src/rust/api/subtitles.dart';
 import '../src/rust/api/playback.dart';
 import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
+import 'casting.dart';
 import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
@@ -166,6 +167,9 @@ class Session extends ChangeNotifier {
     _watchedOf = null;
     watchedChanged.value++;
   }
+
+  /// Google Cast (services/casting.dart).
+  late final casting = Casting(this);
 
   /// Recordings (services/recordings.dart); its timer starts with the first profile.
   late final recordings = Recordings(this);

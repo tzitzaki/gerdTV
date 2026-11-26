@@ -14,6 +14,7 @@ import 'l10n/gen/app_localizations.dart';
 import 'licences.dart';
 import 'platform/engine.dart';
 import 'platform/sandbox_migration.dart';
+import 'screens/cast_ui.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
 import 'screens/profile_picker.dart';
@@ -91,6 +92,7 @@ class GerdTvApp extends StatelessWidget {
           children: [
             Expanded(child: child!),
             NowPlayingBar(session: session),
+            CastBar(session: session),
           ],
         ),
       ),
