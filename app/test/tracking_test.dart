@@ -35,16 +35,18 @@ void main() {
   test(
     'scrobbles reach linked services only, refreshed tokens are kept',
     () async {
-      const trakt = TrackService('trakt', 'Trakt', '', ownApp: true);
-      const simkl = TrackService('simkl', 'Simkl', 'simkl-id');
+      const trakt = TrackService('trakt', 'Trakt', needsSecret: true);
+      const simkl = TrackService('simkl', 'Simkl');
       final secrets = MemorySecrets();
       final t = Tracking(secrets, services: const [trakt, simkl]);
       await t.load('p1');
-      expect(
-        t.client(trakt),
-        isNull,
-        reason: 'Trakt: the user\'s own app first',
-      );
+      // No client id ships with gerdTV (owner decision): every service needs the user's own app first.
+      expect(t.client(trakt), isNull);
+      expect(t.client(simkl), isNull);
+      await t.setApp(simkl, (
+        ' simkl-id ',
+        '',
+      )); // Simkl's device login needs no secret
       expect(t.client(simkl), ('simkl-id', ''));
       final lib = _Library();
 
@@ -82,7 +84,12 @@ void main() {
       await again.forget();
       expect(
         secrets.writes,
-        unorderedEquals(['-trakt.p1', '-trakt-app.p1', '-simkl.p1']),
+        unorderedEquals([
+          '-trakt.p1',
+          '-trakt-app.p1',
+          '-simkl.p1',
+          '-simkl-app.p1',
+        ]),
       );
       expect(secrets.services, isEmpty);
       final empty = MemorySecrets();

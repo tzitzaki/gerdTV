@@ -1,6 +1,5 @@
-// Settings → Account → Trakt / Simkl: link the profile with a device code (link_dialog.dart), or unlink. Trakt
-// first asks for the user's own Trakt app (its client id and secret: no secret ships with gerdTV), Simkl uses
-// gerdTV's client id from the build; a build without it says so.
+// Settings → Account → Trakt / Simkl: link the profile with a device code (link_dialog.dart), or unlink. Both first
+// ask for the user's own app (no client id or secret ships with gerdTV): Trakt's id and secret, Simkl's id.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -49,7 +48,7 @@ class _TrackSettingsState extends State<TrackSettings> {
       _error = null;
     });
     try {
-      if (s.ownApp && _id.text.trim().isNotEmpty) {
+      if (_id.text.trim().isNotEmpty) {
         await tracking.setApp(s, (_id.text, _secret.text));
       }
       final c = tracking.client(s);
@@ -135,35 +134,32 @@ class _TrackSettingsState extends State<TrackSettings> {
       key: Key('track.${s.id}.link'),
       leading: const Icon(Icons.link),
       title: Text(l10n.trackLink(s.label)),
-      subtitle: Text(
-        _error ??
-            (s.ownApp || s.clientId.isNotEmpty
-                ? l10n.trackHint
-                : l10n.trackUnavailable),
-      ),
-      enabled: (s.ownApp || s.clientId.isNotEmpty) && !_busy,
+      subtitle: Text(_error ?? l10n.trackHint),
+      enabled: !_busy,
       onTap: _link,
     );
-    if (!s.ownApp) return link;
-    // Trakt: the user's own app (trakt.tv → Settings → Your API Apps → New Application).
+    // The user's own app: Trakt (trakt.tv → Settings → Your API Apps), Simkl (simkl.com/settings/developer).
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
           child: Column(
             children: [
-              Text(l10n.trackOwnAppHint),
+              Text(s.needsSecret ? l10n.trackOwnAppHint : l10n.simklOwnAppHint),
               TextField(
                 key: Key('track.${s.id}.clientId'),
                 controller: _id,
                 decoration: InputDecoration(labelText: l10n.trackClientId),
               ),
-              TextField(
-                key: Key('track.${s.id}.clientSecret'),
-                controller: _secret,
-                obscureText: true,
-                decoration: InputDecoration(labelText: l10n.trackClientSecret),
-              ),
+              if (s.needsSecret)
+                TextField(
+                  key: Key('track.${s.id}.clientSecret'),
+                  controller: _secret,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: l10n.trackClientSecret,
+                  ),
+                ),
             ],
           ),
         ),

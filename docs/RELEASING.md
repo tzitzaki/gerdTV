@@ -27,8 +27,6 @@ The certificate is not enough for the Keychain: macOS also checks an item's part
 | `MACOS_CERT_P12_BASE64` | the code-signing certificate + key (.p12, legacy PBE so `security import` accepts it), base64 |
 | `MACOS_CERT_PASSWORD` | the .p12 password |
 
-Repository variables (not secrets: public OAuth client ids; no secret ever ships in the app, since anything inside a published app can be extracted): `GERDTV_PREMIUMIZE_CLIENT_ID` and `GERDTV_SIMKL_CLIENT_ID`, gerdTV's registrations at premiumize.me/registerclient and simkl.com/settings/developer, passed to every build as `--dart-define` (`GERDTV_DEFINES` in `release.yml`); empty, the code login of that service is hidden. Trakt needs a client secret, so each user links their own Trakt app instead (Settings → Account → Trakt). Set with `gh variable set <NAME>`.
-
 Set with `gh secret set <NAME> --env release` reading the value from stdin; values are never printed. Losing the Android keystore means uninstalling on every Android device before a new build installs; losing the update key means installed apps can't verify updates. Keep both in a password manager.
 
 ## The update key

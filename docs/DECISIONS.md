@@ -26,8 +26,8 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Profiles: added and switched in Settings → Account; with several, a start picker that remembers the last one and offers "Always open this one".
 - Hidden groups instead of PIN-locked ones: ticked in Settings → Appearance → Hidden groups, gone everywhere (lists, search, guide, favourites, continue watching); no PIN.
 - Continue watching: a row on top of Movies and Series; started after 2 min, finished at 95 %; opening a movie or episode continues where it was left.
-- Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or, in builds with gerdTV's client id, a device code; no torrent search.
-- Watch tracking: Trakt and Simkl by scrobbling (start, pause, stop with progress), linked by device code; no secret in the repository or the app: public client ids from repository variables, Trakt with the user's own app.
+- Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or a device code with the user's own client id; no torrent search.
+- Watch tracking: Trakt and Simkl by scrobbling (start, pause, stop with progress), linked by device code; no client id or secret in the repository or the builds: every service (Trakt, Simkl, Premiumize's code login) with the user's own app, entered in Settings.
 - Trailers: the panel's YouTube trailer in YouTube's embed (webview_flutter), muted behind a movie's or series' title after 2 s, with sound from the Trailer button; movies open a page before playing (Continue watching plays at once).
 - Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; both TV views list channels, then live and upcoming programmes (the guide's search can be limited to its shown group).
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.

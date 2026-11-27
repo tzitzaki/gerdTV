@@ -601,6 +601,7 @@ class Session extends ChangeNotifier {
       );
       profile = p;
       premiumizeToken = await secrets.readService(p.id, 'premiumize');
+      premiumizeApp = await secrets.readService(p.id, 'premiumize-app');
       tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
       subtitlesKey = await secrets.readService(_appSecrets, 'opensubtitles');
       _subtitlesLogin = await secrets.readService(
@@ -728,6 +729,10 @@ class Session extends ChangeNotifier {
       await secrets.writeService(p.id, 'premiumize', null);
     }
     premiumizeToken = null;
+    if (premiumizeApp != null) {
+      await secrets.writeService(p.id, 'premiumize-app', null);
+    }
+    premiumizeApp = null;
     await tracking.forget();
     library = null;
     profile = null;
@@ -957,6 +962,20 @@ class Session extends ChangeNotifier {
 
   /// The open profile's Premiumize key or token (premiumize_screen.dart), null when not linked.
   String? premiumizeToken;
+
+  /// The open profile's own Premiumize client id for the code login (premiumize.me/registerclient; none ships with
+  /// gerdTV), null when none is set.
+  String? premiumizeApp;
+
+  /// Stores the own client id ('' or null forgets it; only a stored one is deleted, see removeProfile).
+  Future<void> setPremiumizeApp(String? id) async {
+    final p = profile;
+    final v = id?.trim() ?? '';
+    if (p == null || (v.isEmpty && premiumizeApp == null)) return;
+    await secrets.writeService(p.id, 'premiumize-app', v.isEmpty ? null : v);
+    premiumizeApp = v.isEmpty ? null : v;
+    notifyListeners();
+  }
 
   /// Links Premiumize with an API key or a device-login token, after Premiumize accepted it (throws its reason).
   Future<void> linkPremiumize(String? token) async {
