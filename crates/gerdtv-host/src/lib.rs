@@ -42,6 +42,8 @@ const MAX_FAILS: u32 = 10;
 const FAIL_WINDOW: i64 = 10 * 60;
 /// Requests are small: the API only takes a key and a few numbers.
 const MAX_BODY: usize = 64 << 10;
+/// How long a client may take to send its whole request.
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// The host's settings (command line).
 #[derive(Debug, Clone)]
@@ -243,6 +245,9 @@ impl Auth {
     }
 
     fn fail(&mut self, ip: IpAddr, now: i64) {
+        // Old windows are dropped, so many addresses can't grow the map without bound.
+        self.fails
+            .retain(|_, (_, since)| now - *since <= FAIL_WINDOW);
         let e = self.fails.entry(ip).or_insert((0, now));
         if now - e.1 > FAIL_WINDOW {
             *e = (0, now);
@@ -416,7 +421,15 @@ pub async fn serve(host: Arc<Host>) -> std::io::Result<()> {
     let listener = TcpListener::bind(&host.cfg.listen).await?;
     eprintln!("host: web on {}", listener.local_addr()?);
     loop {
-        let (stream, peer) = listener.accept().await?;
+        // One failed accept (e.g. out of file descriptors) must not end the server: wait a moment and go on.
+        let (stream, peer) = match listener.accept().await {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("host: accept failed: {e}");
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                continue;
+            }
+        };
         let host = host.clone();
         tokio::spawn(async move {
             let _ = answer(host, stream, peer.ip()).await;
@@ -425,7 +438,10 @@ pub async fn serve(host: Arc<Host>) -> std::io::Result<()> {
 }
 
 async fn answer(host: Arc<Host>, mut stream: TcpStream, peer: IpAddr) -> std::io::Result<()> {
-    let Some(req) = read_request(&mut stream, peer).await? else {
+    // One deadline for the whole request, head and body: a client that trickles bytes or stops can't hold the
+    // connection open.
+    let read = tokio::time::timeout(REQUEST_TIMEOUT, read_request(&mut stream, peer));
+    let Ok(Some(req)) = read.await.map_err(|_| std::io::Error::other("timeout"))? else {
         return Ok(());
     };
     let res = handle(&host, req).await;
@@ -450,9 +466,7 @@ async fn read_request(stream: &mut TcpStream, peer: IpAddr) -> std::io::Result<O
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
     let end = loop {
-        let n = tokio::time::timeout(std::time::Duration::from_secs(15), stream.read(&mut chunk))
-            .await
-            .map_err(|_| std::io::Error::other("timeout"))??;
+        let n = stream.read(&mut chunk).await?;
         if n == 0 {
             return Ok(None);
         }
@@ -504,17 +518,19 @@ async fn read_request(stream: &mut TcpStream, peer: IpAddr) -> std::io::Result<O
     }))
 }
 
-/// Percent-decoding (`+` as a space in queries is the page's own encoding, so it stays `%20` there).
+/// Percent-decoding (`+` as a space in queries is the page's own encoding, so it stays `%20` there). Works on bytes:
+/// a `%` before a multi-byte character is kept as it is, never sliced.
 fn decode(s: &str) -> String {
     let b = s.as_bytes();
+    let hex = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
         if b[i] == b'%'
             && i + 2 < b.len()
-            && let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+            && let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2]))
         {
-            out.push(v);
+            out.push(h << 4 | l);
             i += 3;
         } else {
             out.push(b[i]);
@@ -872,5 +888,27 @@ async fn resolve(http: &reqwest::Client, url: &str) -> Answer {
         Answer::Direct
     } else {
         Answer::Refused(format!("HTTP {}", status.as_u16()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn percent_decoding_never_splits_a_character() {
+        assert_eq!(decode("live%3A12"), "live:12");
+        assert_eq!(decode("/%a\u{e9}"), "/%a\u{e9}");
+        assert_eq!(decode("%zz%"), "%zz%");
+    }
+
+    #[test]
+    fn old_failure_windows_are_dropped() {
+        let mut a = Auth::default();
+        for i in 0..100u8 {
+            a.fail(IpAddr::from([10, 0, 0, i]), 0);
+        }
+        a.fail(IpAddr::from([10, 0, 1, 1]), FAIL_WINDOW + 1);
+        assert_eq!(a.fails.len(), 1);
     }
 }

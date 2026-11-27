@@ -48,6 +48,15 @@ class Devices {
   /// The app keys that travel, by their secure-storage name.
   static const appKeyNames = ['tmdb', 'opensubtitles', 'opensubtitles-login'];
 
+  /// A profile's linked services' secrets that travel: the tokens, and Trakt's/Simkl's own app (tracking.dart).
+  static const serviceNames = [
+    'premiumize',
+    'trakt',
+    'trakt-app',
+    'simkl',
+    'simkl-app',
+  ];
+
   /// Remembered devices.
   final peers = ValueNotifier<List<PeerInfo>>(const []);
 
@@ -94,6 +103,8 @@ class Devices {
 
   /// Called once the session started: remembered devices, the camera's link, and listening if anyone is paired.
   Future<void> init() async {
+    // Any secret changed (a key, a token, a login): the listener answers with the new state.
+    _session.secrets.onChange = () => unawaited(refresh());
     PlatformBridge.onPairLink = _onLink;
     final first = await PlatformBridge.takePairLink();
     if (first != null) _onLink(first);
@@ -159,7 +170,7 @@ class Devices {
     ProfileSecretsInfo? profile;
     if (p != null && s.hasProvider) {
       final services = <String, String>{};
-      for (final name in const ['premiumize', 'trakt', 'simkl']) {
+      for (final name in serviceNames) {
         final v = await s.secrets.readService(p.id, name);
         if (v != null) services[name] = v;
       }
@@ -184,12 +195,15 @@ class Devices {
     );
   }
 
-  /// The app keys changed here: they win at the next sync.
-  void keysChanged() => setAppSetting(
-    dir: _session.appDir!,
-    key: settingKeysUpdatedAt,
-    value: '${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
-  );
+  /// The app keys changed here: they win at the next sync (and the listener answers with them from now on).
+  void keysChanged() {
+    setAppSetting(
+      dir: _session.appDir!,
+      key: settingKeysUpdatedAt,
+      value: '${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
+    );
+    unawaited(refresh());
+  }
 
   /// The open profile, its secrets or the peers changed: the listener answers with the new state.
   Future<void> refresh() async {
@@ -216,13 +230,19 @@ class Devices {
     while (true) {
       final e = await l.nextEvent();
       if (e == null) return;
-      if (e.newCode != null) {
-        if (code.value != null) code.value = e.newCode;
-      } else if (e.failed != null) {
-        failed.value = e.failed;
-      } else if (e.applied != null) {
-        await _apply(e.applied!);
-        applied.value = e.applied;
+      // One failing event (a secure-storage write refused, a profile that won't open) must not end the loop: later
+      // syncs would be merged by the core but their secrets never stored.
+      try {
+        if (e.newCode != null) {
+          if (code.value != null) code.value = e.newCode;
+        } else if (e.failed != null) {
+          failed.value = e.failed;
+        } else if (e.applied != null) {
+          await _apply(e.applied!);
+          applied.value = e.applied;
+        }
+      } catch (err) {
+        failed.value = '$err';
       }
     }
   }

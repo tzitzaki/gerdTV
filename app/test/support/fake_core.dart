@@ -50,6 +50,15 @@ class FakeCore implements RustLibApi {
     required List<String> secrets,
   }) async => openLibrary?.call() ?? (throw 'FakeCore: no library to open');
 
+  /// Deleted profiles' ids.
+  final deleted = <String>[];
+
+  @override
+  Future<void> crateApiLibraryDeleteProfile({
+    required String dir,
+    required String id,
+  }) async => deleted.add(id);
+
   /// Login checks: [loginError] is thrown (null: every login works); [saved] collects every saved profile.
   String? loginError;
   final saved = <ProfileInfo>[];

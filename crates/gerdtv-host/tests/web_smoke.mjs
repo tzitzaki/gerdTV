@@ -64,10 +64,16 @@ try {
   if (await js(`location.host`) === new URL(link).host) throw new Error('still on the front door');
   await until('the session timer', `/[0-9]:[0-9][0-9]/.test(document.getElementById('left').textContent)`);
   await shot('groups');
-  // A group: its channels.
-  await js(`document.querySelector('#content .row').click()`);
+  // The biggest group (over 200 channels: the host pages by 200): More loads the rest into the list.
+  await js(`(() => { const rows = [...document.querySelectorAll('#content .row')];
+    rows.sort((a, b) => +b.querySelector('.c').textContent - +a.querySelector('.c').textContent); rows[0].click(); })()`);
   await until('the channels of a group', `document.body.dataset.ready === 'live:items' && document.querySelectorAll('#content .row').length > 0`);
   await shot('channels');
+  if (!(await js(`document.querySelectorAll('#content .row').length === 200 && !!document.querySelector('.more')`))) {
+    throw new Error('a group over 200 channels shows 200 and More');
+  }
+  await js(`document.querySelector('.more').click()`);
+  await until('the next page', `document.querySelectorAll('#content .row').length > 200`);
   // Search narrows.
   await js(`(() => { const s = document.getElementById('search'); s.value = 'a'; s.dispatchEvent(new Event('input')); })()`);
   await until('search results', `document.body.dataset.ready === 'live:search' && document.querySelectorAll('#content .row').length > 0`);
@@ -77,6 +83,15 @@ try {
   await shot('player');
   await js(`document.getElementById('close').click()`);
   await until('the player closed', `document.getElementById('player').hidden`);
+  // The session ends while something plays: the player stops (its controls would be under the overlay).
+  await js(`document.querySelector('#content .row').click()`);
+  await until('the player again', `!document.getElementById('player').hidden`);
+  await send('Network.clearBrowserCookies');
+  await js(`document.getElementById('fav').click()`);
+  await until('stopped when the session ended', `!document.getElementById('ended').hidden && document.getElementById('player').hidden && !document.getElementById('video').getAttribute('src')`);
+  // A new login for the rest of the walk (the link's cookie is gone): the test's second link.
+  await send('Page.navigate', { url: process.argv[4] });
+  await until('back in', `document.body.dataset.ready === 'live:groups'`);
   // Movies: tiles.
   await js(`document.querySelector('[data-section=movie]').click()`);
   await until('movie groups', `document.body.dataset.ready === 'movie:groups' && document.querySelectorAll('#content .row').length > 0`);

@@ -70,11 +70,14 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   private static weak var shared: GerdtvPlatform?
   /// A pairing link that came before Dart asked (cold start).
   private static var pendingLink: String?
+  /// Dart asked once (takePairLink), so its handler is set: later links go to it at once. Until then a link is kept,
+  /// even if the channel already exists (at a cold start it does, long before Dart listens).
+  private static var dartAsked = false
 
-  /// A gerdtv://pair link from SceneDelegate: to Dart now if it runs, else kept for takePairLink.
+  /// A gerdtv://pair link from SceneDelegate: to Dart now if it listens, else kept for takePairLink.
   static func pairLink(_ url: URL) {
     guard url.scheme == "gerdtv", url.host == "pair" else { return }
-    if let p = shared {
+    if dartAsked, let p = shared {
       p.channel.invokeMethod("pairLink", arguments: url.absoluteString)
     } else {
       pendingLink = url.absoluteString
@@ -105,6 +108,7 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       let args = call.arguments as? [String: Any] ?? [:]
       switch call.method {
       case "takePairLink":
+        GerdtvPlatform.dartAsked = true
         result(GerdtvPlatform.pendingLink)
         GerdtvPlatform.pendingLink = nil
       case "setPlaying":

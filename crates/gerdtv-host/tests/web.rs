@@ -252,6 +252,16 @@ async fn only_fresh_requests_from_paired_apps_are_answered() {
         .status,
         200
     );
+    // Not again with the nonce spelled differently (upper-case hex): one value has one spelling.
+    let mut recased = env.clone();
+    recased.nonce = recased.nonce.to_uppercase();
+    let recased = serde_json::to_vec(&recased).unwrap();
+    let r = handle(
+        &h,
+        req("POST", "front.example.invalid", "/app", None, &recased),
+    )
+    .await;
+    assert_eq!(r.status, 400);
     assert_eq!(
         handle(
             &h,

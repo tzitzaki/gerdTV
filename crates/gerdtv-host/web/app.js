@@ -22,6 +22,7 @@ const T = de
       extend: '+3 Std', endedTitle: 'Sitzung beendet',
       ended: 'Öffne einen neuen Login-Link aus der gerdTV-App: Einstellungen → Konto → Web-Player.',
       notPlayable: 'In diesem Browser nicht abspielbar. Versuche Safari oder Chrome.', now: 'Jetzt', next: 'Danach',
+      more: 'Mehr',
     }
   : {
       tv: 'TV', movies: 'Movies', series: 'Series', search: 'Search', favourites: 'Favourites', cont: 'Continue watching',
@@ -29,6 +30,7 @@ const T = de
       extend: '+3 h', endedTitle: 'Session ended',
       ended: 'Open a new login link from the gerdTV app: Settings → Account → Web player.',
       notPlayable: 'Not playable in this browser. Try Safari or Chrome.', now: 'Now', next: 'Next',
+      more: 'More',
     };
 document.querySelectorAll('[data-t]').forEach((e) => (e.textContent = T[e.dataset.t] || e.textContent));
 $('search').placeholder = T.search;
@@ -51,7 +53,7 @@ async function api(path, body) {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
   if (r.status === 401) {
-    $('ended').hidden = false;
+    sessionOver();
     throw new Error('session');
   }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
@@ -92,7 +94,13 @@ function tick() {
   const left = Math.max(0, state.expires - (Date.now() / 1000 + state.serverOffset));
   const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60);
   $('left').textContent = `${h}:${String(m).padStart(2, '0')} ${T.left}`;
-  if (left <= 0 && state.expires) $('ended').hidden = false;
+  if (left <= 0 && state.expires) sessionOver();
+}
+
+/// The session is over: stop what plays (its controls are under the overlay) and say so.
+function sessionOver() {
+  if (playing) closePlayer(false);
+  $('ended').hidden = false;
 }
 setInterval(tick, 30000);
 
@@ -141,7 +149,8 @@ $('search').oninput = () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     const q = $('search').value.trim();
-    while (current() && current().type === 'search') state.stack.pop();
+    // A new search replaces the last one, and a page opened from it (typing there starts over).
+    while (state.stack.length > 1 && ['search', 'details'].includes(current().type)) state.stack.pop();
     if (q) state.stack.push({ type: 'search', q });
     render();
   }, 200);
@@ -208,10 +217,27 @@ async function groups(out) {
   out.append(rows);
 }
 
+/// The host serves a group 200 items at a time: a More row at the end loads the next 200 into the same list.
+const PAGE = 200;
+
 async function items(out, view) {
   const q = view.favourites ? 'favourites=1' : `category=${encodeURIComponent(view.category)}`;
-  const hits = await api(`/api/items?kind=${state.section}&${q}`);
-  out.append(hits.length ? list(hits) : el('p', 'empty', T.empty));
+  const hits = await api(`/api/items?kind=${state.section}&${q}&offset=0`);
+  if (!hits.length) return out.append(el('p', 'empty', T.empty));
+  const box = list(hits);
+  out.append(box);
+  let offset = hits.length;
+  if (view.favourites || hits.length < PAGE) return;
+  const more = el('button', 'primary more', T.more);
+  more.onclick = async () => {
+    more.disabled = true;
+    const next = await api(`/api/items?kind=${state.section}&${q}&offset=${offset}`);
+    offset += next.length;
+    for (const child of [...list(next).children]) box.append(child);
+    more.disabled = false;
+    if (next.length < PAGE) more.remove();
+  };
+  out.append(more);
 }
 
 async function search(out, view) {
@@ -311,6 +337,8 @@ const video = $('video');
 let playing = null;
 let hls = null;
 let saveTimer = null;
+/// The pending seek to where a movie was left (removed when the player closes, so it can't seek the next stream).
+let resumeSeek = null;
 
 function nativeHls() {
   return video.canPlayType('application/vnd.apple.mpegurl') !== '';
@@ -346,15 +374,19 @@ async function play(h, from) {
 }
 
 async function start() {
-  const src = `/s/${encodeURIComponent(playing.item.key)}${playing.plain ? '?plain=1' : ''}`;
+  const p = playing;
+  const src = `/s/${encodeURIComponent(p.item.key)}${p.plain ? '?plain=1' : ''}`;
   stopHls();
-  const live = playing.item.key.startsWith('live:');
+  clearResumeSeek();
+  const live = p.item.key.startsWith('live:');
   if (live && !nativeHls()) {
     try {
       await loadHlsJs();
     } catch (_) {
       return failed();
     }
+    // Closed (or another item started) while hls.js loaded: nothing to start.
+    if (playing !== p) return;
     if (!window.Hls || !window.Hls.isSupported()) return failed();
     hls = new window.Hls();
     hls.on(window.Hls.Events.ERROR, (_, d) => d.fatal && retryOrFail());
@@ -363,15 +395,25 @@ async function start() {
   } else {
     video.src = src;
   }
-  if (playing.from) {
-    video.addEventListener('loadedmetadata', () => (video.currentTime = playing.from), { once: true });
+  if (p.from) {
+    resumeSeek = () => {
+      resumeSeek = null;
+      video.currentTime = p.from;
+    };
+    video.addEventListener('loadedmetadata', resumeSeek, { once: true });
   }
   video.play().catch(() => {});
 }
 
 video.onerror = () => playing && retryOrFail();
 
+function clearResumeSeek() {
+  if (resumeSeek) video.removeEventListener('loadedmetadata', resumeSeek);
+  resumeSeek = null;
+}
+
 function retryOrFail() {
+  if (!playing) return;
   if (!playing.plain) {
     playing.plain = true;
     start();
@@ -391,22 +433,28 @@ function stopHls() {
 }
 
 function saveProgress() {
-  if (!playing || playing.item.key.startsWith('live:') || !video.duration || !isFinite(video.duration)) return;
-  api('/api/progress', { key: playing.item.key, position: Math.floor(video.currentTime), duration: Math.floor(video.duration) }).catch(() => {});
+  if (!playing || playing.item.key.startsWith('live:') || !video.duration || !isFinite(video.duration)) {
+    return Promise.resolve();
+  }
+  return api('/api/progress', { key: playing.item.key, position: Math.floor(video.currentTime), duration: Math.floor(video.duration) }).catch(() => {});
 }
 
-function closePlayer() {
-  saveProgress();
+/// Stops and hides the player; `refresh`: then the view behind it shows the new position (after it was saved).
+async function closePlayer(refresh = true) {
+  const saved = saveProgress();
   clearInterval(saveTimer);
   stopHls();
+  clearResumeSeek();
   video.removeAttribute('src');
   video.load();
   playing = null;
   $('player').hidden = true;
+  if (!refresh) return;
+  await saved;
   render();
 }
 
-$('close').onclick = closePlayer;
+$('close').onclick = () => closePlayer();
 $('fav').onclick = async () => {
   if (!playing) return;
   await toggleFav(playing.item.key);

@@ -704,7 +704,8 @@ class Session extends ChangeNotifier {
     if (p == null) return;
     await stopPlayback();
     await deleteProfile(dir: await _dir(), id: p.id);
-    await secrets.delete(p.id);
+    // A profile without provider never had a login stored: deleting it would hit the Linux keyring crash below.
+    if (p.source != SourceKind.none) await secrets.delete(p.id);
     // Only the links that exist: deleting a key that was never written crashed the app on Linux (libsecret,
     // flutter_secure_storage_linux 3.0.3), seen in the journey's "remove" step.
     if (premiumizeToken != null) {
@@ -853,16 +854,41 @@ class Session extends ChangeNotifier {
           profiles.where((p) => p.id == profile.id).firstOrNull ?? profile;
       final open = this.profile;
       if (open == null || !hasProvider) {
+        // A placeholder without provider (setup skipped) gives way to the profile that came: its linked services move
+        // over where that one has none, then it is removed (or every start would ask which profile to open).
+        if (open != null && open.id != saved.id) {
+          await _foldPlaceholder(open, saved);
+        }
         await openProfile(saved);
         return;
       }
-      if (open.id == saved.id && loginChanged) {
+      // The open profile changed on the other device (login, server, User-Agent …): reopen it with what is stored.
+      if (open.id == saved.id && (loginChanged || open != saved)) {
         await openProfile(saved);
         return;
       }
     }
     generation++;
     notifyListeners();
+  }
+
+  /// Moves a placeholder profile's linked services' tokens to [target] (only where it has none) and removes the
+  /// placeholder. Only existing secrets are deleted (Linux keyring rule, see [removeProfile]); a placeholder never had
+  /// a login stored.
+  Future<void> _foldPlaceholder(
+    ProfileInfo placeholder,
+    ProfileInfo target,
+  ) async {
+    for (final service in Devices.serviceNames) {
+      final token = await secrets.readService(placeholder.id, service);
+      if (token == null) continue;
+      if (await secrets.readService(target.id, service) == null) {
+        await secrets.writeService(target.id, service, token);
+      }
+      await secrets.writeService(placeholder.id, service, null);
+    }
+    await deleteProfile(dir: await _dir(), id: placeholder.id);
+    profiles = [...profiles.where((p) => p.id != placeholder.id)];
   }
 
   /// Subtitles for what plays (a movie or episode): in the preferred subtitle language, else the app's and English.

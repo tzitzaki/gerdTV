@@ -12,7 +12,8 @@ use gerdtv_testkit::mock_xc::MockXc;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "needs Chrome and Node: just test-web"]
 async fn the_page_logs_in_browses_and_plays_in_chrome() {
-    let mock = MockXc::start(300, 3).await;
+    // Enough entries for a group over 200 channels (the page loads groups 200 at a time).
+    let mock = MockXc::start(3000, 3).await;
     let key = pairing::hex(&pairing::random::<32>());
     // Two names for the same server, so the front door and the player differ by host as in production.
     let port = std::net::TcpListener::bind("127.0.0.1:0")
@@ -45,6 +46,16 @@ async fn the_page_logs_in_browses_and_plays_in_chrome() {
         .await
         .unwrap();
     let link = answer["url"].as_str().unwrap().to_string();
+    // A second link: the walk logs in again after checking that an ended session stops the player.
+    let req = AppRequest {
+        ts: pairing::unix_now(),
+        op: "link".into(),
+        id: String::new(),
+    };
+    let answer = pairing::app_request(&front, "phone", &peer, &req)
+        .await
+        .unwrap();
+    let link2 = answer["url"].as_str().unwrap().to_string();
     let branch = std::process::Command::new("git")
         .args(["branch", "--show-current"])
         .output()
@@ -55,7 +66,7 @@ async fn the_page_logs_in_browses_and_plays_in_chrome() {
     // std's process in a blocking task: the server keeps running on the runtime meanwhile.
     let out = tokio::task::spawn_blocking(move || {
         std::process::Command::new("node")
-            .args([script, &link, &shots])
+            .args([script, &link, &shots, &link2])
             .output()
             .unwrap()
     })

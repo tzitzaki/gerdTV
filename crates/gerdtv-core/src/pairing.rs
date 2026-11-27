@@ -9,10 +9,12 @@
 //!   `gerdtv://pair?a=<addr:port>&c=<code>`). Both derive the key from it; a wrong code fails the first sealed frame
 //!   and burns the code (one attempt), and a code is good for 10 minutes. The connector sends a fresh random 32-byte
 //!   key along, which both keep for later syncs: from then on the peers are **remembered** and connect by device id.
-//! - Every connection gets its own key: SHA-256 over the base key (code or peer key) and a random salt the connector
-//!   sends in clear, so a remembered peer key never repeats a nonce across connections. Frames are sealed with
+//! - Every connection gets its own key: SHA-256 over the base key (code or peer key) and two random salts sent in
+//!   clear, one from each side. The listener's salt means a recorded connection replayed later gets another key (its
+//!   frames don't open, and the listener never seals twice under one key and nonce). Frames are sealed with
 //!   ChaCha20-Poly1305; the nonce is the direction plus a counter.
-//! - Order: connector → header (clear: version, salt, its device id for a remembered peer), then sealed: connector's
+//! - Order: connector → header (clear: version, salt, its device id for a remembered peer), listener → its salt
+//!   (clear), then sealed: connector's
 //!   hello (device, new key), listener's hello (device; the connector can ask its user "send to X?" now), connector's
 //!   bundle, listener's bundle. Both then merge the other's bundle (`apply`): a two-way sync, newer wins.
 //!
@@ -49,7 +51,7 @@ pub const CODE_TTL: Duration = Duration::from_secs(10 * 60);
 const MAX_FRAME: usize = 32 << 20;
 /// How long either side waits for the other's next frame; the connector's user may be confirming meanwhile.
 const STEP_TIMEOUT: Duration = Duration::from_secs(120);
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PairError {
@@ -180,16 +182,15 @@ pub fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
+/// Lower-case hex only, so one value has one spelling (the host's replay check compares nonces as text).
 fn unhex(s: &str) -> Option<Vec<u8>> {
-    s.len()
-        .is_multiple_of(2)
-        .then(|| {
-            (0..s.len())
-                .step_by(2)
-                .map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok())
-                .collect()
-        })
-        .flatten()
+    if !s.len().is_multiple_of(2) || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return None;
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
+        .collect()
 }
 
 /// A new install's device id.
@@ -233,11 +234,13 @@ fn code_key(code: &str) -> [u8; 32] {
     h.finalize().into()
 }
 
-fn session_key(base: &[u8], salt: &[u8]) -> [u8; 32] {
+/// The connection's key: the base key and both sides' salts (the connector's first, then the listener's).
+fn session_key(base: &[u8], connector: &[u8], listener: &[u8]) -> [u8; 32] {
     let mut h = Sha256::new();
-    h.update(b"gerdtv-session-v1");
+    h.update(b"gerdtv-session-v2");
     h.update(base);
-    h.update(salt);
+    h.update(connector);
+    h.update(listener);
     h.finalize().into()
 }
 
@@ -418,7 +421,11 @@ async fn connect(
         from,
     };
     write_frame(&mut stream, &serde_json::to_vec(&header).unwrap()).await?;
-    let mut channel = Channel::new(stream, session_key(&base, &salt), false);
+    let theirs = read_frame(&mut stream).await?;
+    if theirs.len() != 16 {
+        return Err(PairError::Protocol);
+    }
+    let mut channel = Channel::new(stream, session_key(&base, &salt, &theirs), false);
     channel
         .send(&Hello {
             device: me.clone(),
@@ -471,12 +478,31 @@ pub struct Listener {
     pub port: u16,
     codes: Arc<Mutex<CodeState>>,
     task: tokio::task::JoinHandle<()>,
+    /// Replaces a shown code once it runs out, so the screen never shows one that can't work.
+    rotate: tokio::task::JoinHandle<()>,
 }
 
 impl Drop for Listener {
     fn drop(&mut self) {
         self.task.abort();
+        self.rotate.abort();
     }
+}
+
+/// How often the listener looks whether the shown code ran out.
+const ROTATE_EVERY: Duration = Duration::from_secs(15);
+
+/// Replaces an expired code with a fresh one (returned for the screen); None while the code is still good or none
+/// is shown.
+fn rotate_expired(codes: &Mutex<CodeState>, ttl: Duration) -> Option<String> {
+    let mut c = codes.lock().unwrap();
+    let (_, made) = c.code.as_ref()?;
+    if made.elapsed() <= ttl {
+        return None;
+    }
+    let fresh = new_code();
+    c.code = Some((fresh.clone(), Instant::now()));
+    Some(fresh)
 }
 
 impl Listener {
@@ -498,10 +524,21 @@ impl Listener {
         let listener = TcpListener::bind(("0.0.0.0", port)).await?;
         let port = listener.local_addr()?.port();
         let codes = Arc::new(Mutex::new(CodeState::default()));
+        let (c, rotate_events) = (codes.clone(), events.clone());
+        let rotate = tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(ROTATE_EVERY).await;
+                if let Some(fresh) = rotate_expired(&c, CODE_TTL) {
+                    let _ = rotate_events.send(Event::NewCode(fresh));
+                }
+            }
+        });
         let c = codes.clone();
         let task = tokio::spawn(async move {
             loop {
                 let Ok((stream, from)) = listener.accept().await else {
+                    // Out of file descriptors and the like: wait instead of spinning.
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                     continue;
                 };
                 let (local, codes, events) = (local.clone(), c.clone(), events.clone());
@@ -519,7 +556,12 @@ impl Listener {
                 });
             }
         });
-        Ok(Listener { port, codes, task })
+        Ok(Listener {
+            port,
+            codes,
+            task,
+            rotate,
+        })
     }
 
     /// Starts accepting a new code (shown to the user) and returns it.
@@ -566,7 +608,11 @@ async fn answer(
             code_key(&code).to_vec()
         }
     };
-    let mut channel = Channel::new(stream, session_key(&base, &salt), true);
+    // This side's salt: a replayed recording gets another key, so it neither opens nor makes this side seal twice
+    // under one key and nonce.
+    let mine = random::<16>();
+    write_frame(&mut stream, &mine).await?;
+    let mut channel = Channel::new(stream, session_key(&base, &salt, &mine), true);
     let hello: Hello = channel.receive().await?;
     // A remembered peer must say who it claimed to be in clear.
     if header
@@ -628,8 +674,8 @@ pub fn snapshot(local: &Local) -> Result<Bundle> {
     })
 }
 
-/// The app keys after a sync: the other side's whole set when it changed them later, else ours with its gaps filled.
-/// None: nothing changes here.
+/// The app keys after a sync, the same on both sides from one exchange: the set changed last wins whole (a key removed
+/// there is removed here); at the same time the two sets fill each other's gaps. None: nothing changes here.
 pub fn merge_keys(
     local: &BTreeMap<String, String>,
     local_at: i64,
@@ -638,6 +684,8 @@ pub fn merge_keys(
 ) -> Option<(BTreeMap<String, String>, i64)> {
     let merged = if their_at > local_at {
         (theirs.clone(), their_at)
+    } else if their_at < local_at {
+        (local.clone(), local_at)
     } else {
         let mut m = local.clone();
         for (k, v) in theirs {
@@ -694,7 +742,10 @@ pub fn apply(
             let added = here.is_none();
             Some(AppliedProfile {
                 profile: if newer { b.profile } else { here.unwrap() },
-                login: (newer && known.is_none_or(|p| p.login != b.login)).then_some(b.login),
+                // The login to store: a newer profile's, or any profile that isn't this side's open one (its stored
+                // login is unknown here, e.g. the host switched profiles and back); unchanged ones aren't rewritten.
+                login: ((newer || known.is_none()) && known.is_none_or(|p| p.login != b.login))
+                    .then_some(b.login),
                 services,
                 added,
             })
@@ -1052,11 +1103,14 @@ mod tests {
                 Some((m(&[("tmdb", "b")]), 20)),
             ),
             (m(&[("tmdb", "a")]), 20, m(&[("tmdb", "b")]), 10, None),
+            // Newer here: kept whole, so both sides end with the same set (the other side takes it whole).
+            (m(&[("tmdb", "a")]), 20, m(&[("os", "c")]), 10, None),
+            // The same time: the two fill each other's gaps.
             (
                 m(&[("tmdb", "a")]),
                 20,
                 m(&[("os", "c")]),
-                10,
+                20,
                 Some((m(&[("tmdb", "a"), ("os", "c")]), 20)),
             ),
             (m(&[]), 0, m(&[]), 0, None),
@@ -1249,6 +1303,104 @@ mod tests {
         assert_eq!(plain, br#"{"url":"x"}"#);
     }
 
+    /// A sync recorded on the network and played back later gets nowhere: the listener's own salt makes another key.
+    #[tokio::test]
+    async fn a_replayed_sync_is_refused() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let tv = side("tv", Some("p1"), None, 100);
+        let phone = side("phone", Some("p1"), Some("live:7"), 50);
+        let key = hex(&random::<32>());
+        let mut tv_local = tv.clone();
+        tv_local.peers = vec![Peer {
+            device: phone.me.clone(),
+            key: key.clone(),
+            addr: String::new(),
+            web: String::new(),
+        }];
+        let (listener, _shared, mut rx) = listen(tv_local).await;
+        let target = format!("127.0.0.1:{}", listener.port);
+        // A relay that records what the phone sends.
+        let relay = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let relay_addr = relay.local_addr().unwrap().to_string();
+        let recorded = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let rec = recorded.clone();
+        let t = target.clone();
+        tokio::spawn(async move {
+            let (mut inbound, _) = relay.accept().await.unwrap();
+            let mut outbound = TcpStream::connect(&t).await.unwrap();
+            let (mut ir, mut iw) = inbound.split();
+            let (mut or, mut ow) = outbound.split();
+            let up = async {
+                let mut buf = [0u8; 4096];
+                loop {
+                    let n = ir.read(&mut buf).await.unwrap_or(0);
+                    if n == 0 {
+                        break;
+                    }
+                    rec.lock().unwrap().extend_from_slice(&buf[..n]);
+                    if ow.write_all(&buf[..n]).await.is_err() {
+                        break;
+                    }
+                }
+            };
+            let down = tokio::io::copy(&mut or, &mut iw);
+            let _ = tokio::join!(up, down);
+        });
+        let peer = Peer {
+            device: tv.me.clone(),
+            key,
+            addr: relay_addr.clone(),
+            web: String::new(),
+        };
+        connect_peer(&relay_addr, &phone.me, None, &peer)
+            .await
+            .unwrap()
+            .exchange(&phone)
+            .await
+            .unwrap();
+        applied(&mut rx).await;
+        // Played back to the listener: refused at the first sealed frame, nothing applied.
+        let bytes = recorded.lock().unwrap().clone();
+        let mut again = TcpStream::connect(&target).await.unwrap();
+        again.write_all(&bytes).await.unwrap();
+        let mut sink = Vec::new();
+        let _ = again.read_to_end(&mut sink).await;
+        match rx.recv().await.unwrap() {
+            Event::Failed(e) => assert!(e.contains("code") || e.contains("unexpected"), "{e}"),
+            other => panic!("a replay was taken: {other:?}"),
+        }
+        for d in [&tv.dir, &phone.dir] {
+            std::fs::remove_dir_all(d).unwrap();
+        }
+    }
+
+    #[test]
+    fn an_expired_code_is_replaced_by_itself() {
+        let codes = Mutex::new(CodeState::default());
+        assert_eq!(
+            rotate_expired(&codes, Duration::ZERO),
+            None,
+            "no code shown"
+        );
+        codes.lock().unwrap().code = Some(("OLD".into(), Instant::now()));
+        assert_eq!(
+            rotate_expired(&codes, Duration::from_secs(600)),
+            None,
+            "still good"
+        );
+        let fresh = rotate_expired(&codes, Duration::ZERO).unwrap();
+        assert_ne!(fresh, "OLD");
+        assert_eq!(codes.lock().unwrap().code.as_ref().unwrap().0, fresh);
+    }
+
+    #[test]
+    fn hex_has_one_spelling() {
+        assert_eq!(unhex("0a"), Some(vec![10]));
+        assert_eq!(unhex("0A"), None);
+        assert_eq!(unhex("+a"), None);
+        assert_eq!(unhex("abc"), None);
+    }
+
     #[test]
     fn an_older_profile_keeps_this_sides_login_but_merges_user_data() {
         let here = side("here", Some("p1"), Some("live:1"), 200);
@@ -1263,6 +1415,18 @@ mod tests {
         let lib = Library::open(&here.dir, "p1", vec!["u".into(), "p".into()]).unwrap();
         let data = lib.export_user_data().unwrap();
         assert!(data.contains("live:1") && data.contains("live:2"));
+        // Here another profile is open (the host switched and comes back to p1): its stored login is unknown here, so
+        // the one that came is returned to be stored, older or not.
+        let mut switched = here.clone();
+        switched.secrets.profile = Some(ProfileSecrets {
+            id: "p2".into(),
+            ..Default::default()
+        });
+        let a = apply(&switched, &there.me, None, snapshot(&there).unwrap()).unwrap();
+        assert_eq!(
+            a.profile.unwrap().login,
+            Some(vec!["user-there".to_string(), "pass-there".to_string()])
+        );
         for d in [&here.dir, &there.dir] {
             std::fs::remove_dir_all(d).unwrap();
         }

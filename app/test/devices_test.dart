@@ -3,6 +3,7 @@
 // screen: a login link with its QR, and ending a web session. And a start without paired devices leaves secure
 // storage alone. The protocol and the
 // merge rules are the core's tests (pairing.rs).
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/devices_screen.dart';
@@ -35,7 +36,31 @@ class _Secrets extends Secrets {
   ) async {}
 }
 
+/// Secure storage in memory, behind the real Secrets (so its change hook runs).
+class _MemoryStorage extends Fake implements FlutterSecureStorage {
+  final items = <String, String>{};
+
+  @override
+  dynamic noSuchMethod(Invocation i) {
+    final key = i.namedArguments[#key] as String;
+    switch (i.memberName) {
+      case #read:
+        return Future<String?>.value(items[key]);
+      case #write:
+        items[key] = i.namedArguments[#value] as String;
+        return Future<void>.value();
+      case #delete:
+        items.remove(key);
+        return Future<void>.value();
+    }
+    return super.noSuchMethod(i);
+  }
+}
+
 class _Listener extends Fake implements PairListener {
+  /// How often the app handed it a new state.
+  int updates = 0;
+
   @override
   int port() => 4100;
 
@@ -46,7 +71,7 @@ class _Listener extends Fake implements PairListener {
   void clearCode() {}
 
   @override
-  void update({required LocalInfo local}) {}
+  void update({required LocalInfo local}) => updates++;
 
   /// Nothing happens on this side in these tests.
   @override
@@ -115,11 +140,13 @@ class _PairingCore extends FakeCore {
   QrInfo crateApiPairingPairQr({required String text}) =>
       QrInfo(width: 21, modules: List.filled(21 * 21, true));
 
+  final listener = _Listener();
+
   @override
   Future<PairListener> crateApiPairingPairListenerStart({
     required LocalInfo local,
     required bool announce,
-  }) async => _Listener();
+  }) async => listener;
 
   @override
   Future<List<FoundDevice>> crateApiPairingPairDiscover({
@@ -167,6 +194,23 @@ void main() {
     await session.devices.init();
     expect(secrets.reads, ['peers.app'], reason: 'with one paired: the list');
     core.appSettings.remove('paired_devices');
+  });
+
+  test('a key or token changed here reaches the running listener', () async {
+    // Else a sync started by the other device answers with the old keys and overwrites the new one.
+    final secrets = Secrets(_MemoryStorage());
+    final session = Session(secrets: secrets, appDir: '/nonexistent');
+    await session.devices.init();
+    await session.devices.startPairing();
+    final before = core.listener.updates;
+    session.devices.keysChanged();
+    await Future<void>.delayed(Duration.zero);
+    expect(core.listener.updates, greaterThan(before));
+    final after = core.listener.updates;
+    await secrets.writeService('p1', 'premiumize', 'pm');
+    await Future<void>.delayed(Duration.zero);
+    expect(core.listener.updates, greaterThan(after));
+    session.devices.stopPairing();
   });
 
   testWidgets('show a code: its QR and the code', (tester) async {
