@@ -144,6 +144,12 @@ test-epg-budget:
 # Opt-in checks against the real account in the GERDTV_* environment (counts and timings only; docs/SETUP.md).
 test-live:
     cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1
+    cargo test -q -p gerdtv-host --release --test live -- --ignored --nocapture --test-threads 1
+
+# The web player in headless Chrome against the mock panel (gerdtv-host's tests/web_smoke.rs; needs Chrome and Node).
+# Screenshots: ~/gerdTV-screens/<branch>/web-*.png.
+test-web:
+    cargo test -q -p gerdtv-host --test web_smoke -- --ignored
 
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 # Expanded reporter: every test's output (the JOURNEY steps) prints as it happens, so a hang shows where it stopped.

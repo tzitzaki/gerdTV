@@ -2,10 +2,10 @@
 # The version is set by the wrap-up PR (0.YYMMDD.<PR#>, docs/RELEASING.md) together with app/pubspec.yaml.
 [workspace]
 resolver = "3"
-members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release"]
+members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release", "crates/gerdtv-host"]
 
 [workspace.package]
-version = "0.261127.65"
+version = "0.261127.66"
 edition = "2024"
 license = "GPL-3.0-only"
 
@@ -29,6 +29,11 @@ libmpv2 = "7.0.1"
 # Google Cast (owner decision, Spike C): exact, as it is pre-1.0 and says breaking changes may come; its mDNS
 # discovery uses mdns-sd (pre-approved), not called on iOS (Apple's Bonjour browser there).
 oxicast = { version = "=0.0.5", default-features = false, features = ["discovery"] }
+# Device pairing (owner-approved): the transfer is sealed with the one-time key from the pairing code; QR codes are
+# only encoded (no image/svg output: the app paints the module matrix itself); mdns-sd at oxicast's version.
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+qrcode = { version = "0.15.0", default-features = false, features = ["std"] }
+mdns-sd = "0.20.3"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros", "signal"] }
 
 [workspace.lints.clippy]

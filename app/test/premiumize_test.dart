@@ -73,7 +73,7 @@ void main() {
     expect(secrets.services, {'premiumize.p1': 'good-key'});
     expect(session.premiumizeToken, 'good-key');
     // Linked, it is a section of its own after Series.
-    expect(shellPages(premiumize: true).map((p) => p.name), [
+    expect(shellPages(provider: true, premiumize: true).map((p) => p.name), [
       'tv',
       'movies',
       'series',
@@ -81,7 +81,7 @@ void main() {
       'settings',
     ]);
     expect(
-      shellPages(premiumize: false),
+      shellPages(provider: true, premiumize: false),
       isNot(contains(ShellPage.premiumize)),
     );
     expect(

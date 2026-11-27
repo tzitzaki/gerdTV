@@ -1,6 +1,7 @@
 // The app shell (docs/DESIGN.md): a sidebar on wide windows (desktop, tablet), a bottom bar on phones. Sections:
-// TV (the channel lists or the guide grid, switched beside its search field and remembered), Movies, Series, Premiumize
-// while an account is linked, Settings. TV, Movies and Series have their own search on top (section_search.dart), whose
+// TV (the channel lists or the guide grid, switched beside its search field and remembered), Movies, Series (all three
+// only with a provider: setup can be skipped), Premiumize while an account is linked, Settings; Settings alone shows
+// without a navigation bar. TV, Movies and Series have their own search on top (section_search.dart), whose
 // query the shell keeps while another section is shown. While a sync runs, a thin bar shows at the top; a failed sync
 // says so with a retry, over the cached catalogue. On phones a horizontal fling switches to the neighbouring section
 // (not on the guide, whose grid scrolls sideways).
@@ -25,10 +26,18 @@ enum ShellPage { tv, movies, series, premiumize, settings }
 /// Profile setting: TV shows the guide grid ("guide") or the channel lists (default).
 const tvViewSetting = 'tv_view';
 
-/// The sections shown: Premiumize only while an account is linked.
-List<ShellPage> shellPages({required bool premiumize}) => [
+/// The sections shown: TV, Movies and Series only with a provider, Premiumize only while an account is linked.
+List<ShellPage> shellPages({
+  required bool provider,
+  required bool premiumize,
+}) => [
   for (final p in ShellPage.values)
-    if (p != ShellPage.premiumize || premiumize) p,
+    if (switch (p) {
+      ShellPage.tv || ShellPage.movies || ShellPage.series => provider,
+      ShellPage.premiumize => premiumize,
+      ShellPage.settings => true,
+    })
+      p,
 ];
 
 class Shell extends StatefulWidget {
@@ -58,6 +67,10 @@ class _ShellState extends State<Shell> {
   final _focus = {for (final s in SearchSection.values) s: FocusNode()};
   final _settingsFocus = FocusNode();
 
+  /// The shell's own focus: a section switch takes it back, so a field of the section left behind (Settings' search)
+  /// can't keep the keyboard outside the new section, where typing would no longer start its search.
+  final _shellFocus = FocusNode(skipTraversal: true);
+
   @override
   void dispose() {
     for (final c in _queries.values) {
@@ -67,6 +80,7 @@ class _ShellState extends State<Shell> {
       f.dispose();
     }
     _settingsFocus.dispose();
+    _shellFocus.dispose();
     super.dispose();
   }
 
@@ -139,11 +153,20 @@ class _ShellState extends State<Shell> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final s = widget.session;
-    final pages = shellPages(premiumize: s.premiumizeToken != null);
-    // Unlinked while shown (another profile): back to TV.
-    if (!pages.contains(_page)) _page = ShellPage.tv;
+    final pages = shellPages(
+      provider: s.hasProvider,
+      premiumize: s.premiumizeToken != null,
+    );
+    // Unlinked while shown (another profile), or no provider: the first section there is.
+    if (!pages.contains(_page)) _page = pages.first;
+    // Settings alone (no provider, nothing linked): no navigation, which needs two destinations.
+    final nav = pages.length > 1;
     final index = pages.indexOf(_page);
-    void go(int i) => setState(() => _page = pages[i]);
+    void go(int i) {
+      setState(() => _page = pages[i]);
+      _shellFocus.requestFocus();
+    }
+
     final destinations = [
       for (final p in pages)
         switch (p) {
@@ -208,6 +231,7 @@ class _ShellState extends State<Shell> {
       focus: section == null ? _settingsFocus : _focus[section]!,
       field: section == null ? null : _queries[section],
       child: Focus(
+        focusNode: _shellFocus,
         autofocus: true,
         child: LayoutBuilder(
           builder: (context, c) {
@@ -216,28 +240,30 @@ class _ShellState extends State<Shell> {
                 body: SafeArea(
                   child: Row(
                     children: [
-                      NavigationRail(
-                        selectedIndex: index,
-                        labelType: NavigationRailLabelType.all,
-                        leading: ListenableBuilder(
-                          listenable: s,
-                          builder: (context, _) => Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: Tokens.space,
+                      if (nav) ...[
+                        NavigationRail(
+                          selectedIndex: index,
+                          labelType: NavigationRailLabelType.all,
+                          leading: ListenableBuilder(
+                            listenable: s,
+                            builder: (context, _) => Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: Tokens.space,
+                              ),
+                              child: AppLogoMark(logo: s.logo, size: 40),
                             ),
-                            child: AppLogoMark(logo: s.logo, size: 40),
                           ),
+                          onDestinationSelected: go,
+                          destinations: [
+                            for (final d in destinations)
+                              NavigationRailDestination(
+                                icon: Icon(d.$1),
+                                label: Text(d.$2),
+                              ),
+                          ],
                         ),
-                        onDestinationSelected: go,
-                        destinations: [
-                          for (final d in destinations)
-                            NavigationRailDestination(
-                              icon: Icon(d.$1),
-                              label: Text(d.$2),
-                            ),
-                        ],
-                      ),
-                      const VerticalDivider(width: 1),
+                        const VerticalDivider(width: 1),
+                      ],
                       Expanded(child: body),
                     ],
                   ),
@@ -257,14 +283,16 @@ class _ShellState extends State<Shell> {
                   child: body,
                 ),
               ),
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: index,
-                onDestinationSelected: go,
-                destinations: [
-                  for (final d in destinations)
-                    NavigationDestination(icon: Icon(d.$1), label: d.$2),
-                ],
-              ),
+              bottomNavigationBar: nav
+                  ? NavigationBar(
+                      selectedIndex: index,
+                      onDestinationSelected: go,
+                      destinations: [
+                        for (final d in destinations)
+                          NavigationDestination(icon: Icon(d.$1), label: d.$2),
+                      ],
+                    )
+                  : null,
             );
           },
         ),

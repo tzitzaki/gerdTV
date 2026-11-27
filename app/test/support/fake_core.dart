@@ -40,6 +40,46 @@ class FakeCore implements RustLibApi {
     required String dir,
   }) async => profiles;
 
+  /// What Library.open returns (tests hand in a fake Library); null: opening fails.
+  Library Function()? openLibrary;
+
+  @override
+  Future<Library> crateApiLibraryLibraryOpen({
+    required String dir,
+    required String profileId,
+    required List<String> secrets,
+  }) async => openLibrary?.call() ?? (throw 'FakeCore: no library to open');
+
+  /// Deleted profiles' ids.
+  final deleted = <String>[];
+
+  @override
+  Future<void> crateApiLibraryDeleteProfile({
+    required String dir,
+    required String id,
+  }) async => deleted.add(id);
+
+  /// Login checks: [loginError] is thrown (null: every login works); [saved] collects every saved profile.
+  String? loginError;
+  final saved = <ProfileInfo>[];
+
+  @override
+  Future<void> crateApiLibraryCheckLogin({
+    required ProfileInfo profile,
+    required List<String> secrets,
+  }) async {
+    if (loginError != null) throw loginError!;
+  }
+
+  @override
+  Future<ProfileInfo> crateApiLibrarySaveProfile({
+    required String dir,
+    required ProfileInfo profile,
+  }) async {
+    saved.add(profile);
+    return profile;
+  }
+
   /// Premiumize: every key but "bad" is accepted (the real check asks Premiumize's account/info).
   @override
   Future<void> crateApiPremiumizePmCheck({required String token}) async {
@@ -90,8 +130,9 @@ class FakeCore implements RustLibApi {
 
 FakeCore? _core;
 
-/// Installs [FakeCore] once per test process (RustLib can only be initialised once) and returns it.
-FakeCore useFakeCore() {
-  if (_core == null) RustLib.initMock(api: _core = FakeCore());
+/// Installs [FakeCore] (or a test's subclass, [core]) once per test process (RustLib can only be initialised once)
+/// and returns it.
+FakeCore useFakeCore([FakeCore? core]) {
+  if (_core == null) RustLib.initMock(api: _core = core ?? FakeCore());
   return _core!;
 }

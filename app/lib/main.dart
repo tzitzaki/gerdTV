@@ -17,6 +17,7 @@ import 'platform/sandbox_migration.dart';
 import 'screens/cast_ui.dart';
 import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
+import 'screens/devices_screen.dart';
 import 'screens/profile_picker.dart';
 import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
@@ -65,6 +66,13 @@ Future<void> main() async {
   unawaited(session.reminders!.init());
   unawaited(session.start());
   session.platform.attach();
+  // The camera's pairing link (gerdtv://pair…): connect and ask before anything is sent.
+  session.devices.link.addListener(() {
+    final link = session.devices.link.value;
+    if (link == null) return;
+    session.devices.link.value = null;
+    unawaited(openPairLink(session, link));
+  });
   runApp(GerdTvApp(session: session));
 }
 
