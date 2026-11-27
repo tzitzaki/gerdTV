@@ -5,7 +5,8 @@
 //   device's name and platform are shown and nothing is sent before Sync is pressed ("pair as you scan").
 // - Paired devices: Sync now (two-way) and Forget.
 // No dialog except Forget's confirmation (the design's one modal); the camera's link opens [PairLinkScreen], the same
-// confirmation as a page.
+// confirmation as a page. The code part ([PairCodeView]) and the nearby part ([NearbyDevices]) are shared with the
+// first run's welcome screen (welcome_screen.dart), so both pair the same way.
 
 import 'dart:async';
 
@@ -27,12 +28,6 @@ class DevicesScreen extends StatefulWidget {
 
 class _DevicesScreenState extends State<DevicesScreen> {
   String? _qr;
-  List<FoundDevice>? _found;
-  bool _searching = false;
-
-  /// The device picked from the list, waiting for its code.
-  FoundDevice? _picked;
-  final _code = TextEditingController();
   String? _status;
 
   @override
@@ -41,7 +36,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final d = widget.session.devices;
     d.applied.addListener(_onApplied);
     d.failed.addListener(_onFailed);
-    unawaited(_search());
   }
 
   @override
@@ -50,7 +44,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     d.applied.removeListener(_onApplied);
     d.failed.removeListener(_onFailed);
     if (_qr != null) d.stopPairing();
-    _code.dispose();
     super.dispose();
   }
 
@@ -73,49 +66,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     if (mounted) setState(() => _qr = qr);
   }
 
-  Future<void> _search() async {
-    setState(() => _searching = true);
-    final found = await widget.session.devices.discover().catchError(
-      (_) => <FoundDevice>[],
-    );
-    if (mounted) {
-      setState(() {
-        _found = found;
-        _searching = false;
-      });
-    }
-  }
-
-  Future<void> _connect() async {
-    final picked = _picked!;
-    final l10n = AppLocalizations.of(context);
-    setState(() => _status = null);
-    try {
-      final c = await widget.session.devices.connectCode(
-        picked.addr,
-        _code.text,
-      );
-      if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => PairConfirmScreen(
-            session: widget.session,
-            connection: c,
-            addr: picked.addr,
-          ),
-        ),
-      );
-      if (mounted) {
-        setState(() {
-          _picked = null;
-          _code.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _status = l10n.devicesFailed('$e'));
-    }
-  }
-
   Future<void> _syncNow(PeerInfo p) async {
     final l10n = AppLocalizations.of(context);
     setState(() => _status = l10n.devicesSyncing);
@@ -124,16 +74,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
       if (mounted) setState(() => _status = l10n.devicesSynced(a.peer.name));
     } catch (e) {
       if (mounted) setState(() => _status = l10n.devicesFailed('$e'));
-    }
-  }
-
-  /// The webcam's QR: a pairing link opens its confirmation (as the system camera's link does); anything else says so.
-  Future<void> _scan(AppLocalizations l10n) async {
-    final text = await PlatformBridge.scanQr(l10n.devicesScanCamera);
-    if (text == null || !mounted) return; // closed, or no camera
-    if (!widget.session.devices.openLink(text)) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.devicesScanNotCode)));
     }
   }
 
@@ -197,90 +137,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
               onTap: _showCode,
             )
           else
-            ValueListenableBuilder<String?>(
-              valueListenable: d.code,
-              builder: (context, code, _) => Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Tokens.space * 2,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // A new code (the old one was used) changes the QR too.
-                    QrView(text: d.qrText() ?? _qr!, size: 220),
-                    const SizedBox(height: Tokens.space * 2),
-                    SelectableText(
-                      code ?? '',
-                      key: const Key('devices.code'),
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    Text('${d.me.name} · ${l10n.devicesWaiting}'),
-                    const SizedBox(height: Tokens.space),
-                    Text(l10n.devicesShowCodeHint),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PairCodeView(session: widget.session, qr: _qr!),
+                  const SizedBox(height: Tokens.space),
+                  Text(l10n.devicesShowCodeHint),
+                ],
               ),
             ),
           // This device connects to one it finds.
           heading(l10n.devicesNearby),
-          // The Mac has no system camera that opens links: its webcam scans the other device's QR here.
-          if (PlatformBridge.canScanQr)
-            ListTile(
-              key: const Key('devices.scan'),
-              leading: const Icon(Icons.qr_code_scanner),
-              title: Text(l10n.devicesScanCamera),
-              onTap: () => _scan(l10n),
-            ),
-          if (_searching) const LinearProgressIndicator(),
-          for (final f in _found ?? const <FoundDevice>[])
-            ListTile(
-              key: Key('devices.found.${f.device.id}'),
-              leading: const Icon(Icons.devices_other),
-              title: Text(f.device.name),
-              subtitle: Text(f.device.platform),
-              selected: _picked?.device.id == f.device.id,
-              onTap: () => setState(() => _picked = f),
-            ),
-          if (_found != null && _found!.isEmpty && !_searching)
-            ListTile(title: Text(l10n.devicesNoneFound)),
-          if (_picked != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('devices.codeField'),
-                      controller: _code,
-                      autofocus: true,
-                      autocorrect: false,
-                      // Six digits: the number pad (a TV remote's too).
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: l10n.devicesEnterCode(_picked!.device.name),
-                      ),
-                      onSubmitted: (_) => _connect(),
-                    ),
-                  ),
-                  const SizedBox(width: Tokens.space),
-                  FilledButton(
-                    key: const Key('devices.connect'),
-                    onPressed: _connect,
-                    child: Text(l10n.devicesNext),
-                  ),
-                ],
-              ),
-            ),
-          ListTile(
-            key: const Key('devices.search'),
-            leading: const Icon(Icons.refresh),
-            title: Text(l10n.devicesSearch),
-            subtitle: Text(l10n.devicesScanHint),
-            enabled: !_searching,
-            onTap: _search,
+          NearbyDevices(
+            session: widget.session,
+            onStatus: (m) => setState(() => _status = m),
           ),
           // Remembered devices.
           ValueListenableBuilder<List<PeerInfo>>(
@@ -397,6 +269,196 @@ class _PairConfirmScreenState extends State<PairConfirmScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// This device's pairing code while it listens ([Devices.startPairing] gave [qr]): the QR for a phone's camera, the
+/// code to type on the other device, and this device's name. A new code (the old one was used) changes the QR too.
+class PairCodeView extends StatelessWidget {
+  const PairCodeView({super.key, required this.session, required this.qr});
+  final Session session;
+  final String qr;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final d = session.devices;
+    final theme = Theme.of(context);
+    return ValueListenableBuilder<String?>(
+      valueListenable: d.code,
+      builder: (context, code, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          QrView(text: d.qrText() ?? qr, size: 220),
+          const SizedBox(height: Tokens.space * 2),
+          SelectableText(
+            code ?? '',
+            key: const Key('devices.code'),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+              letterSpacing: 2,
+            ),
+          ),
+          Text('${d.me.name} · ${l10n.devicesWaiting}'),
+        ],
+      ),
+    );
+  }
+}
+
+/// The gerdTV devices this one finds on the network (searched on open), the Mac's webcam scan, and for a picked
+/// device its code field; Next connects and opens [PairConfirmScreen], which shows who answered before anything is
+/// sent. Errors go to [onStatus] (the page shows them on top).
+class NearbyDevices extends StatefulWidget {
+  const NearbyDevices({
+    super.key,
+    required this.session,
+    required this.onStatus,
+  });
+  final Session session;
+  final ValueChanged<String?> onStatus;
+
+  @override
+  State<NearbyDevices> createState() => _NearbyDevicesState();
+}
+
+class _NearbyDevicesState extends State<NearbyDevices> {
+  List<FoundDevice>? _found;
+  bool _searching = false;
+
+  /// The device picked from the list, waiting for its code.
+  FoundDevice? _picked;
+  final _code = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_search());
+  }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    setState(() => _searching = true);
+    final found = await widget.session.devices.discover().catchError(
+      (_) => <FoundDevice>[],
+    );
+    if (mounted) {
+      setState(() {
+        _found = found;
+        _searching = false;
+      });
+    }
+  }
+
+  Future<void> _connect() async {
+    final picked = _picked!;
+    final l10n = AppLocalizations.of(context);
+    widget.onStatus(null);
+    try {
+      final c = await widget.session.devices.connectCode(
+        picked.addr,
+        _code.text,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PairConfirmScreen(
+            session: widget.session,
+            connection: c,
+            addr: picked.addr,
+          ),
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _picked = null;
+          _code.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) widget.onStatus(l10n.devicesFailed('$e'));
+    }
+  }
+
+  /// The webcam's QR: a pairing link opens its confirmation (as the system camera's link does); anything else says so.
+  Future<void> _scan(AppLocalizations l10n) async {
+    final text = await PlatformBridge.scanQr(l10n.devicesScanCamera);
+    if (text == null || !mounted) return; // closed, or no camera
+    if (!widget.session.devices.openLink(text)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.devicesScanNotCode)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // The Mac has no system camera that opens links: its webcam scans the other device's QR here.
+        if (PlatformBridge.canScanQr)
+          ListTile(
+            key: const Key('devices.scan'),
+            leading: const Icon(Icons.qr_code_scanner),
+            title: Text(l10n.devicesScanCamera),
+            onTap: () => _scan(l10n),
+          ),
+        if (_searching) const LinearProgressIndicator(),
+        for (final f in _found ?? const <FoundDevice>[])
+          ListTile(
+            key: Key('devices.found.${f.device.id}'),
+            leading: const Icon(Icons.devices_other),
+            title: Text(f.device.name),
+            subtitle: Text(f.device.platform),
+            selected: _picked?.device.id == f.device.id,
+            onTap: () => setState(() => _picked = f),
+          ),
+        if (_found != null && _found!.isEmpty && !_searching)
+          ListTile(title: Text(l10n.devicesNoneFound)),
+        if (_picked != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('devices.codeField'),
+                    controller: _code,
+                    autofocus: true,
+                    autocorrect: false,
+                    // Six digits: the number pad (a TV remote's too).
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: l10n.devicesEnterCode(_picked!.device.name),
+                    ),
+                    onSubmitted: (_) => _connect(),
+                  ),
+                ),
+                const SizedBox(width: Tokens.space),
+                FilledButton(
+                  key: const Key('devices.connect'),
+                  onPressed: _connect,
+                  child: Text(l10n.devicesNext),
+                ),
+              ],
+            ),
+          ),
+        ListTile(
+          key: const Key('devices.search'),
+          leading: const Icon(Icons.refresh),
+          title: Text(l10n.devicesSearch),
+          subtitle: Text(l10n.devicesScanHint),
+          enabled: !_searching,
+          onTap: _search,
+        ),
+      ],
     );
   }
 }
