@@ -538,10 +538,8 @@ class _MaterialDesktopVideoControlsState
                   controller(context).player.next(),
               const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious):
                   () => controller(context).player.previous(),
-              const SingleActivator(LogicalKeyboardKey.space): () {
-                debugPrint('DIAG media_kit default space'); // TEMP
-                controller(context).player.playOrPause();
-              },
+              const SingleActivator(LogicalKeyboardKey.space): () =>
+                  controller(context).player.playOrPause(),
               const SingleActivator(LogicalKeyboardKey.keyJ): () {
                 final rate = controller(context).player.state.position -
                     const Duration(seconds: 10);
@@ -626,7 +624,6 @@ class _MaterialDesktopVideoControlsState
                                       tapPadding) {
                             // Only play and pause when the bottom seek bar is visible
                             // and when clicking outside of the bottom seek bar region
-                            debugPrint('DIAG media_kit tap playOrPause'); // TEMP
                             controller(context).player.playOrPause();
                           }
                         },
