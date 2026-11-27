@@ -12,3 +12,4 @@ app-wide, shared pairing widgets, direct APK/IPA links (welcome QR, iPhone updat
 6. Docs: 00:18
 8. Updater (check, bar, background download, macOS on quit): 00:35
 9. Auto-sync with the host: 00:43
+10. Docs for updates and auto-sync: 00:50

@@ -18,7 +18,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
-- Updates: Settings → About → Updates says up to date on the newest release; on an older one it offers the new version, downloads it and opens Downloads.
+- Updates: on an older release the bar under the app appears within a minute; quitting gerdTV installs it (the next start is new), or Install and restart.
 - Sandbox off: after updating from a sandboxed release, profiles, favourites and the login are still there without entering anything again.
 - Install and restart: gerdTV restarts on the new version within seconds; no `gerdTV.previous.app` in Applications, and the zip is gone from Downloads.
 - Logo: the Dock and Finder show the orange gTV icon; picking another logo in Settings → Appearance changes the Dock icon at once and after a restart.
@@ -39,7 +39,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Devices & sync: scanning the Mac's or Shield's pairing QR with the camera opens gerdTV, names the device, Sync moves the profile.
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
-- Updates: on an older release, Settings → About → Updates → Download the IPA opens the file itself in Safari.
+- Updates: on an older release the bar under the app appears within a minute; Download the IPA opens the file itself in Safari.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
 - Home: floats only what plays, no black; returning closes the window (one picture); the button closes the player, restore reopens it.
 - Lock: sound plays on 5 min, picture at once after; the lock screen card shows title, programme, logo; its and a headset's pause work.
@@ -51,7 +51,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Cast: the local network prompt comes once, then Cast to a device lists devices (Bonjour); casting a movie works.
 
 ## Android phone
-- Get the app: the TV welcome's Android QR installs the APK; on mobile data, Sync now with the Shield works through the host.
+- Get the app: the TV welcome's Android QR installs the APK; a favourite set on mobile data reaches the Shield by itself (auto-sync via the host).
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
 - PiP: Home floats a playing channel (not after Stop or paused), a tap returns; lock screen: the card with title, programme, play/pause.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
@@ -76,7 +76,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Search: Up reaches the section's search field; typed or spoken (its mic) words find channels of every group.
 - Guide grid: the D-pad moves between programme cells in all four directions, the focused one stays in view, OK opens its sheet.
 - Zapping: Up/Down, banner at the bottom; OK opens the list, Left from it Stop; Left skips 10 s back ("−0:10", Live), Right to now.
-- Updates: on an older release, Download then Install opens the system's installer (asking once to allow gerdTV) and the new version starts.
+- Updates: on an older release the bar's Install (after its background download) opens the system's installer and the new version starts.
 - Logo: picking another logo in Settings → Appearance changes the banner in the launcher row (if not, the banner stays the gTV wordmark).
 - Your data: Export says Downloads/gerdtv-….json; Import opens a file picker that reaches that file (if none opens, note the error shown).
 - Recordings: a recording keeps running with the screen off; its folder: the system picker, or without one a USB drive's gerdTV folder.

@@ -46,6 +46,8 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Host updates: the host updates itself (`gerdtv-host update`, nightly by a root timer the owner enables) from the signed `latest.json`, keeping the old binary for an automatic rollback; a VM snapshot is the owner's `--before` command, not code in the repo.
 - First run is a welcome screen that pairs with another device (QR, code, nearby devices), with no provider form; Skip opens the app without a provider: all of Settings works and only initialised sections show; the provider's login is added or edited in Settings → Account and replaces the old one only once it works.
 - Pairing and sync across networks go through the user's own gerdTV host (a relay that can't read the frames), never a third-party service; the LAN is always tried first and stays the normal way.
+- Auto-sync: the paired host is the hub; apps sync with it at the start, on return to the front and after a settled change, quietly.
+- Updates: checked by gerdTV itself, fetched in the background where it can install, macOS installs on quit; a bar tells, never a dialog.
 - D-pad Up/Down leave a text field for the control above or below, in every form (one shortcut map around the navigator).
 - Shared logic and values live once, in a named function, widget or constant; reuse before writing, and merge copies when touching them.
 - User data export: the open profile only, no secrets; import merges row by row (newer `updated_at` wins, nothing is deleted).
