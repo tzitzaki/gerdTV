@@ -2,7 +2,7 @@
 
 App-wide settings (`app_logo`, `theme_mode`, `theme_accent`, `theme_tinted`, `theme_black`) in `app.json` in the app-support folder, a flat string map rewritten atomically (`app_setting` in `crates/gerdtv-core/src/library.rs`).
 
-Devices & sync (`crates/gerdtv-core/src/pairing.rs`): the remembered devices (id, name, platform, key, last address) are one JSON list in secure storage (`gerdtv.peers.app`); `app.json` holds this install's `device_id` and `keys_updated_at` (when the TMDB and OpenSubtitles keys last changed here). A profile from another device keeps its `updated_at`, so the next sync compares real edit times.
+Devices & sync (`crates/gerdtv-core/src/pairing.rs`): the remembered devices (id, name, platform, key, last address) are one JSON list in secure storage (`gerdtv.peers.app`); `app.json` holds this install's `device_id`, `keys_updated_at` (when the TMDB and OpenSubtitles keys last changed here) and `paired_devices` (how many are remembered: secure storage is read at start only when there are any). A profile from another device keeps its `updated_at`, so the next sync compares real edit times.
 
 Profiles: their non-secret settings (name, source kind (Xtream Codes, M3U URL, M3U file, or none yet when setup was skipped), server or file, user agent, connection limit, `updated_at`) in `profiles.json` in the app-support folder, rewritten atomically. Secrets (Xtream Codes login, an M3U URL with credentials) stay in the platform's secure storage.
 

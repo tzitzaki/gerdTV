@@ -82,6 +82,9 @@ void main() {
     debugPrint('JOURNEY: setup screen');
     // First run: skipped, so only Settings shows (no navigation), and the provider is added there.
     expect(find.text('Add your provider'), findsOneWidget);
+    // Below Connect: outside a small window until scrolled to (macOS CI's is 800×600).
+    await tester.ensureVisible(find.byKey(const Key('setup.skip')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('setup.skip')));
     await waitFor(tester, find.byKey(const Key('settings.search')));
     expect(find.byType(NavigationRail), findsNothing);

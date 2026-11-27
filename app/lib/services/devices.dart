@@ -37,6 +37,11 @@ class Devices {
   /// App setting: when the app keys (TMDB, OpenSubtitles) were last changed here (unix seconds).
   static const settingKeysUpdatedAt = 'keys_updated_at';
 
+  /// App setting: how many devices are remembered. The list itself is in secure storage, which is read only when
+  /// this says there is one: a start without paired devices never touches the keyring (on Linux a first read before
+  /// any write can wait on a keyring prompt, and froze the app under Xvfb).
+  static const settingPaired = 'paired_devices';
+
   /// The app-wide secrets' id (Session keeps the TMDB and OpenSubtitles keys under it too).
   static const _app = 'app';
 
@@ -89,6 +94,11 @@ class Devices {
 
   /// Called once the session started: remembered devices, the camera's link, and listening if anyone is paired.
   Future<void> init() async {
+    PlatformBridge.onPairLink = _onLink;
+    final first = await PlatformBridge.takePairLink();
+    if (first != null) _onLink(first);
+    final paired = appSetting(dir: _session.appDir!, key: settingPaired);
+    if ((int.tryParse(paired ?? '') ?? 0) == 0) return;
     final raw = await _session.secrets.readService(_app, 'peers');
     if (raw != null) {
       try {
@@ -109,15 +119,17 @@ class Devices {
         // Unreadable (e.g. written by a newer gerdTV): start over rather than fail the start.
       }
     }
-    PlatformBridge.onPairLink = _onLink;
-    final first = await PlatformBridge.takePairLink();
-    if (first != null) _onLink(first);
     if (peers.value.isNotEmpty) await _listen();
   }
 
   void _onLink(String raw) => link.value = pairParseLink(link: raw);
 
   Future<void> _savePeers() async {
+    setAppSetting(
+      dir: _session.appDir!,
+      key: settingPaired,
+      value: '${peers.value.length}',
+    );
     await _session.secrets.writeService(
       _app,
       'peers',

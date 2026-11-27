@@ -1,6 +1,7 @@
 // New, because nothing owns device pairing's screen yet: showing a code shows its QR and the code, and pairing with a
 // found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. Also the web player's
-// screen: a login link with its QR, and ending a web session. The protocol and the
+// screen: a login link with its QR, and ending a web session. And a start without paired devices leaves secure
+// storage alone. The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
@@ -14,11 +15,17 @@ import 'package:material_ui/material_ui.dart';
 import 'support/fake_core.dart';
 
 class _Secrets extends Secrets {
+  /// Every read of a service secret, as "service.id".
+  final reads = <String>[];
+
   @override
   Future<List<String>?> read(String profileId) async => null;
 
   @override
-  Future<String?> readService(String profileId, String service) async => null;
+  Future<String?> readService(String profileId, String service) async {
+    reads.add('$service.$profileId');
+    return null;
+  }
 
   @override
   Future<void> writeService(
@@ -148,6 +155,19 @@ void main() {
     await tester.pumpAndSettle();
     return session;
   }
+
+  test('a start without paired devices never reads secure storage', () async {
+    // A first read before any write can wait on a keyring prompt on Linux; it froze the app's start under Xvfb.
+    final secrets = _Secrets();
+    final session = Session(secrets: secrets, appDir: '/nonexistent');
+    core.appSettings.remove('paired_devices');
+    await session.devices.init();
+    expect(secrets.reads, isEmpty);
+    core.appSettings['paired_devices'] = '1';
+    await session.devices.init();
+    expect(secrets.reads, ['peers.app'], reason: 'with one paired: the list');
+    core.appSettings.remove('paired_devices');
+  });
 
   testWidgets('show a code: its QR and the code', (tester) async {
     await show(tester);
