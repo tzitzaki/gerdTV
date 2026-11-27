@@ -128,6 +128,8 @@ pub struct ProfileBundle {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Applied {
     pub peer: Device,
+    /// Where the peer listens ("ip:port"), when it said so: kept for the next sync (iOS doesn't announce itself).
+    pub peer_addr: Option<String>,
     /// A new pairing: the key to remember for `peer` (the address is the owner's to add).
     pub new_key: Option<String>,
     /// The app keys to store when they changed (with their time).
@@ -152,6 +154,8 @@ pub struct Local {
     pub me: Device,
     pub secrets: LocalSecrets,
     pub peers: Vec<Peer>,
+    /// This side's listener port, told to the other side (None: not listening).
+    pub port: Option<u16>,
 }
 
 // ---- codes and keys ----
@@ -347,6 +351,8 @@ struct Header {
 #[derive(Serialize, Deserialize)]
 struct Hello {
     device: Device,
+    /// Where this side listens (its address is the connection's).
+    port: Option<u16>,
     /// Code pairing only: the key both keep.
     new_key: Option<String>,
 }
@@ -357,19 +363,30 @@ struct Hello {
 pub struct Connection {
     channel: Channel,
     pub peer: Device,
+    peer_addr: Option<String>,
     new_key: Option<String>,
 }
 
 /// Connects with a code the other device shows.
-pub async fn connect_code(addr: &str, code: &str, me: &Device) -> Result<Connection> {
+pub async fn connect_code(
+    addr: &str,
+    code: &str,
+    me: &Device,
+    port: Option<u16>,
+) -> Result<Connection> {
     let new_key = hex(&random::<32>());
-    connect(addr, code_key(code).to_vec(), None, me, Some(new_key)).await
+    connect(addr, code_key(code).to_vec(), None, me, port, Some(new_key)).await
 }
 
 /// Connects to a remembered device.
-pub async fn connect_peer(addr: &str, me: &Device, peer: &Peer) -> Result<Connection> {
+pub async fn connect_peer(
+    addr: &str,
+    me: &Device,
+    port: Option<u16>,
+    peer: &Peer,
+) -> Result<Connection> {
     let key = unhex(&peer.key).ok_or(PairError::UnknownPeer)?;
-    connect(addr, key, Some(me.id.clone()), me, None).await
+    connect(addr, key, Some(me.id.clone()), me, port, None).await
 }
 
 async fn connect(
@@ -377,6 +394,7 @@ async fn connect(
     base: Vec<u8>,
     from: Option<String>,
     me: &Device,
+    port: Option<u16>,
     new_key: Option<String>,
 ) -> Result<Connection> {
     let mut stream = tokio::time::timeout(Duration::from_secs(10), TcpStream::connect(addr))
@@ -393,13 +411,16 @@ async fn connect(
     channel
         .send(&Hello {
             device: me.clone(),
+            port,
             new_key: new_key.clone(),
         })
         .await?;
     let hello: Hello = channel.receive().await?;
+    let host = addr.rsplit_once(':').map_or(addr, |(h, _)| h);
     Ok(Connection {
         channel,
         peer: hello.device,
+        peer_addr: hello.port.map(|p| format!("{host}:{p}")),
         new_key,
     })
 }
@@ -410,7 +431,9 @@ impl Connection {
         let mine = snapshot(local)?;
         self.channel.send(&mine).await?;
         let theirs: Bundle = self.channel.receive().await?;
-        apply(local, &self.peer, self.new_key, theirs)
+        let mut a = apply(local, &self.peer, self.new_key, theirs)?;
+        a.peer_addr = self.peer_addr;
+        Ok(a)
     }
 }
 
@@ -461,12 +484,8 @@ impl Listener {
                 let (local, codes, events) = (local.clone(), c.clone(), events.clone());
                 tokio::spawn(async move {
                     match answer(stream, &local, &codes, &events).await {
-                        Ok(mut applied) => {
-                            // The address this peer is reached at next time (its listener's port is its own; the
-                            // owner keeps what mDNS reports, this is only the host part).
-                            if applied.new_key.is_some() {
-                                tracing::info!("paired with a device at {}", from.ip());
-                            }
+                        Ok((mut applied, port)) => {
+                            applied.peer_addr = port.map(|p| format!("{}:{p}", from.ip()));
                             applied.peer.name.truncate(64);
                             let _ = events.send(Event::Applied(Box::new(applied)));
                         }
@@ -498,7 +517,7 @@ async fn answer(
     local: &Mutex<Local>,
     codes: &Mutex<CodeState>,
     events: &UnboundedSender<Event>,
-) -> Result<Applied> {
+) -> Result<(Applied, Option<u16>)> {
     let header: Header =
         serde_json::from_slice(&read_frame(&mut stream).await?).map_err(|_| PairError::Protocol)?;
     if header.v != VERSION {
@@ -538,6 +557,7 @@ async fn answer(
     channel
         .send(&Hello {
             device: snapshot_local.me.clone(),
+            port: snapshot_local.port,
             new_key: None,
         })
         .await?;
@@ -545,7 +565,10 @@ async fn answer(
     // This side's state at the moment the other's arrives (its owner may have changed it meanwhile).
     let now_local = local.lock().unwrap().clone();
     channel.send(&snapshot(&now_local)?).await?;
-    apply(&now_local, &hello.device, hello.new_key, theirs)
+    Ok((
+        apply(&now_local, &hello.device, hello.new_key, theirs)?,
+        hello.port,
+    ))
 }
 
 // ---- bundles and merging ----
@@ -655,6 +678,7 @@ pub fn apply(
     };
     Ok(Applied {
         peer: peer.clone(),
+        peer_addr: None,
         new_key,
         app_keys,
         profile,
@@ -791,6 +815,7 @@ mod tests {
             me: device(name),
             secrets,
             peers: vec![],
+            port: None,
         }
     }
 
@@ -875,9 +900,14 @@ mod tests {
         phone.secrets.app_keys.insert("tmdb".into(), "k".into());
         phone.secrets.keys_updated_at = 5;
         let addr = format!("127.0.0.1:{}", listener.port);
-        let conn = connect_code(&addr, &format_code(&code).to_lowercase(), &phone.me)
-            .await
-            .unwrap();
+        let conn = connect_code(
+            &addr,
+            &format_code(&code).to_lowercase(),
+            &phone.me,
+            Some(4100),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             conn.peer,
             device("tv"),
@@ -904,6 +934,12 @@ mod tests {
         // Both remember each other with the same key; the phone got nothing it lacked.
         assert!(mine.new_key.is_some() && mine.new_key == theirs.new_key);
         assert_eq!(mine.peer, device("tv"));
+        // The TV knows where the phone listens; the phone knows where it reached the TV.
+        assert_eq!(theirs.peer_addr.as_deref(), Some("127.0.0.1:4100"));
+        assert!(
+            mine.peer_addr.is_none(),
+            "the TV's local has no port in this test"
+        );
         assert!(mine.profile.is_none() && mine.app_keys.is_none());
 
         // Later, as remembered peers: the phone's favourite added on the TV comes back, no code needed.
@@ -931,7 +967,7 @@ mod tests {
             key,
             addr: addr.clone(),
         };
-        let back = connect_peer(&addr, &phone.me, &peer)
+        let back = connect_peer(&addr, &phone.me, None, &peer)
             .await
             .unwrap()
             .exchange(&phone)
@@ -952,7 +988,7 @@ mod tests {
             addr: addr.clone(),
         };
         assert!(
-            connect_peer(&addr, &device("other"), &stranger)
+            connect_peer(&addr, &device("other"), None, &stranger)
                 .await
                 .is_err()
         );
@@ -969,7 +1005,7 @@ mod tests {
         let addr = format!("127.0.0.1:{}", listener.port);
         let wrong = if code.starts_with('A') { "B" } else { "A" }.to_string() + &code[1..];
         assert!(matches!(
-            connect_code(&addr, &wrong, &phone.me).await,
+            connect_code(&addr, &wrong, &phone.me, None).await,
             Err(PairError::Auth | PairError::Io(_))
         ));
         let Event::NewCode(fresh) = rx.recv().await.unwrap() else {
@@ -977,10 +1013,10 @@ mod tests {
         };
         assert_ne!(fresh, code);
         // The old code doesn't work any more, even typed right.
-        assert!(connect_code(&addr, &code, &phone.me).await.is_err());
+        assert!(connect_code(&addr, &code, &phone.me, None).await.is_err());
         // No code at all accepted once pairing is closed.
         listener.clear_code();
-        assert!(connect_code(&addr, &fresh, &phone.me).await.is_err());
+        assert!(connect_code(&addr, &fresh, &phone.me, None).await.is_err());
         assert!(
             library::load_profiles(&shared.lock().unwrap().dir)
                 .unwrap()

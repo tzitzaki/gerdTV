@@ -121,8 +121,9 @@ class FakeCore implements RustLibApi {
 
 FakeCore? _core;
 
-/// Installs [FakeCore] once per test process (RustLib can only be initialised once) and returns it.
-FakeCore useFakeCore() {
-  if (_core == null) RustLib.initMock(api: _core = FakeCore());
+/// Installs [FakeCore] (or a test's subclass, [core]) once per test process (RustLib can only be initialised once)
+/// and returns it.
+FakeCore useFakeCore([FakeCore? core]) {
+  if (_core == null) RustLib.initMock(api: _core = core ?? FakeCore());
   return _core!;
 }

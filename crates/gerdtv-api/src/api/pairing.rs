@@ -35,11 +35,15 @@ pub struct LocalInfo {
     pub keys_updated_at: i64,
     pub profile: Option<ProfileSecretsInfo>,
     pub peers: Vec<PeerInfo>,
+    /// This device's listener port (None: not listening).
+    pub port: Option<u16>,
 }
 
 /// What a sync changed here: the app stores the secrets in it and refreshes its profiles.
 pub struct AppliedInfo {
     pub peer: DeviceInfo,
+    /// Where the peer listens, when it said so ("ip:port").
+    pub peer_addr: Option<String>,
     /// A new pairing: remember `peer` with this key.
     pub new_key: Option<String>,
     /// The app keys to store, when they changed, and their time.
@@ -132,6 +136,7 @@ impl From<LocalInfo> for core::Local {
                 }),
             },
             peers: l.peers.into_iter().map(Into::into).collect(),
+            port: l.port,
         }
     }
 }
@@ -144,6 +149,7 @@ impl From<core::Applied> for AppliedInfo {
         };
         AppliedInfo {
             peer: a.peer.into(),
+            peer_addr: a.peer_addr,
             new_key: a.new_key,
             app_keys,
             keys_updated_at,
@@ -323,9 +329,10 @@ pub async fn pair_connect_code(
     addr: String,
     code: String,
     me: DeviceInfo,
+    port: Option<u16>,
 ) -> Result<PairConnection, String> {
     Ok(connection(
-        core::connect_code(&addr, &code, &me.into())
+        core::connect_code(&addr, &code, &me.into(), port)
             .await
             .map_err(err)?,
     ))
@@ -335,10 +342,11 @@ pub async fn pair_connect_code(
 pub async fn pair_connect_peer(
     addr: String,
     me: DeviceInfo,
+    port: Option<u16>,
     peer: PeerInfo,
 ) -> Result<PairConnection, String> {
     Ok(connection(
-        core::connect_peer(&addr, &me.into(), &peer.into())
+        core::connect_peer(&addr, &me.into(), port, &peer.into())
             .await
             .map_err(err)?,
     ))

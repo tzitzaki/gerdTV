@@ -33,6 +33,7 @@ import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
 import 'settings_model.dart';
+import 'devices_screen.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
@@ -274,6 +275,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.logout),
               title: Text(l10n.settingsRemove),
               onTap: () => _confirmRemove(context),
+            ),
+          ),
+          // Devices & sync: pair with and sync to other gerdTV installs (also without a provider: getting one is the
+          // point then).
+          SettingsEntry(
+            id: 'devices',
+            section: l10n.devicesTitle,
+            title: l10n.devicesTitle,
+            keywords: l10n.settingsKeywordsDevices,
+            build: (context) => ListTile(
+              key: const Key('settings.devices'),
+              leading: const Icon(Icons.devices),
+              title: Text(l10n.devicesTitle),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DevicesScreen(session: session),
+                ),
+              ),
             ),
           ),
           if (lib != null)

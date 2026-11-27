@@ -34,6 +34,7 @@ import 'casting.dart';
 import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
+import 'devices.dart';
 import 'secrets.dart';
 import 'tracking.dart';
 
@@ -173,6 +174,9 @@ class Session extends ChangeNotifier {
 
   /// Recordings (services/recordings.dart); its timer starts with the first profile.
   late final recordings = Recordings(this);
+
+  /// Devices & sync: pairing with and syncing to other gerdTV installs (services/devices.dart).
+  late final devices = Devices(this);
 
   /// The countdown to the next episode (the player shows it).
   late final nextUp = NextUp((item) => unawaited(play(item)));
@@ -450,6 +454,9 @@ class Session extends ChangeNotifier {
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
     profiles = await listProfiles(dir: dir);
     await _openOrChoose();
+    unawaited(
+      devices.init(),
+    ); // remembered devices, a pairing link from the camera
   }
 
   /// One profile, or the one set to open always: open it. Several: the picker. None that opens: setup.
@@ -587,6 +594,9 @@ class Session extends ChangeNotifier {
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
+      unawaited(
+        devices.refresh(),
+      ); // a sync from another device now answers with this profile
       if (canRecord) recordings.startTimer();
       unawaited(
         reminders?.watchLinux(library!),
@@ -636,7 +646,7 @@ class Session extends ChangeNotifier {
 
   Future<void> sync() async {
     final lib = library;
-    if (lib == null || syncing || !hasProvider) return;
+    if (lib == null || syncing || profile?.source == SourceKind.none) return;
     syncing = true;
     syncError = null;
     notifyListeners();
@@ -662,7 +672,7 @@ class Session extends ChangeNotifier {
       (_) => unawaited(refreshGuide()),
     );
     // No provider: no channels, so no guide to match.
-    if (lib == null || !hasProvider) return;
+    if (lib == null || profile?.source == SourceKind.none) return;
     if (guideRefreshing) {
       // A source added meanwhile isn't in the running refresh: once more afterwards, else it waits up to 12 h.
       _guideAgain |= force;
@@ -777,6 +787,7 @@ class Session extends ChangeNotifier {
       k == null || k.isEmpty ? null : k,
     );
     tmdbKey = k == null || k.isEmpty ? null : k;
+    devices.keysChanged();
     notifyListeners();
   }
 
@@ -793,6 +804,7 @@ class Session extends ChangeNotifier {
     final k = key?.trim();
     subtitlesKey = k == null || k.isEmpty ? null : k;
     await secrets.writeService(_appSecrets, 'opensubtitles', subtitlesKey);
+    devices.keysChanged();
     notifyListeners();
   }
 
@@ -814,6 +826,42 @@ class Session extends ChangeNotifier {
       'opensubtitles-login',
       _subtitlesLogin,
     );
+    devices.keysChanged();
+    notifyListeners();
+  }
+
+  /// A device sync stored new secrets or changed a profile (services/devices.dart): reloads what it touched. A device
+  /// without a usable profile (first start, setup skipped) opens the profile that came; the open one is reopened when
+  /// its login changed, else only its lists refresh (the user data was merged into its database).
+  Future<void> afterDeviceSync({
+    required bool keysChanged,
+    required ProfileInfo? profile,
+    required bool loginChanged,
+  }) async {
+    if (keysChanged) {
+      tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
+      subtitlesKey = await secrets.readService(_appSecrets, 'opensubtitles');
+      _subtitlesLogin = await secrets.readService(
+        _appSecrets,
+        'opensubtitles-login',
+      );
+      _subtitlesToken = null;
+    }
+    if (profile != null) {
+      profiles = await listProfiles(dir: await _dir());
+      final saved =
+          profiles.where((p) => p.id == profile.id).firstOrNull ?? profile;
+      final open = this.profile;
+      if (open == null || !hasProvider) {
+        await openProfile(saved);
+        return;
+      }
+      if (open.id == saved.id && loginChanged) {
+        await openProfile(saved);
+        return;
+      }
+    }
+    generation++;
     notifyListeners();
   }
 

@@ -45,7 +45,8 @@ import media_kit_video
 
 /// The "gerdtv/platform" channel on iOS: setPlaying (audio session), nowPlaying(…), clearNowPlaying (→ mediaCommand), preparePip(on), setFloating(on), pipState(playing, position,
 /// duration, live), startPip → Bool, stopPip, setLogo(name), openUrl(url) → Bool, brightness → Double,
-/// setBrightness(value), resetBrightness; → pipCommand(action "play"/"pause"/"skip", secs), pip(Bool: the window shows), pipRestore.
+/// setBrightness(value), resetBrightness, takePairLink → String?; → pipCommand(action "play"/"pause"/"skip", secs),
+/// pip(Bool: the window shows), pipRestore, pairLink(String).
 final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   AVPictureInPictureSampleBufferPlaybackDelegate
 {
@@ -65,9 +66,25 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
   /// The screen's brightness before the player's swipe changed it (nil: unchanged).
   private var ownBrightness: CGFloat?
 
+  /// The one instance (SceneDelegate reaches it for pairing links).
+  private static weak var shared: GerdtvPlatform?
+  /// A pairing link that came before Dart asked (cold start).
+  private static var pendingLink: String?
+
+  /// A gerdtv://pair link from SceneDelegate: to Dart now if it runs, else kept for takePairLink.
+  static func pairLink(_ url: URL) {
+    guard url.scheme == "gerdtv", url.host == "pair" else { return }
+    if let p = shared {
+      p.channel.invokeMethod("pairLink", arguments: url.absoluteString)
+    } else {
+      pendingLink = url.absoluteString
+    }
+  }
+
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "gerdtv/platform", binaryMessenger: messenger)
     super.init()
+    GerdtvPlatform.shared = self
     // Leaving the app gives the screen its own brightness back (the swipe's is for watching in gerdTV).
     NotificationCenter.default.addObserver(
       forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
@@ -87,6 +104,9 @@ final class GerdtvPlatform: NSObject, AVPictureInPictureControllerDelegate,
       guard let self else { return }
       let args = call.arguments as? [String: Any] ?? [:]
       switch call.method {
+      case "takePairLink":
+        result(GerdtvPlatform.pendingLink)
+        GerdtvPlatform.pendingLink = nil
       case "setPlaying":
         let playing = args["playing"] as? Bool ?? false
         try? AVAudioSession.sharedInstance().setActive(playing)

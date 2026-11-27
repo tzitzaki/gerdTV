@@ -5831,13 +5831,15 @@ fn wire__crate__api__pairing__pair_connect_code_impl(
             let api_addr = <String>::sse_decode(&mut deserializer);
             let api_code = <String>::sse_decode(&mut deserializer);
             let api_me = <crate::api::pairing::DeviceInfo>::sse_decode(&mut deserializer);
+            let api_port = <Option<u16>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::pairing::pair_connect_code(api_addr, api_code, api_me)
-                                .await?;
+                        let output_ok = crate::api::pairing::pair_connect_code(
+                            api_addr, api_code, api_me, api_port,
+                        )
+                        .await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -5870,14 +5872,16 @@ fn wire__crate__api__pairing__pair_connect_peer_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_addr = <String>::sse_decode(&mut deserializer);
             let api_me = <crate::api::pairing::DeviceInfo>::sse_decode(&mut deserializer);
+            let api_port = <Option<u16>>::sse_decode(&mut deserializer);
             let api_peer = <crate::api::pairing::PeerInfo>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::pairing::pair_connect_peer(api_addr, api_me, api_peer)
-                                .await?;
+                        let output_ok = crate::api::pairing::pair_connect_peer(
+                            api_addr, api_me, api_port, api_peer,
+                        )
+                        .await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -6920,6 +6924,7 @@ impl SseDecode for crate::api::pairing::AppliedInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_peer = <crate::api::pairing::DeviceInfo>::sse_decode(deserializer);
+        let mut var_peerAddr = <Option<String>>::sse_decode(deserializer);
         let mut var_newKey = <Option<String>>::sse_decode(deserializer);
         let mut var_appKeys =
             <Option<std::collections::HashMap<String, String>>>::sse_decode(deserializer);
@@ -6928,6 +6933,7 @@ impl SseDecode for crate::api::pairing::AppliedInfo {
             <Option<crate::api::pairing::AppliedProfileInfo>>::sse_decode(deserializer);
         return crate::api::pairing::AppliedInfo {
             peer: var_peer,
+            peer_addr: var_peerAddr,
             new_key: var_newKey,
             app_keys: var_appKeys,
             keys_updated_at: var_keysUpdatedAt,
@@ -7662,6 +7668,7 @@ impl SseDecode for crate::api::pairing::LocalInfo {
         let mut var_profile =
             <Option<crate::api::pairing::ProfileSecretsInfo>>::sse_decode(deserializer);
         let mut var_peers = <Vec<crate::api::pairing::PeerInfo>>::sse_decode(deserializer);
+        let mut var_port = <Option<u16>>::sse_decode(deserializer);
         return crate::api::pairing::LocalInfo {
             dir: var_dir,
             me: var_me,
@@ -7669,6 +7676,7 @@ impl SseDecode for crate::api::pairing::LocalInfo {
             keys_updated_at: var_keysUpdatedAt,
             profile: var_profile,
             peers: var_peers,
+            port: var_port,
         };
     }
 }
@@ -7858,6 +7866,17 @@ impl SseDecode for Option<crate::api::tracking::TrackItem> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::tracking::TrackItem>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u16>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -8810,6 +8829,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::pairing::AppliedInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.peer.into_into_dart().into_dart(),
+            self.peer_addr.into_into_dart().into_dart(),
             self.new_key.into_into_dart().into_dart(),
             self.app_keys.into_into_dart().into_dart(),
             self.keys_updated_at.into_into_dart().into_dart(),
@@ -9266,6 +9286,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::pairing::LocalInfo {
             self.keys_updated_at.into_into_dart().into_dart(),
             self.profile.into_into_dart().into_dart(),
             self.peers.into_into_dart().into_dart(),
+            self.port.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -10052,6 +10073,7 @@ impl SseEncode for crate::api::pairing::AppliedInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::pairing::DeviceInfo>::sse_encode(self.peer, serializer);
+        <Option<String>>::sse_encode(self.peer_addr, serializer);
         <Option<String>>::sse_encode(self.new_key, serializer);
         <Option<std::collections::HashMap<String, String>>>::sse_encode(self.app_keys, serializer);
         <i64>::sse_encode(self.keys_updated_at, serializer);
@@ -10615,6 +10637,7 @@ impl SseEncode for crate::api::pairing::LocalInfo {
         <i64>::sse_encode(self.keys_updated_at, serializer);
         <Option<crate::api::pairing::ProfileSecretsInfo>>::sse_encode(self.profile, serializer);
         <Vec<crate::api::pairing::PeerInfo>>::sse_encode(self.peers, serializer);
+        <Option<u16>>::sse_encode(self.port, serializer);
     }
 }
 
@@ -10769,6 +10792,16 @@ impl SseEncode for Option<crate::api::tracking::TrackItem> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::tracking::TrackItem>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u16>::sse_encode(value, serializer);
         }
     }
 }

@@ -43,20 +43,24 @@ Future<PairConnection> pairConnectCode({
   required String addr,
   required String code,
   required DeviceInfo me,
+  int? port,
 }) => RustLib.instance.api.crateApiPairingPairConnectCode(
   addr: addr,
   code: code,
   me: me,
+  port: port,
 );
 
 /// Connects to a remembered device.
 Future<PairConnection> pairConnectPeer({
   required String addr,
   required DeviceInfo me,
+  int? port,
   required PeerInfo peer,
 }) => RustLib.instance.api.crateApiPairingPairConnectPeer(
   addr: addr,
   me: me,
+  port: port,
   peer: peer,
 );
 
@@ -97,6 +101,9 @@ abstract class PairListener implements RustOpaqueInterface {
 class AppliedInfo {
   final DeviceInfo peer;
 
+  /// Where the peer listens, when it said so ("ip:port").
+  final String? peerAddr;
+
   /// A new pairing: remember `peer` with this key.
   final String? newKey;
 
@@ -107,6 +114,7 @@ class AppliedInfo {
 
   const AppliedInfo({
     required this.peer,
+    this.peerAddr,
     this.newKey,
     this.appKeys,
     required this.keysUpdatedAt,
@@ -116,6 +124,7 @@ class AppliedInfo {
   @override
   int get hashCode =>
       peer.hashCode ^
+      peerAddr.hashCode ^
       newKey.hashCode ^
       appKeys.hashCode ^
       keysUpdatedAt.hashCode ^
@@ -127,6 +136,7 @@ class AppliedInfo {
       other is AppliedInfo &&
           runtimeType == other.runtimeType &&
           peer == other.peer &&
+          peerAddr == other.peerAddr &&
           newKey == other.newKey &&
           appKeys == other.appKeys &&
           keysUpdatedAt == other.keysUpdatedAt &&
@@ -216,6 +226,9 @@ class LocalInfo {
   final ProfileSecretsInfo? profile;
   final List<PeerInfo> peers;
 
+  /// This device's listener port (None: not listening).
+  final int? port;
+
   const LocalInfo({
     required this.dir,
     required this.me,
@@ -223,6 +236,7 @@ class LocalInfo {
     required this.keysUpdatedAt,
     this.profile,
     required this.peers,
+    this.port,
   });
 
   @override
@@ -232,7 +246,8 @@ class LocalInfo {
       appKeys.hashCode ^
       keysUpdatedAt.hashCode ^
       profile.hashCode ^
-      peers.hashCode;
+      peers.hashCode ^
+      port.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -244,7 +259,8 @@ class LocalInfo {
           appKeys == other.appKeys &&
           keysUpdatedAt == other.keysUpdatedAt &&
           profile == other.profile &&
-          peers == other.peers;
+          peers == other.peers &&
+          port == other.port;
 }
 
 /// Something the listener reports: a struct, not an enum with data (that would need the freezed package in Dart).

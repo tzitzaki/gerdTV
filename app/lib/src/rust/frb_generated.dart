@@ -655,11 +655,13 @@ abstract class RustLibApi extends BaseApi {
     required String addr,
     required String code,
     required DeviceInfo me,
+    int? port,
   });
 
   Future<PairConnection> crateApiPairingPairConnectPeer({
     required String addr,
     required DeviceInfo me,
+    int? port,
     required PeerInfo peer,
   });
 
@@ -4896,6 +4898,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String addr,
     required String code,
     required DeviceInfo me,
+    int? port,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -4904,6 +4907,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(addr, serializer);
           sse_encode_String(code, serializer);
           sse_encode_box_autoadd_device_info(me, serializer);
+          sse_encode_opt_box_autoadd_u_16(port, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -4917,7 +4921,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPairingPairConnectCodeConstMeta,
-        argValues: [addr, code, me],
+        argValues: [addr, code, me, port],
         apiImpl: this,
       ),
     );
@@ -4926,13 +4930,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPairingPairConnectCodeConstMeta =>
       const TaskConstMeta(
         debugName: "pair_connect_code",
-        argNames: ["addr", "code", "me"],
+        argNames: ["addr", "code", "me", "port"],
       );
 
   @override
   Future<PairConnection> crateApiPairingPairConnectPeer({
     required String addr,
     required DeviceInfo me,
+    int? port,
     required PeerInfo peer,
   }) {
     return handler.executeNormal(
@@ -4941,6 +4946,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(addr, serializer);
           sse_encode_box_autoadd_device_info(me, serializer);
+          sse_encode_opt_box_autoadd_u_16(port, serializer);
           sse_encode_box_autoadd_peer_info(peer, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -4955,7 +4961,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPairingPairConnectPeerConstMeta,
-        argValues: [addr, me, peer],
+        argValues: [addr, me, port, peer],
         apiImpl: this,
       ),
     );
@@ -4964,7 +4970,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPairingPairConnectPeerConstMeta =>
       const TaskConstMeta(
         debugName: "pair_connect_peer",
-        argNames: ["addr", "me", "peer"],
+        argNames: ["addr", "me", "port", "peer"],
       );
 
   @override
@@ -5980,14 +5986,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AppliedInfo dco_decode_applied_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return AppliedInfo(
       peer: dco_decode_device_info(arr[0]),
-      newKey: dco_decode_opt_String(arr[1]),
-      appKeys: dco_decode_opt_Map_String_String_None(arr[2]),
-      keysUpdatedAt: dco_decode_i_64(arr[3]),
-      profile: dco_decode_opt_box_autoadd_applied_profile_info(arr[4]),
+      peerAddr: dco_decode_opt_String(arr[1]),
+      newKey: dco_decode_opt_String(arr[2]),
+      appKeys: dco_decode_opt_Map_String_String_None(arr[3]),
+      keysUpdatedAt: dco_decode_i_64(arr[4]),
+      profile: dco_decode_opt_box_autoadd_applied_profile_info(arr[5]),
     );
   }
 
@@ -6111,6 +6118,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TrackItem dco_decode_box_autoadd_track_item(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_track_item(raw);
+  }
+
+  @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -6560,8 +6573,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LocalInfo dco_decode_local_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return LocalInfo(
       dir: dco_decode_String(arr[0]),
       me: dco_decode_device_info(arr[1]),
@@ -6569,6 +6582,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       keysUpdatedAt: dco_decode_i_64(arr[3]),
       profile: dco_decode_opt_box_autoadd_profile_secrets_info(arr[4]),
       peers: dco_decode_list_peer_info(arr[5]),
+      port: dco_decode_opt_box_autoadd_u_16(arr[6]),
     );
   }
 
@@ -6693,6 +6707,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_track_item(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_16(raw);
   }
 
   @protected
@@ -7362,6 +7382,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AppliedInfo sse_decode_applied_info(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_peer = sse_decode_device_info(deserializer);
+    var var_peerAddr = sse_decode_opt_String(deserializer);
     var var_newKey = sse_decode_opt_String(deserializer);
     var var_appKeys = sse_decode_opt_Map_String_String_None(deserializer);
     var var_keysUpdatedAt = sse_decode_i_64(deserializer);
@@ -7370,6 +7391,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
     return AppliedInfo(
       peer: var_peer,
+      peerAddr: var_peerAddr,
       newKey: var_newKey,
       appKeys: var_appKeys,
       keysUpdatedAt: var_keysUpdatedAt,
@@ -7518,6 +7540,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TrackItem sse_decode_box_autoadd_track_item(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_track_item(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_16(deserializer));
   }
 
   @protected
@@ -8165,6 +8193,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       deserializer,
     );
     var var_peers = sse_decode_list_peer_info(deserializer);
+    var var_port = sse_decode_opt_box_autoadd_u_16(deserializer);
     return LocalInfo(
       dir: var_dir,
       me: var_me,
@@ -8172,6 +8201,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       keysUpdatedAt: var_keysUpdatedAt,
       profile: var_profile,
       peers: var_peers,
+      port: var_port,
     );
   }
 
@@ -8356,6 +8386,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_track_item(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_16(deserializer));
     } else {
       return null;
     }
@@ -9098,6 +9139,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_applied_info(AppliedInfo self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_device_info(self.peer, serializer);
+    sse_encode_opt_String(self.peerAddr, serializer);
     sse_encode_opt_String(self.newKey, serializer);
     sse_encode_opt_Map_String_String_None(self.appKeys, serializer);
     sse_encode_i_64(self.keysUpdatedAt, serializer);
@@ -9270,6 +9312,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_track_item(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_16(self, serializer);
   }
 
   @protected
@@ -9832,6 +9880,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.keysUpdatedAt, serializer);
     sse_encode_opt_box_autoadd_profile_secrets_info(self.profile, serializer);
     sse_encode_list_peer_info(self.peers, serializer);
+    sse_encode_opt_box_autoadd_u_16(self.port, serializer);
   }
 
   @protected
@@ -10016,6 +10065,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_track_item(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_16(self, serializer);
     }
   }
 

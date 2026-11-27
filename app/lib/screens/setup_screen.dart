@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import 'app_logo.dart';
+import 'devices_screen.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 
@@ -232,7 +233,20 @@ class _SetupScreenState extends State<SetupScreen> {
                         ),
                       ),
                     ),
-                    // First run only (not when added from Settings): Settings works without a provider.
+                    // First run only (not when added from Settings): from another device, or Settings without a provider.
+                    if (widget.edit == null && !Navigator.of(context).canPop())
+                      TextButton(
+                        key: const Key('setup.fromDevice'),
+                        onPressed: _busy
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      DevicesScreen(session: widget.session),
+                                ),
+                              ),
+                        child: Text(l10n.setupFromDevice),
+                      ),
                     if (widget.edit == null && !Navigator.of(context).canPop())
                       TextButton(
                         key: const Key('setup.skip'),

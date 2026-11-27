@@ -27,7 +27,10 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Deinterlacing on: an interlaced HD channel shows no combed edges and still plays smoothly; off again: as before.
 - Subtitles online (with your OpenSubtitles key): Find subtitles online lists German ones for a movie; a tap shows them in the picture.
 
+- Devices & sync: Show a code; on the Shield pick the Mac and type it; the Shield names the Mac first, Sync moves the login and favourites.
+
 ## iPhone and iPad
+- Devices & sync: scanning the Mac's or Shield's pairing QR with the camera opens gerdTV, names the device, Sync moves the profile.
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
