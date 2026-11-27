@@ -8,6 +8,9 @@
 	     so turning it back on doesn't silently block every stream mpv opens. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- The webcam for scanning a pairing QR (Devices & sync); needed with the hardened runtime or the sandbox. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>

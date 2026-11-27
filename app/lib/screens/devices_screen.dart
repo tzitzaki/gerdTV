@@ -1,7 +1,7 @@
 // Settings → Account → Devices & sync, and setup's "Get from another device" (services/devices.dart has the
 // mechanism). Three parts:
 // - Show a code: this device listens; its QR (for a phone's camera) and the code to type elsewhere.
-// - Pair with a device on this network: the devices mDNS finds; pick one, type the code it shows, then the found
+// - Pair with a device on this network: on the Mac also by scanning its QR with the webcam; the devices mDNS finds; pick one, type the code it shows, then the found
 //   device's name and platform are shown and nothing is sent before Sync is pressed ("pair as you scan").
 // - Paired devices: Sync now (two-way) and Forget.
 // No dialog except Forget's confirmation (the design's one modal); the camera's link opens [PairLinkScreen], the same
@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../platform/platform_bridge.dart';
 import '../services/session.dart';
 import '../src/rust/api/pairing.dart';
 import '../theme.dart';
@@ -126,6 +127,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
+  /// The webcam's QR: a pairing link opens its confirmation (as the system camera's link does); anything else says so.
+  Future<void> _scan(AppLocalizations l10n) async {
+    final text = await PlatformBridge.scanQr(l10n.devicesScanCamera);
+    if (text == null || !mounted) return; // closed, or no camera
+    if (!widget.session.devices.openLink(text)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.devicesScanNotCode)));
+    }
+  }
+
   Future<void> _forget(PeerInfo p) async {
     final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
@@ -215,6 +226,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
             ),
           // This device connects to one it finds.
           heading(l10n.devicesNearby),
+          // The Mac has no system camera that opens links: its webcam scans the other device's QR here.
+          if (PlatformBridge.canScanQr)
+            ListTile(
+              key: const Key('devices.scan'),
+              leading: const Icon(Icons.qr_code_scanner),
+              title: Text(l10n.devicesScanCamera),
+              onTap: () => _scan(l10n),
+            ),
           if (_searching) const LinearProgressIndicator(),
           for (final f in _found ?? const <FoundDevice>[])
             ListTile(

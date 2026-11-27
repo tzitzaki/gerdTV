@@ -1,11 +1,12 @@
 // New, because nothing owns device pairing's screen yet: showing a code shows its QR and the code, and pairing with a
 // found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. Also the web player's
 // screen: a login link with its QR, and ending a web session. And a start without paired devices leaves secure
-// storage alone. The protocol and the
+// storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused. The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
+import 'package:gerdtv/platform/platform_bridge.dart';
 import 'package:gerdtv/screens/devices_screen.dart';
 import 'package:gerdtv/screens/web_player_screen.dart';
 import 'package:gerdtv/services/secrets.dart';
@@ -131,6 +132,12 @@ class _PairingCore extends FakeCore {
   String? crateApiPairingPairLocalIp() => '192.0.2.9';
 
   @override
+  PairLink? crateApiPairingPairParseLink({required String link}) =>
+      link.startsWith('gerdtv://pair?')
+      ? const PairLink(addr: '192.0.2.5:4100', code: 'ABCD-EFGH-JKMN')
+      : null;
+
+  @override
   String crateApiPairingPairLinkText({
     required String addr,
     required String code,
@@ -211,6 +218,41 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(core.listener.updates, greaterThan(after));
     session.devices.stopPairing();
+  });
+
+  testWidgets('the Mac scans a QR with its webcam; only a pairing link opens', (
+    tester,
+  ) async {
+    PlatformBridge.canScanQr = true;
+    addTearDown(() => PlatformBridge.canScanQr = false);
+    var scanned = 'gerdtv://pair?a=192.0.2.5:4100&c=ABCD-EFGH-JKMN';
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      PlatformBridge.channel,
+      (call) async => call.method == 'scanQr' ? scanned : null,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        PlatformBridge.channel,
+        null,
+      ),
+    );
+    final session = await show(tester);
+    await tester.tap(find.byKey(const Key('devices.scan')));
+    await tester.pumpAndSettle();
+    expect(
+      session.devices.link.value,
+      const PairLink(addr: '192.0.2.5:4100', code: 'ABCD-EFGH-JKMN'),
+    );
+    session.devices.link.value = null;
+    scanned = 'https://example.invalid/menu';
+    await tester.tap(find.byKey(const Key('devices.scan')));
+    await tester.pumpAndSettle();
+    expect(session.devices.link.value, isNull);
+    expect(
+      find.text("That QR code isn't a gerdTV pairing code."),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('show a code: its QR and the code', (tester) async {

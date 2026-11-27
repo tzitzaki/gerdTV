@@ -4,6 +4,8 @@
 <dict>
 	<!-- Google Cast: finding devices on the local network (Bonjour) and casting to them; also AirPlay of gerdTV's
 	     local stream. iOS and macOS ask the user once. -->
+	<key>NSCameraUsageDescription</key>
+	<string>gerdTV uses the camera only while you scan another device's pairing code in Devices &amp; sync.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>gerdTV finds Cast devices and your other gerdTV devices on your network, to cast to them and to sync your profile with them.</string>
 	<key>NSBonjourServices</key>

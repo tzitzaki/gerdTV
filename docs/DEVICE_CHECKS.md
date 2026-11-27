@@ -29,6 +29,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 - Web player (host paired): a link from Settings → Web player opens in Safari and Chrome; a channel and a movie play, +3 h extends.
 - Devices & sync: Show a code; on the Shield pick the Mac and type it; the Shield names the Mac first, Sync moves the login and favourites.
+- Pair by webcam: Devices & sync → Scan a code with the camera asks for the camera once; the TV's QR opens the confirmation; closing the window cancels.
+- Web player in Safari: a busy account (a channel playing in the app) says the provider's connection is in use; back, close and stars are Material icons.
 
 ## iPhone and iPad
 - Web player: the link's QR opens the page in Safari away from home; channels play; Add to Home Screen opens it full screen.
