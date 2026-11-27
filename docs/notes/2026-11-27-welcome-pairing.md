@@ -11,3 +11,4 @@ app-wide, shared pairing widgets, direct APK/IPA links (welcome QR, iPhone updat
 4b. Relay via own host: 00:08
 6. Docs: 00:18
 8. Updater (check, bar, background download, macOS on quit): 00:35
+9. Auto-sync with the host: 00:43

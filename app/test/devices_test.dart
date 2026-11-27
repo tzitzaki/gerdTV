@@ -4,7 +4,8 @@
 // storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused; extended:
 // the first run's welcome screen listens at once (QR and code), folds the phone files (computer only) and fades the
 // nearby list until it has the focus, and Skip opens
-// the app without a provider; extended: the relay (a host found nearby, named in the QR, a typed one wins). The protocol and the
+// the app without a provider; extended: auto-sync with the paired host (at once, then only for a settled change);
+// extended: the relay (a host found nearby, named in the QR, a typed one wins). The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
@@ -111,8 +112,32 @@ class _Connection extends Fake implements PairConnection {
   }
 }
 
+/// A library whose user data is [data] (auto-sync fingerprints the export).
+class _Library extends Fake implements Library {
+  String data = '{}';
+
+  @override
+  Future<String> exportUserData() async => data;
+}
+
 class _PairingCore extends FakeCore {
   final connection = _Connection();
+
+  /// Remembered-device syncs started (auto-sync's rounds).
+  int peerSyncs = 0;
+
+  @override
+  Future<PairConnection> crateApiPairingPairConnectPeer({
+    required String addr,
+    required DeviceInfo me,
+    int? port,
+    required PeerInfo peer,
+    String? relayWeb,
+  }) async {
+    peerSyncs++;
+    return _Connection();
+  }
+
   String? typedCode;
   final webSessions = [
     WebSessionInfo(id: 's1', created: 0, expires: 0, agent: 'Firefox'),
@@ -361,6 +386,38 @@ void main() {
     expect(core.listener.relay, 'https://tv.example.invalid');
     await tester.pumpWidget(const SizedBox());
   });
+
+  test(
+    'auto-sync with the host: at once, then only for a settled change',
+    () async {
+      final session = Session(secrets: _Secrets(), appDir: '/nonexistent');
+      final lib = _Library();
+      session.library = lib;
+      final d = session.devices;
+      d.peers.value = [
+        const PeerInfo(
+          device: DeviceInfo(id: 'h1', name: 'gerdTV host', platform: 'host'),
+          key: 'k',
+          addr: '192.0.2.6:8791',
+          web: 'https://tv.example.invalid',
+        ),
+      ];
+      final before = core.peerSyncs;
+      int syncs() => core.peerSyncs - before;
+      await d.autoSync(); // the start's round
+      expect(syncs(), 1);
+      await d.checkAutoSync();
+      expect(syncs(), 1, reason: 'nothing changed, and what came is no change');
+      lib.data = '{"favourites":[1]}';
+      await d.checkAutoSync();
+      expect(syncs(), 1, reason: 'still changing: wait one check');
+      await d.checkAutoSync();
+      expect(syncs(), 2, reason: 'settled: sent');
+      d.keysChanged();
+      await d.checkAutoSync();
+      expect(syncs(), 3, reason: 'a changed key goes at once');
+    },
+  );
 
   testWidgets('pair with a found device: who answered first, Sync sends', (
     tester,
