@@ -229,6 +229,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SimklImport dco_decode_box_autoadd_simkl_import(dynamic raw);
 
   @protected
+  SubsLogin dco_decode_box_autoadd_subs_login(dynamic raw);
+
+  @protected
   TrackItem dco_decode_box_autoadd_track_item(dynamic raw);
 
   @protected
@@ -452,6 +455,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SimklImport? dco_decode_opt_box_autoadd_simkl_import(dynamic raw);
 
   @protected
+  SubsLogin? dco_decode_opt_box_autoadd_subs_login(dynamic raw);
+
+  @protected
   TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw);
 
   @protected
@@ -528,6 +534,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SourceKind dco_decode_source_kind(dynamic raw);
+
+  @protected
+  SubsLogin dco_decode_subs_login(dynamic raw);
 
   @protected
   SubtitleInfo dco_decode_subtitle_info(dynamic raw);
@@ -757,6 +766,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SimklImport sse_decode_box_autoadd_simkl_import(SseDeserializer deserializer);
+
+  @protected
+  SubsLogin sse_decode_box_autoadd_subs_login(SseDeserializer deserializer);
 
   @protected
   TrackItem sse_decode_box_autoadd_track_item(SseDeserializer deserializer);
@@ -1020,6 +1032,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SubsLogin? sse_decode_opt_box_autoadd_subs_login(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   TrackItem? sse_decode_opt_box_autoadd_track_item(
     SseDeserializer deserializer,
   );
@@ -1104,6 +1121,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SourceKind sse_decode_source_kind(SseDeserializer deserializer);
+
+  @protected
+  SubsLogin sse_decode_subs_login(SseDeserializer deserializer);
 
   @protected
   SubtitleInfo sse_decode_subtitle_info(SseDeserializer deserializer);
@@ -1384,6 +1404,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_simkl_import(
     SimklImport self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_subs_login(
+    SubsLogin self,
     SseSerializer serializer,
   );
 
@@ -1721,6 +1747,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_subs_login(
+    SubsLogin? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_track_item(
     TrackItem? self,
     SseSerializer serializer,
@@ -1809,6 +1841,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_source_kind(SourceKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_subs_login(SubsLogin self, SseSerializer serializer);
 
   @protected
   void sse_encode_subtitle_info(SubtitleInfo self, SseSerializer serializer);

@@ -744,12 +744,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<String> crateApiSubtitlesSubsDownload({
     required String key,
-    String? token,
+    SubsLogin? login,
     required BigInt fileId,
     required String dir,
   });
 
-  Future<String> crateApiSubtitlesSubsLogin({
+  Future<SubsLogin> crateApiSubtitlesSubsLogin({
     required String key,
     required String username,
     required String password,
@@ -758,6 +758,7 @@ abstract class RustLibApi extends BaseApi {
   Future<List<SubtitleInfo>> crateApiSubtitlesSubsSearch({
     required Library library_,
     required String key,
+    SubsLogin? login,
     required String itemKey,
     required String languages,
   });
@@ -5591,7 +5592,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<String> crateApiSubtitlesSubsDownload({
     required String key,
-    String? token,
+    SubsLogin? login,
     required BigInt fileId,
     required String dir,
   }) {
@@ -5600,7 +5601,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(key, serializer);
-          sse_encode_opt_String(token, serializer);
+          sse_encode_opt_box_autoadd_subs_login(login, serializer);
           sse_encode_u_64(fileId, serializer);
           sse_encode_String(dir, serializer);
           pdeCallFfi(
@@ -5615,7 +5616,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiSubtitlesSubsDownloadConstMeta,
-        argValues: [key, token, fileId, dir],
+        argValues: [key, login, fileId, dir],
         apiImpl: this,
       ),
     );
@@ -5624,11 +5625,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSubtitlesSubsDownloadConstMeta =>
       const TaskConstMeta(
         debugName: "subs_download",
-        argNames: ["key", "token", "fileId", "dir"],
+        argNames: ["key", "login", "fileId", "dir"],
       );
 
   @override
-  Future<String> crateApiSubtitlesSubsLogin({
+  Future<SubsLogin> crateApiSubtitlesSubsLogin({
     required String key,
     required String username,
     required String password,
@@ -5648,7 +5649,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_String,
+          decodeSuccessData: sse_decode_subs_login,
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiSubtitlesSubsLoginConstMeta,
@@ -5667,6 +5668,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<List<SubtitleInfo>> crateApiSubtitlesSubsSearch({
     required Library library_,
     required String key,
+    SubsLogin? login,
     required String itemKey,
     required String languages,
   }) {
@@ -5679,6 +5681,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(key, serializer);
+          sse_encode_opt_box_autoadd_subs_login(login, serializer);
           sse_encode_String(itemKey, serializer);
           sse_encode_String(languages, serializer);
           pdeCallFfi(
@@ -5693,7 +5696,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiSubtitlesSubsSearchConstMeta,
-        argValues: [library_, key, itemKey, languages],
+        argValues: [library_, key, login, itemKey, languages],
         apiImpl: this,
       ),
     );
@@ -5702,7 +5705,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSubtitlesSubsSearchConstMeta =>
       const TaskConstMeta(
         debugName: "subs_search",
-        argNames: ["library_", "key", "itemKey", "languages"],
+        argNames: ["library_", "key", "login", "itemKey", "languages"],
       );
 
   @override
@@ -6236,6 +6239,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SimklImport dco_decode_box_autoadd_simkl_import(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_simkl_import(raw);
+  }
+
+  @protected
+  SubsLogin dco_decode_box_autoadd_subs_login(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_subs_login(raw);
   }
 
   @protected
@@ -6834,6 +6843,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SubsLogin? dco_decode_opt_box_autoadd_subs_login(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_subs_login(raw);
+  }
+
+  @protected
   TrackItem? dco_decode_opt_box_autoadd_track_item(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_track_item(raw);
@@ -7135,6 +7150,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SourceKind dco_decode_source_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return SourceKind.values[raw as int];
+  }
+
+  @protected
+  SubsLogin dco_decode_subs_login(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return SubsLogin(
+      token: dco_decode_String(arr[0]),
+      host: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -7687,6 +7714,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_simkl_import(deserializer));
+  }
+
+  @protected
+  SubsLogin sse_decode_box_autoadd_subs_login(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_subs_login(deserializer));
   }
 
   @protected
@@ -8546,6 +8579,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SubsLogin? sse_decode_opt_box_autoadd_subs_login(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_subs_login(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   TrackItem? sse_decode_opt_box_autoadd_track_item(
     SseDeserializer deserializer,
   ) {
@@ -8897,6 +8943,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return SourceKind.values[inner];
+  }
+
+  @protected
+  SubsLogin sse_decode_subs_login(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_token = sse_decode_String(deserializer);
+    var var_host = sse_decode_String(deserializer);
+    return SubsLogin(token: var_token, host: var_host);
   }
 
   @protected
@@ -9499,6 +9553,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_simkl_import(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_subs_login(
+    SubsLogin self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_subs_login(self, serializer);
   }
 
   @protected
@@ -10264,6 +10327,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_subs_login(
+    SubsLogin? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_subs_login(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_track_item(
     TrackItem? self,
     SseSerializer serializer,
@@ -10516,6 +10592,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_source_kind(SourceKind self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_subs_login(SubsLogin self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.host, serializer);
   }
 
   @protected

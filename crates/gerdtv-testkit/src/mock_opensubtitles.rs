@@ -2,6 +2,8 @@
 //!   POST /api/v1/login {username, password} → {token, base_url, user}
 //!   GET  /api/v1/subtitles?tmdb_id=|parent_tmdb_id=&season_number=&episode_number=|query=&languages=
 //!   POST /api/v1/download {file_id} → {link, remaining}; GET /file/<id>.srt serves the subtitle
+//! The login names another host as `base_url` (`localhost:<port>`, as the real one may name vip-api.opensubtitles.com),
+//! and a logged-in request to any other host is refused with 400, as the real API may answer it.
 //! Every call needs the `Api-Key` header ([KEY]); a download without a login token is allowed [FREE] times (the
 //! real limit: 5 per IP and day), with one per [QUOTA] (OpenSubtitles answers 406 when it's spent).
 //! Search results come from a small fixed table; downloads are counted for the tests.
@@ -74,9 +76,12 @@ fn answer(req: &Request, d: &mut (u32, u32), base: &str) -> (u16, &'static str, 
     match (req.method.as_str(), req.path.as_str()) {
         ("POST", "/api/v1/login") => {
             if body["username"] == USER && body["password"] == PASS {
+                let host = base
+                    .trim_start_matches("http://")
+                    .replace("127.0.0.1", "localhost");
                 json(
                     200,
-                    json!({ "token": TOKEN, "base_url": "api.opensubtitles.com", "status": 200,
+                    json!({ "token": TOKEN, "base_url": host, "status": 200,
                                    "user": { "allowed_downloads": QUOTA, "level": "Sub leecher" } }),
                 )
             } else {
@@ -85,6 +90,11 @@ fn answer(req: &Request, d: &mut (u32, u32), base: &str) -> (u16, &'static str, 
                     json!({ "message": "Error, invalid username/password", "status": 401 }),
                 )
             }
+        }
+        _ if req.header("authorization") == Some(&format!("Bearer {TOKEN}"))
+            && !req.header("host").unwrap_or("").starts_with("localhost") =>
+        {
+            json(400, json!({ "message": "use the base_url of your login" }))
         }
         ("GET", "/api/v1/subtitles") => {
             let tmdb = num("tmdb_id").or(num("parent_tmdb_id"));

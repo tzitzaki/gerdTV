@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261127.65: the web player from a home host (login links from the app), device-to-device sync, skippable setup, provider edit.
+- Version 0.261127.66: OpenSubtitles VIP logins (calls go to the login's host). 0.261127.65: web player via a home host, device sync, setup skip, provider edit.
 - Before: watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, OpenSubtitles, own groups, Android TV home screen; AirPlay is still open.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.

@@ -8,10 +8,9 @@ import 'library.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `client`
+// These functions are ignored because they are not marked as `pub`: `client`, `core`
 
-/// A token for the user's own download quota (wrong login: the error says so; don't retry, it's rate-limited).
-Future<String> subsLogin({
+Future<SubsLogin> subsLogin({
   required String key,
   required String username,
   required String password,
@@ -25,11 +24,13 @@ Future<String> subsLogin({
 Future<List<SubtitleInfo>> subsSearch({
   required Library library_,
   required String key,
+  SubsLogin? login,
   required String itemKey,
   required String languages,
 }) => RustLib.instance.api.crateApiSubtitlesSubsSearch(
   library_: library_,
   key: key,
+  login: login,
   itemKey: itemKey,
   languages: languages,
 );
@@ -37,15 +38,35 @@ Future<List<SubtitleInfo>> subsSearch({
 /// Downloads a subtitle into `dir` (the cache folder); its path, for mpv's sub-add.
 Future<String> subsDownload({
   required String key,
-  String? token,
+  SubsLogin? login,
   required BigInt fileId,
   required String dir,
 }) => RustLib.instance.api.crateApiSubtitlesSubsDownload(
   key: key,
-  token: token,
+  login: login,
   fileId: fileId,
   dir: dir,
 );
+
+/// A token for the user's own download quota (wrong login: the error says so; don't retry, it's rate-limited).
+/// A login: its token and the host its calls must use (VIP accounts: vip-api.opensubtitles.com).
+class SubsLogin {
+  final String token;
+  final String host;
+
+  const SubsLogin({required this.token, required this.host});
+
+  @override
+  int get hashCode => token.hashCode ^ host.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SubsLogin &&
+          runtimeType == other.runtimeType &&
+          token == other.token &&
+          host == other.host;
+}
 
 /// One subtitle to choose in the player.
 class SubtitleInfo {
