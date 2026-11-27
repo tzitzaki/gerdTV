@@ -1,6 +1,7 @@
 //! `gerdtv-host`: the headless host's command line (lib.rs explains the parts; docs/INSTALL.md the setup).
 //!
-//!   gerdtv-host pair  --dir <state> [--pair-port 8791]    shows a code and QR; a gerdTV app pairs and sends its profile
+//!   gerdtv-host pair  --dir <state> --front <https://…> [--pair-port 8791]
+//!                     shows a code and QR; a gerdTV app pairs, sends its profile and learns the web address
 //!   gerdtv-host serve --dir <state> --front <https://…> --player <http://…> [--listen 127.0.0.1:8790] [--proxy <ip>]
 //!                     [--pair-port 8791]
 //! `--pair-port`: where paired apps reach it for syncs (TCP on every interface; allow it from the LAN only).
@@ -22,7 +23,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn usage() -> ! {
     eprintln!(
-        "usage: gerdtv-host pair --dir <state> [--pair-port 8791]\n       gerdtv-host serve --dir <state> \
+        "usage: gerdtv-host pair --dir <state> --front <https://…> [--pair-port 8791]\n       gerdtv-host serve --dir <state> \
          --front <https://…> --player <http://…> [--listen 127.0.0.1:8790] [--proxy <tunnel ip>] [--pair-port 8791]\n       \
          gerdtv-host update [--unit gerdtv-host.service] [--before <command>]\n       gerdtv-host --version"
     );
@@ -66,7 +67,8 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(8791);
     match args.first().map(String::as_str) {
-        Some("pair") => pair(cfg, file, pair_port).await,
+        // The front address goes out with the pairing (the first sync): the app shows its Web player entry from it.
+        Some("pair") if !cfg.front.is_empty() => pair(cfg, file, pair_port).await,
         Some("serve") if !cfg.front.is_empty() && !cfg.player.is_empty() => {
             serve(cfg, file, pair_port).await
         }

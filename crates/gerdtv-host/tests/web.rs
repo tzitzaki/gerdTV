@@ -391,3 +391,31 @@ fn what_a_sync_brings_is_kept_with_one_profile() {
     let p = f.secrets.profile.unwrap();
     assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p1", "came-p1"));
 }
+
+/// Bug: `pair` without `--front` paired with an empty web address, so the app hid its Web player entry until a later
+/// Sync now. Pairing is the first sync and must carry the address: without `--front` it refuses (usage, exit 2).
+#[test]
+fn pairing_without_the_front_address_is_refused() {
+    let dir = std::env::temp_dir().join(format!("gerdtv-host-pair-{}", pairing::new_device_id()));
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_gerdtv-host"))
+        .args(["pair", "--dir", dir.to_str().unwrap(), "--pair-port", "0"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    // A refusal exits at once; the bug was a pairing that started (and waited for an app).
+    let mut code = None;
+    for _ in 0..50 {
+        if let Some(status) = child.try_wait().unwrap() {
+            code = status.code();
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    if code.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(code, Some(2), "pair started without --front");
+}
