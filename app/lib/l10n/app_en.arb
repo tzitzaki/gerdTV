@@ -547,7 +547,6 @@
       }
     }
   },
-  "setupFromDevice": "Get from another device",
   "setupIntro": "Enter the login your provider gave you. It is stored only in this device's secure storage.",
   "setupM3u": "M3U playlist",
   "setupM3uUrl": "Playlist URL",
@@ -557,7 +556,6 @@
   "setupRequired": "Required",
   "setupSave": "Test and save",
   "setupServer": "Server address",
-  "setupSkip": "Skip for now",
   "setupTitle": "Add your provider",
   "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
@@ -736,5 +734,30 @@
         "type": "String"
       }
     }
-  }
+  },
+  "welcomeAndroid": "Android",
+  "welcomeFromHere": "Or connect from here to a device that shows a code",
+  "welcomeGetApp": "No gerdTV on the phone yet? Scan to download it",
+  "welcomeIntro": "Bring your provider over from a device that already has gerdTV: nothing to type here.",
+  "welcomeIphone": "iPhone (re-sign it first)",
+  "welcomeNoDevice": "No other device? Skip to the app and add your provider's login in Settings → Account.",
+  "welcomeSkip": "Skip to the app",
+  "welcomeStep1": "Open gerdTV on your phone, tablet or computer.",
+  "welcomeStep2": "Go to {path}.",
+  "@welcomeStep2": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "welcomeStep3": "Scan this QR with the phone's camera, or pick {name} there and type the code.",
+  "@welcomeStep3": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "welcomeTitle": "Welcome to gerdTV"
 }

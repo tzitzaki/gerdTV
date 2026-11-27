@@ -1,4 +1,4 @@
-// Settings → Account → Devices & sync, and setup's "Get from another device" (services/devices.dart has the
+// Settings → Account → Devices & sync, and the first run's welcome screen (services/devices.dart has the
 // mechanism). Three parts:
 // - Show a code: this device listens; its QR (for a phone's camera) and the code to type elsewhere.
 // - Pair with a device on this network: on the Mac also by scanning its QR with the webcam; the devices mDNS finds; pick one, type the code it shows, then the found

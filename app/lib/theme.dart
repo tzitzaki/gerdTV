@@ -162,6 +162,13 @@ ThemeData gerdTheme(
   );
 }
 
+/// The phone layout: iOS or Android below [Tokens.wideLayout] (a tablet or the TV is wider). One rule for the
+/// swipe-back slide and for what only a phone leaves out (the welcome screen's phone download QR).
+bool isPhone(BuildContext context) =>
+    (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android) &&
+    MediaQuery.sizeOf(context).width < Tokens.wideLayout;
+
 /// Every route's transition, in [Tokens.motion] (instead of the platform's 300–500 ms slides):
 /// - phones (iOS and Android below [Tokens.wideLayout], the shell's phone layout): the iOS slide, whose left-edge
 ///   swipe closes the page (owner decision: swipe-back on phones; Android's system back keeps working too);
@@ -177,10 +184,7 @@ class RouteTransitions extends PageTransitionsBuilder {
   Duration get transitionDuration => Tokens.motion;
 
   /// Phones get the slide with swipe-back.
-  static bool swipeBack(BuildContext context) =>
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android) &&
-      MediaQuery.sizeOf(context).width < Tokens.wideLayout;
+  static bool swipeBack(BuildContext context) => isPhone(context);
 
   @override
   Widget buildTransitions<T>(

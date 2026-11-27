@@ -6,7 +6,7 @@ import 'package:gerdtv/services/tracking.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:gerdtv/src/rust/api/tracking.dart';
 
-import 'premiumize_test.dart' show MemorySecrets;
+import 'support/memory_secrets.dart';
 import 'support/fake_core.dart';
 
 class _Library implements Library {

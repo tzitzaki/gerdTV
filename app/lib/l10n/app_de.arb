@@ -295,7 +295,6 @@
   "setupConnecting": "Verbinde und lade den Katalog…",
   "setupEditTitle": "Anbieter bearbeiten",
   "setupFailed": "Verbindung fehlgeschlagen: {message}",
-  "setupFromDevice": "Von einem anderen Gerät holen",
   "setupIntro": "Gib die Zugangsdaten deines Anbieters ein. Sie werden nur im sicheren Speicher dieses Geräts abgelegt.",
   "setupM3u": "M3U-Playlist",
   "setupM3uUrl": "Playlist-URL",
@@ -305,7 +304,6 @@
   "setupRequired": "Pflichtfeld",
   "setupSave": "Testen und speichern",
   "setupServer": "Server-Adresse",
-  "setupSkip": "Vorerst überspringen",
   "setupTitle": "Anbieter hinzufügen",
   "setupUserAgentHint": "Optional: nur wenn der Anbieter einen bestimmten Player verlangt.",
   "setupUsername": "Benutzername",
@@ -397,5 +395,16 @@
   "webNoSessions": "Keine.",
   "webSessions": "Offene Web-Sitzungen",
   "webTitle": "Web-Player",
-  "webUntil": "bis {time}"
+  "webUntil": "bis {time}",
+  "welcomeAndroid": "Android",
+  "welcomeFromHere": "Oder von hier aus mit einem Gerät verbinden, das einen Code zeigt",
+  "welcomeGetApp": "Noch kein gerdTV auf dem Handy? Zum Herunterladen scannen",
+  "welcomeIntro": "Hol deinen Anbieter von einem Gerät, auf dem gerdTV schon läuft: hier musst du nichts eintippen.",
+  "welcomeIphone": "iPhone (vorher neu signieren)",
+  "welcomeNoDevice": "Kein anderes Gerät? Weiter zur App und den Login deines Anbieters unter Einstellungen → Konto eintragen.",
+  "welcomeSkip": "Weiter zur App",
+  "welcomeStep1": "Öffne gerdTV auf deinem Handy, Tablet oder Computer.",
+  "welcomeStep2": "Geh zu {path}.",
+  "welcomeStep3": "Scanne diesen QR mit der Kamera des Handys oder wähle dort {name} und tippe den Code ein.",
+  "welcomeTitle": "Willkommen bei gerdTV"
 }

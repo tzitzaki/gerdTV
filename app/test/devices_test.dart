@@ -1,7 +1,9 @@
 // New, because nothing owns device pairing's screen yet: showing a code shows its QR and the code, and pairing with a
 // found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. Also the web player's
 // screen: a login link with its QR, and ending a web session. And a start without paired devices leaves secure
-// storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused. The protocol and the
+// storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused; extended:
+// the first run's welcome screen listens at once (QR and code), offers the phone files on a computer and Skip opens
+// the app without a provider. The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,8 +11,10 @@ import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/platform/platform_bridge.dart';
 import 'package:gerdtv/screens/devices_screen.dart';
 import 'package:gerdtv/screens/web_player_screen.dart';
+import 'package:gerdtv/screens/welcome_screen.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
+import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:gerdtv/src/rust/api/pairing.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -126,9 +130,6 @@ class _PairingCore extends FakeCore {
   }) async => webSessions.removeWhere((s) => s.id == id);
 
   @override
-  String crateApiPairingPairNewDeviceId() => 'me1';
-
-  @override
   String? crateApiPairingPairLocalIp() => '192.0.2.9';
 
   @override
@@ -142,10 +143,6 @@ class _PairingCore extends FakeCore {
     required String addr,
     required String code,
   }) => 'gerdtv://pair?a=$addr&c=$code';
-
-  @override
-  QrInfo crateApiPairingPairQr({required String text}) =>
-      QrInfo(width: 21, modules: List.filled(21 * 21, true));
 
   final listener = _Listener();
 
@@ -262,6 +259,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('devices.qr')), findsOneWidget);
     expect(find.text('482 913'), findsOneWidget);
+  });
+
+  testWidgets('welcome: the code at once, phone files, Skip opens the app', (
+    tester,
+  ) async {
+    final session = Session(secrets: _Secrets(), appDir: '/nonexistent')
+      ..state = SessionState.needsSetup;
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: session.navigatorKey,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: WelcomeScreen(session: session),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('482 913'), findsOneWidget, reason: 'no tap needed');
+    expect(find.byKey(const Key('devices.found.tv1')), findsOneWidget);
+    // The test runs as a computer: both phone files, as QRs.
+    expect(find.byKey(const Key('welcome.get.android')), findsOneWidget);
+    expect(find.byKey(const Key('welcome.get.ios')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('welcome.skip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('welcome.skip')));
+    await tester.pumpAndSettle();
+    // Skip saved a profile without a provider (opening it is the session's part, app_test's journey).
+    expect(session.profiles.single.source, SourceKind.none);
+    await tester.pumpWidget(const SizedBox()); // stops pairing
   });
 
   testWidgets('pair with a found device: who answered first, Sync sends', (

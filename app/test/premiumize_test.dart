@@ -5,35 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/premiumize_screen.dart';
 import 'package:gerdtv/screens/shell.dart';
-import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_core.dart';
-
-class MemorySecrets extends Secrets {
-  final services = <String, String>{};
-
-  /// Every write and delete, as "key" (a delete as "-key").
-  final writes = <String>[];
-
-  @override
-  Future<String?> readService(String profileId, String service) async =>
-      services['$service.$profileId'];
-
-  @override
-  Future<void> writeService(
-    String profileId,
-    String service,
-    String? token,
-  ) async {
-    writes.add('${token == null ? '-' : ''}$service.$profileId');
-    token == null
-        ? services.remove('$service.$profileId')
-        : services['$service.$profileId'] = token;
-  }
-}
+import 'support/memory_secrets.dart';
 
 void main() {
   setUpAll(useFakeCore);

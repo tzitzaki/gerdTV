@@ -15,6 +15,7 @@ import 'package:gerdtv/screens/guide_settings.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/theme.dart';
 import 'package:gerdtv/services/session.dart';
+import 'package:gerdtv/src/rust/api/library.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -170,7 +171,7 @@ void main() {
       const Timeout(Duration(minutes: 5));
   // One session (and so one media_kit Player) for all three sizes, like the app: a second Player in one process
   // misbehaves (docs/HANDOVER.md), and with one per size the desktop run hung in CI. The account is removed
-  // between sizes, so each starts at the setup screen.
+  // between sizes, so each starts at the welcome screen.
   late Directory dir;
   late Session session;
   setUpAll(() async {
@@ -201,21 +202,25 @@ void main() {
           child: GerdTvApp(session: session),
         ),
       );
-      await waitFor(tester, find.text('Add your provider'));
-      await checkScreen(tester, form, 'setup', size);
+      await waitFor(tester, find.text('Welcome to gerdTV'));
+      await waitFor(tester, find.byKey(const Key('devices.code')));
+      await checkScreen(tester, form, 'welcome', size);
 
-      // Sign in to the mock panel; the guide loads in the background.
-      await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
-      await tester.enterText(
-        find.byKey(const Key('setup.username')),
-        'testuser',
+      // Sign in to the mock panel as a sync from another device would bring it (the provider form is checked as
+      // settings-edit-provider below, app_test fills it); the guide loads in the background.
+      final added = await tester.runAsync(
+        () => session.addProfile(
+          const ProfileInfo(
+            id: '',
+            name: 'Mock',
+            source: SourceKind.xtream,
+            server: mockXc,
+            userAgent: '',
+          ),
+          const ['testuser', 'testpass'],
+        ),
       );
-      await tester.enterText(
-        find.byKey(const Key('setup.password')),
-        'testpass',
-      );
-      await tester.ensureVisible(find.byKey(const Key('setup.connect')));
-      await tapReady(tester, find.byKey(const Key('setup.connect')));
+      expect(added, isNull);
       final rail = size.width >= 720;
       await waitFor(tester, find.byType(rail ? NavigationRail : NavigationBar));
       await waitFor(tester, find.byType(ListTile));

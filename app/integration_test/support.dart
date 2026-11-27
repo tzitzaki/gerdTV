@@ -2,36 +2,12 @@
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gerdtv/services/secrets.dart';
 import 'package:material_ui/material_ui.dart';
 
-const mockXc = String.fromEnvironment('GERDTV_MOCK_XC');
+// The one in-memory Secrets, shared with the widget tests.
+export '../test/support/memory_secrets.dart';
 
-/// Headless runners have no keyring for libsecret: secrets stay in memory, linked services' too (the Linux plugin
-/// takes the app down on the first service read without a secret service, e.g. opening a profile without provider
-/// after Skip).
-class MemorySecrets extends Secrets {
-  final _m = <String, List<String>>{};
-  final _services = <String, String>{};
-  @override
-  Future<void> write(String profileId, List<String> secrets) async =>
-      _m[profileId] = secrets;
-  @override
-  Future<List<String>?> read(String profileId) async => _m[profileId];
-  @override
-  Future<void> delete(String profileId) async => _m.remove(profileId);
-  @override
-  Future<String?> readService(String profileId, String service) async =>
-      _services['$service.$profileId'];
-  @override
-  Future<void> writeService(
-    String profileId,
-    String service,
-    String? token,
-  ) async => token == null
-      ? _services.remove('$service.$profileId')
-      : _services['$service.$profileId'] = token;
-}
+const mockXc = String.fromEnvironment('GERDTV_MOCK_XC');
 
 /// Pumps frames in real time until [found] appears.
 Future<void> waitFor(

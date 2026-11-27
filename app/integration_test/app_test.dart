@@ -78,13 +78,13 @@ void main() {
     await tester.pumpWidget(GerdTvApp(session: session));
     await tester.pumpAndSettle();
 
-    debugPrint('JOURNEY: setup screen');
+    debugPrint('JOURNEY: welcome screen');
     // First run: skipped, so only Settings shows (no navigation), and the provider is added there.
-    expect(find.text('Add your provider'), findsOneWidget);
-    // Below Connect: outside a small window until scrolled to (macOS CI's is 800×600).
-    await tester.ensureVisible(find.byKey(const Key('setup.skip')));
+    expect(find.text('Welcome to gerdTV'), findsOneWidget);
+    // Outside a small window until scrolled to (macOS CI's is 800×600).
+    await tester.ensureVisible(find.byKey(const Key('welcome.skip')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('setup.skip')));
+    await tester.tap(find.byKey(const Key('welcome.skip')));
     await waitFor(tester, find.byKey(const Key('settings.search')));
     expect(find.byType(NavigationRail), findsNothing);
     await tester.enterText(
@@ -94,7 +94,6 @@ void main() {
     await tester.pumpAndSettle();
     await tapReady(tester, find.byKey(const Key('settings.profileEdit')));
     await waitFor(tester, find.byKey(const Key('setup.server')));
-    expect(find.byKey(const Key('setup.skip')), findsNothing);
     await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
     await tester.enterText(find.byKey(const Key('setup.username')), 'testuser');
     await tester.enterText(find.byKey(const Key('setup.password')), 'testpass');
@@ -887,14 +886,14 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: guide settings');
-    // Settings: found by search, remove the account → back to setup.
+    // Settings: found by search, remove the account → back to the welcome screen.
     await tester.enterText(find.byKey(const Key('settings.search')), 'remove');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('guide.unmatched')), findsNothing);
     await tapReady(tester, find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
-    await waitFor(tester, find.text('Add your provider'));
+    await waitFor(tester, find.text('Welcome to gerdTV'));
     debugPrint('JOURNEY: account removed');
     await tester.runAsync(() => dir.delete(recursive: true));
     debugPrint('JOURNEY: done');
