@@ -39,6 +39,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Devices & sync: scanning the Mac's or Shield's pairing QR with the camera opens gerdTV, names the device, Sync moves the profile.
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
+- Updates: on an older release, Settings → About → Updates → Download the IPA opens the file itself in Safari.
 - Live TV (also Das Erste HD: MP2 + AC-3 sound) and a movie play with sound; Back keeps the channel running in the bottom bar; Stop ends it.
 - Home: floats only what plays, no black; returning closes the window (one picture); the button closes the player, restore reopens it.
 - Lock: sound plays on 5 min, picture at once after; the lock screen card shows title, programme, logo; its and a headset's pause work.
@@ -50,6 +51,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Cast: the local network prompt comes once, then Cast to a device lists devices (Bonjour); casting a movie works.
 
 ## Android phone
+- Get the app: the TV welcome's Android QR installs the APK; on mobile data, Sync now with the Shield works through the host.
 - Own engine: Player engine gerdTV, restart; a channel and a movie play smoothly (MediaCodec), and the picture-in-picture still works.
 - PiP: Home floats a playing channel (not after Stop or paused), a tap returns; lock screen: the card with title, programme, play/pause.
 - Reminders: Remind me on a programme in 10 minutes asks for permission, notifies about 5 minutes before, and a tap plays it.
@@ -61,6 +63,8 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Languages: Settings → Playback → Audio language German picks the German track of a two-language movie.
 
 ## Shield
+- Welcome (fresh install): QR, code and Skip on one screen, Skip focused; the phone's camera pairs (Wi-Fi, then mobile data via the host).
+- Provider form (Settings → Account → add provider): Up/Down move between all fields and the keyboard's Next goes on.
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
 - Install and remote: dark start (no white flash), sharp text (no grid or colour fringes), the wide logo banner on Home; D-pad reaches every field.
 - Movie page: OK on a movie opens its page with the muted trailer; OK plays, Trailer plays it with sound, Back returns.
