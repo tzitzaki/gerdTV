@@ -208,11 +208,18 @@ class WatchdogAdapter {
   }
 
   /// Platform code calls these on resume and on connectivity changes.
-  void wake() => _run(
-    _watchdog?.onWake(
-      frozenSecs: BigInt.from(DateTime.now().difference(_lastTick).inSeconds),
-    ),
-  );
+  void wake() => _runWake();
+  void _runWake() {
+    debugPrint(
+      'DIAG wake frozen=${DateTime.now().difference(_lastTick).inSeconds}',
+    ); // TEMP: macOS screen check
+    _run(
+      _watchdog?.onWake(
+        frozenSecs: BigInt.from(DateTime.now().difference(_lastTick).inSeconds),
+      ),
+    );
+  }
+
   void networkChanged() => _run(_watchdog?.onNetworkChanged());
 
   Future<void> stop() async {
@@ -237,6 +244,7 @@ class WatchdogAdapter {
 
   void _run(List<WatchdogCommand>? commands) {
     for (final c in commands ?? const <WatchdogCommand>[]) {
+      debugPrint('DIAG watchdog command ${c.kind}'); // TEMP: macOS screen check
       switch (c.kind) {
         case CommandKind.reload:
           _lastPosition = Duration.zero;
