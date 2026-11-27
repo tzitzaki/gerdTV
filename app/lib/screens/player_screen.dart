@@ -15,7 +15,6 @@
 // Touch (phones): media_kit's gestures, switchable in Settings → Playback (withGestures below).
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -168,8 +167,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
-    // TEMP experiment A (macOS CI): the player doesn't drive the Mac's window, to see if that breaks the pause.
-    if (VideoWindow.supported && !Platform.isMacOS) {
+    if (VideoWindow.supported) {
       _widthSub = session.player.stream.width.listen((_) => _followPicture());
       _heightSub = session.player.stream.height.listen((_) => _followPicture());
       session.pictureFormat.addListener(_followPicture);
