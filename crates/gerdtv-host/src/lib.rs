@@ -3,9 +3,9 @@
 //! owner's own machine, reached through their own tunnel.
 //!
 //! Two names, one port (the tunnel sends both here; routing is by the `Host` header):
-//! - the **front door** (`front`, HTTPS at the tunnel): `/l/<token>` turns a one-time login link (10 minutes) into a
-//!   session and hands the browser over to the player; `/app` answers a paired app's sealed requests (a new link, the
-//!   sessions, ending one; pairing.rs `app_request`).
+//! - the **front door** (`front`, HTTPS at the tunnel): `/l/<code>` (or the code typed on its page, `/go?c=`) turns a
+//!   one-time login link (8 characters, 10 minutes) into a session and hands the browser over to the player; `/app`
+//!   answers a paired app's sealed requests (a new link, the sessions, ending one; pairing.rs `app_request`).
 //! - the **player** (`player`, plain HTTP, so the page may play the provider's http:// streams directly): `/h/<code>`
 //!   sets the session cookie, the page itself (web/), `/api/*` for the catalogue, and `/s/<key>`, which redirects to
 //!   the stream: to the provider's own redirect target where there is one (it carries a token, not the login).
@@ -193,17 +193,34 @@ fn token() -> String {
     pairing::hex(&pairing::random::<16>())
 }
 
+/// A login link's code alphabet: 32 characters without the look-alikes 0/O and 1/I, so a byte's low 5 bits pick one
+/// evenly. 8 of them are 40 bits: with one use, 10 minutes and [MAX_FAILS] tries per address, guessing is hopeless.
+const CODE_ALPHABET: &[u8; 32] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+/// A typed code as stored: upper case, letters and digits only ("k7qm 4xpa" and "K7QM-4XPA" are the same code).
+fn normalize_code(typed: &str) -> String {
+    typed
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_uppercase())
+        .collect()
+}
+
 impl Auth {
+    /// A new login link's code, "XXXX-XXXX" (short enough to type: the link, or the code on the front page).
     pub fn new_link(&mut self, now: i64) -> String {
         self.links.retain(|_, made| now - *made <= LINK_TTL);
-        let t = token();
-        self.links.insert(t.clone(), now);
-        t
+        let code: String = pairing::random::<8>()
+            .iter()
+            .map(|b| CODE_ALPHABET[(b & 31) as usize] as char)
+            .collect();
+        self.links.insert(code.clone(), now);
+        format!("{}-{}", &code[..4], &code[4..])
     }
 
-    /// A link opened: a new session and its hand-over code; None when used, unknown or too old.
-    pub fn open_link(&mut self, t: &str, agent: &str, now: i64) -> Option<String> {
-        let made = self.links.remove(t)?;
+    /// A link opened (its code as typed): a new session and its hand-over code; None when used, unknown or too old.
+    pub fn open_link(&mut self, typed: &str, agent: &str, now: i64) -> Option<String> {
+        let made = self.links.remove(&normalize_code(typed))?;
         if now - made > LINK_TTL {
             return None;
         }
@@ -574,16 +591,24 @@ async fn front(host: &Host, req: Request) -> Response {
         return Response::page(429, "Too many attempts. Try again in a few minutes.");
     }
     match (req.method.as_str(), req.path.as_str()) {
+        // The code field sends GET /go?c=<code>: the same as opening /l/<code>.
         ("GET", "/") => Response::page(
             200,
-            "Open a login link from the gerdTV app: Settings → Account → Web player.",
+            "Open a login link from the gerdTV app (Settings → Account → Web player), or type its code:</p>\
+             <form action=/go><input name=c required autocomplete=off autocapitalize=characters spellcheck=false \
+             placeholder=XXXX-XXXX style='font:inherit;padding:.4em;width:9em'> <button style='font:inherit;padding:.4em'>\
+             Log in</button></form><p>",
         ),
-        ("GET", p) if p.starts_with("/l/") => {
-            let opened =
-                host.auth
-                    .lock()
-                    .unwrap()
-                    .open_link(&p[3..], req.header("user-agent"), now);
+        ("GET", p) if p.starts_with("/l/") || p == "/go" => {
+            let typed = match p.strip_prefix("/l/") {
+                Some(code) => code,
+                None => req.query.get("c").map_or("", String::as_str),
+            };
+            let opened = host
+                .auth
+                .lock()
+                .unwrap()
+                .open_link(typed, req.header("user-agent"), now);
             match opened {
                 Some(code) => Response::redirect(&format!(
                     "{}/h/{code}",
@@ -593,7 +618,7 @@ async fn front(host: &Host, req: Request) -> Response {
                     host.auth.lock().unwrap().fail(ip, now);
                     Response::page(
                         410,
-                        "This link was used already or ran out. Make a new one in the gerdTV app.",
+                        "This link or code was used already, ran out or is mistyped. Make a new one in the gerdTV app.",
                     )
                 }
             }

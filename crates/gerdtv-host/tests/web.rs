@@ -1,5 +1,5 @@
-//! New, because nothing owns the web player's server: login links work once and for 10 minutes, sessions last 3 h
-//! and extend by 3 h while valid, the API needs a session, nothing it sends carries the provider login, the stream
+//! New, because nothing owns the web player's server: login links (or their typed code) work once and for 10
+//! minutes, sessions last 3 h and extend by 3 h while valid, the API needs a session, nothing it sends carries the provider login, the stream
 //! redirect hands over the provider's own target, and only paired apps' fresh requests are answered. Against the
 //! testkit's mock panel; requests go straight to `handle` (the socket layer is the Playwright smoke's, `just test-web`).
 
@@ -83,7 +83,21 @@ async fn a_link_logs_in_once_and_the_session_serves_the_catalogue_without_the_lo
     let url = link["url"].as_str().unwrap();
     assert!(url.starts_with(&format!("{FRONT}/l/")));
     let path = &url[FRONT.len()..];
-    let opened = handle(&h, req("GET", "front.example.invalid", path, None, b"")).await;
+    // Short enough to type: /l/XXXX-XXXX; typed on the front page, case and dash don't matter.
+    let code = &path[3..];
+    assert!(code.len() == 9 && code.as_bytes()[4] == b'-', "{code}");
+    let typed = code.replace('-', "").to_lowercase();
+    let opened = handle(
+        &h,
+        req(
+            "GET",
+            "front.example.invalid",
+            &format!("/go?c={typed}"),
+            None,
+            b"",
+        ),
+    )
+    .await;
     assert_eq!(opened.status, 302);
     let to = location(&opened);
     assert!(to.starts_with(&format!("{PLAYER}/h/")), "{to}");
