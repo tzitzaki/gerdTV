@@ -742,7 +742,7 @@
   "welcomeIphone": "iPhone (re-sign it first)",
   "welcomeNoDevice": "No other device? Skip to the app and add your provider's login in Settings → Account.",
   "welcomeSkip": "Skip to the app",
-  "welcomeStep1": "Open gerdTV on your phone, tablet or computer.",
+  "welcomeStep1": "Open gerdTV on your phone, tablet or computer, on the same network as this device.",
   "welcomeStep2": "Go to {path}.",
   "@welcomeStep2": {
     "placeholders": {

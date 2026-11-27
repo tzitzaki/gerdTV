@@ -6,7 +6,8 @@
 // (Session.skipSetup); the login is then added in Settings → Account (the setup form). On a TV or computer a second
 // part offers this version's phone files as QRs (Android APK, iPhone IPA), so a phone without gerdTV gets the build
 // that pairs with this one.
-// Remote: Skip takes the focus first; Up/Down walk the page (fieldDpadKeys in theme.dart), the scroll view follows.
+// Remote: Skip takes the focus first; Up/Down walk the page (fieldDpadKeys in theme.dart), the scroll view follows,
+// so nothing that can't take focus sits below the last control (the nearby list).
 // Debugging: no QR means Devices.startPairing failed or no local IP was found (pairLocalIp); the status line shows a
 // failed sync's reason.
 
@@ -78,28 +79,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final phone = isPhone(context);
     final s = widget.session;
 
-    final header = Row(
-      children: [
-        AppLogoMark(logo: s.logo, size: 64),
-        const SizedBox(width: Tokens.space * 2),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.welcomeTitle, style: theme.textTheme.headlineMedium),
-              const SizedBox(height: Tokens.space / 2),
-              Text(
-                l10n.welcomeIntro,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
     // The three steps on the other device; the path names the same labels Settings shows.
     final steps = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,7 +126,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       ],
     );
 
-    // A phone doesn't need a QR for a phone.
+    // A phone doesn't need a QR for a phone. Right under the steps (step 1 needs gerdTV on the phone), in one compact
+    // row: nothing that can't take focus may sit below the last focusable control, or a remote never scrolls to it.
     final downloads = phone
         ? const SizedBox.shrink()
         : Column(
@@ -163,12 +143,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     ('ios', l10n.welcomeIphone),
                   ])
                     if (phoneFile(platform: platform) case final url?)
-                      Column(
+                      Row(
                         key: Key('welcome.get.$platform'),
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          QrView(text: url, size: 120),
-                          const SizedBox(height: Tokens.space),
-                          Text(label, style: theme.textTheme.labelLarge),
+                          QrView(text: url, size: 96),
+                          const SizedBox(width: Tokens.space),
+                          Flexible(
+                            child: Text(
+                              label,
+                              style: theme.textTheme.labelLarge,
+                            ),
+                          ),
                         ],
                       ),
                 ],
@@ -176,19 +162,40 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ],
           );
 
-    // Skip first in focus order (autofocus), so the remote has a start; the hint says where logins go instead.
-    final skip = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Skip takes the focus first (the remote's start) and stays in view: in the header when wide, under the code
+    // card on narrow screens.
+    final skipButton = FilledButton.tonalIcon(
+      key: const Key('welcome.skip'),
+      autofocus: true,
+      icon: const Icon(Icons.arrow_forward),
+      label: Text(l10n.welcomeSkip),
+      onPressed: () => s.skipSetup(l10n.setupNoProvider),
+    );
+    final noDevice = Padding(
+      padding: const EdgeInsets.only(top: Tokens.space * 2),
+      child: Text(l10n.welcomeNoDevice, style: theme.textTheme.bodyMedium),
+    );
+
+    final header = Row(
       children: [
-        Text(l10n.welcomeNoDevice, style: theme.textTheme.bodyMedium),
-        const SizedBox(height: Tokens.space * 1.5),
-        FilledButton.tonalIcon(
-          key: const Key('welcome.skip'),
-          autofocus: true,
-          icon: const Icon(Icons.arrow_forward),
-          label: Text(l10n.welcomeSkip),
-          onPressed: () => s.skipSetup(l10n.setupNoProvider),
+        AppLogoMark(logo: s.logo, size: 64),
+        const SizedBox(width: Tokens.space * 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.welcomeTitle, style: theme.textTheme.headlineMedium),
+              const SizedBox(height: Tokens.space / 2),
+              Text(
+                l10n.welcomeIntro,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
+        if (wide) ...[const SizedBox(width: Tokens.space * 2), skipButton],
       ],
     );
 
@@ -205,13 +212,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
     const gap = SizedBox(height: Tokens.space * 3);
     return Scaffold(
-      // A soft accent glow from the top-left corner into the surface: the chosen accent colours the first screen.
+      // A soft accent glow from the top-left corner fading into the surface: the chosen accent colours the screen.
       body: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topLeft,
-            radius: 1.4,
-            colors: [scheme.primary.withValues(alpha: 0.16), scheme.surface],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0, 0.6],
+            colors: [scheme.primary.withValues(alpha: 0.18), scheme.surface],
           ),
         ),
         child: SafeArea(
@@ -232,29 +240,29 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [steps, gap, skip, status, nearby],
+                              children: [
+                                steps,
+                                downloads,
+                                noDevice,
+                                status,
+                                nearby,
+                              ],
                             ),
                           ),
                           const SizedBox(width: Tokens.space * 4),
-                          // Fixed width: the QR card (220 + padding) and the two phone QRs side by side.
-                          SizedBox(
-                            width: 290,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [codeCard, downloads],
-                            ),
-                          ),
+                          codeCard,
                         ],
                       )
                     else ...[
                       steps,
                       const SizedBox(height: Tokens.space * 2),
                       Align(alignment: Alignment.centerLeft, child: codeCard),
-                      gap,
-                      skip,
+                      downloads,
+                      noDevice,
+                      const SizedBox(height: Tokens.space * 1.5),
+                      Align(alignment: Alignment.centerLeft, child: skipButton),
                       status,
                       nearby,
-                      downloads,
                     ],
                   ],
                 ),

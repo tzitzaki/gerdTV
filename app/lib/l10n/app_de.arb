@@ -403,7 +403,7 @@
   "welcomeIphone": "iPhone (vorher neu signieren)",
   "welcomeNoDevice": "Kein anderes Gerät? Weiter zur App und den Login deines Anbieters unter Einstellungen → Konto eintragen.",
   "welcomeSkip": "Weiter zur App",
-  "welcomeStep1": "Öffne gerdTV auf deinem Handy, Tablet oder Computer.",
+  "welcomeStep1": "Öffne gerdTV auf deinem Handy, Tablet oder Computer, im selben Netzwerk wie dieses Gerät.",
   "welcomeStep2": "Geh zu {path}.",
   "welcomeStep3": "Scanne diesen QR mit der Kamera des Handys oder wähle dort {name} und tippe den Code ein.",
   "welcomeTitle": "Willkommen bei gerdTV"
