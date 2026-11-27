@@ -145,6 +145,11 @@ test-epg-budget:
 test-live:
     cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1
 
+# The web player in headless Chrome against the mock panel (gerdtv-host's tests/web_smoke.rs; needs Chrome and Node).
+# Screenshots: ~/gerdTV-screens/<branch>/web-*.png.
+test-web:
+    cargo test -q -p gerdtv-host --test web_smoke -- --ignored
+
 # Integration tests on the Linux desktop build under Xvfb, with the testkit's fault server running alongside.
 # Expanded reporter: every test's output (the JOURNEY steps) prints as it happens, so a hang shows where it stopped.
 # A hang that blocks the app (no Dart timeout can fire) is ended after 10 min without output, with the app's native

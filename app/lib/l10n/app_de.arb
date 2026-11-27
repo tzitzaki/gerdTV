@@ -268,6 +268,7 @@
   "settingsKeywordsUnmatched": "Zuordnung epg",
   "settingsKeywordsUpdates": "Version Release herunterladen neu",
   "settingsKeywordsUserAgent": "user agent player kennung header",
+  "settingsKeywordsWeb": "web browser player link login sitzung",
   "settingsLastSync": "{entries} Einträge in {categories} Gruppen",
   "settingsLicences": "Lizenzen",
   "settingsLists": "Listen",
@@ -379,5 +380,13 @@
   "userDataImported": "Importiert: {count} neue oder neuere Einträge",
   "watchedLabel": "Gesehen",
   "watchedMark": "Als gesehen markieren",
-  "watchedUnmark": "Als nicht gesehen markieren"
+  "watchedUnmark": "Als nicht gesehen markieren",
+  "webCopy": "Kopieren",
+  "webEnd": "Beenden",
+  "webLinkHint": "In einem beliebigen Browser öffnen: Er funktioniert einmal, 10 Minuten lang. Die Sitzung dauert 3 Stunden und lässt sich dort um 3 Stunden verlängern.",
+  "webMakeLink": "Login-Link erstellen",
+  "webNoSessions": "Keine.",
+  "webSessions": "Offene Web-Sitzungen",
+  "webTitle": "Web-Player",
+  "webUntil": "bis {time}"
 }

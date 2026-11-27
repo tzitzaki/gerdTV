@@ -886,6 +886,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gerdtv-host"
+version = "0.261126.63"
+dependencies = [
+ "gerdtv-core",
+ "gerdtv-testkit",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "gerdtv-release"
 version = "0.261126.63"
 dependencies = [
@@ -912,6 +924,7 @@ version = "0.261126.63"
 dependencies = [
  "flutter_rust_bridge",
  "gerdtv-core",
+ "serde_json",
  "tokio",
 ]
 

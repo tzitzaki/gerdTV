@@ -87,6 +87,9 @@ pub struct Peer {
     /// 32 bytes, hex.
     pub key: String,
     pub addr: String,
+    /// A headless host's web player address (its front door, e.g. "https://tv.example.org"); "" for apps.
+    #[serde(default)]
+    pub web: String,
 }
 
 /// What this device has to offer, as its owner (the app's secure storage, the host's file) keeps it.
@@ -130,6 +133,8 @@ pub struct Applied {
     pub peer: Device,
     /// Where the peer listens ("ip:port"), when it said so: kept for the next sync (iOS doesn't announce itself).
     pub peer_addr: Option<String>,
+    /// The peer's web player address, when it is a host.
+    pub peer_web: Option<String>,
     /// A new pairing: the key to remember for `peer` (the address is the owner's to add).
     pub new_key: Option<String>,
     /// The app keys to store when they changed (with their time).
@@ -156,6 +161,8 @@ pub struct Local {
     pub peers: Vec<Peer>,
     /// This side's listener port, told to the other side (None: not listening).
     pub port: Option<u16>,
+    /// A host's web player address, told to the other side (None: an app).
+    pub web: Option<String>,
 }
 
 // ---- codes and keys ----
@@ -353,6 +360,9 @@ struct Hello {
     device: Device,
     /// Where this side listens (its address is the connection's).
     port: Option<u16>,
+    /// A host's web player address.
+    #[serde(default)]
+    web: Option<String>,
     /// Code pairing only: the key both keep.
     new_key: Option<String>,
 }
@@ -364,6 +374,7 @@ pub struct Connection {
     channel: Channel,
     pub peer: Device,
     peer_addr: Option<String>,
+    peer_web: Option<String>,
     new_key: Option<String>,
 }
 
@@ -412,6 +423,7 @@ async fn connect(
         .send(&Hello {
             device: me.clone(),
             port,
+            web: None,
             new_key: new_key.clone(),
         })
         .await?;
@@ -421,6 +433,7 @@ async fn connect(
         channel,
         peer: hello.device,
         peer_addr: hello.port.map(|p| format!("{host}:{p}")),
+        peer_web: hello.web,
         new_key,
     })
 }
@@ -433,6 +446,7 @@ impl Connection {
         let theirs: Bundle = self.channel.receive().await?;
         let mut a = apply(local, &self.peer, self.new_key, theirs)?;
         a.peer_addr = self.peer_addr;
+        a.peer_web = self.peer_web;
         Ok(a)
     }
 }
@@ -558,6 +572,7 @@ async fn answer(
         .send(&Hello {
             device: snapshot_local.me.clone(),
             port: snapshot_local.port,
+            web: snapshot_local.web.clone(),
             new_key: None,
         })
         .await?;
@@ -679,10 +694,162 @@ pub fn apply(
     Ok(Applied {
         peer: peer.clone(),
         peer_addr: None,
+        peer_web: None,
         new_key,
         app_keys,
         profile,
     })
+}
+
+// ---- a paired app talking to a host (web player links and sessions) ----
+//
+// A paired app asks the headless host for a web login link, or lists and ends web sessions, over plain HTTP(S) to the
+// host's front door: the request and the answer are sealed with a key derived from their pairing key, so neither a
+// proxy nor the network sees or forges them. A request is good once (its random nonce) and for 2 minutes.
+
+/// How long a sealed app request is accepted after it was made (clocks of paired devices are NTP-synced).
+pub const APP_REQUEST_TTL: i64 = 120;
+
+fn app_key(peer_key: &[u8]) -> ChaCha20Poly1305 {
+    let mut h = Sha256::new();
+    h.update(b"gerdtv-app-v1");
+    h.update(peer_key);
+    ChaCha20Poly1305::new_from_slice(&h.finalize()).expect("32-byte key")
+}
+
+/// The answer's nonce: the request's with the top bit of its first byte flipped, so the two never collide.
+fn answer_nonce(n: &[u8; 12]) -> [u8; 12] {
+    let mut a = *n;
+    a[0] ^= 0x80;
+    a
+}
+
+/// What travels to the host's `/app`: who asks, the nonce, and the sealed request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppEnvelope {
+    pub from: String,
+    pub nonce: String,
+    pub sealed: String,
+}
+
+/// A sealed app request's content.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AppRequest {
+    /// Unix seconds when made.
+    pub ts: i64,
+    /// "link" (a new login link), "sessions" (the list), "end" (end session `id`).
+    pub op: String,
+    #[serde(default)]
+    pub id: String,
+}
+
+/// Seals `req` for the host as `me`, with the pairing key `peer_key` (hex). Returns the envelope and the nonce.
+pub fn seal_app_request(
+    me: &str,
+    peer_key: &str,
+    req: &AppRequest,
+) -> Option<(AppEnvelope, [u8; 12])> {
+    let key = unhex(peer_key)?;
+    let nonce = random::<12>();
+    let sealed = app_key(&key)
+        .encrypt(
+            &Nonce::from(nonce),
+            serde_json::to_vec(req).ok()?.as_slice(),
+        )
+        .ok()?;
+    Some((
+        AppEnvelope {
+            from: me.to_string(),
+            nonce: hex(&nonce),
+            sealed: hex(&sealed),
+        },
+        nonce,
+    ))
+}
+
+/// The host's side: opens an envelope from a remembered peer (None: unknown, forged or broken). Freshness and replay
+/// are the host's to check (`ts`, the nonce).
+pub fn open_app_request(
+    peers: &[Peer],
+    env: &AppEnvelope,
+) -> Option<(AppRequest, [u8; 12], Vec<u8>)> {
+    let peer = peers.iter().find(|p| p.device.id == env.from)?;
+    let key = unhex(&peer.key)?;
+    let nonce: [u8; 12] = unhex(&env.nonce)?.try_into().ok()?;
+    let plain = app_key(&key)
+        .decrypt(&Nonce::from(nonce), unhex(&env.sealed)?.as_slice())
+        .ok()?;
+    Some((serde_json::from_slice(&plain).ok()?, nonce, key))
+}
+
+/// Seals the host's answer (hex) to a request with `nonce`, under the asking peer's key.
+pub fn seal_app_answer(key: &[u8], nonce: &[u8; 12], answer: &serde_json::Value) -> String {
+    let sealed = app_key(key)
+        .encrypt(
+            &Nonce::from(answer_nonce(nonce)),
+            answer.to_string().as_bytes(),
+        )
+        .expect("sealing never fails for small answers");
+    hex(&sealed)
+}
+
+/// The app's side: sends `req` to the host's front door `web` and opens its answer.
+pub async fn app_request(
+    web: &str,
+    me: &str,
+    peer: &Peer,
+    req: &AppRequest,
+) -> Result<serde_json::Value> {
+    let (env, nonce) = seal_app_request(me, &peer.key, req).ok_or(PairError::UnknownPeer)?;
+    crate::xtream::ensure_tls_provider();
+    let res = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| PairError::Io(std::io::Error::other(e.without_url())))?
+        .post(format!("{}/app", web.trim_end_matches('/')))
+        .header("content-type", "application/json")
+        .body(serde_json::to_vec(&env).map_err(|_| PairError::Protocol)?)
+        .send()
+        .await
+        .map_err(|e| PairError::Io(std::io::Error::other(e.without_url())))?;
+    if !res.status().is_success() {
+        return Err(PairError::Io(std::io::Error::other(format!(
+            "the host answered HTTP {}",
+            res.status().as_u16()
+        ))));
+    }
+    let bytes = res.bytes().await.map_err(|_| PairError::Protocol)?;
+    let body: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| PairError::Protocol)?;
+    open_app_answer(&peer.key, &nonce, body["sealed"].as_str().unwrap_or("")).ok_or(PairError::Auth)
+}
+
+/// The app's side: opens the host's sealed answer (hex) to its request with `nonce`; None: forged or broken.
+pub fn open_app_answer(
+    peer_key: &str,
+    nonce: &[u8; 12],
+    sealed: &str,
+) -> Option<serde_json::Value> {
+    let plain = app_key(&unhex(peer_key)?)
+        .decrypt(&Nonce::from(answer_nonce(nonce)), unhex(sealed)?.as_slice())
+        .ok()?;
+    serde_json::from_slice(&plain).ok()
+}
+
+/// Unix seconds now.
+pub fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// This device's address on the local network (the one a route to the internet would use), for the QR. A UDP
+/// "connection" sends nothing; it only makes the system pick the outgoing interface.
+pub fn local_ip() -> Option<String> {
+    let s = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    s.connect(("192.0.2.1", 9)).ok()?;
+    Some(s.local_addr().ok()?.ip().to_string())
 }
 
 // ---- mDNS ----
@@ -816,6 +983,7 @@ mod tests {
             secrets,
             peers: vec![],
             port: None,
+            web: None,
         }
     }
 
@@ -952,6 +1120,7 @@ mod tests {
             device: phone.me.clone(),
             key: key.clone(),
             addr: String::new(),
+            web: String::new(),
         }];
         shared.lock().unwrap().secrets = LocalSecrets {
             profile: Some(ProfileSecrets {
@@ -966,6 +1135,7 @@ mod tests {
             device: device("tv"),
             key,
             addr: addr.clone(),
+            web: String::new(),
         };
         let back = connect_peer(&addr, &phone.me, None, &peer)
             .await
@@ -986,6 +1156,7 @@ mod tests {
             device: device("tv"),
             key: hex(&random::<32>()),
             addr: addr.clone(),
+            web: String::new(),
         };
         assert!(
             connect_peer(&addr, &device("other"), None, &stranger)
@@ -1023,6 +1194,50 @@ mod tests {
                 .is_empty()
         );
         std::fs::remove_dir_all(&phone.dir).unwrap();
+    }
+
+    #[test]
+    fn app_requests_open_only_for_the_paired_key_and_answers_only_for_the_asker() {
+        let key = hex(&random::<32>());
+        let peers = vec![Peer {
+            device: device("phone"),
+            key: key.clone(),
+            addr: String::new(),
+            web: String::new(),
+        }];
+        let req = AppRequest {
+            ts: 5,
+            op: "link".into(),
+            id: String::new(),
+        };
+        let (env, nonce) = seal_app_request("phone", &key, &req).unwrap();
+        let (opened, n, k) = open_app_request(&peers, &env).unwrap();
+        assert_eq!((opened, n), (req.clone(), nonce));
+        // Another key, another sender, or a changed byte: nothing opens.
+        let (other, _) = seal_app_request("phone", &hex(&random::<32>()), &req).unwrap();
+        assert!(open_app_request(&peers, &other).is_none());
+        let mut forged = env.clone();
+        forged.from = "tv".into();
+        assert!(open_app_request(&peers, &forged).is_none());
+        let mut flipped = env.clone();
+        flipped.sealed.replace_range(
+            0..2,
+            if &env.sealed[0..2] == "00" {
+                "01"
+            } else {
+                "00"
+            },
+        );
+        assert!(open_app_request(&peers, &flipped).is_none());
+        // The answer opens with the request's nonce flipped, under the same key.
+        let a = seal_app_answer(&k, &nonce, &serde_json::json!({"url": "x"}));
+        let plain = app_key(&k)
+            .decrypt(
+                &Nonce::from(answer_nonce(&nonce)),
+                unhex(&a).unwrap().as_slice(),
+            )
+            .unwrap();
+        assert_eq!(plain, br#"{"url":"x"}"#);
     }
 
     #[test]

@@ -1,9 +1,11 @@
 // New, because nothing owns device pairing's screen yet: showing a code shows its QR and the code, and pairing with a
-// found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. The protocol and the
+// found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. Also the web player's
+// screen: a login link with its QR, and ending a web session. The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/screens/devices_screen.dart';
+import 'package:gerdtv/screens/web_player_screen.dart';
 import 'package:gerdtv/services/secrets.dart';
 import 'package:gerdtv/services/session.dart';
 import 'package:gerdtv/src/rust/api/pairing.dart';
@@ -67,6 +69,28 @@ class _Connection extends Fake implements PairConnection {
 class _PairingCore extends FakeCore {
   final connection = _Connection();
   String? typedCode;
+  final webSessions = [
+    WebSessionInfo(id: 's1', created: 0, expires: 0, agent: 'Firefox'),
+  ];
+
+  @override
+  Future<String> crateApiPairingHostLink({
+    required String meId,
+    required PeerInfo peer,
+  }) async => '${peer.web}/l/abc';
+
+  @override
+  Future<List<WebSessionInfo>> crateApiPairingHostSessions({
+    required String meId,
+    required PeerInfo peer,
+  }) async => List.of(webSessions);
+
+  @override
+  Future<void> crateApiPairingHostEndSession({
+    required String meId,
+    required PeerInfo peer,
+    required String id,
+  }) async => webSessions.removeWhere((s) => s.id == id);
 
   @override
   String crateApiPairingPairNewDeviceId() => 'me1';
@@ -155,5 +179,34 @@ void main() {
     // Remembered, with where it listens.
     expect(session.devices.peers.value.single.addr, '192.0.2.5:4100');
     expect(find.byKey(const Key('devices.peer.tv1')), findsOneWidget);
+  });
+
+  testWidgets('web player: a login link with its QR; End ends a session', (
+    tester,
+  ) async {
+    final session = Session(secrets: _Secrets(), appDir: '/nonexistent');
+    const host = PeerInfo(
+      device: DeviceInfo(id: 'h1', name: 'gerdTV host', platform: 'host'),
+      key: 'k',
+      addr: '',
+      web: 'https://tv.example.invalid',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: WebPlayerScreen(session: session, host: host),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('web.session.s1')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('web.makeLink')));
+    await tester.pumpAndSettle();
+    expect(find.text('https://tv.example.invalid/l/abc'), findsOneWidget);
+    expect(find.byKey(const Key('devices.qr')), findsOneWidget);
+    await tester.ensureVisible(find.text('End')); // below the QR
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('End'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('web.session.s1')), findsNothing);
   });
 }

@@ -34,6 +34,7 @@ import 'track_settings.dart';
 import '../services/tracking.dart';
 import 'settings_model.dart';
 import 'devices_screen.dart';
+import 'web_player_screen.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
@@ -295,6 +296,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions.
+          for (final host in session.devices.peers.value.where(
+            (p) => p.web.isNotEmpty,
+          ))
+            SettingsEntry(
+              id: 'web.${host.device.id}',
+              section: l10n.devicesTitle,
+              title: l10n.webTitle,
+              keywords: l10n.settingsKeywordsWeb,
+              build: (context) => ListTile(
+                key: Key('settings.web.${host.device.id}'),
+                leading: const Icon(Icons.public),
+                title: Text(l10n.webTitle),
+                subtitle: Text(host.web),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        WebPlayerScreen(session: session, host: host),
+                  ),
+                ),
+              ),
+            ),
           if (lib != null)
             SettingsEntry(
               id: 'premiumize',

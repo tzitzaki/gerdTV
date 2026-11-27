@@ -8,7 +8,7 @@ import 'library.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `btree`, `connection`, `err`
+// These functions are ignored because they are not marked as `pub`: `btree`, `connection`, `err`, `host_call`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`
 
 /// A new install's device id.
@@ -28,6 +28,27 @@ QrInfo pairQr({required String text}) =>
 
 /// This device's address on the local network (the one a route to the internet would use), for the QR.
 String? pairLocalIp() => RustLib.instance.api.crateApiPairingPairLocalIp();
+
+/// Asks a paired host (its web address `peer.web`) for a one-time web login link; returns the link.
+Future<String> hostLink({required String meId, required PeerInfo peer}) =>
+    RustLib.instance.api.crateApiPairingHostLink(meId: meId, peer: peer);
+
+/// The host's web sessions.
+Future<List<WebSessionInfo>> hostSessions({
+  required String meId,
+  required PeerInfo peer,
+}) => RustLib.instance.api.crateApiPairingHostSessions(meId: meId, peer: peer);
+
+/// Ends one of the host's web sessions.
+Future<void> hostEndSession({
+  required String meId,
+  required PeerInfo peer,
+  required String id,
+}) => RustLib.instance.api.crateApiPairingHostEndSession(
+  meId: meId,
+  peer: peer,
+  id: id,
+);
 
 /// gerdTV devices that answer on the network within `wait_ms` (mDNS; not on iOS, where the QR carries the address).
 Future<List<FoundDevice>> pairDiscover({
@@ -104,6 +125,9 @@ class AppliedInfo {
   /// Where the peer listens, when it said so ("ip:port").
   final String? peerAddr;
 
+  /// The peer's web player address, when it is a host.
+  final String? peerWeb;
+
   /// A new pairing: remember `peer` with this key.
   final String? newKey;
 
@@ -115,6 +139,7 @@ class AppliedInfo {
   const AppliedInfo({
     required this.peer,
     this.peerAddr,
+    this.peerWeb,
     this.newKey,
     this.appKeys,
     required this.keysUpdatedAt,
@@ -125,6 +150,7 @@ class AppliedInfo {
   int get hashCode =>
       peer.hashCode ^
       peerAddr.hashCode ^
+      peerWeb.hashCode ^
       newKey.hashCode ^
       appKeys.hashCode ^
       keysUpdatedAt.hashCode ^
@@ -137,6 +163,7 @@ class AppliedInfo {
           runtimeType == other.runtimeType &&
           peer == other.peer &&
           peerAddr == other.peerAddr &&
+          peerWeb == other.peerWeb &&
           newKey == other.newKey &&
           appKeys == other.appKeys &&
           keysUpdatedAt == other.keysUpdatedAt &&
@@ -313,10 +340,19 @@ class PeerInfo {
   final String key;
   final String addr;
 
-  const PeerInfo({required this.device, required this.key, required this.addr});
+  /// A headless host's web player address ("" for apps).
+  final String web;
+
+  const PeerInfo({
+    required this.device,
+    required this.key,
+    required this.addr,
+    required this.web,
+  });
 
   @override
-  int get hashCode => device.hashCode ^ key.hashCode ^ addr.hashCode;
+  int get hashCode =>
+      device.hashCode ^ key.hashCode ^ addr.hashCode ^ web.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -325,7 +361,8 @@ class PeerInfo {
           runtimeType == other.runtimeType &&
           device == other.device &&
           key == other.key &&
-          addr == other.addr;
+          addr == other.addr &&
+          web == other.web;
 }
 
 class ProfileSecretsInfo {
@@ -370,4 +407,37 @@ class QrInfo {
           runtimeType == other.runtimeType &&
           width == other.width &&
           modules == other.modules;
+}
+
+/// A web session on a host, as its list shows it.
+class WebSessionInfo {
+  final String id;
+
+  /// Unix seconds.
+  final PlatformInt64 created;
+  final PlatformInt64 expires;
+
+  /// The browser, as it named itself (shortened).
+  final String agent;
+
+  const WebSessionInfo({
+    required this.id,
+    required this.created,
+    required this.expires,
+    required this.agent,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ created.hashCode ^ expires.hashCode ^ agent.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WebSessionInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          created == other.created &&
+          expires == other.expires &&
+          agent == other.agent;
 }

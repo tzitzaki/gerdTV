@@ -503,6 +503,7 @@
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
   "settingsKeywordsUserAgent": "user agent player header",
+  "settingsKeywordsWeb": "web browser player link login session",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -711,5 +712,20 @@
   },
   "watchedLabel": "Watched",
   "watchedMark": "Mark as watched",
-  "watchedUnmark": "Mark as not watched"
+  "watchedUnmark": "Mark as not watched",
+  "webCopy": "Copy",
+  "webEnd": "End",
+  "webLinkHint": "Open it in any browser: it works once, for 10 minutes. The session lasts 3 hours and can be extended there by 3 hours.",
+  "webMakeLink": "Make a login link",
+  "webNoSessions": "None.",
+  "webSessions": "Open web sessions",
+  "webTitle": "Web player",
+  "webUntil": "until {time}",
+  "@webUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  }
 }

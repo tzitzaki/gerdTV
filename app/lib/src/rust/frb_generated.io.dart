@@ -392,6 +392,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<WatchdogCommand> dco_decode_list_watchdog_command(dynamic raw);
 
   @protected
+  List<WebSessionInfo> dco_decode_list_web_session_info(dynamic raw);
+
+  @protected
   LocalHlsStatus dco_decode_local_hls_status(dynamic raw);
 
   @protected
@@ -559,6 +562,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WatchdogCommand dco_decode_watchdog_command(dynamic raw);
+
+  @protected
+  WebSessionInfo dco_decode_web_session_info(dynamic raw);
 
   @protected
   CastHandle
@@ -937,6 +943,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<WebSessionInfo> sse_decode_list_web_session_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LocalHlsStatus sse_decode_local_hls_status(SseDeserializer deserializer);
 
   @protected
@@ -1124,6 +1135,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WatchdogCommand sse_decode_watchdog_command(SseDeserializer deserializer);
+
+  @protected
+  WebSessionInfo sse_decode_web_session_info(SseDeserializer deserializer);
 
   @protected
   void
@@ -1609,6 +1623,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_web_session_info(
+    List<WebSessionInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_local_hls_status(
     LocalHlsStatus self,
     SseSerializer serializer,
@@ -1821,6 +1841,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_watchdog_command(
     WatchdogCommand self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_web_session_info(
+    WebSessionInfo self,
     SseSerializer serializer,
   );
 }

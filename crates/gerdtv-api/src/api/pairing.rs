@@ -19,6 +19,8 @@ pub struct PeerInfo {
     pub device: DeviceInfo,
     pub key: String,
     pub addr: String,
+    /// A headless host's web player address ("" for apps).
+    pub web: String,
 }
 
 pub struct ProfileSecretsInfo {
@@ -44,6 +46,8 @@ pub struct AppliedInfo {
     pub peer: DeviceInfo,
     /// Where the peer listens, when it said so ("ip:port").
     pub peer_addr: Option<String>,
+    /// The peer's web player address, when it is a host.
+    pub peer_web: Option<String>,
     /// A new pairing: remember `peer` with this key.
     pub new_key: Option<String>,
     /// The app keys to store, when they changed, and their time.
@@ -113,6 +117,7 @@ impl From<PeerInfo> for core::Peer {
             device: p.device.into(),
             key: p.key,
             addr: p.addr,
+            web: p.web,
         }
     }
 }
@@ -137,6 +142,7 @@ impl From<LocalInfo> for core::Local {
             },
             peers: l.peers.into_iter().map(Into::into).collect(),
             port: l.port,
+            web: None,
         }
     }
 }
@@ -150,6 +156,7 @@ impl From<core::Applied> for AppliedInfo {
         AppliedInfo {
             peer: a.peer.into(),
             peer_addr: a.peer_addr,
+            peer_web: a.peer_web,
             new_key: a.new_key,
             app_keys,
             keys_updated_at,
@@ -197,10 +204,63 @@ pub fn pair_qr(text: String) -> QrInfo {
 /// This device's address on the local network (the one a route to the internet would use), for the QR.
 #[flutter_rust_bridge::frb(sync)]
 pub fn pair_local_ip() -> Option<String> {
-    // A UDP "connection" sends nothing; it only makes the system pick the outgoing interface.
-    let s = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
-    s.connect(("192.0.2.1", 9)).ok()?;
-    Some(s.local_addr().ok()?.ip().to_string())
+    core::local_ip()
+}
+
+/// A web session on a host, as its list shows it.
+pub struct WebSessionInfo {
+    pub id: String,
+    /// Unix seconds.
+    pub created: i64,
+    pub expires: i64,
+    /// The browser, as it named itself (shortened).
+    pub agent: String,
+}
+
+/// Asks a paired host (its web address `peer.web`) for a one-time web login link; returns the link.
+pub async fn host_link(me_id: String, peer: PeerInfo) -> Result<String, String> {
+    let v = host_call(&me_id, peer, "link", "").await?;
+    Ok(v["url"].as_str().unwrap_or("").to_string())
+}
+
+/// The host's web sessions.
+pub async fn host_sessions(me_id: String, peer: PeerInfo) -> Result<Vec<WebSessionInfo>, String> {
+    let v = host_call(&me_id, peer, "sessions", "").await?;
+    Ok(v["sessions"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|s| WebSessionInfo {
+                    id: s["id"].as_str().unwrap_or("").to_string(),
+                    created: s["created"].as_i64().unwrap_or(0),
+                    expires: s["expires"].as_i64().unwrap_or(0),
+                    agent: s["agent"].as_str().unwrap_or("").to_string(),
+                })
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Ends one of the host's web sessions.
+pub async fn host_end_session(me_id: String, peer: PeerInfo, id: String) -> Result<(), String> {
+    host_call(&me_id, peer, "end", &id).await.map(|_| ())
+}
+
+async fn host_call(
+    me: &str,
+    peer: PeerInfo,
+    op: &str,
+    id: &str,
+) -> Result<serde_json::Value, String> {
+    let web = peer.web.clone();
+    let req = core::AppRequest {
+        ts: core::unix_now(),
+        op: op.to_string(),
+        id: id.to_string(),
+    };
+    core::app_request(&web, me, &peer.into(), &req)
+        .await
+        .map_err(err)
 }
 
 /// gerdTV devices that answer on the network within `wait_ms` (mDNS; not on iOS, where the QR carries the address).

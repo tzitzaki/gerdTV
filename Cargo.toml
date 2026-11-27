@@ -2,7 +2,7 @@
 # The version is set by the wrap-up PR (0.YYMMDD.<PR#>, docs/RELEASING.md) together with app/pubspec.yaml.
 [workspace]
 resolver = "3"
-members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release"]
+members = ["crates/gerdtv-core", "crates/gerdtv-api", "crates/gerdtv-testkit", "crates/gerdtv-release", "crates/gerdtv-host"]
 
 [workspace.package]
 version = "0.261126.63"

@@ -102,6 +102,7 @@ class Devices {
               ),
               key: p['key'] as String,
               addr: p['addr'] as String,
+              web: p['web'] as String? ?? '',
             ),
         ];
       } catch (_) {
@@ -128,6 +129,7 @@ class Devices {
             'platform': p.device.platform,
             'key': p.key,
             'addr': p.addr,
+            'web': p.web,
           },
       ]),
     );
@@ -307,6 +309,7 @@ class Devices {
           device: a.peer,
           key: key,
           addr: addr ?? a.peerAddr ?? known.firstOrNull?.addr ?? '',
+          web: a.peerWeb ?? known.firstOrNull?.web ?? '',
         ),
       ];
       await _savePeers();

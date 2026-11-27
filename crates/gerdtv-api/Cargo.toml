@@ -14,6 +14,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
 gerdtv-core.workspace = true
+serde_json.workspace = true # host calls: the sealed answers
 tokio.workspace = true # pairing: its listener's event queue and the blocking mDNS browse
 
 [lints.rust]
