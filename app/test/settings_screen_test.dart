@@ -2,7 +2,7 @@
 // keywords, subcategory or category, accents folded) and the two layouts (categories beside the content on wide windows, a list
 // that opens a page on phones), with the search narrowing the visible entries as you type; picking a logo stores it
 // app-wide; the player choices are stored for the next start, and say so only for a real
-// change.
+// change; extended: Web player shows without a paired host, saying what it needs.
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -163,6 +163,9 @@ void main() {
         find.byKey(const Key('settings.section.Provider')),
         findsOneWidget,
       );
+      // Web player shows without a paired host too, saying what it needs (it was hidden, so hard to find).
+      expect(find.byKey(const Key('settings.web.none')), findsOneWidget);
+      expect(find.textContaining('Needs a gerdTV host'), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings.cat.about')));
       await tester.pump();
       expect(find.byKey(const Key('settings.remove')), findsNothing);

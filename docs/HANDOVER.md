@@ -1,9 +1,8 @@
 # Handover
 
 ## State
-- Version 0.261127.69: a back arrow on the provider page, Esc and the mouse's back button close any page, a desktop window minimum (960 × 540).
-- Also in 0.261127.69: 6-digit pairing codes made safe by SPAKE2, and Simkl's and Premiumize's client ids entered in Settings (none in the builds).
-- Before: the player window's ratio, TV search, Skia on Android, Mac webcam pairing (.68), OpenSubtitles VIP (.66), web player and device sync (.65).
+- Version 0.261127.70: host self-update (signed release, rollback), `--version`, 8-character login codes, Web player always in Settings.
+- Before: back arrow and Esc on pages, SPAKE2 pairing codes (.69), the player window's ratio, Mac webcam pairing (.68), web player (.65).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -19,7 +18,7 @@
 - For Trakt: create your own app on trakt.tv (Settings → Your API Apps, redirect urn:ietf:wg:oauth:2.0:oob) and enter it in Settings → Account → Trakt.
 - Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Account.
 - Move the signing files from the private config folder into the password manager, then delete them there.
-- Web player: set up the host on your Linux VM (docs/INSTALL.md, Web player host; the home-specific steps are in your private runbook).
+- Web player host: update it to 0.261127.70 by hand once, then enable the nightly update timer and snapshot hook (private runbook, section 9).
 - Install this release on the Mac (from the DMG), the iPhone and the Shield and go through docs/DEVICE_CHECKS.md (a housekeeping round is planned).
 
 ## Open work
@@ -33,6 +32,7 @@
 - [DEVICE] Devices & sync and the web player: the new lines in docs/DEVICE_CHECKS.md (camera link on the phone, Safari and Chrome).
 
 ## Things to watch
+- The Linux integration test app_test sometimes doesn't complete (seen once locally in #70, green on rerun; the nightly's integration job failed too).
 - Web sessions live in the host's memory: a restart of the host ends them all (a new link logs in again).
 - The host hands browsers the provider's tokenised redirect; if the provider binds it to the host's IP, the page retries the plain address.
 - oxicast is pre-1.0 and pinned exactly: an update may change its API; Cast is checked by hand only (no fake receiver, owner decision).

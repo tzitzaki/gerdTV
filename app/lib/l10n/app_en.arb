@@ -724,6 +724,7 @@
   "webEnd": "End",
   "webLinkHint": "Open it in any browser: it works once, for 10 minutes. The session lasts 3 hours and can be extended there by 3 hours.",
   "webMakeLink": "Make a login link",
+  "webNoHost": "Plays gerdTV in a browser. Needs a gerdTV host, a program on an always-on Linux computer of yours (see the install guide), paired in Devices & sync on the same network.",
   "webNoSessions": "None.",
   "webSessions": "Open web sessions",
   "webTitle": "Web player",

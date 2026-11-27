@@ -392,6 +392,7 @@
   "webEnd": "Beenden",
   "webLinkHint": "In einem beliebigen Browser öffnen: Er funktioniert einmal, 10 Minuten lang. Die Sitzung dauert 3 Stunden und lässt sich dort um 3 Stunden verlängern.",
   "webMakeLink": "Login-Link erstellen",
+  "webNoHost": "Spielt gerdTV im Browser. Braucht einen gerdTV-Host, ein Programm auf einem ständig laufenden Linux-Rechner (siehe Installationsanleitung), gekoppelt unter Geräte & Abgleich im selben Netz.",
   "webNoSessions": "Keine.",
   "webSessions": "Offene Web-Sitzungen",
   "webTitle": "Web-Player",

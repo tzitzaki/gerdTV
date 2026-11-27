@@ -1,5 +1,5 @@
-//! New, because nothing owns the web player's server: login links work once and for 10 minutes, sessions last 3 h
-//! and extend by 3 h while valid, the API needs a session, nothing it sends carries the provider login, the stream
+//! New, because nothing owns the web player's server: login links (or their typed code) work once and for 10
+//! minutes, sessions last 3 h and extend by 3 h while valid, the API needs a session, nothing it sends carries the provider login, the stream
 //! redirect hands over the provider's own target, and only paired apps' fresh requests are answered. Against the
 //! testkit's mock panel; requests go straight to `handle` (the socket layer is the Playwright smoke's, `just test-web`).
 
@@ -83,7 +83,21 @@ async fn a_link_logs_in_once_and_the_session_serves_the_catalogue_without_the_lo
     let url = link["url"].as_str().unwrap();
     assert!(url.starts_with(&format!("{FRONT}/l/")));
     let path = &url[FRONT.len()..];
-    let opened = handle(&h, req("GET", "front.example.invalid", path, None, b"")).await;
+    // Short enough to type: /l/XXXX-XXXX; typed on the front page, case and dash don't matter.
+    let code = &path[3..];
+    assert!(code.len() == 9 && code.as_bytes()[4] == b'-', "{code}");
+    let typed = code.replace('-', "").to_lowercase();
+    let opened = handle(
+        &h,
+        req(
+            "GET",
+            "front.example.invalid",
+            &format!("/go?c={typed}"),
+            None,
+            b"",
+        ),
+    )
+    .await;
     assert_eq!(opened.status, 302);
     let to = location(&opened);
     assert!(to.starts_with(&format!("{PLAYER}/h/")), "{to}");
@@ -376,4 +390,32 @@ fn what_a_sync_brings_is_kept_with_one_profile() {
     f.store(&applied("p1", None, None));
     let p = f.secrets.profile.unwrap();
     assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p1", "came-p1"));
+}
+
+/// Bug: `pair` without `--front` paired with an empty web address, so the app hid its Web player entry until a later
+/// Sync now. Pairing is the first sync and must carry the address: without `--front` it refuses (usage, exit 2).
+#[test]
+fn pairing_without_the_front_address_is_refused() {
+    let dir = std::env::temp_dir().join(format!("gerdtv-host-pair-{}", pairing::new_device_id()));
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_gerdtv-host"))
+        .args(["pair", "--dir", dir.to_str().unwrap(), "--pair-port", "0"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    // A refusal exits at once; the bug was a pairing that started (and waited for an app).
+    let mut code = None;
+    for _ in 0..50 {
+        if let Some(status) = child.try_wait().unwrap() {
+            code = status.code();
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    if code.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(code, Some(2), "pair started without --front");
 }
