@@ -1,8 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261127.66: OpenSubtitles VIP logins (calls go to the login's host). 0.261127.65: web player via a home host, device sync, setup skip, provider edit.
-- Before: watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, OpenSubtitles, own groups, Android TV home screen; AirPlay is still open.
+- Version 0.261127.68: the player window keeps the picture's ratio; TV search lists channels, then live and upcoming programmes (ended behind a tap).
+- Also in 0.261127.68: Android renders with Skia, wide TV banners, dark launch screens, the web player's busy notice and icons, webcam pairing on the Mac.
+- Before: OpenSubtitles VIP logins (.66), web player and device sync (.65), watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, own groups.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -26,7 +27,6 @@
 - [DEVICE] Android recordings while gerdTV is closed: try a start by the exact alarm alone (a headless engine) once the notification path is checked.
 - Trakt: import its watch progress like Simkl's (only scrobbling, now with TMDB ids, is built for Trakt).
 - M3U catch-up (catchup-source templates) when an M3U profile needs it.
-- A dedicated test for the guide's sticky titles (the screen check's overlap rule no longer catches a hidden running title).
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; black or a long freeze: send the log ("TextureHW: first picture").
 - The TV-layout focus polish; lazy VOD details; the menu bar's tray on Linux.
@@ -48,13 +48,13 @@
 - Background PiP switches mpv to software rendering and decoding: a short freeze on leaving and returning; 4K HEVC may stutter there.
 - German public channels send no IDR frames (open GOP): with Apple's player, segments start on recovery-point I-frames.
 - One media_kit Player per process: a second one misbehaved, and one per screen-check size hung CI's Linux job (#26).
+- Android renders with Skia (Impeller off in the manifest, the Shield garbled under it): recheck when a Flutter update drops Skia on Android.
 - flutter_secure_storage_linux crashes the app when deleting a key that was never written: delete only what exists (Session.removeProfile).
 
 ## Ideas not chosen
 - Sleep timer, playback speed, search across accounts, multiview, downloads and skip intro (session 7's comparison).
 - Web player: an HTTPS relay for Firefox and .ts-only channels; a real offline PWA (needs HTTPS for the player page).
 - Apple Developer ID (99 USD a year): Keychain tied to the team ID, notarized; possible later step (docs/RELEASING.md).
-- The provider's short EPG per channel, and an own iptv-org grabber on a server.
-- Seamless reconnect with a second player taking over (costs a second provider connection).
+- The provider's short EPG per channel, an own iptv-org grabber, and seamless reconnect by a second player (costs a second connection).
 - A persistent macOS Finder icon for the chosen logo (changing the app bundle breaks its code signature).
 - A Vulkan render path for mpv (mpv 0.42 has no Vulkan render API, mpv#18343; it would be our own mpv patch).
