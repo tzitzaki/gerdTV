@@ -4,7 +4,7 @@
 //
 // Two sizes are remembered across restarts (app-wide settings): the browsing size (the window outside the player) and
 // the player's width (its height follows each picture's ratio). Opening the player animates to the player size,
-// leaving it animates back. Fullscreen and the mini player have their own sizes: [unlock] while they show.
+// leaving it animates back (stepped in Dart, see _resizeTo). Fullscreen and the mini player have their own sizes: [unlock] while they show.
 //
 // Debug hints: bars despite the lock usually mean the ratio came from a stream whose width/height mpv reported before
 // the first frame (zapping re-fits on the next report); a window that doesn't move at all means getCurrent() returned
@@ -85,7 +85,7 @@ class VideoWindow {
       width = parseWindowSize(await read(playerKey))?.width ?? width;
     }
     if (_unlockedFor.isEmpty && _ratio == ratio) {
-      _apply(w, width, animate: true);
+      await _apply(w, width, animate: true);
     }
   }
 
@@ -117,7 +117,7 @@ class VideoWindow {
     final width = _widthAtUnlock;
     if (w == null || ratio == null || _unlockedFor.isNotEmpty) return;
     if (ratio != _ratioAtUnlock && width != null) {
-      _apply(w, width, animate: false);
+      await _apply(w, width, animate: false);
     } else {
       w.aspectRatio = ratio;
     }
@@ -132,11 +132,15 @@ class VideoWindow {
     w.aspectRatio = 0;
     await write(playerKey, formatWindowSize(w.contentSize.toSize()));
     final browse = parseWindowSize(await read(browseKey));
-    if (browse != null) w.setSize(browse.toNative(), Platform.isMacOS);
+    if (browse != null) await _resizeTo(w, browse, animate: true);
   }
 
   /// Locks the ratio and sizes the content to [width] at it, within the screen.
-  void _apply(wm.Window w, double width, {required bool animate}) {
+  Future<void> _apply(
+    wm.Window w,
+    double width, {
+    required bool animate,
+  }) async {
     final ratio = _ratio!;
     // The title bar (and Linux's decorations) are outside the content: the frame is larger by them.
     final frame = w.size.toSize();
@@ -157,15 +161,31 @@ class VideoWindow {
       ),
     );
     // Lock after the resize: GTK applies the aspect hint to programmatic resizes too, so a lock from the old ratio
-    // would bend the new size. Linux resizes without animation (GTK doesn't animate it).
+    // would bend the new size.
     w.aspectRatio = 0;
-    w.setSize(
-      ui.Size(
-        target.width + extra.width,
-        target.height + extra.height,
-      ).toNative(),
-      animate && Platform.isMacOS,
+    await _resizeTo(
+      w,
+      ui.Size(target.width + extra.width, target.height + extra.height),
+      animate: animate,
     );
     w.aspectRatio = ratio;
+  }
+
+  /// Resizes the frame to [size]; animated in 8 steps of 20 ms. Not nativeapi's own animation: on macOS it goes
+  /// through NSWindow's animator proxy, and called this way the window didn't move at all (CI: 780 px stayed 780).
+  /// Debugging a window that ends between sizes: something else resized it during the 160 ms.
+  Future<void> _resizeTo(
+    wm.Window w,
+    ui.Size size, {
+    required bool animate,
+  }) async {
+    final from = w.size.toSize();
+    if (animate) {
+      for (var i = 1; i < 8; i++) {
+        w.setSize(ui.Size.lerp(from, size, i / 8)!.toNative(), false);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    }
+    w.setSize(size.toNative(), false);
   }
 }

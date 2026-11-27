@@ -521,22 +521,17 @@ void main() {
 
     debugPrint('JOURNEY: catch-up played a past programme');
     // Live now and Upcoming come first; "Show earlier" loads the ended ones under "Earlier" (missed shows on demand,
-    // never mixed into what's on). The field still holds "sport", whose ended programmes exist in the mock guide;
-    // the button is built only once scrolled to.
-    await waitFor(
-      tester,
-      find.byType(ItemRow),
-    ); // the results load after the player closed
+    // never mixed into what's on). The field still holds "sport", whose ended programmes exist in the mock guide.
+    // The list is still scrolled down to that button from the programme step, so the channel rows above it are no
+    // longer built: wait for the button itself (the results load after the player closed).
+    final showEarlier = find.byKey(const Key('search.showEarlier'));
+    await waitFor(tester, showEarlier);
     final resultListElement = find
-        .ancestor(
-          of: find.byType(ItemRow).first,
-          matching: find.byType(Scrollable),
-        )
+        .ancestor(of: showEarlier, matching: find.byType(Scrollable))
         .evaluate()
         .first;
     final resultList = find.byElementPredicate((e) => e == resultListElement);
     expect(find.byKey(const Key('search.earlier')), findsNothing);
-    final showEarlier = find.byKey(const Key('search.showEarlier'));
     await tester.scrollUntilVisible(
       showEarlier,
       400,
@@ -556,21 +551,13 @@ void main() {
     );
 
     debugPrint('JOURNEY: search lists ended programmes under Earlier');
-    // "Also in": Movies with the same query; a typo still finds movies; each section keeps its own query.
-    await waitFor(
-      tester,
-      find.byType(ItemRow),
-    ); // the results load after the player closed
+    // "Also in": Movies with the same query; a typo still finds movies; each section keeps its own query. The line
+    // is at the end of the same result list, below Earlier.
     final also = find.byKey(const Key('search.also.movies'));
     await tester.scrollUntilVisible(
       also,
       400,
-      scrollable: find
-          .ancestor(
-            of: find.byType(ItemRow).first,
-            matching: find.byType(Scrollable),
-          )
-          .first,
+      scrollable: resultList,
       maxScrolls: 60,
     );
     await tapReady(tester, also);
