@@ -45,6 +45,14 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Device pairing: the camera scanned another device's QR (gerdtv://pair?a=…&c=…); MainActivity hands the
+                 link to Dart (takePairLink at start, pairLink while running). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="gerdtv" android:host="pair"/>
+            </intent-filter>
         </activity>
         <!-- Shares the downloaded update (cache folder) with the system's installer; see res/xml/file_paths.xml. -->
         <provider

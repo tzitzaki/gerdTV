@@ -99,6 +99,63 @@
   "delayLater": "Later",
   "detailsMinutes": "min",
   "detailsPlay": "Play",
+  "devicesConfirm": "Sync with {name} ({platform})?",
+  "@devicesConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesConfirmBody": "The open provider with its login, your keys and your user data go to that device, and its come here; the newer one wins. Only the two devices see it, sealed with the code.",
+  "devicesEnterCode": "Code shown on {name}",
+  "@devicesEnterCode": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesFailed": "Couldn't sync: {message}",
+  "@devicesFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesForget": "Forget",
+  "devicesForgetConfirm": "Forget {name}? It can't sync with this device until you pair them again.",
+  "@devicesForgetConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesNearby": "gerdTV devices on this network",
+  "devicesNext": "Next",
+  "devicesNoneFound": "None found. Open Devices & sync on the other device; both must be on the same network.",
+  "devicesPaired": "Paired devices (tap to sync now)",
+  "devicesScanHint": "A phone can also scan the other device's QR with its camera.",
+  "devicesSearch": "Search again",
+  "devicesShowCode": "Show a code on this device",
+  "devicesShowCodeHint": "On the other device: Devices & sync, pick this one and type the code, or scan the QR with a phone's camera.",
+  "devicesSync": "Sync",
+  "devicesSynced": "Synced with {name}",
+  "@devicesSynced": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesSyncing": "Syncing…",
+  "devicesTitle": "Devices & sync",
+  "devicesWaiting": "waiting for the other device…",
   "episodesEmpty": "This series has no episodes.",
   "favouriteAdd": "Add to favourites",
   "favouriteRemove": "Remove from favourites",
@@ -295,8 +352,10 @@
   "premiumizeTransfers": "Transfers",
   "premiumizeUnlink": "Unlink",
   "profileAdd": "Add a provider",
+  "profileAddProvider": "Add the provider",
   "profileAlways": "Always open this one",
   "profileChoose": "Which provider?",
+  "profileEdit": "Edit the provider",
   "profileFailed": "Could not open (sign in again by adding it anew)",
   "profileSwitch": "Switch to {name}",
   "@profileSwitch": {
@@ -421,6 +480,7 @@
   "settingsKeywordsBuffer": "cache delay zapping",
   "settingsKeywordsData": "export import backup favourites file transfer",
   "settingsKeywordsDeinterlace": "interlaced combing picture",
+  "settingsKeywordsDevices": "devices sync pair qr code transfer phone tv computer",
   "settingsKeywordsEngine": "engine mpv ffmpeg libmpv decoder player",
   "settingsKeywordsFrameRate": "hz fps judder refresh rate afr",
   "settingsKeywordsGestures": "swipe touch seek volume double tap",
@@ -446,6 +506,7 @@
   "settingsKeywordsUnmatched": "mapping epg",
   "settingsKeywordsUpdates": "version release download new",
   "settingsKeywordsUserAgent": "user agent player header",
+  "settingsKeywordsWeb": "web browser player link login session",
   "settingsLastSync": "{entries} entries in {categories} groups",
   "@settingsLastSync": {
     "placeholders": {
@@ -473,6 +534,7 @@
   "setupBadUrl": "Enter an address starting with http:// or https://",
   "setupConnect": "Connect",
   "setupConnecting": "Connecting and loading the catalogue…",
+  "setupEditTitle": "Edit your provider",
   "setupFailed": "Couldn't connect: {message}",
   "@setupFailed": {
     "placeholders": {
@@ -481,12 +543,17 @@
       }
     }
   },
+  "setupFromDevice": "Get from another device",
   "setupIntro": "Enter the login your provider gave you. It is stored only in this device's secure storage.",
   "setupM3u": "M3U playlist",
   "setupM3uUrl": "Playlist URL",
+  "setupName": "Name",
+  "setupNoProvider": "No provider yet",
   "setupPassword": "Password",
   "setupRequired": "Required",
+  "setupSave": "Test and save",
   "setupServer": "Server address",
+  "setupSkip": "Skip for now",
   "setupTitle": "Add your provider",
   "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
@@ -648,5 +715,20 @@
   },
   "watchedLabel": "Watched",
   "watchedMark": "Mark as watched",
-  "watchedUnmark": "Mark as not watched"
+  "watchedUnmark": "Mark as not watched",
+  "webCopy": "Copy",
+  "webEnd": "End",
+  "webLinkHint": "Open it in any browser: it works once, for 10 minutes. The session lasts 3 hours and can be extended there by 3 hours.",
+  "webMakeLink": "Make a login link",
+  "webNoSessions": "None.",
+  "webSessions": "Open web sessions",
+  "webTitle": "Web player",
+  "webUntil": "until {time}",
+  "@webUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  }
 }

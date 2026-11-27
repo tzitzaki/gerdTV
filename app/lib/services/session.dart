@@ -35,6 +35,7 @@ import 'casting.dart';
 import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
+import 'devices.dart';
 import 'secrets.dart';
 import 'tracking.dart';
 
@@ -174,6 +175,9 @@ class Session extends ChangeNotifier {
 
   /// Recordings (services/recordings.dart); its timer starts with the first profile.
   late final recordings = Recordings(this);
+
+  /// Devices & sync: pairing with and syncing to other gerdTV installs (services/devices.dart).
+  late final devices = Devices(this);
 
   /// The countdown to the next episode (the player shows it).
   late final nextUp = NextUp((item) => unawaited(play(item)));
@@ -466,6 +470,9 @@ class Session extends ChangeNotifier {
     }
     profiles = await listProfiles(dir: dir);
     await _openOrChoose();
+    unawaited(
+      devices.init(),
+    ); // remembered devices, a pairing link from the camera
   }
 
   /// One profile, or the one set to open always: open it. Several: the picker. None that opens: setup.
@@ -497,7 +504,9 @@ class Session extends ChangeNotifier {
   /// secrets are missing (e.g. a new device with the profile list restored) or its database can't open.
   Future<bool> openProfile(ProfileInfo p, {bool? always}) async {
     final s = await secrets.read(p.id);
-    if (s == null && p.source != SourceKind.m3UFile) return false;
+    final noSecrets =
+        p.source == SourceKind.m3UFile || p.source == SourceKind.none;
+    if (s == null && !noSecrets) return false;
     if (library != null) await stopPlayback();
     zapList = const [];
     lastChannel = _channel = null;
@@ -535,6 +544,49 @@ class Session extends ChangeNotifier {
     await openProfile(saved);
   }
 
+  /// Replaces the open profile's provider login (Settings → Account → Edit) only once the new one works: tested first
+  /// (nothing stored), then saved with its secrets and the profile reopened, which syncs the new catalogue; the user
+  /// data stays, it lives in the same profile database. Returns why it failed, or null; on failure the old login is
+  /// untouched and keeps working.
+  Future<String?> updateProfile(
+    ProfileInfo info,
+    List<String> newSecrets,
+  ) async {
+    try {
+      await checkLogin(profile: info, secrets: newSecrets);
+    } catch (e) {
+      return '$e';
+    }
+    final saved = await saveProfile(dir: await _dir(), profile: info);
+    await secrets.write(saved.id, newSecrets);
+    profiles = [for (final q in profiles) q.id == saved.id ? saved : q];
+    await openProfile(saved);
+    return null;
+  }
+
+  /// Whether the open profile has a provider (setup can be skipped: Settings works, the browse sections stay hidden
+  /// until one is added).
+  bool get hasProvider => profile != null && profile!.source != SourceKind.none;
+
+  /// Setup's Skip: a profile without a provider, named [name], so all of Settings works (keys, look, Premiumize, a
+  /// profile from another device) before any provider is entered; Settings → Account adds one later (the edit form).
+  Future<void> skipSetup(String name) async {
+    final dir = await _dir();
+    final saved = await saveProfile(
+      dir: dir,
+      profile: ProfileInfo(
+        id: '',
+        name: name,
+        source: SourceKind.none,
+        server: '',
+        userAgent: '',
+      ),
+    );
+    profiles = [...profiles, saved];
+    setAppSetting(dir: dir, key: settingLastProfile, value: saved.id);
+    await _open(saved, const []);
+  }
+
   /// Whether [p] opens without asking.
   bool opensAlways(ProfileInfo p) =>
       appDir != null &&
@@ -558,6 +610,9 @@ class Session extends ChangeNotifier {
       await tracking.load(p.id);
       state = SessionState.ready;
       notifyListeners();
+      unawaited(
+        devices.refresh(),
+      ); // a sync from another device now answers with this profile
       if (canRecord) recordings.startTimer();
       unawaited(
         reminders?.watchLinux(library!),
@@ -607,7 +662,7 @@ class Session extends ChangeNotifier {
 
   Future<void> sync() async {
     final lib = library;
-    if (lib == null || syncing) return;
+    if (lib == null || syncing || profile?.source == SourceKind.none) return;
     syncing = true;
     syncError = null;
     notifyListeners();
@@ -632,7 +687,8 @@ class Session extends ChangeNotifier {
       const Duration(hours: 1),
       (_) => unawaited(refreshGuide()),
     );
-    if (lib == null) return;
+    // No provider: no channels, so no guide to match.
+    if (lib == null || profile?.source == SourceKind.none) return;
     if (guideRefreshing) {
       // A source added meanwhile isn't in the running refresh: once more afterwards, else it waits up to 12 h.
       _guideAgain |= force;
@@ -664,7 +720,8 @@ class Session extends ChangeNotifier {
     if (p == null) return;
     await stopPlayback();
     await deleteProfile(dir: await _dir(), id: p.id);
-    await secrets.delete(p.id);
+    // A profile without provider never had a login stored: deleting it would hit the Linux keyring crash below.
+    if (p.source != SourceKind.none) await secrets.delete(p.id);
     // Only the links that exist: deleting a key that was never written crashed the app on Linux (libsecret,
     // flutter_secure_storage_linux 3.0.3), seen in the journey's "remove" step.
     if (premiumizeToken != null) {
@@ -747,6 +804,7 @@ class Session extends ChangeNotifier {
       k == null || k.isEmpty ? null : k,
     );
     tmdbKey = k == null || k.isEmpty ? null : k;
+    devices.keysChanged();
     notifyListeners();
   }
 
@@ -763,6 +821,7 @@ class Session extends ChangeNotifier {
     final k = key?.trim();
     subtitlesKey = k == null || k.isEmpty ? null : k;
     await secrets.writeService(_appSecrets, 'opensubtitles', subtitlesKey);
+    devices.keysChanged();
     notifyListeners();
   }
 
@@ -784,7 +843,68 @@ class Session extends ChangeNotifier {
       'opensubtitles-login',
       _subtitlesLogin,
     );
+    devices.keysChanged();
     notifyListeners();
+  }
+
+  /// A device sync stored new secrets or changed a profile (services/devices.dart): reloads what it touched. A device
+  /// without a usable profile (first start, setup skipped) opens the profile that came; the open one is reopened when
+  /// its login changed, else only its lists refresh (the user data was merged into its database).
+  Future<void> afterDeviceSync({
+    required bool keysChanged,
+    required ProfileInfo? profile,
+    required bool loginChanged,
+  }) async {
+    if (keysChanged) {
+      tmdbKey = await secrets.readService(_appSecrets, 'tmdb');
+      subtitlesKey = await secrets.readService(_appSecrets, 'opensubtitles');
+      _subtitlesLogin = await secrets.readService(
+        _appSecrets,
+        'opensubtitles-login',
+      );
+      _subtitlesToken = null;
+    }
+    if (profile != null) {
+      profiles = await listProfiles(dir: await _dir());
+      final saved =
+          profiles.where((p) => p.id == profile.id).firstOrNull ?? profile;
+      final open = this.profile;
+      if (open == null || !hasProvider) {
+        // A placeholder without provider (setup skipped) gives way to the profile that came: its linked services move
+        // over where that one has none, then it is removed (or every start would ask which profile to open).
+        if (open != null && open.id != saved.id) {
+          await _foldPlaceholder(open, saved);
+        }
+        await openProfile(saved);
+        return;
+      }
+      // The open profile changed on the other device (login, server, User-Agent …): reopen it with what is stored.
+      if (open.id == saved.id && (loginChanged || open != saved)) {
+        await openProfile(saved);
+        return;
+      }
+    }
+    generation++;
+    notifyListeners();
+  }
+
+  /// Moves a placeholder profile's linked services' tokens to [target] (only where it has none) and removes the
+  /// placeholder. Only existing secrets are deleted (Linux keyring rule, see [removeProfile]); a placeholder never had
+  /// a login stored.
+  Future<void> _foldPlaceholder(
+    ProfileInfo placeholder,
+    ProfileInfo target,
+  ) async {
+    for (final service in Devices.serviceNames) {
+      final token = await secrets.readService(placeholder.id, service);
+      if (token == null) continue;
+      if (await secrets.readService(target.id, service) == null) {
+        await secrets.writeService(target.id, service, token);
+      }
+      await secrets.writeService(placeholder.id, service, null);
+    }
+    await deleteProfile(dir: await _dir(), id: placeholder.id);
+    profiles = [...profiles.where((p) => p.id != placeholder.id)];
   }
 
   /// Subtitles for what plays (a movie or episode): in the preferred subtitle language, else the app's and English.

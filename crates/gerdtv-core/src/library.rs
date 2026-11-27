@@ -29,6 +29,8 @@ pub enum SourceKind {
     M3uUrl,
     /// M3U from a local file: `server` is the file path; no secrets.
     M3uFile,
+    /// No provider yet (setup skipped): Settings works, sync has nothing to fetch; Settings → Account adds one.
+    None,
 }
 
 /// One recording as the list shows it; `state`: scheduled, recording, done, refused, failed or skipped.
@@ -163,6 +165,17 @@ pub fn save_profile(dir: &Path, mut p: Profile) -> Result<Profile> {
     Ok(p)
 }
 
+/// Adds or replaces a profile exactly as given, `updated_at` included: a profile from another device (pairing.rs)
+/// keeps its time, so the next sync between the two compares the real edit times and doesn't bounce back and forth.
+pub fn put_profile(dir: &Path, p: &Profile) -> Result<()> {
+    let mut all = load_profiles(dir)?;
+    match all.iter_mut().find(|x| x.id == p.id) {
+        Some(x) => *x = p.clone(),
+        None => all.push(p.clone()),
+    }
+    store_profiles(dir, &all)
+}
+
 /// Removes a profile, its database and the database's backups (inside the app's own folder; the app confirms first).
 pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     let mut all = load_profiles(dir)?;
@@ -173,6 +186,58 @@ pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     }
     for backup in db::backups(&db_path(dir, id)) {
         let _ = std::fs::remove_file(backup);
+    }
+    Ok(())
+}
+
+/// Tests a login before it replaces a profile's working one (Settings → Account → Edit): Xtream Codes asks for the
+/// account info (a refused or expired login fails), an M3U URL must answer with a playlist (only its first bytes are
+/// read, so a big list costs nothing here; the sync after saving downloads it). Nothing is stored.
+pub async fn check_login(p: &Profile, secrets: &[String]) -> Result<()> {
+    let need = match p.source {
+        SourceKind::Xtream => 2,
+        SourceKind::M3uUrl => 1,
+        SourceKind::M3uFile | SourceKind::None => 0,
+    };
+    if secrets.len() < need {
+        return Err(LibraryError::Secrets(need));
+    }
+    match p.source {
+        SourceKind::Xtream => {
+            let ua = Some(p.user_agent.as_str());
+            Xtream::new(&p.server, &secrets[0], &secrets[1], ua)
+                .account()
+                .await?;
+        }
+        SourceKind::M3uUrl => {
+            xtream::ensure_tls_provider();
+            let net = |e: reqwest::Error| XcError::Network(e.without_url().to_string());
+            let ua = if p.user_agent.is_empty() {
+                "gerdTV"
+            } else {
+                &p.user_agent
+            };
+            let client = reqwest::Client::builder()
+                .user_agent(ua)
+                .connect_timeout(CONNECT_TIMEOUT)
+                .read_timeout(READ_TIMEOUT)
+                .build()
+                .map_err(net)?;
+            let mut res = client.get(&secrets[0]).send().await.map_err(net)?;
+            if !res.status().is_success() {
+                return Err(XcError::Http(res.status().as_u16()).into());
+            }
+            // The first chunk is enough: every M3U starts with "#EXTM3U" (after an optional UTF-8 BOM).
+            let head = res.chunk().await.map_err(net)?.unwrap_or_default();
+            let head = head.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&head);
+            if !head.trim_ascii_start().starts_with(b"#EXTM3U") {
+                return Err(XcError::Parse("playlist").into());
+            }
+        }
+        SourceKind::M3uFile => {
+            std::fs::metadata(&p.server)?;
+        }
+        SourceKind::None => {}
     }
     Ok(())
 }
@@ -223,7 +288,7 @@ impl Library {
         let need = match profile.source {
             SourceKind::Xtream => 2,
             SourceKind::M3uUrl => 1,
-            SourceKind::M3uFile => 0,
+            SourceKind::M3uFile | SourceKind::None => 0,
         };
         if secrets.len() < need {
             return Err(LibraryError::Secrets(need));
@@ -397,6 +462,8 @@ impl Library {
                     account: None,
                 })
             }
+            // Nothing to fetch; the app doesn't ask either (Session.sync), this only keeps a stray call harmless.
+            SourceKind::None => Ok(SyncResult::default()),
         }
     }
 
@@ -1590,6 +1657,21 @@ mod tests {
         }
     }
 
+    /// Setup skipped: the profile opens without secrets (Settings works) and a sync fetches nothing.
+    #[tokio::test]
+    async fn a_profile_without_provider_opens_and_syncs_nothing() {
+        let dir = tempdir("none");
+        let p = save_profile(&dir, profile(SourceKind::None, "")).unwrap();
+        let lib = Library::open(&dir, &p.id, vec![]).unwrap();
+        assert_eq!(lib.sync().await.unwrap().stats.entries, 0);
+        assert!(
+            lib.categories(Kind::Live, Sort::Provider)
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn profiles_round_trip_without_secrets() {
         let dir = tempdir("profiles");
@@ -2014,6 +2096,44 @@ mod tests {
         lib.delete_recording(planned).await.unwrap();
         assert_eq!(lib.recordings().unwrap().len(), 2);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn check_login_accepts_only_a_working_login() {
+        let mock = MockXc::start(10, 1).await;
+        let xc = profile(SourceKind::Xtream, &mock.base());
+        let m3u = profile(SourceKind::M3uUrl, "");
+        let list = |user: &str| {
+            vec![format!(
+                "{}/get.php?username={user}&password={PASS}&type=m3u_plus",
+                mock.base()
+            )]
+        };
+        let s = |u: &str, p: &str| vec![u.to_string(), p.to_string()];
+        assert!(check_login(&xc, &s(USER, PASS)).await.is_ok());
+        assert!(matches!(
+            check_login(&xc, &s(USER, "wrong")).await,
+            Err(LibraryError::Xtream(XcError::Auth))
+        ));
+        assert!(check_login(&m3u, &list(USER)).await.is_ok());
+        assert!(matches!(
+            check_login(&m3u, &list("wrong")).await,
+            Err(LibraryError::Xtream(XcError::Http(401)))
+        ));
+        // Something that answers, but not with a playlist (the panel's API instead of get.php).
+        let api = vec![format!(
+            "{}/player_api.php?username={USER}&password={PASS}",
+            mock.base()
+        )];
+        assert!(matches!(
+            check_login(&m3u, &api).await,
+            Err(LibraryError::Xtream(XcError::Parse("playlist")))
+        ));
+        mock.set_expired(true);
+        assert!(matches!(
+            check_login(&xc, &s(USER, PASS)).await,
+            Err(LibraryError::Xtream(XcError::Expired(_)))
+        ));
     }
 
     #[tokio::test]

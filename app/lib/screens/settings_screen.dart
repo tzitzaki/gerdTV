@@ -33,6 +33,8 @@ import 'track_prefs_settings.dart';
 import 'track_settings.dart';
 import '../services/tracking.dart';
 import 'settings_model.dart';
+import 'devices_screen.dart';
+import 'web_player_screen.dart';
 import 'setup_screen.dart';
 import 'update_settings.dart';
 import 'user_data_settings.dart';
@@ -181,6 +183,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         );
                       }),
                     ),
+                  // Edit the open profile's provider: the setup form, pre-filled; a new login replaces the old one only
+                  // once it works.
+                  if (session.profile != null)
+                    ListTile(
+                      key: const Key('settings.profileEdit'),
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(
+                        session.hasProvider
+                            ? l10n.profileEdit
+                            : l10n.profileAddProvider,
+                      ),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => SetupScreen(
+                            session: session,
+                            edit: session.profile,
+                          ),
+                        ),
+                      ),
+                    ),
                   ListTile(
                     key: const Key('settings.profileAdd'),
                     leading: const Icon(Icons.add),
@@ -195,21 +217,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          SettingsEntry(
-            id: 'sync',
-            section: provider,
-            title: l10n.settingsSyncNow,
-            keywords: l10n.settingsKeywordsAccount,
-            build: (_) => ListTile(
-              key: const Key('settings.sync'),
-              leading: const Icon(Icons.sync),
-              title: Text(l10n.settingsSyncNow),
-              enabled: !session.syncing,
-              onTap: session.sync,
+          if (session.hasProvider)
+            SettingsEntry(
+              id: 'sync',
+              section: provider,
+              title: l10n.settingsSyncNow,
+              keywords: l10n.settingsKeywordsAccount,
+              build: (_) => ListTile(
+                key: const Key('settings.sync'),
+                leading: const Icon(Icons.sync),
+                title: Text(l10n.settingsSyncNow),
+                enabled: !session.syncing,
+                onTap: session.sync,
+              ),
             ),
-          ),
           // What the provider sees as the player; some only serve players they know.
-          if (lib != null)
+          if (lib != null && session.hasProvider)
             SettingsEntry(
               id: 'userAgent',
               section: provider,
@@ -255,6 +278,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _confirmRemove(context),
             ),
           ),
+          // Devices & sync: pair with and sync to other gerdTV installs (also without a provider: getting one is the
+          // point then).
+          SettingsEntry(
+            id: 'devices',
+            section: l10n.devicesTitle,
+            title: l10n.devicesTitle,
+            keywords: l10n.settingsKeywordsDevices,
+            build: (context) => ListTile(
+              key: const Key('settings.devices'),
+              leading: const Icon(Icons.devices),
+              title: Text(l10n.devicesTitle),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DevicesScreen(session: session),
+                ),
+              ),
+            ),
+          ),
+          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions.
+          for (final host in session.devices.peers.value.where(
+            (p) => p.web.isNotEmpty,
+          ))
+            SettingsEntry(
+              id: 'web.${host.device.id}',
+              section: l10n.devicesTitle,
+              title: l10n.webTitle,
+              keywords: l10n.settingsKeywordsWeb,
+              build: (context) => ListTile(
+                key: Key('settings.web.${host.device.id}'),
+                leading: const Icon(Icons.public),
+                title: Text(l10n.webTitle),
+                subtitle: Text(host.web),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        WebPlayerScreen(session: session, host: host),
+                  ),
+                ),
+              ),
+            ),
           if (lib != null)
             SettingsEntry(
               id: 'premiumize',

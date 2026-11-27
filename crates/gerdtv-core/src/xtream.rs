@@ -53,7 +53,7 @@ pub struct Xtream {
 }
 
 /// reqwest is built without a TLS provider; install rustls' ring provider once per process.
-pub(crate) fn ensure_tls_provider() {
+pub fn ensure_tls_provider() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
         let _ = rustls::crypto::ring::default_provider().install_default(); // Err = another one is installed: fine

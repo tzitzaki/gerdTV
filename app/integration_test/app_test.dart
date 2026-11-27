@@ -59,7 +59,7 @@ void main() {
     expect(await keychain.read('k'), isNull);
   }, skip: !Platform.isMacOS);
 
-  testWidgets('set up an account, browse, play, search, remove', (
+  testWidgets('skip setup, add the account, browse, play, search, remove', (
     tester,
   ) async {
     expect(mockXc, isNotEmpty, reason: 'run through `just test-integration`');
@@ -79,14 +79,38 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: setup screen');
-    // First run: the Xtream Codes login.
+    // First run: skipped, so only Settings shows (no navigation), and the provider is added there.
     expect(find.text('Add your provider'), findsOneWidget);
+    // Below Connect: outside a small window until scrolled to (macOS CI's is 800×600).
+    await tester.ensureVisible(find.byKey(const Key('setup.skip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setup.skip')));
+    await waitFor(tester, find.byKey(const Key('settings.search')));
+    expect(find.byType(NavigationRail), findsNothing);
+    await tester.enterText(
+      find.byKey(const Key('settings.search')),
+      'provider',
+    );
+    await tester.pumpAndSettle();
+    await tapReady(tester, find.byKey(const Key('settings.profileEdit')));
+    await waitFor(tester, find.byKey(const Key('setup.server')));
+    expect(find.byKey(const Key('setup.skip')), findsNothing);
     await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
     await tester.enterText(find.byKey(const Key('setup.username')), 'testuser');
     await tester.enterText(find.byKey(const Key('setup.password')), 'testpass');
+    // Below the form (with its Name field): outside a small window until scrolled to.
+    await tester.ensureVisible(find.byKey(const Key('setup.connect')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('setup.connect')));
     await waitFor(tester, find.byType(NavigationRail));
+    // The catalogue syncs in the background once the new login is saved.
+    await waitFor(
+      tester,
+      find.byWidgetPredicate((_) => session.lastSync != null),
+    );
     expect(session.lastSync!.entries, greaterThan(1000));
+    await tester.enterText(find.byKey(const Key('settings.search')), '');
+    await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: synced, shell shown');
     // Settings → Playback: Fast zap for the whole profile.

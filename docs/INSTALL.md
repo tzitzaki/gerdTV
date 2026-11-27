@@ -17,5 +17,13 @@ Needs iOS/iPadOS 26. Download `gerdTV-ios-unsigned-<version>.ipa` and re-sign an
 ## Linux (x64)
 Unpack `gerdTV-linux-x64-<version>.tar.gz` anywhere and run `gerdTV/gerdtv`. Needs libmpv, GTK 3, libsecret (the login is kept in the desktop keyring) and (for the tray icon) AppIndicator. To update, replace the folder.
 
+## Web player host (a Linux machine of yours)
+`gerdTV-host-linux-x64-<version>` is one binary: it keeps one profile in sync and serves the web player to browsers. It needs two public names on a tunnel or reverse proxy of yours, both pointed at it: the front door over HTTPS (login links only) and the player over plain HTTP (so the browser may play the provider's http:// streams itself; the video never passes the host or the tunnel). Run it as its own user with a state folder only that user can read:
+- Pair it once (stop the service first): `gerdtv-host pair --dir /var/lib/gerdtv`, then in the gerdTV app Settings → Account → Devices & sync: pick "gerdTV host" and type the code it prints. It gets the app's open provider, keys and user data.
+- Serve: `gerdtv-host serve --dir /var/lib/gerdtv --front https://<front name> --player http://<player name> --listen 127.0.0.1:8790 --proxy <tunnel's address>` (paired apps sync with it on TCP 8791, `--pair-port`; allow that and mDNS, UDP 5353, from the LAN only) (a systemd unit with `Restart=on-failure`; logs in the journal).
+- Tunnel: route both names to the listen address. Turn off "always use HTTPS" for the player name only; Chrome asks once before opening it (it is plain HTTP).
+- Use: the app's Settings → Account → Web player makes a login link (works once, 10 minutes); a session lasts 3 hours and the page extends it by 3 hours. Safari, Chrome and Edge play the provider's streams directly; Firefox only where the provider allows it.
+- Update: replace the binary with the new release's and restart the service.
+
 ## Checking a download
 Each release has `latest.json` with every asset's SHA-256 (signed in `latest.json.sig`); `shasum -a 256 <file>` must match.
