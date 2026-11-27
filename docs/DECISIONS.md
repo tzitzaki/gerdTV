@@ -29,13 +29,14 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Debrid: Premiumize's own cloud as a source (folders, transfers, play), linked per profile with the API key or, in builds with gerdTV's client id, a device code; no torrent search.
 - Watch tracking: Trakt and Simkl by scrobbling (start, pause, stop with progress), linked by device code; no secret in the repository or the app: public client ids from repository variables, Trakt with the user's own app.
 - Trailers: the panel's YouTube trailer in YouTube's embed (webview_flutter), muted behind a movie's or series' title after 2 s, with sound from the Trailer button; movies open a page before playing (Continue watching plays at once).
-- Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; Live TV adds 5 programmes and Show all, the Guide searches programmes.
+- Search lives in each section, not in a tab of its own: a section's group list searches the whole section, a group only itself with an All groups chip; both TV views list channels, then live and upcoming programmes (the guide's search can be limited to its shown group).
 - Voice search on Android only, through a mic in the search field and the system's speech recognizer; the remote's own voice key stays with the system.
 - Search ranking: tiers (word starts, group name, mid-word, typos from 4 letters), favourites and recents first within each tier; a tier is searched only when the better ones don't fill the page, so a search stays as fast as a plain word search (bench gate); typing anywhere starts the search.
-- Programme search: running and upcoming first, then an Earlier group of ended programmes (each with its own limit).
+- Programme search: Live now, then Upcoming (each with its own limit); ended programmes only on "Show earlier"; programmes also match by their channel's name.
 - macOS runs without the app sandbox (the updater swaps the bundle in place); the old container's data is copied over once, never moved.
 - macOS menu bar mode, on by default and switchable: closing or quitting from the Dock hides gerdTV into the menu bar; built natively in Swift (no tray_manager).
 - Desktop mini player (Spike B): the main window shrinks into a borderless, always-on-top window (window_manager's native API), so the same engine and player keep playing; no second window.
+- Desktop player window: the content keeps the picture's aspect ratio while the player shows (resizing too); browsing and player sizes are remembered separately, with an animated switch.
 - The playback watchdog is a pure Rust state machine; a small Dart adapter feeds it mpv events and runs its commands.
 - Pre-approved Rust deps: tokio, reqwest (rustls, gzip, stream), serde/serde_json, quick-xml, flate2, lzma-rust2 (xz guides), rusqlite (bundled, FTS5), tracing (+ subscriber, appender), thiserror, one of time/chrono, mdns-sd, one Google Cast crate (Spike C), chacha20poly1305 and qrcode (device pairing), flutter_rust_bridge, ed25519-dalek + sha2, criterion (dev), libmpv2 (dev, testkit only).
 - Pre-approved Dart deps: media_kit (+ media_kit_video and the chosen libs packages), flutter_rust_bridge, path_provider, flutter_secure_storage, window_manager, tray_manager, launch_at_startup, flutter_local_notifications, file_selector and share_plus (Settings → Account → Your data), webview_flutter with its Android and WebKit packages (trailers), flutter_lints; plus Flutter's first-party flutter_localizations, intl (required by gen-l10n), material_ui (Material moved out of the SDK) and cupertino_ui (its Cupertino counterpart, pulled in by material_ui; used for the phones' swipe-back slide).
@@ -48,6 +49,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Linux CI runs the integration tests on gerdTV's own libmpv only (no Lua scripts to deadlock media_kit's start); the standard engine keeps the libmpv harness.
 - State management with `ChangeNotifier`/`ValueListenable`, navigation with `Navigator`/`Router`; images fetched and disk-cached by the core, shown with `Image.file`.
 - Native code only as small, commented Swift/Kotlin platform channels; no third-party native libraries.
+- Android renders with Skia over OpenGL ES (Impeller off): Impeller's Vulkan path garbles the Shield's picture; retest when Flutter removes the switch.
 - The Rust bridge is integrated with Cargokit (flutter_rust_bridge's default backend), not Dart native-assets hooks.
 - Xtream Codes lists are fetched in full (one call per kind, measured at under 2 s each on a 20k-entry account), not per category.
 - Sources: Xtream Codes first, M3U/M3U8 as fallback, any number of XMLTV URLs per profile; where guides overlap the provider's wins.
@@ -59,7 +61,7 @@ Standing owner decisions not visible in code; one line each. Superseded lines ar
 - Casting: Google Cast from every platform in the core (oxicast pinned exactly; the provider's address first, gerdTV's local HLS as live's fallback); AirPlay from Apple platforms via AVKit/AVPlayer, not built yet: it needs the local HLS on the network address while AirPlay is active (a [MAC] session with a receiver).
 - Recording in the core as direct stream capture; desktop while the app runs (also menu-bar/tray only), Android via the foreground service while gerdTV runs and, closed, an exact-alarm notification that starts it when opened (a start by the alarm alone waits for a device check); none on iOS; 2 min lead, 10 min lag; at the account's limit the recording wins after a notice with Skip.
 - CI only on GitHub's free standard runners (`ubuntu-latest`, `macos-latest`); no self-hosted or larger runners.
-- One branch and PR per session, features as commits, the wrap-up as its last commit; CI runs only the areas a change touches.
+- One branch and PR per session, features as commits, the wrap-up as its last commit; CI runs only the areas a change touches; the draft PR is opened only once `just ready` is green (branch pushes start no CI), the wrap-up pushed right after.
 - macOS releases ship a DMG for the first install and keep the zip for the in-app updater.
 - Releases: one per wrap-up from `release.yml`; macOS signed with a stable self-signed certificate; Android with the release keystore; an unsigned iOS IPA; a signed `latest.json` for the in-app updater.
 - No automated installs on the owner's devices; the owner installs every first copy.

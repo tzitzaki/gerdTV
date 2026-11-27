@@ -1,12 +1,15 @@
+import AVFoundation
 import Cocoa
 import FlutterMacOS
 import MediaPlayer
+import Vision
 
 // The "gerdtv/platform" channel on macOS: setLogo(name, png) sets the Dock icon for this run (Dart sends it again at
 // every start). The Finder icon stays the bundled one: changing the app bundle would break its code signature.
 // setMenuBar(enabled, labels) turns the menu bar mode on or off (Settings → Playback, app/lib/platform/menu_bar.dart);
 // its menu calls back "menuBar" with "toggle" or "stop". nowPlaying(…) and clearNowPlaying drive the media keys and
-// Control Center (NowPlaying below), which call back "mediaCommand" with "play" or "pause".
+// Control Center (NowPlaying below), which call back "mediaCommand" with "play" or "pause". scanQr(title) opens the
+// webcam and answers with the first QR code's text, or nil (QrScanner below; Devices & sync on the Mac).
 class MainFlutterWindow: NSWindow {
   private var channel: FlutterMethodChannel?
 
@@ -49,6 +52,9 @@ class MainFlutterWindow: NSWindow {
       } else if call.method == "clearNowPlaying" {
         NowPlaying.shared.clear()
         result(nil)
+      } else if call.method == "scanQr" {
+        let title = (call.arguments as? [String: Any])?["title"] as? String ?? ""
+        QrScanner.scan(title: title) { text in result(text) }
       } else {
         result(FlutterMethodNotImplemented)
       }
@@ -185,5 +191,89 @@ final class MenuBar: NSObject {
     else { return false }
     return [kAELogOut, kAEReallyLogOut, kAERestart, kAEShutDown, kAEShowRestartDialog, kAEShowShutdownDialog]
       .map { OSType($0) }.contains(reason)
+  }
+}
+
+/// Pairing by the webcam (Devices & sync → Scan with the camera): a small window shows the camera, Vision looks for a QR
+/// code in every frame, and the first one's text goes back to Dart; nil when the window is closed, there's no camera or
+/// the camera is refused. Only one scan at a time.
+/// Debugging: no picture or nil at once = camera access refused (System Settings → Privacy & Security → Camera), or
+/// NSCameraUsageDescription missing in Info.plist (then macOS ends the app on the first access).
+final class QrScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, NSWindowDelegate {
+  private static var current: QrScanner?
+  private let session = AVCaptureSession()
+  private let queue = DispatchQueue(label: "gerdtv.qr")
+  private var panel: NSPanel?
+  private var done: ((String?) -> Void)?
+
+  static func scan(title: String, completion: @escaping (String?) -> Void) {
+    guard current == nil else { return completion(nil) }
+    let scanner = QrScanner()
+    current = scanner
+    scanner.done = completion
+    switch AVCaptureDevice.authorizationStatus(for: .video) {
+    case .authorized:
+      scanner.start(title: title)
+    case .notDetermined:
+      AVCaptureDevice.requestAccess(for: .video) { granted in
+        DispatchQueue.main.async { granted ? scanner.start(title: title) : scanner.finish(nil) }
+      }
+    default:
+      scanner.finish(nil)
+    }
+  }
+
+  private func start(title: String) {
+    guard let camera = AVCaptureDevice.default(for: .video),
+      let input = try? AVCaptureDeviceInput(device: camera), session.canAddInput(input)
+    else { return finish(nil) }
+    session.addInput(input)
+    let output = AVCaptureVideoDataOutput()
+    output.alwaysDiscardsLateVideoFrames = true
+    output.setSampleBufferDelegate(self, queue: queue)
+    guard session.canAddOutput(output) else { return finish(nil) }
+    session.addOutput(output)
+    let panel = NSPanel(
+      contentRect: NSRect(x: 0, y: 0, width: 480, height: 360), styleMask: [.titled, .closable],
+      backing: .buffered, defer: false)
+    panel.title = title
+    panel.isReleasedWhenClosed = false
+    panel.delegate = self
+    let view = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
+    view.wantsLayer = true
+    let preview = AVCaptureVideoPreviewLayer(session: session)
+    preview.videoGravity = .resizeAspectFill
+    preview.frame = view.bounds
+    preview.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+    view.layer?.addSublayer(preview)
+    panel.contentView = view
+    panel.center()
+    panel.makeKeyAndOrderFront(nil)
+    self.panel = panel
+    queue.async { self.session.startRunning() }
+  }
+
+  func captureOutput(
+    _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection
+  ) {
+    guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+    let request = VNDetectBarcodesRequest()
+    request.symbologies = [.qr]
+    try? VNImageRequestHandler(cvPixelBuffer: pixels, options: [:]).perform([request])
+    guard let text = request.results?.first?.payloadStringValue else { return }
+    DispatchQueue.main.async { self.finish(text) }
+  }
+
+  func windowWillClose(_ notification: Notification) { finish(nil) }
+
+  /// Answers once: the first QR code, a closed window and a refusal all end here.
+  private func finish(_ text: String?) {
+    guard let done else { return }
+    self.done = nil
+    queue.async { self.session.stopRunning() }
+    panel?.delegate = nil
+    panel?.close()
+    QrScanner.current = nil
+    done(text)
   }
 }

@@ -15,6 +15,7 @@ import 'package:path_provider/path_provider.dart';
 import '../platform/menu_bar.dart';
 import '../platform/engine.dart';
 import '../platform/platform_bridge.dart';
+import '../platform/video_window.dart';
 import '../player/av_player.dart';
 import '../player/floating.dart';
 import '../player/frame_rate.dart';
@@ -361,6 +362,13 @@ class Session extends ChangeNotifier {
   Future<String> _dir() async =>
       appDir ??= (await getApplicationSupportDirectory()).path;
 
+  /// Desktop: the window follows the player's picture and remembers the browsing and player sizes (app-wide).
+  late final VideoWindow videoWindow = VideoWindow(
+    read: (key) async => appSetting(dir: await _dir(), key: key),
+    write: (key, value) async =>
+        setAppSetting(dir: await _dir(), key: key, value: value),
+  );
+
   /// The app's logo (app-wide setting, Settings → Appearance), shown in the shell and on the setup screen.
   AppLogo logo = AppLogo.screen;
 
@@ -452,6 +460,14 @@ class Session extends ChangeNotifier {
     };
     // The launcher icons of Android and iOS stay switched; the Dock and window icons are set again on every start.
     if (Platform.isMacOS || Platform.isLinux) unawaited(platform.setLogo(logo));
+    // The window exists once the first frame is drawn.
+    if (VideoWindow.supported) {
+      unawaited(
+        WidgetsBinding.instance.endOfFrame.then(
+          (_) => videoWindow.restoreBrowse(),
+        ),
+      );
+    }
     profiles = await listProfiles(dir: dir);
     await _openOrChoose();
     unawaited(

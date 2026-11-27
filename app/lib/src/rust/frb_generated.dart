@@ -372,7 +372,8 @@ abstract class RustLibApi extends BaseApi {
     required Library that,
     required String query,
     required int limit,
-    required bool earlier,
+    required ProgrammeWhen when,
+    String? category,
   });
 
   void crateApiLibraryLibrarySetBitrate({
@@ -2820,7 +2821,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required Library that,
     required String query,
     required int limit,
-    required bool earlier,
+    required ProgrammeWhen when,
+    String? category,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2832,7 +2834,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(query, serializer);
           sse_encode_u_32(limit, serializer);
-          sse_encode_bool(earlier, serializer);
+          sse_encode_programme_when(when, serializer);
+          sse_encode_opt_String(category, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -2845,7 +2848,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiLibraryLibrarySearchProgrammesConstMeta,
-        argValues: [that, query, limit, earlier],
+        argValues: [that, query, limit, when, category],
         apiImpl: this,
       ),
     );
@@ -2854,7 +2857,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiLibraryLibrarySearchProgrammesConstMeta =>
       const TaskConstMeta(
         debugName: "Library_search_programmes",
-        argNames: ["that", "query", "limit", "earlier"],
+        argNames: ["that", "query", "limit", "when", "category"],
       );
 
   @override
@@ -7042,6 +7045,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProgrammeWhen dco_decode_programme_when(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ProgrammeWhen.values[raw as int];
+  }
+
+  @protected
   QrInfo dco_decode_qr_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -8822,6 +8831,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ProgrammeWhen sse_decode_programme_when(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ProgrammeWhen.values[inner];
+  }
+
+  @protected
   QrInfo sse_decode_qr_info(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_width = sse_decode_u_32(deserializer);
@@ -10501,6 +10517,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_programme_when(ProgrammeWhen self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_qr_info(QrInfo self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self.width, serializer);
@@ -11105,17 +11127,19 @@ class LibraryImpl extends RustOpaque implements Library {
     offset: offset,
   );
 
-  /// Programmes whose title, sub-title or description match: running and upcoming soonest first, or with `earlier`
-  /// the ended ones, most recent first.
+  /// Programmes whose title, sub-title, description or channel name match, title hits first: running or upcoming
+  /// soonest first, or the ended ones most recent first; `category` limits them to one group's channels.
   Future<List<ProgrammeHit>> searchProgrammes({
     required String query,
     required int limit,
-    required bool earlier,
+    required ProgrammeWhen when,
+    String? category,
   }) => RustLib.instance.api.crateApiLibraryLibrarySearchProgrammes(
     that: this,
     query: query,
     limit: limit,
-    earlier: earlier,
+    when: when,
+    category: category,
   );
 
   void setBitrate({required String key, required BigInt bps}) => RustLib

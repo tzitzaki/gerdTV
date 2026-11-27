@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- gerdTV's dark tile colour (Tokens.ink): the window until Flutter draws, in light and dark system modes alike,
+         so the start never flashes white (the Shield runs in light mode). -->
+    <color name="ink">#FF12121A</color>
+</resources>

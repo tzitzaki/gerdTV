@@ -22,6 +22,7 @@ const T = de
       extend: '+3 Std', endedTitle: 'Sitzung beendet',
       ended: 'Öffne einen neuen Login-Link aus der gerdTV-App: Einstellungen → Konto → Web-Player.',
       notPlayable: 'In diesem Browser nicht abspielbar. Versuche Safari oder Chrome.', now: 'Jetzt', next: 'Danach',
+      busy: (a, m) => `Deine ${m === 1 ? 'Verbindung beim Anbieter ist' : `${m} Verbindungen beim Anbieter sind`} belegt (${a} von ${m}): beende die Wiedergabe auf einem anderen Gerät und versuche es noch einmal.`,
       more: 'Mehr',
     }
   : {
@@ -30,6 +31,7 @@ const T = de
       extend: '+3 h', endedTitle: 'Session ended',
       ended: 'Open a new login link from the gerdTV app: Settings → Account → Web player.',
       notPlayable: 'Not playable in this browser. Try Safari or Chrome.', now: 'Now', next: 'Next',
+      busy: (a, m) => `Your provider's ${m === 1 ? 'connection is' : `${m} connections are`} in use (${a} of ${m}): stop playback on another device and try again.`,
       more: 'More',
     };
 document.querySelectorAll('[data-t]').forEach((e) => (e.textContent = T[e.dataset.t] || e.textContent));
@@ -58,6 +60,36 @@ async function api(path, body) {
   }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
   return r.json();
+}
+
+// Material icons (Google, CC BY 4.0): the outlines of Flutter's MaterialIcons font, 24 × 24, so the page looks like the
+// app. The rail's icons are in index.html. Debugging a missing icon: the path must be in a viewBox of 0 0 24 24.
+const ICON = {
+  star: 'M12 17.25 18.19 21l-1.64-7.03 5.43-4.74-7.17-.61L12 2.02 9.19 8.62l-7.17.61 5.43 4.74L5.81 21z',
+  starBorder: 'M21.98 9.23 14.81 8.63 12 2.02 9.19 8.63 2.02 9.23l5.43 4.74L5.81 21 12 17.25 18.19 21l-1.64-7.03zM12 15.42l-3.75 2.25.98-4.27-3.33-2.9 4.41-.38L12 6.09l1.69 4.03 4.41.38-3.33 2.9.98 4.27z',
+};
+
+function icon(name, cls = 'i') {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('class', cls);
+  s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', ICON[name]);
+  s.append(p);
+  return s;
+}
+
+/** A favourite's star in a button: filled when it is one. */
+function setStar(button, on) {
+  button.replaceChildren(icon(on ? 'star' : 'starBorder'));
+}
+
+/** Text led by a small star (favourites, ratings). */
+function starred(cls, text) {
+  const e = el('div', cls);
+  e.append(icon('star', 'mark'), text);
+  return e;
 }
 
 function el(tag, cls, text) {
@@ -208,7 +240,7 @@ async function groups(out) {
     const r = el('div', 'row');
     r.tabIndex = 0;
     const t = el('div', 't');
-    t.append(el('div', 'n', g.favourites ? `★ ${T.favourites}` : g.name));
+    t.append(g.favourites ? starred('n', T.favourites) : el('div', 'n', g.name));
     r.append(t, el('div', 'c', String(g.count)));
     r.onclick = () => go({ type: 'items', title: g.favourites ? T.favourites : g.name, category: g.id, favourites: !!g.favourites });
     r.onkeydown = (e) => e.key === 'Enter' && r.click();
@@ -257,7 +289,7 @@ function list(hits, shelf) {
       e.append(img(h.logo), el('div', 'n', h.name));
     } else {
       const t = el('div', 't');
-      t.append(el('div', 'n', `${state.favs.has(h.key) ? '★ ' : ''}${h.name}`));
+      t.append(state.favs.has(h.key) ? starred('n', h.name) : el('div', 'n', h.name));
       const sub = el('div', 's');
       t.append(sub);
       if (h.key.startsWith('live:')) live.push([h.key, sub]);
@@ -297,7 +329,9 @@ async function details(out, view) {
   box.append(img(h.logo, 'poster'));
   const info = el('div', 'info');
   info.append(el('h2', '', h.name));
-  info.append(el('p', 'meta', [d.release, d.genre, d.duration ? `${Math.round(d.duration / 60)} min` : '', d.rating ? `★ ${d.rating}` : ''].filter(Boolean).join(' · ')));
+  const meta = el('p', 'meta', [d.release, d.genre, d.duration ? `${Math.round(d.duration / 60)} min` : ''].filter(Boolean).join(' · '));
+  if (d.rating) meta.append(meta.textContent ? ' · ' : '', icon('star', 'mark'), ` ${d.rating}`);
+  info.append(meta);
   info.append(el('p', '', d.plot));
   if (d.cast) info.append(el('p', 'meta', d.cast));
   if (h.key.startsWith('movie:')) {
@@ -310,10 +344,12 @@ async function details(out, view) {
       info.append(r);
     }
   }
-  const fav = el('button', '', state.favs.has(h.key) ? '★' : '☆');
+  const fav = el('button', 'fav');
+  fav.setAttribute('aria-label', T.favourites);
+  setStar(fav, state.favs.has(h.key));
   fav.onclick = async () => {
     await toggleFav(h.key);
-    fav.textContent = state.favs.has(h.key) ? '★' : '☆';
+    setStar(fav, state.favs.has(h.key));
   };
   info.append(fav);
   box.append(info);
@@ -361,7 +397,7 @@ async function play(h, from) {
   $('error').hidden = true;
   $('now').textContent = h.name;
   $('next').textContent = '';
-  $('fav').textContent = state.favs.has(h.key) ? '★' : '☆';
+  setStar($('fav'), state.favs.has(h.key));
   await start();
   if (h.key.startsWith('live:')) {
     const [x] = await api(`/api/nownext?keys=${encodeURIComponent(h.key)}`).catch(() => [{}]);
@@ -420,9 +456,14 @@ function retryOrFail() {
   } else failed();
 }
 
-function failed() {
+// A refused stream is often the account's limit (another device or the app plays): say so instead of blaming the
+// browser. Debugging: /api/busy answers {busy, active, max} from the panel's active_cons and max_connections.
+async function failed() {
+  const p = playing;
   $('error').textContent = T.notPlayable;
   $('error').hidden = false;
+  const b = await api('/api/busy').catch(() => ({}));
+  if (b.busy && playing === p) $('error').textContent = T.busy(b.active, b.max);
 }
 
 function stopHls() {
@@ -459,7 +500,7 @@ $('close').onclick = () => closePlayer();
 $('fav').onclick = async () => {
   if (!playing) return;
   await toggleFav(playing.item.key);
-  $('fav').textContent = state.favs.has(playing.item.key) ? '★' : '☆';
+  setStar($('fav'), state.favs.has(playing.item.key));
 };
 
 // ---- start ----

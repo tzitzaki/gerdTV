@@ -8,7 +8,8 @@
 //! Quirks copied from real panels: numbers often sent as strings, empty strings for missing values, `tmdb` ids on
 //! some entries only, `epg_channel_id` sometimes null.
 //!
-//! Switches for tests: `set_expired` (account expired), `set_max_connections`, and the shared `Fault` for streams.
+//! Switches for tests: `set_expired` (account expired), `set_max_connections`, `set_active_connections` (streams the
+//! account plays elsewhere), and the shared `Fault` for streams.
 
 use crate::fault::{Fault, FaultServer};
 use crate::generate::{Entry, Kind, library, write_m3u, write_xmltv};
@@ -24,6 +25,7 @@ pub const PASS: &str = "testpass";
 struct Switches {
     expired: bool,
     max_connections: u32,
+    active_connections: u32,
     /// The next answer to this action is `[]` (real panels do this now and then under load).
     empty_once: Option<String>,
 }
@@ -61,6 +63,7 @@ impl MockXc {
         let switches = Arc::new(Mutex::new(Switches {
             expired: false,
             max_connections: 2,
+            active_connections: 0,
             empty_once: None,
         }));
         let streams = FaultServer::start().await;
@@ -93,6 +96,10 @@ impl MockXc {
 
     pub fn set_max_connections(&self, n: u32) {
         self.switches.lock().unwrap().max_connections = n;
+    }
+
+    pub fn set_active_connections(&self, n: u32) {
+        self.switches.lock().unwrap().active_connections = n;
     }
 
     /// Faults for the streams (see fault.rs).
@@ -196,7 +203,7 @@ fn player_api(req: &Request, data: &Data, sw: &Mutex<Switches>) -> Value {
                 "username": USER, "password": PASS, "auth": 1,
                 "status": if sw.expired { "Expired" } else { "Active" },
                 "exp_date": if sw.expired { "1600000000" } else { "4102444800" },
-                "is_trial": "0", "active_cons": "0", "created_at": "1600000000",
+                "is_trial": "0", "active_cons": sw.active_connections.to_string(), "created_at": "1600000000",
                 "max_connections": sw.max_connections.to_string(),
                 "allowed_output_formats": ["m3u8", "ts"]
             },

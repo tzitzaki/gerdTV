@@ -23,8 +23,11 @@ import 'programme_sheet.dart';
 import 'programme_text.dart';
 
 class GuideScreen extends StatefulWidget {
-  const GuideScreen({super.key, required this.session});
+  const GuideScreen({super.key, required this.session, this.group});
   final Session session;
+
+  /// Told the shown group, for the search's "only this group" chip.
+  final ValueNotifier<CategoryInfo?>? group;
 
   @override
   State<GuideScreen> createState() => _GuideScreenState();
@@ -146,6 +149,7 @@ class _GuideScreenState extends State<GuideScreen> {
       _channels = items;
       _pages.clear();
     });
+    widget.group?.value = g;
     if (_v.hasClients) _v.jumpTo(0);
     if (keepTime) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToStart());

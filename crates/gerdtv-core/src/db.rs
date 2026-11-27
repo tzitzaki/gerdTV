@@ -1490,6 +1490,8 @@ http://h.example.invalid/live/alice/s3cret/401.ts
 http://h.example.invalid/live/alice/s3cret/402.ts
 #EXTINF:-1 group-title=\"DE | Sport\",Eurosport 1
 http://h.example.invalid/live/alice/s3cret/403.ts
+#EXTINF:-1 group-title=\"UK\",TNT Sports 4 HD UK
+http://h.example.invalid/live/alice/s3cret/404.ts
 ";
         import_m3u(
             &mut c,
@@ -1504,16 +1506,31 @@ http://h.example.invalid/live/alice/s3cret/403.ts
             ("munchen", &["BR München FHD"]),
             ("MÜNCHEN", &["BR München FHD"]),
             ("7", &["BR München FHD"]),
+            ("tnt 4", &["TNT Sports 4 HD UK"]), // a short word and a number
             ("reise 2019", &["Die Reise (2019)"]),
             ("planet", &["Planet Wissen S01E02"]),
             // The group counts, after the name hits: every channel of "DE | DAZN".
             ("dazn", &["DAZN 1 HD", "Bundesliga Konferenz"]),
             // Word start first, then via the group "DE | Sport" (Eurosport's own match is only mid-word).
-            ("sport", &["DE | ARD Sportschau HD", "Eurosport 1"]),
-            ("port", &["DE | ARD Sportschau HD", "Eurosport 1"]), // mid-word only
-            ("dazm", &["DAZN 1 HD"]),                             // 1 typo in 4 letters
-            ("munchne", &["BR München FHD"]),                     // swapped letters
-            ("dzn", &[]),                                         // 3 letters: no typos
+            (
+                "sport",
+                &[
+                    "DE | ARD Sportschau HD",
+                    "TNT Sports 4 HD UK",
+                    "Eurosport 1",
+                ],
+            ),
+            (
+                "port",
+                &[
+                    "DE | ARD Sportschau HD",
+                    "Eurosport 1",
+                    "TNT Sports 4 HD UK",
+                ],
+            ), // mid-word only
+            ("dazm", &["DAZN 1 HD"]),         // 1 typo in 4 letters
+            ("munchne", &["BR München FHD"]), // swapped letters
+            ("dzn", &[]),                     // 3 letters: no typos
             ("\"ard\" OR -x", &[]), // user-typed FTS syntax is just words: "ard" "or" "x" → no match
             ("", &[]),
             ("zzz", &[]),

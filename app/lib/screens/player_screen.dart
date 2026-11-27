@@ -24,6 +24,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../platform/mini_window.dart';
 import '../platform/platform_bridge.dart';
+import '../platform/video_window.dart';
 import '../services/casting.dart' show castable;
 import '../services/recordings.dart' show canRecord;
 import '../services/session.dart';
@@ -77,11 +78,13 @@ MaterialVideoControlsThemeData withGestures(
 /// app goes to the background unless told otherwise; gerdTV keeps playing (owner decision: playback ends only by
 /// Stop), so the phone's lock screen, another app or iOS's hand-over to AVPlayer Picture-in-Picture don't pause it.
 /// Debugging: sound stopping on lock with this in place points at the audio session (ios/Runner/AppDelegate.swift).
+/// [window] (desktop player): fullscreen lifts the window's ratio lock and restores it afterwards.
 Video playerVideo(
   VideoController controller, {
   required VideoControlsBuilder? controls,
   SubtitleViewConfiguration subtitles = const SubtitleViewConfiguration(),
   PictureFormat format = PictureFormat.fit,
+  VideoWindow? window,
 }) => Video(
   // A new state per controller: the picture moves between engines (mpv, AVPlayer) with the same widget tree.
   key: ObjectKey(controller),
@@ -92,6 +95,14 @@ Video playerVideo(
   aspectRatio: format.aspect,
   pauseUponEnteringBackgroundMode: false,
   resumeUponEnteringForegroundMode: false,
+  onEnterFullscreen: () async {
+    window?.unlock('fullscreen');
+    await defaultEnterNativeFullscreen();
+  },
+  onExitFullscreen: () async {
+    await defaultExitNativeFullscreen();
+    await window?.lock('fullscreen');
+  },
 );
 
 class PlayerScreen extends StatefulWidget {
@@ -118,6 +129,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _shiftTick;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _bufferSub;
+
+  /// Desktop: the picture's size, which the window's ratio follows (VideoWindow).
+  StreamSubscription<int?>? _widthSub;
+  StreamSubscription<int?>? _heightSub;
 
   /// The screen's brightness when the player opened (the brightness swipe starts there); 0.5 until it is known.
   double _brightness = 0.5;
@@ -152,6 +167,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionSub = session.player.stream.position.listen(
       (p) => _liveEdge.position(p.inMilliseconds / 1000),
     );
+    if (VideoWindow.supported) {
+      _widthSub = session.player.stream.width.listen((_) => _followPicture());
+      _heightSub = session.player.stream.height.listen((_) => _followPicture());
+      session.pictureFormat.addListener(_followPicture);
+      _followPicture(); // a stream already playing (opened from the bar)
+    }
     session.pipFailure.addListener(_showPipFailure);
     // Opened while it floats (the window's restore, the bar): the picture is here again.
     if (session.floating.value) unawaited(session.stopApplePip());
@@ -324,11 +345,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_panel) _loadNowNext(_channels);
   }
 
+  /// The picture's ratio: the item's forced aspect (picture format 16:9 or 4:3), else the stream's, null until mpv
+  /// (or AVPlayer) reported both sides.
+  double? get _pictureRatio => windowRatio(
+    widget.session.pictureFormat.value.aspect,
+    widget.session.player.state.width,
+    widget.session.player.state.height,
+  );
+
+  void _followPicture() {
+    final ratio = _pictureRatio;
+    if (ratio != null) unawaited(widget.session.videoWindow.follow(ratio));
+  }
+
   /// Desktop: into the floating mini player and back. (Android/iOS Picture-in-Picture set pictureMode themselves.)
   void _toggleMini() {
     if (!isDesktop) return;
     final mini = !widget.session.pictureMode.value;
-    mini ? _miniWindow.enter() : _miniWindow.exit();
+    final window = widget.session.videoWindow;
+    if (mini) {
+      window.unlock('mini');
+      _miniWindow.enter(_pictureRatio ?? 16 / 9);
+    } else {
+      _miniWindow.exit();
+      unawaited(window.lock('mini'));
+    }
     widget.session.pictureMode.value = mini;
   }
 
@@ -365,10 +406,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _shiftTick?.cancel();
     _positionSub?.cancel();
     _bufferSub?.cancel();
+    _widthSub?.cancel();
+    _heightSub?.cancel();
+    widget.session.pictureFormat.removeListener(_followPicture);
     if (_miniWindow.isMini) {
       _miniWindow.exit();
       widget.session.pictureMode.value = false;
     }
+    // Back to the browsing size (the player's size is remembered for next time).
+    unawaited(widget.session.videoWindow.leave());
     // Leaving the screen does not stop the stream: the now-playing bar takes over (deferred, as in initState).
     final session = widget.session;
     scheduleMicrotask(() => session.playerOpen.value = false);
@@ -689,6 +735,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             child: playerVideo(
                               widget.session.video,
                               controls: AdaptiveVideoControls,
+                              window: widget.session.videoWindow,
                               format: widget.session.pictureFormat.value,
                               subtitles: subtitleLook(
                                 size: widget.session.library?.setting(

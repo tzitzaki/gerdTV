@@ -170,6 +170,19 @@ async fn a_link_logs_in_once_and_the_session_serves_the_catalogue_without_the_lo
         location(&s)
     );
 
+    // A stream that won't play: the page asks whether the account's connections are all in use.
+    let busy = |r: gerdtv_host::Response| -> serde_json::Value {
+        serde_json::from_slice(&r.body).unwrap()
+    };
+    assert_eq!(busy(handle(&h, get("/api/busy")).await)["busy"], false);
+    mock.set_active_connections(2); // the mock allows 2
+    let b = busy(handle(&h, get("/api/busy")).await);
+    assert_eq!(
+        (b["busy"].clone(), b["active"].clone(), b["max"].clone()),
+        (true.into(), 2.into(), 2.into())
+    );
+    mock.set_active_connections(0);
+
     // Favourites and positions write into the host's profile.
     let fav = req(
         "POST",

@@ -1,5 +1,6 @@
 // New, because nothing owned the macOS update swap: it waits until gerdTV has quit, installs the new bundle, and
-// puts the old one back when copying fails. Run on any platform with cp standing in for ditto.
+// puts the old one back when copying fails; extended: the download is deleted once installed, kept after a failure.
+// Run on any platform with cp standing in for ditto.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,7 @@ Future<(Directory, String)> setUp(String version) async {
     File('${root.path}/$name/Contents/version').createSync(recursive: true);
     File('${root.path}/$name/Contents/version').writeAsStringSync(v);
   }
+  File('${root.path}/Downloads/gerdTV-macos.zip').createSync(recursive: true);
   File(
     '${root.path}/swap-macos.sh',
   ).writeAsStringSync(File('assets/update/swap-macos.sh').readAsStringSync());
@@ -29,6 +31,7 @@ Future<int> swap(Directory root, String old, {required String copy}) async {
       '${app.pid}',
       old,
       '${root.path}/new/gerdTV.app',
+      '${root.path}/Downloads/gerdTV-macos.zip',
     ],
     environment: {'GERDTV_COPY': copy, 'GERDTV_OPEN': 'true'},
   );
@@ -57,6 +60,12 @@ void main() {
         File('${root.path}/swap.log').readAsStringSync(),
         contains('installed'),
       );
+      expect(
+        File('${root.path}/Downloads/gerdTV-macos.zip').existsSync(),
+        isFalse,
+        reason: 'the download is deleted',
+      );
+      expect(Directory('${root.path}/new/gerdTV.app').existsSync(), isFalse);
     },
   );
 
@@ -68,6 +77,11 @@ void main() {
     expect(
       File('${root.path}/swap.log').readAsStringSync(),
       contains('previous version is back'),
+    );
+    expect(
+      File('${root.path}/Downloads/gerdTV-macos.zip').existsSync(),
+      isTrue,
+      reason: 'kept for another try',
     );
   });
 }

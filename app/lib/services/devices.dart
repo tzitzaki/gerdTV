@@ -133,7 +133,14 @@ class Devices {
     if (peers.value.isNotEmpty) await _listen();
   }
 
-  void _onLink(String raw) => link.value = pairParseLink(link: raw);
+  void _onLink(String raw) => openLink(raw);
+
+  /// A pairing link from the system camera or the Mac's webcam: opens its confirmation; false when [raw] isn't one.
+  bool openLink(String raw) {
+    final l = pairParseLink(link: raw);
+    if (l != null) link.value = l;
+    return l != null;
+  }
 
   Future<void> _savePeers() async {
     setAppSetting(

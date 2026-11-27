@@ -89,6 +89,20 @@ class PlatformBridge {
   /// A gerdtv://pair link arrived while gerdTV runs (Android, iOS: the camera scanned a pairing QR).
   static void Function(String link)? onPairLink;
 
+  /// Whether this platform scans a pairing QR with its own camera window ([scanQr]): the Mac. Phones and tablets
+  /// use the system camera, which opens the gerdtv://pair link. A test turns it on.
+  static bool canScanQr =
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+
+  /// The Mac's webcam window: the first QR code's text, or null when closed or refused (MainFlutterWindow.swift).
+  static Future<String?> scanQr(String title) async {
+    try {
+      return await channel.invokeMethod<String>('scanQr', {'title': title});
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   /// The gerdtv://pair link that started gerdTV, once (Android, iOS); null without one.
   static Future<String?> takePairLink() async {
     if (kIsWeb ||

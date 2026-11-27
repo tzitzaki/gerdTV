@@ -315,6 +315,82 @@ fn arb_files_match_and_are_sorted() {
     }
 }
 
+/// Android TV: Impeller stays off (its Vulkan path garbled the Shield's picture; release builds ignore a backend choice),
+/// and every banner the manifest names is a wide 320 × 180 PNG rendered by `just logos` (the square icon looked lost on
+/// the Google TV home).
+#[test]
+fn android_renders_with_skia_and_has_wide_banners() {
+    let manifest = read("app/android/app/src/main/AndroidManifest.xml");
+    assert!(
+        manifest.contains(
+            "android:name=\"io.flutter.embedding.android.EnableImpeller\"\n            android:value=\"false\""
+        ),
+        "AndroidManifest.xml: EnableImpeller false"
+    );
+    let banners: Vec<&str> = manifest
+        .split("android:banner=\"@drawable/")
+        .skip(1)
+        .map(|rest| rest.split('"').next().unwrap())
+        .collect();
+    assert!(!banners.is_empty(), "the manifest names no banner");
+    for name in banners {
+        let path = format!("app/android/app/src/main/res/drawable-xhdpi/{name}.png");
+        let png = fs::read(repo_root().join(&path)).unwrap_or_else(|e| panic!("{path}: {e}"));
+        // The PNG header's IHDR chunk: width and height, big-endian, at bytes 16..24.
+        let size = |at: usize| u32::from_be_bytes(png[at..at + 4].try_into().unwrap());
+        assert_eq!((size(16), size(20)), (320, 180), "{path}");
+    }
+}
+
+/// The start never flashes white: Android's launch and window backgrounds are gerdTV's dark ink in light and dark
+/// system modes (Flutter's template is white in light mode, which the Shield uses), and so is iOS's launch screen.
+#[test]
+fn launch_screens_are_dark() {
+    let res = "app/android/app/src/main/res";
+    assert!(
+        read(&format!("{res}/values/colors.xml")).contains("<color name=\"ink\">#FF12121A</color>")
+    );
+    for file in [
+        "drawable/launch_background.xml",
+        "drawable-v21/launch_background.xml",
+    ] {
+        assert!(
+            read(&format!("{res}/{file}")).contains("@color/ink"),
+            "{file}: dark background"
+        );
+    }
+    for file in ["values/styles.xml", "values-night/styles.xml"] {
+        // LaunchTheme draws launch_background (above), NormalTheme the colour itself.
+        assert!(
+            read(&format!("{res}/{file}"))
+                .contains("<item name=\"android:windowBackground\">@color/ink</item>"),
+            "{file}: NormalTheme dark"
+        );
+    }
+    assert!(
+        !read("app/ios/Runner/Base.lproj/LaunchScreen.storyboard")
+            .contains("red=\"1\" green=\"1\" blue=\"1\""),
+        "LaunchScreen.storyboard: no white background"
+    );
+}
+
+/// The heavy-job lock is taken with `flock -o`: without it the command's children (xvfb-run, the app, gdb) inherit
+/// the lock, and one orphan of a killed run blocked every session for hours.
+#[test]
+fn heavy_lock_is_not_inherited() {
+    for file in ["justfile", "CLAUDE.md"] {
+        let text = read(file);
+        let uses: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("gerdTV-heavy.lock") && l.contains("flock"))
+            .collect();
+        assert!(!uses.is_empty(), "{file}: no heavy lock found");
+        for line in uses {
+            assert!(line.contains("flock -o"), "{file}: `{line}` without -o");
+        }
+    }
+}
+
 /// Every platform shows the exact name "gerdTV" (lowercase `gerdtv` only for ids and binaries).
 #[test]
 fn platforms_show_the_name_gerdtv() {

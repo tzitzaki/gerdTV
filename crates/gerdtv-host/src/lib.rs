@@ -801,6 +801,13 @@ async fn api(
                     .collect(),
             ))
         }
+        // A stream that won't play: busy means the account plays all the streams it may (another device, or the app).
+        ("GET", "/api/busy") => match lib.connections().await.map_err(e)? {
+            Some((active, max)) => {
+                Response::json(json!({ "busy": active >= max, "active": active, "max": max }))
+            }
+            None => Response::json(json!({ "busy": false })),
+        },
         ("GET", "/api/details") => {
             let d = lib.details(q("key"), None).await.map_err(e)?;
             Response::json(json!({
