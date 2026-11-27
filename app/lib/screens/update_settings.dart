@@ -2,7 +2,7 @@
 // checks are the core's, gerdtv_core::update), shows its notes and downloads the file, kept only when its SHA-256
 // matches. Installing: macOS swaps the bundle in place and restarts (platform/mac_install.dart), Android hands the APK
 // to the system's installer, Linux opens the download folder; on iPhone/iPad the IPA has to be re-signed first, so
-// there is a hint and, like everywhere, a link to the release page.
+// its tile opens the file itself (the browser downloads it) with a hint. Every platform also links the release page.
 // Debugging: a failure shows the core's reason (signature, size/SHA-256, network).
 
 import 'dart:io';
@@ -115,9 +115,15 @@ class _UpdateSettingsState extends State<UpdateSettings> {
                 ? null
                 : Text(u.notes, maxLines: 8, overflow: TextOverflow.ellipsis),
           ),
-          // iPhone/iPad: no download here; the release page below has the IPA.
+          // iPhone/iPad: no install from inside the app; the browser downloads the IPA itself (the manifest's own URL).
           if (updatePlatform == 'ios')
-            const SizedBox.shrink()
+            ListTile(
+              key: const Key('update.ipa'),
+              leading: const Icon(Icons.download),
+              title: Text(l10n.updateIpa),
+              subtitle: Text(l10n.updateIosHint),
+              onTap: () => openOrShow(context, u.url),
+            )
           else if (_file == null)
             ListTile(
               key: const Key('update.download'),
@@ -148,12 +154,11 @@ class _UpdateSettingsState extends State<UpdateSettings> {
               ),
           ],
         ],
-        // Every platform: the newest release's page (its notes and all files); on iOS the way to the new IPA.
+        // Every platform: the newest release's page (its notes and all files).
         ListTile(
           key: const Key('update.page'),
           leading: const Icon(Icons.open_in_new),
           title: Text(l10n.updatePage),
-          subtitle: updatePlatform == 'ios' ? Text(l10n.updateIosHint) : null,
           onTap: () => openOrShow(context, releasePage()),
         ),
       ],

@@ -33,7 +33,7 @@ use crate::api::library::*;
 use crate::api::pairing::*;
 use crate::api::playback::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -44,7 +44,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2145342;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1410673369;
 
 // Section: executor
 
@@ -6225,6 +6225,36 @@ fn wire__crate__api__playback__parse_buffer_impl(
         },
     )
 }
+fn wire__crate__api__update__phone_file_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "phone_file",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_platform = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::update::phone_file(api_platform))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__premiumize__pm_check_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -8820,25 +8850,25 @@ fn pde_ffi_dispatcher_primary_impl(
         119 => wire__crate__api__pairing__pair_connect_code_impl(port, ptr, rust_vec_len, data_len),
         120 => wire__crate__api__pairing__pair_connect_peer_impl(port, ptr, rust_vec_len, data_len),
         121 => wire__crate__api__pairing__pair_discover_impl(port, ptr, rust_vec_len, data_len),
-        128 => wire__crate__api__premiumize__pm_check_impl(port, ptr, rust_vec_len, data_len),
-        129 => wire__crate__api__premiumize__pm_device_poll_impl(port, ptr, rust_vec_len, data_len),
-        130 => {
+        129 => wire__crate__api__premiumize__pm_check_impl(port, ptr, rust_vec_len, data_len),
+        130 => wire__crate__api__premiumize__pm_device_poll_impl(port, ptr, rust_vec_len, data_len),
+        131 => {
             wire__crate__api__premiumize__pm_device_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        131 => wire__crate__api__premiumize__pm_folder_impl(port, ptr, rust_vec_len, data_len),
-        132 => wire__crate__api__premiumize__pm_transfers_impl(port, ptr, rust_vec_len, data_len),
-        134 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
-        136 => wire__crate__api__tracking__simkl_history_impl(port, ptr, rust_vec_len, data_len),
-        137 => wire__crate__api__subtitles__subs_download_impl(port, ptr, rust_vec_len, data_len),
-        138 => wire__crate__api__subtitles__subs_login_impl(port, ptr, rust_vec_len, data_len),
-        139 => wire__crate__api__subtitles__subs_search_impl(port, ptr, rust_vec_len, data_len),
-        141 => {
+        132 => wire__crate__api__premiumize__pm_folder_impl(port, ptr, rust_vec_len, data_len),
+        133 => wire__crate__api__premiumize__pm_transfers_impl(port, ptr, rust_vec_len, data_len),
+        135 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
+        137 => wire__crate__api__tracking__simkl_history_impl(port, ptr, rust_vec_len, data_len),
+        138 => wire__crate__api__subtitles__subs_download_impl(port, ptr, rust_vec_len, data_len),
+        139 => wire__crate__api__subtitles__subs_login_impl(port, ptr, rust_vec_len, data_len),
+        140 => wire__crate__api__subtitles__subs_search_impl(port, ptr, rust_vec_len, data_len),
+        142 => {
             wire__crate__api__tracking__track_device_poll_impl(port, ptr, rust_vec_len, data_len)
         }
-        142 => {
+        143 => {
             wire__crate__api__tracking__track_device_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        143 => wire__crate__api__tracking__track_scrobble_impl(port, ptr, rust_vec_len, data_len),
+        144 => wire__crate__api__tracking__track_scrobble_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8919,9 +8949,10 @@ fn pde_ffi_dispatcher_sync_impl(
         125 => wire__crate__api__pairing__pair_parse_link_impl(ptr, rust_vec_len, data_len),
         126 => wire__crate__api__pairing__pair_qr_impl(ptr, rust_vec_len, data_len),
         127 => wire__crate__api__playback__parse_buffer_impl(ptr, rust_vec_len, data_len),
-        133 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
-        135 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
-        140 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
+        128 => wire__crate__api__update__phone_file_impl(ptr, rust_vec_len, data_len),
+        134 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
+        136 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
+        141 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -11509,7 +11540,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -11622,7 +11653,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

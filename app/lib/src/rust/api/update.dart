@@ -12,6 +12,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// The newest release's page on GitHub.
 String releasePage() => RustLib.instance.api.crateApiUpdateReleasePage();
 
+/// This version's install file for `platform` ("android", "ios"), for the welcome screen's QR; None elsewhere.
+String? phoneFile({required String platform}) =>
+    RustLib.instance.api.crateApiUpdatePhoneFile(platform: platform);
+
 /// A newer, correctly signed release with a build for `platform` ("macos", "ios", "android", "linux"), or None.
 Future<UpdateInfo?> checkUpdate({required String platform}) =>
     RustLib.instance.api.crateApiUpdateCheckUpdate(platform: platform);
