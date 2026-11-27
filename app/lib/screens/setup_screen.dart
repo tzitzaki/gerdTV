@@ -1,17 +1,23 @@
 // First run: the provider's login (Xtream Codes) or a playlist URL (M3U), nothing else. Connecting runs the first
 // sync; a refused login or an unreachable server is shown under the button and the form stays filled.
+// With [SetupScreen.edit] the same form edits the open profile's provider (Settings → Account): pre-filled, with a
+// name field, and Save replaces the login only once the new one works (Session.updateProfile).
 
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import 'app_logo.dart';
+import 'devices_screen.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key, required this.session});
+  const SetupScreen({super.key, required this.session, this.edit});
   final Session session;
+
+  /// The profile to edit; null adds a new one.
+  final ProfileInfo? edit;
 
   @override
   State<SetupScreen> createState() => _SetupScreenState();
@@ -37,13 +43,36 @@ class _SetupScreenState extends State<SetupScreen> {
   final _pass = TextEditingController();
   final _m3u = TextEditingController();
   final _userAgent = TextEditingController();
+  final _name = TextEditingController();
   bool _xtream = true;
   bool _busy = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    final p = widget.edit;
+    if (p == null) return;
+    // A profile without a provider (setup skipped) gets its name from the provider it gets now.
+    if (p.source != SourceKind.none) _name.text = p.name;
+    _xtream = p.source != SourceKind.m3UUrl;
+    _server.text = p.server;
+    _userAgent.text = p.userAgent;
+    // The login itself is only in secure storage; it fills in a moment later.
+    widget.session.secrets.read(p.id).then((s) {
+      if (!mounted || s == null) return;
+      if (_xtream && s.length >= 2) {
+        _user.text = s[0];
+        _pass.text = s[1];
+      } else if (!_xtream && s.isNotEmpty) {
+        _m3u.text = s[0];
+      }
+    });
+  }
+
+  @override
   void dispose() {
-    for (final c in [_server, _user, _pass, _m3u, _userAgent]) {
+    for (final c in [_server, _user, _pass, _m3u, _userAgent, _name]) {
       c.dispose();
     }
     super.dispose();
@@ -56,17 +85,26 @@ class _SetupScreenState extends State<SetupScreen> {
       _error = null;
     });
     final server = _server.text.trim();
+    final edit = widget.edit;
+    final name = _name.text.trim();
     final info = ProfileInfo(
-      id: '',
-      name: _xtream ? (Uri.tryParse(server)?.host ?? 'Xtream Codes') : 'M3U',
+      id: edit?.id ?? '',
+      name: name.isNotEmpty
+          ? name
+          : _xtream
+          ? (Uri.tryParse(server)?.host ?? 'Xtream Codes')
+          : 'M3U',
       source: _xtream ? SourceKind.xtream : SourceKind.m3UUrl,
       server: _xtream ? server : '',
       userAgent: _userAgent.text,
+      maxConnections: edit?.maxConnections,
     );
     final secrets = _xtream
         ? [_user.text.trim(), _pass.text]
         : [_m3u.text.trim()];
-    final error = await widget.session.addProfile(info, secrets);
+    final error = edit == null
+        ? await widget.session.addProfile(info, secrets)
+        : await widget.session.updateProfile(info, secrets);
     if (!mounted) return;
     // Added from Settings (a pushed page): back to the app, now on the new profile.
     if (error == null && Navigator.of(context).canPop()) {
@@ -102,12 +140,23 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                     const SizedBox(height: Tokens.space * 2),
                     Text(
-                      l10n.setupTitle,
+                      widget.edit == null ||
+                              widget.edit!.source == SourceKind.none
+                          ? l10n.setupTitle
+                          : l10n.setupEditTitle,
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: Tokens.space),
                     Text(l10n.setupIntro),
                     const SizedBox(height: Tokens.space * 3),
+                    if (widget.edit != null) ...[
+                      TextFormField(
+                        key: const Key('setup.name'),
+                        controller: _name,
+                        decoration: InputDecoration(labelText: l10n.setupName),
+                      ),
+                      const SizedBox(height: Tokens.space * 3),
+                    ],
                     SegmentedButton<bool>(
                       segments: [
                         ButtonSegment(
@@ -176,10 +225,38 @@ class _SetupScreenState extends State<SetupScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(Tokens.space * 1.5),
                         child: Text(
-                          _busy ? l10n.setupConnecting : l10n.setupConnect,
+                          _busy
+                              ? l10n.setupConnecting
+                              : widget.edit == null
+                              ? l10n.setupConnect
+                              : l10n.setupSave,
                         ),
                       ),
                     ),
+                    // First run only (not when added from Settings): from another device, or Settings without a provider.
+                    if (widget.edit == null && !Navigator.of(context).canPop())
+                      TextButton(
+                        key: const Key('setup.fromDevice'),
+                        onPressed: _busy
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      DevicesScreen(session: widget.session),
+                                ),
+                              ),
+                        child: Text(l10n.setupFromDevice),
+                      ),
+                    if (widget.edit == null && !Navigator.of(context).canPop())
+                      TextButton(
+                        key: const Key('setup.skip'),
+                        onPressed: _busy
+                            ? null
+                            : () => widget.session.skipSetup(
+                                l10n.setupNoProvider,
+                              ),
+                        child: Text(l10n.setupSkip),
+                      ),
                     if (_busy)
                       const Padding(
                         padding: EdgeInsets.only(top: Tokens.space * 2),

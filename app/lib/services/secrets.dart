@@ -28,6 +28,10 @@ class Secrets {
   final FlutterSecureStorage _storage; // on macOS only the old place
   final MacKeychain? _mac; // null on every other platform
 
+  /// Called after any secret was written or deleted: Devices then refreshes what its sync listener answers with, so a
+  /// key or token changed a moment ago isn't overwritten by an older one from the other device.
+  void Function()? onChange;
+
   Future<String?> _read(String key) async {
     final mac = _mac;
     if (mac == null) return _storage.read(key: key);
@@ -63,8 +67,10 @@ class Secrets {
 
   String _key(String profileId) => 'gerdtv.profile.$profileId';
 
-  Future<void> write(String profileId, List<String> secrets) =>
-      _write(_key(profileId), jsonEncode(secrets));
+  Future<void> write(String profileId, List<String> secrets) async {
+    await _write(_key(profileId), jsonEncode(secrets));
+    onChange?.call();
+  }
 
   /// The profile's secrets, or null when missing or unreadable (e.g. after an iOS re-sign).
   Future<List<String>?> read(String profileId) async {
@@ -76,7 +82,10 @@ class Secrets {
     }
   }
 
-  Future<void> delete(String profileId) => _delete(_key(profileId));
+  Future<void> delete(String profileId) async {
+    await _delete(_key(profileId));
+    onChange?.call();
+  }
 
   /// A linked service's token for a profile ([service]: "premiumize", "trakt", "simkl"); null when there is none
   /// or it can't be read. Kept apart from the provider login, so linking or unlinking never touches that.
@@ -88,8 +97,14 @@ class Secrets {
     }
   }
 
-  Future<void> writeService(String profileId, String service, String? token) =>
-      token == null
-      ? _delete('gerdtv.$service.$profileId')
-      : _write('gerdtv.$service.$profileId', token);
+  Future<void> writeService(
+    String profileId,
+    String service,
+    String? token,
+  ) async {
+    await (token == null
+        ? _delete('gerdtv.$service.$profileId')
+        : _write('gerdtv.$service.$profileId', token));
+    onChange?.call();
+  }
 }

@@ -5,10 +5,23 @@
 	<!-- Google Cast: finding devices on the local network (Bonjour) and casting to them; also AirPlay of gerdTV's
 	     local stream. iOS and macOS ask the user once. -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>gerdTV finds Cast devices on your network and sends them what you choose to play.</string>
+	<string>gerdTV finds Cast devices and your other gerdTV devices on your network, to cast to them and to sync your profile with them.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_googlecast._tcp</string>
+	</array>
+	<!-- Device pairing: the camera's link to another device's pairing QR (gerdtv://pair?…) opens gerdTV
+	     (SceneDelegate.swift). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>gerdtv-pair</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>gerdtv</string>
+			</array>
+		</dict>
 	</array>
 	<!-- Sound (and Apple Picture-in-Picture) keep playing with the screen locked or in another app. -->
 	<key>UIBackgroundModes</key>

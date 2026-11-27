@@ -150,6 +150,11 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "isTv" -> result.success(isTv())
+                    // The pairing link gerdTV was started with (once; null without one).
+                    "takePairLink" -> {
+                        result.success(pairLink(intent))
+                        intent.data = null
+                    }
                     "takeOpenItem" -> {
                         result.success(openItem(intent))
                         intent.removeExtra(TvHome.EXTRA_ITEM)
@@ -339,7 +344,12 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         openItem(intent)?.let { channel?.invokeMethod("openItem", it) }
+        pairLink(intent)?.let { channel?.invokeMethod("pairLink", it) }
     }
+
+    /** A gerdtv://pair link (the camera scanned another device's pairing QR), or null. */
+    private fun pairLink(intent: Intent): String? =
+        intent.data?.takeIf { it.scheme == "gerdtv" && it.host == "pair" }?.toString()
 
     private fun isTv() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 

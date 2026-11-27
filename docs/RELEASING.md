@@ -10,7 +10,7 @@
 
 ## What release.yml builds
 - `macos-latest`: `gerdTV-macos-<version>.zip` (the app signed with the stable self-signed certificate, packed with `ditto -c -k --keepParent`; the updater's file in `latest.json`), `gerdTV-macos-<version>.dmg` (the same app with an Applications link for the first install, `scripts/macos-dmg.sh`; not in `latest.json`, `just verify-release` checks it is there) and `gerdTV-ios-unsigned-<version>.ipa` (`flutter build ios --release --no-codesign`, `Payload/Runner.app` zipped, for a re-signing service).
-- `ubuntu-latest`: `gerdTV-android-<version>.apk` (arm64-v8a, release keystore) and `gerdTV-linux-x64-<version>.tar.gz`.
+- `ubuntu-latest`: `gerdTV-android-<version>.apk` (arm64-v8a, release keystore), `gerdTV-linux-x64-<version>.tar.gz` and `gerdTV-host-linux-x64-<version>` (the headless host, `cargo build --release -p gerdtv-host`; platform `host` in `latest.json`, so `just verify-release` checks it too).
 - Last job: `latest.json` (version, notes, per platform: asset, size, SHA-256, minimum OS) signed with the ed25519 update key into `latest.json.sig` (`gerdtv-release`), then `gh release create` with every asset. Notes: the merged PR titles since the previous published release, each with its commit subjects when it has several (without the version commit; `scripts/release-notes.sh`) (a tag whose release run failed has no release and is skipped) plus install hints linking `docs/INSTALL.md`. Any failed platform job means no release (no half releases). Tags with a `-` (e.g. a test tag) are published as pre-releases.
 
 ## Why a stable self-signed certificate on macOS

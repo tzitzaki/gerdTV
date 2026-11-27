@@ -12,6 +12,7 @@ pub mod library;
 pub mod logos;
 pub mod m3u;
 pub mod opensubtitles;
+pub mod pairing;
 pub mod playback;
 pub mod premiumize;
 pub mod recorder;

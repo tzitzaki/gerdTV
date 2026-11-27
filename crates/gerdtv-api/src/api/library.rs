@@ -34,6 +34,8 @@ pub enum SourceKind {
     Xtream,
     M3uUrl,
     M3uFile,
+    /// No provider yet (setup skipped).
+    None,
 }
 
 /// A profile's non-secret settings (secrets stay in the app's secure storage).
@@ -55,6 +57,7 @@ impl From<core::Profile> for ProfileInfo {
                 core::SourceKind::Xtream => SourceKind::Xtream,
                 core::SourceKind::M3uUrl => SourceKind::M3uUrl,
                 core::SourceKind::M3uFile => SourceKind::M3uFile,
+                core::SourceKind::None => SourceKind::None,
             },
             server: p.server,
             user_agent: p.user_agent,
@@ -86,24 +89,37 @@ pub fn set_app_setting(dir: String, key: String, value: String) -> Result<(), St
     core::set_app_setting(&PathBuf::from(dir), &key, &value).map_err(err)
 }
 
+impl From<ProfileInfo> for core::Profile {
+    fn from(profile: ProfileInfo) -> Self {
+        core::Profile {
+            id: profile.id,
+            name: profile.name,
+            source: match profile.source {
+                SourceKind::Xtream => core::SourceKind::Xtream,
+                SourceKind::M3uUrl => core::SourceKind::M3uUrl,
+                SourceKind::M3uFile => core::SourceKind::M3uFile,
+                SourceKind::None => core::SourceKind::None,
+            },
+            server: profile.server,
+            user_agent: profile.user_agent,
+            max_connections: profile.max_connections,
+            updated_at: 0,
+        }
+    }
+}
+
 /// Adds (empty id) or replaces a profile; returns it with its id.
 pub fn save_profile(dir: String, profile: ProfileInfo) -> Result<ProfileInfo, String> {
-    let p = core::Profile {
-        id: profile.id,
-        name: profile.name,
-        source: match profile.source {
-            SourceKind::Xtream => core::SourceKind::Xtream,
-            SourceKind::M3uUrl => core::SourceKind::M3uUrl,
-            SourceKind::M3uFile => core::SourceKind::M3uFile,
-        },
-        server: profile.server,
-        user_agent: profile.user_agent,
-        max_connections: profile.max_connections,
-        updated_at: 0,
-    };
-    Ok(core::save_profile(&PathBuf::from(dir), p)
+    Ok(core::save_profile(&PathBuf::from(dir), profile.into())
         .map_err(err)?
         .into())
+}
+
+/// Tests a login without storing anything (Settings → Account → Edit saves only a working one).
+pub async fn check_login(profile: ProfileInfo, secrets: Vec<String>) -> Result<(), String> {
+    core::check_login(&profile.into(), &secrets)
+        .await
+        .map_err(err)
 }
 
 pub fn delete_profile(dir: String, id: String) -> Result<(), String> {

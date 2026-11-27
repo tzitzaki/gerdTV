@@ -1,0 +1,9 @@
+{
+  "name": "gerdTV",
+  "short_name": "gerdTV",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12121a",
+  "theme_color": "#12121a",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

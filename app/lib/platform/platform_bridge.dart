@@ -54,6 +54,8 @@ class PlatformBridge {
       } else if (call.method == 'openItem') {
         final m = call.arguments as Map;
         onOpenItem?.call(m['profile'] as String, m['key'] as String);
+      } else if (call.method == 'pairLink') {
+        onPairLink?.call(call.arguments as String);
       } else if (call.method == 'mediaCommand') {
         onMediaCommand?.call(call.arguments as String);
       } else if (call.method == 'menuBar') {
@@ -83,6 +85,23 @@ class PlatformBridge {
 
   /// An entry of the Android TV home screen was picked while gerdTV runs (services/tv_home.dart).
   static void Function(String profile, String key)? onOpenItem;
+
+  /// A gerdtv://pair link arrived while gerdTV runs (Android, iOS: the camera scanned a pairing QR).
+  static void Function(String link)? onPairLink;
+
+  /// The gerdtv://pair link that started gerdTV, once (Android, iOS); null without one.
+  static Future<String?> takePairLink() async {
+    if (kIsWeb ||
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return null;
+    }
+    try {
+      return await channel.invokeMethod<String>('takePairLink');
+    } on MissingPluginException {
+      return null;
+    }
+  }
 
   static Future<T?> _android<T>(String method, [Object? args]) async {
     if (defaultTargetPlatform != TargetPlatform.android) return null;
