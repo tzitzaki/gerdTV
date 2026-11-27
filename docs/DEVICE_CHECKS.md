@@ -30,7 +30,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Subtitles online (with your OpenSubtitles key): Find subtitles online lists German ones for a movie; a tap shows them in the picture.
 
 - Web player (host paired): a link from Settings → Web player opens in Safari and Chrome; a channel and a movie play, +3 h extends.
-- Devices & sync: Show a code; on the Shield pick the Mac and type it; the Shield names the Mac first, Sync moves the login and favourites.
+- Devices & sync (both on this release): Show a code (6 digits); the Shield picks the Mac, takes it on the number pad, names the Mac; Sync moves the login.
 - Pair by webcam: Devices & sync → Scan a code with the camera asks for the camera once; the TV's QR opens the confirmation; closing the window cancels.
 - Web player in Safari: a busy account (a channel playing in the app) says the provider's connection is in use; back, close and stars are Material icons.
 

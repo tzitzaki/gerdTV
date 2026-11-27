@@ -257,7 +257,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       controller: _code,
                       autofocus: true,
                       autocorrect: false,
-                      textCapitalization: TextCapitalization.characters,
+                      // Six digits: the number pad (a TV remote's too).
+                      keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: l10n.devicesEnterCode(_picked!.device.name),
                       ),

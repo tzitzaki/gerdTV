@@ -13,6 +13,7 @@ lzma-rust2.workspace = true
 mdns-sd.workspace = true
 oxicast.workspace = true
 qrcode.workspace = true
+spake2.workspace = true
 quick-xml.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
