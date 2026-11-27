@@ -374,6 +374,23 @@ fn launch_screens_are_dark() {
     );
 }
 
+/// The heavy-job lock is taken with `flock -o`: without it the command's children (xvfb-run, the app, gdb) inherit
+/// the lock, and one orphan of a killed run blocked every session for hours.
+#[test]
+fn heavy_lock_is_not_inherited() {
+    for file in ["justfile", "CLAUDE.md"] {
+        let text = read(file);
+        let uses: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("gerdTV-heavy.lock") && l.contains("flock"))
+            .collect();
+        assert!(!uses.is_empty(), "{file}: no heavy lock found");
+        for line in uses {
+            assert!(line.contains("flock -o"), "{file}: `{line}` without -o");
+        }
+    }
+}
+
 /// Every platform shows the exact name "gerdTV" (lowercase `gerdtv` only for ids and binaries).
 #[test]
 fn platforms_show_the_name_gerdtv() {

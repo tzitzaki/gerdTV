@@ -1,10 +1,12 @@
 # gerdTV task runner. `just` lists the recipes. Gates and their order: CLAUDE.md ("Dev loop") and docs/SETUP.md.
 # Heavy jobs (Android/Gradle builds, integration tests, benchmarks) take ~/.gerdTV-heavy.lock so only one runs at a time on a
-# shared dev machine; CI runners have the lock to themselves.
+# shared dev machine; CI runners have the lock to themselves. `-o`: only flock holds it, not the command's children
+# (xvfb-run, the app, gdb, Gradle), so a killed or crashed run can't leave an orphan blocking every session for hours.
+# Debug a lock that never frees: `fuser ~/.gerdTV-heavy.lock` names the holder.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-heavy := "flock " + env_var('HOME') + "/.gerdTV-heavy.lock"
+heavy := "flock -o " + env_var('HOME') + "/.gerdTV-heavy.lock"
 
 default:
     @just --list
