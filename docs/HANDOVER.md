@@ -1,8 +1,8 @@
 # Handover
 
 ## State
-- Version 0.261127.65: the web player from a home host (login links from the app), device-to-device sync, skippable setup, provider edit.
-- Before: watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, OpenSubtitles, own groups, Android TV home screen; AirPlay is still open.
+- Version 0.261127.67: release builds carry gerdTV's Simkl client id, so Settings → Account → Simkl offers the code login.
+- Before: web player, device sync, watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, OpenSubtitles, own groups; AirPlay is still open.
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -14,7 +14,7 @@
 - Open: reorder channels inside the provider's groups too, or only inside your own groups as now?
 
 ## Owner one-off jobs
-- Register gerdTV at premiumize.me/registerclient and simkl.com/settings/developer (TV/device type), then `gh variable set` both ids (docs/RELEASING.md).
+- Register gerdTV at premiumize.me/registerclient, then `gh variable set GERDTV_PREMIUMIZE_CLIENT_ID` (docs/RELEASING.md).
 - For Trakt: create your own app on trakt.tv (Settings → Your API Apps, redirect urn:ietf:wg:oauth:2.0:oob) and enter it in Settings → Account → Trakt.
 - Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Account.
 - Move the signing files from the private config folder into the password manager, then delete them there.
