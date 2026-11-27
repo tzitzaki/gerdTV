@@ -1,7 +1,7 @@
 # Handover
 
 ## State
-- Version 0.261127.70: host self-update (signed release, rollback), `--version`, 8-character login codes, Web player shown right after pairing.
+- Version 0.261127.70: host self-update (signed release, rollback), `--version`, 8-character login codes, Web player always in Settings.
 - Before: back arrow and Esc on pages, SPAKE2 pairing codes (.69), the player window's ratio, Mac webcam pairing (.68), web player (.65).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
