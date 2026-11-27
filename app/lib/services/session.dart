@@ -797,7 +797,7 @@ class Session extends ChangeNotifier {
   /// rate-limited (core: opensubtitles.rs).
   String? subtitlesKey;
   String? _subtitlesLogin; // JSON [username, password]
-  String? _subtitlesToken;
+  SubsLogin? _subtitlesSession; // the login's token and host, for this run
 
   bool get hasSubtitlesLogin => _subtitlesLogin != null;
 
@@ -811,11 +811,11 @@ class Session extends ChangeNotifier {
 
   /// Checks the login with OpenSubtitles first (throws its reason); null removes it.
   Future<void> setSubtitlesLogin(String? user, String? password) async {
-    _subtitlesToken = null;
+    _subtitlesSession = null;
     if (user == null || user.trim().isEmpty) {
       _subtitlesLogin = null;
     } else {
-      _subtitlesToken = await subsLogin(
+      _subtitlesSession = await subsLogin(
         key: subtitlesKey ?? '',
         username: user.trim(),
         password: password ?? '',
@@ -846,7 +846,7 @@ class Session extends ChangeNotifier {
         _appSecrets,
         'opensubtitles-login',
       );
-      _subtitlesToken = null;
+      _subtitlesSession = null; // a synced login logs in again at its first use
     }
     if (profile != null) {
       profiles = await listProfiles(dir: await _dir());
@@ -902,26 +902,33 @@ class Session extends ChangeNotifier {
     return subsSearch(
       library_: lib,
       key: key,
+      login: await _subtitlesLoggedIn(key),
       itemKey: it.key,
       languages: languages,
     );
   }
 
-  /// Downloads a found subtitle and shows it in mpv (logged in first, once per run, when there is a login).
-  Future<void> loadSubtitle(SubtitleInfo s) async {
-    final key = subtitlesKey;
-    if (key == null) return;
-    if (_subtitlesToken == null && _subtitlesLogin != null) {
+  /// The login of this run, logged in at its first use (once: OpenSubtitles rate-limits logins); null without one.
+  /// Its calls go to the host the login named (core: opensubtitles.rs).
+  Future<SubsLogin?> _subtitlesLoggedIn(String key) async {
+    if (_subtitlesSession == null && _subtitlesLogin != null) {
       final login = (jsonDecode(_subtitlesLogin!) as List).cast<String>();
-      _subtitlesToken = await subsLogin(
+      _subtitlesSession = await subsLogin(
         key: key,
         username: login[0],
         password: login[1],
       );
     }
+    return _subtitlesSession;
+  }
+
+  /// Downloads a found subtitle and shows it in mpv (with the login's quota, when there is one).
+  Future<void> loadSubtitle(SubtitleInfo s) async {
+    final key = subtitlesKey;
+    if (key == null) return;
     final path = await subsDownload(
       key: key,
-      token: _subtitlesToken,
+      login: await _subtitlesLoggedIn(key),
       fileId: s.fileId,
       dir: '${(await getTemporaryDirectory()).path}/subtitles',
     );

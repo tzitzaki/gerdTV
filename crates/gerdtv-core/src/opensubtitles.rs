@@ -59,6 +59,13 @@ pub struct Found {
     pub downloads: u64,
 }
 
+/// A login: its token, and the host its calls go to (from `base_url`; empty: the default).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Login {
+    pub token: String,
+    pub host: String,
+}
+
 pub struct OpenSubtitles {
     http: reqwest::Client,
     base: String,
@@ -104,25 +111,47 @@ impl OpenSubtitles {
         }
     }
 
-    /// A token for the user's own download quota.
-    pub async fn login(&self, username: &str, password: &str) -> Result<String> {
+    /// Where a call goes: the login's host (VIP accounts get vip-api.opensubtitles.com, whose calls fail without
+    /// the token) with this client's scheme, else this client's base.
+    fn url(&self, login: Option<&Login>, path: &str) -> String {
+        match login.filter(|l| !l.host.is_empty()) {
+            Some(l) => {
+                let scheme = self.base.split("://").next().unwrap_or("https");
+                format!("{scheme}://{}{path}", l.host)
+            }
+            None => format!("{}{path}", self.base),
+        }
+    }
+
+    /// A call with the login's token, when there is a login.
+    fn signed(req: reqwest::RequestBuilder, login: Option<&Login>) -> reqwest::RequestBuilder {
+        match login {
+            Some(l) => req.bearer_auth(&l.token),
+            None => req,
+        }
+    }
+
+    /// A token for the user's own download quota, and the host its later calls must use ("Further API requests
+    /// must continue on returned base_url host", its API definition).
+    pub async fn login(&self, username: &str, password: &str) -> Result<Login> {
         let req = self
             .http
             .post(format!("{}/api/v1/login", self.base))
             .header("Content-Type", "application/json")
             .body(json!({ "username": username, "password": password }).to_string());
         match self.call(req).await {
-            Ok(v) => v["token"]
-                .as_str()
-                .map(str::to_string)
-                .ok_or(SubsError::Http(200)),
+            Ok(v) => Ok(Login {
+                token: v["token"].as_str().ok_or(SubsError::Http(200))?.to_string(),
+                host: v["base_url"].as_str().unwrap_or_default().to_string(),
+            }),
             Err(SubsError::Http(401)) => Err(SubsError::Login),
             Err(e) => Err(e),
         }
     }
 
     /// Subtitles for `s`, the most downloaded first (as OpenSubtitles orders them by default).
-    pub async fn search(&self, s: &Search) -> Result<Vec<Found>> {
+    /// Logged in, it goes to the login's host with the token (its API: send the token with every call there).
+    pub async fn search(&self, s: &Search, login: Option<&Login>) -> Result<Vec<Found>> {
         // Its advice: parameters sorted, lowercase, no defaults, so answers come from its cache.
         let mut q: Vec<(&str, String)> = Vec::new();
         match (s.tmdb, s.episode) {
@@ -148,11 +177,12 @@ impl OpenSubtitles {
         }
         q.sort();
         let v = self
-            .call(
+            .call(Self::signed(
                 self.http
-                    .get(format!("{}/api/v1/subtitles", self.base))
+                    .get(self.url(login, "/api/v1/subtitles"))
                     .query(&q),
-            )
+                login,
+            ))
             .await?;
         Ok(v["data"]
             .as_array()
@@ -173,16 +203,20 @@ impl OpenSubtitles {
             .collect())
     }
 
-    /// Downloads a file into `dir` (the cache folder) and returns its path; `token` uses the user's quota.
-    pub async fn download(&self, file_id: u64, token: Option<&str>, dir: &Path) -> Result<PathBuf> {
-        let mut req = self
-            .http
-            .post(format!("{}/api/v1/download", self.base))
-            .header("Content-Type", "application/json")
-            .body(json!({ "file_id": file_id }).to_string());
-        if let Some(t) = token {
-            req = req.bearer_auth(t);
-        }
+    /// Downloads a file into `dir` (the cache folder) and returns its path; a login uses the user's quota.
+    pub async fn download(
+        &self,
+        file_id: u64,
+        login: Option<&Login>,
+        dir: &Path,
+    ) -> Result<PathBuf> {
+        let req = Self::signed(
+            self.http
+                .post(self.url(login, "/api/v1/download"))
+                .header("Content-Type", "application/json")
+                .body(json!({ "file_id": file_id }).to_string()),
+            login,
+        );
         let v = self.call(req).await?;
         let link = v["link"].as_str().ok_or(SubsError::Http(200))?;
         let res = self
@@ -229,22 +263,28 @@ mod tests {
         let os = OpenSubtitles::new(&mock.base(), KEY);
         let ids = |found: Vec<Found>| found.into_iter().map(|f| f.file_id).collect::<Vec<_>>();
         assert_eq!(
-            ids(os.search(&search(Some(1001), None, "")).await.unwrap()),
+            ids(os
+                .search(&search(Some(1001), None, ""), None)
+                .await
+                .unwrap()),
             [11, 12]
         );
         assert_eq!(
-            ids(os.search(&search(Some(1001), None, "en")).await.unwrap()),
+            ids(os
+                .search(&search(Some(1001), None, "en"), None)
+                .await
+                .unwrap()),
             [12]
         );
         assert_eq!(
             ids(os
-                .search(&search(Some(2001), Some((1, 2)), ""))
+                .search(&search(Some(2001), Some((1, 2)), ""), None)
                 .await
                 .unwrap()),
             [21]
         );
         assert!(
-            os.search(&search(Some(2001), Some((1, 3)), ""))
+            os.search(&search(Some(2001), Some((1, 3)), ""), None)
                 .await
                 .unwrap()
                 .is_empty()
@@ -267,13 +307,18 @@ mod tests {
             os.login(USER, "wrong").await,
             Err(SubsError::Login)
         ));
-        let token = os.login(USER, PASS).await.unwrap();
-        os.download(21, Some(&token), &dir).await.unwrap();
+        // Logged in, every call goes to the host the login named (VIP accounts: vip-api), with the token.
+        let login = os.login(USER, PASS).await.unwrap();
+        assert!(login.host.starts_with("localhost:"), "{login:?}");
+        let episode = search(Some(2001), Some((1, 2)), "");
+        let found = os.search(&episode, Some(&login));
+        assert_eq!(ids(found.await.unwrap()), [21]);
+        os.download(21, Some(&login), &dir).await.unwrap();
         assert_eq!(mock.downloads(), (FREE, 1));
 
         let bad = OpenSubtitles::new(&mock.base(), "nope");
         assert!(matches!(
-            bad.search(&search(Some(1001), None, "")).await,
+            bad.search(&search(Some(1001), None, ""), None).await,
             Err(SubsError::Key)
         ));
         std::fs::remove_dir_all(&dir).unwrap();
