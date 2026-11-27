@@ -832,23 +832,47 @@ async fn api(
 
 /// The stream's address for the browser. Live goes as the provider's HLS (browsers play HLS, not raw MPEG-TS). The
 /// provider usually answers with a redirect to a tokenised address: that one goes to the browser, so the login stays
-/// here; a provider without one gets its plain address (`?plain=1` asks for it, the page's retry when a tokenised
-/// address is refused, e.g. bound to this host's IP).
+/// here. A provider that serves the stream itself (no redirect) gets its plain address; one that refuses it (a dead
+/// channel, the account's limit) gets a 502, so a refused stream never hands out the login. `plain` (`?plain=1`, the
+/// page's retry when a tokenised address is refused, e.g. bound to this host's IP) skips the lookup.
 async fn stream(host: &Host, lib: &Library, key: &str, plain: bool) -> Result<Response, String> {
     let url = lib.stream_url(key, "m3u8").map_err(|e| e.to_string())?;
-    if !plain && let Some(target) = resolve(&host.http, &url).await {
-        return Ok(Response::redirect(&target));
+    if plain {
+        return Ok(Response::redirect(&url));
     }
-    Ok(Response::redirect(&url))
+    Ok(match resolve(&host.http, &url).await {
+        Answer::Redirect(to) => Response::redirect(&to),
+        Answer::Direct => Response::redirect(&url),
+        Answer::Refused(why) => {
+            eprintln!("host: the provider refused a stream: {why}");
+            Response::new(502, "text/plain", "refused by the provider")
+        }
+    })
 }
 
-/// The provider's redirect target for `url`, if it answers with one (only the head is read).
-async fn resolve(http: &reqwest::Client, url: &str) -> Option<String> {
-    let res = http.get(url).send().await.ok()?;
-    if !res.status().is_redirection() {
-        return None;
+enum Answer {
+    Redirect(String),
+    Direct,
+    Refused(String),
+}
+
+/// What the provider answers for `url` (only the head is read; the stream itself is never fetched).
+async fn resolve(http: &reqwest::Client, url: &str) -> Answer {
+    let res = match http.get(url).send().await {
+        Ok(r) => r,
+        Err(e) => return Answer::Refused(e.without_url().to_string()),
+    };
+    let status = res.status();
+    if status.is_redirection()
+        && let Some(to) = res.headers().get("location").and_then(|v| v.to_str().ok())
+        // A relative target is relative to the provider's address.
+        && let Some(abs) = reqwest::Url::parse(url).ok().and_then(|u| u.join(to).ok())
+    {
+        return Answer::Redirect(abs.to_string());
     }
-    let to = res.headers().get("location")?.to_str().ok()?;
-    // A relative target is relative to the provider's address.
-    Some(reqwest::Url::parse(url).ok()?.join(to).ok()?.to_string())
+    if status.is_success() {
+        Answer::Direct
+    } else {
+        Answer::Refused(format!("HTTP {}", status.as_u16()))
+    }
 }

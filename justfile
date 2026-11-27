@@ -144,6 +144,7 @@ test-epg-budget:
 # Opt-in checks against the real account in the GERDTV_* environment (counts and timings only; docs/SETUP.md).
 test-live:
     cargo test -q -p gerdtv-core --release --test live -- --ignored --nocapture --test-threads 1
+    cargo test -q -p gerdtv-host --release --test live -- --ignored --nocapture --test-threads 1
 
 # The web player in headless Chrome against the mock panel (gerdtv-host's tests/web_smoke.rs; needs Chrome and Node).
 # Screenshots: ~/gerdTV-screens/<branch>/web-*.png.
