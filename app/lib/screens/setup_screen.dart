@@ -158,6 +158,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.name'),
                           controller: _name,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupName,
                           ),
@@ -185,6 +186,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.server'),
                           controller: _server,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupServer,
                             hintText: 'http://example.com:8080',
@@ -197,6 +199,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.username'),
                           controller: _user,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupUsername,
                           ),

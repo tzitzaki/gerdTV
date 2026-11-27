@@ -253,3 +253,23 @@ class BackKeys extends StatelessWidget {
     ),
   );
 }
+
+/// D-pad Up/Down (and the arrow keys) leave a text field for the control above or below, in every form (owner
+/// decision: one rule for the whole app). Without this the Shield's remote was stuck in the setup form's server field:
+/// Flutter's text-editing shortcuts (DefaultTextEditingShortcuts, above the app's builder) map Up/Down to caret moves
+/// inside a single-line field, so focus never left it. A Shortcuts wrapped around the navigator (MaterialApp.builder)
+/// sits deeper and wins. `ignoreTextFields: false` is needed: the default intent does nothing while a field is
+/// focused. Focus traversal's default request scrolls the new target into view. Left/Right stay the caret's; deeper
+/// bindings (the player's zap keys, a search's own shortcuts) still win over this one.
+/// Debugging: arrows stuck in a field again usually means a page built outside the app's navigator (its own
+/// Navigator or an Overlay) or a multi-line field, which wants Up/Down for its lines.
+const fieldDpadKeys = <ShortcutActivator, Intent>{
+  SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
+    TraversalDirection.up,
+    ignoreTextFields: false,
+  ),
+  SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
+    TraversalDirection.down,
+    ignoreTextFields: false,
+  ),
+};

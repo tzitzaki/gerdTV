@@ -99,7 +99,11 @@ class GerdTvApp extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: BackKeys(navigator: session.navigatorKey, child: child!),
+              // Up/Down leave text fields in every form (theme.dart, fieldDpadKeys).
+              child: Shortcuts(
+                shortcuts: fieldDpadKeys,
+                child: BackKeys(navigator: session.navigatorKey, child: child!),
+              ),
             ),
             NowPlayingBar(session: session),
             CastBar(session: session),
