@@ -8,6 +8,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Search: in TV lists and guide "tnt 4"-style queries list the channel first, then Live now and Upcoming; Show earlier; the guide's group chip limits it.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
+- Back: Settings → Account → Edit the provider closes with its back arrow, Esc and the mouse's side button; an open dialog closes first.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
 - Player window: no black bars, resizing keeps the ratio, 4:3 channels re-fit, back returns to the list size (also after a restart); P floats it at that ratio.

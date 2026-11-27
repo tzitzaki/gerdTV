@@ -5,6 +5,8 @@
 import 'package:cupertino_ui/cupertino_ui.dart'
     show CupertinoPageTransitionsBuilder;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kBackMouseButton;
+import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
 class Tokens {
@@ -211,4 +213,43 @@ class RouteTransitions extends PageTransitionsBuilder {
       ),
     );
   }
+}
+
+/// Esc and the mouse's back button (the side button) close the top page on every platform (owner decision: desktop
+/// has no swipe-back, and pages like Settings → Edit provider were a dead end). Wrapped around the app's navigator
+/// (MaterialApp.builder), so it only hears an Esc that nothing focused below it took: the player binds Esc itself, and
+/// a dialog, sheet or menu (a PopupRoute) is left to Flutter's own Esc, which closes it only when it may be dismissed.
+/// On the first page maybePop does nothing; a page that must not close (a running login test) says so with PopScope.
+/// Not a DismissIntent action: Flutter stops at the page route's own (disabled) dismiss action and goes no further.
+/// Debugging: Esc doing nothing on a page usually means the focus is outside the app's navigator.
+class BackKeys extends StatelessWidget {
+  const BackKeys({super.key, required this.navigator, required this.child});
+  final GlobalKey<NavigatorState> navigator;
+  final Widget child;
+
+  bool _back() {
+    final focused = FocusManager.instance.primaryFocus?.context;
+    final route = focused == null ? null : ModalRoute.of(focused);
+    if (route is PopupRoute) return false;
+    navigator.currentState?.maybePop();
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (e) {
+      if (e.buttons & kBackMouseButton != 0) _back();
+    },
+    child: Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (_, event) =>
+          event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.escape &&
+              _back()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored,
+      child: child,
+    ),
+  );
 }

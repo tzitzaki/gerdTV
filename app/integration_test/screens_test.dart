@@ -342,6 +342,37 @@ void main() {
         await tapReady(tester, find.byKey(Key('settings.cat.$cat')));
         await settle(tester);
         await checkScreen(tester, form, 'settings-$cat', size);
+        if (cat == 'account') {
+          // The provider's edit page closes by its back arrow and by Esc (it was a dead end on desktop).
+          final edit = find.byKey(const Key('settings.profileEdit'));
+          for (final close in ['arrow', 'esc']) {
+            // Up: the screen check's Tab sweep left the list at its end.
+            await tester.scrollUntilVisible(
+              edit,
+              -300,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const Key('settings.content')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tapReady(tester, edit);
+            await waitFor(tester, find.byKey(const Key('setup.connect')));
+            if (close == 'arrow') {
+              await checkScreen(tester, form, 'settings-edit-provider', size);
+              await tester.pageBack();
+            } else {
+              await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            }
+            await settle(tester);
+            expect(
+              find.byKey(const Key('setup.connect')),
+              findsNothing,
+              reason: 'the edit page closes by its $close',
+            );
+          }
+        }
         if (!wide) {
           await tester.pageBack();
           await settle(tester);
