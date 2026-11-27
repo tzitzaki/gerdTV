@@ -31,6 +31,8 @@ use std::sync::{Arc, Mutex, RwLock};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
+pub mod update;
+
 /// A one-time login link works this long.
 pub const LINK_TTL: i64 = 10 * 60;
 /// The front door's hand-over to the player works this long (it is used at once by the redirect).

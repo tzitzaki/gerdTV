@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 /// The test key's seed: fixed so tests can compile in the matching public key.
 const TEST_SEED: [u8; 32] = [7; 32];
-const PLATFORMS: [&str; 4] = ["macos", "ios", "android", "linux"];
+const PLATFORMS: [&str; 5] = ["macos", "ios", "android", "linux", "host"];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Variant {
@@ -23,7 +23,7 @@ pub enum Variant {
     BadHash,
     /// Signed correctly, but the version is older than `current`.
     Downgrade,
-    /// The manifest has no entry for "linux".
+    /// The manifest has no entry for "linux" or "host".
     MissingPlatform,
     /// Every request fails with HTTP 500.
     NetworkError,
@@ -49,11 +49,13 @@ fn asset_name(platform: &str, version: &str) -> String {
         "macos" => format!("gerdTV-macos-{version}.zip"),
         "ios" => format!("gerdTV-ios-unsigned-{version}.ipa"),
         "android" => format!("gerdTV-android-{version}.apk"),
+        "host" => format!("gerdTV-host-linux-x64-{version}"),
         _ => format!("gerdTV-linux-x64-{version}.tar.gz"),
     }
 }
 
-fn asset_bytes(platform: &str) -> Vec<u8> {
+/// A platform's synthetic build (what a verified download must contain).
+pub fn asset_bytes(platform: &str) -> Vec<u8> {
     format!("synthetic {platform} build").into_bytes()
 }
 
@@ -128,7 +130,7 @@ impl MockRelease {
 fn manifest(variant: Variant, version: &str) -> String {
     let mut platforms = serde_json::Map::new();
     for p in PLATFORMS {
-        if variant == Variant::MissingPlatform && p == "linux" {
+        if variant == Variant::MissingPlatform && (p == "linux" || p == "host") {
             continue;
         }
         let bytes = asset_bytes(p);
