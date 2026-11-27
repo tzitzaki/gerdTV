@@ -376,6 +376,7 @@
   "updateIosHint": "Der Browser lädt die Datei; mit dem Re-Signing-Dienst signieren, dann installieren.",
   "updateIpa": "IPA herunterladen",
   "updateNone": "gerdTV ist aktuell.",
+  "updateOnQuit": "Version {version} ist bereit und wird beim Beenden von gerdTV installiert.",
   "updatePage": "Release-Seite",
   "updateShowFolder": "Im Ordner zeigen",
   "userAgent": "User-Agent",

@@ -20,6 +20,7 @@ import 'screens/player_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/profile_picker.dart';
 import 'screens/shell.dart';
+import 'screens/update_bar.dart';
 import 'screens/welcome_screen.dart';
 import 'services/reminders.dart';
 import 'services/tv_home.dart';
@@ -105,6 +106,7 @@ class GerdTvApp extends StatelessWidget {
                 child: BackKeys(navigator: session.navigatorKey, child: child!),
               ),
             ),
+            UpdateBar(session: session),
             NowPlayingBar(session: session),
             CastBar(session: session),
           ],

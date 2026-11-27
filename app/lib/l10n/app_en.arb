@@ -694,6 +694,14 @@
   "updateIosHint": "Your browser downloads the file; re-sign it with your re-signing service, then install it.",
   "updateIpa": "Download the IPA",
   "updateNone": "gerdTV is up to date.",
+  "updateOnQuit": "Version {version} is ready and goes in when gerdTV quits.",
+  "@updateOnQuit": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "updatePage": "Release page",
   "updateShowFolder": "Show in folder",
   "userAgent": "User-Agent",

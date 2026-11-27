@@ -10,3 +10,4 @@ app-wide, shared pairing widgets, direct APK/IPA links (welcome QR, iPhone updat
 3. Welcome screen: 23:43
 4b. Relay via own host: 00:08
 6. Docs: 00:18
+8. Updater (check, bar, background download, macOS on quit): 00:35

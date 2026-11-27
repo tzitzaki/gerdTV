@@ -1,5 +1,6 @@
 // New, because nothing owned the macOS update swap: it waits until gerdTV has quit, installs the new bundle, and
-// puts the old one back when copying fails; extended: the download is deleted once installed, kept after a failure.
+// puts the old one back when copying fails; extended: the download is deleted once installed, kept after a failure;
+// extended: gerdTV starts again only when Install and restart asked for it (the "reopen" file), not after a quit.
 // Run on any platform with cp standing in for ditto.
 import 'dart:io';
 
@@ -21,7 +22,13 @@ Future<(Directory, String)> setUp(String version) async {
   return (root, '${root.path}/Applications/gerdTV.app');
 }
 
-Future<int> swap(Directory root, String old, {required String copy}) async {
+Future<int> swap(
+  Directory root,
+  String old, {
+  required String copy,
+  bool reopen = false,
+}) async {
+  if (reopen) File('${root.path}/reopen').writeAsStringSync('');
   // A stand-in for gerdTV that quits after 2 s: the swap must wait for it.
   final app = await Process.start('sleep', ['2']);
   final r = await Process.run(
@@ -33,7 +40,11 @@ Future<int> swap(Directory root, String old, {required String copy}) async {
       '${root.path}/new/gerdTV.app',
       '${root.path}/Downloads/gerdTV-macos.zip',
     ],
-    environment: {'GERDTV_COPY': copy, 'GERDTV_OPEN': 'true'},
+    // "Opening" gerdTV leaves a mark, so the test sees whether it was started again.
+    environment: {
+      'GERDTV_COPY': copy,
+      'GERDTV_OPEN': 'touch ${root.path}/opened',
+    },
   );
   return r.exitCode;
 }
@@ -66,8 +77,21 @@ void main() {
         reason: 'the download is deleted',
       );
       expect(Directory('${root.path}/new/gerdTV.app').existsSync(), isFalse);
+      expect(
+        File('${root.path}/opened').existsSync(),
+        isFalse,
+        reason: 'a quit stays a quit',
+      );
     },
   );
+
+  test('Install and restart starts gerdTV again', () async {
+    final (root, old) = await setUp('v2');
+    addTearDown(() => root.deleteSync(recursive: true));
+    expect(await swap(root, old, copy: 'cp -R', reopen: true), 0);
+    expect(File('$old/Contents/version').readAsStringSync(), 'v2');
+    expect(File('${root.path}/opened').existsSync(), isTrue);
+  });
 
   test('a failed copy puts the previous version back', () async {
     final (root, old) = await setUp('v2');

@@ -1,9 +1,10 @@
 #!/bin/bash
-# The macOS update swap (lib/platform/mac_install.dart starts it, then the app quits): waits until gerdTV has quit,
-# moves the installed bundle aside, copies the new one into its place (ditto keeps the signature intact), puts the
-# old one back if that fails, and starts gerdTV again. Once installed, the download (the zip) and the unpacked bundle
-# are deleted; after a failure the zip stays for another try. The new bundle was checked against the installed app's
-# code signing requirement before this runs.
+# The macOS update swap (lib/platform/mac_install.dart starts it as soon as the download is verified): waits as long
+# as gerdTV runs, however it ends (the update goes in at the quit), moves the installed bundle aside, copies the new
+# one into its place (ditto keeps the signature intact) and puts the old one back if that fails. It starts gerdTV
+# again only when the file "reopen" exists next to this script (Install and restart writes it before quitting).
+# Once installed, the download (the zip) and the unpacked bundle are deleted; after a failure the zip stays for
+# another try. The new bundle was checked against the installed app's code signing requirement before this runs.
 # Usage: swap-macos.sh <pid> <installed.app> <new.app> [<download.zip>]
 # Debug: the log is next to this script (swap.log); GERDTV_COPY / GERDTV_OPEN replace ditto / open in tests.
 pid="$1"
@@ -13,14 +14,9 @@ zip="$4"
 copy="${GERDTV_COPY:-ditto}"
 open="${GERDTV_OPEN:-open}"
 exec >>"$(dirname "$0")/swap.log" 2>&1
-for _ in $(seq 1 120); do
-  kill -0 "$pid" 2>/dev/null || break
+while kill -0 "$pid" 2>/dev/null; do
   sleep 0.5
 done
-if kill -0 "$pid" 2>/dev/null; then
-  echo "swap: gerdTV ($pid) is still running after 60 s; nothing changed"
-  exit 1
-fi
 backup="${old%.app}.previous.app"
 rm -rf "$backup"
 mv "$old" "$backup" || { echo "swap: can't move $old aside; nothing changed"; exit 1; }
@@ -34,4 +30,4 @@ else
   mv "$backup" "$old"
   echo "swap: copy failed; the previous version is back"
 fi
-$open "$old"
+if [[ -f "$(dirname "$0")/reopen" ]]; then $open "$old"; fi
