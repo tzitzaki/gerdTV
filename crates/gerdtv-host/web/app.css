@@ -18,7 +18,9 @@ button:focus-visible, input:focus-visible, .row:focus-visible, .tile:focus-visib
 #rail .logo { font-weight: 800; font-size: 22px; margin-bottom: calc(var(--space) * 2); }
 #rail .logo b, .accent { color: var(--accent); }
 #rail button { width: 80px; padding: var(--space); display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 13px; }
-#rail button .i, #mode .i { width: 24px; height: 24px; fill: currentColor; display: block; }
+#rail button .i, #mode .i, #back .i, #bar .i, .fav .i { width: 24px; height: 24px; fill: currentColor; display: block; }
+/* The small star before favourites' names and ratings, on the text's baseline. */
+.mark { width: 1em; height: 1em; fill: var(--accent); vertical-align: -0.125em; margin-right: 4px; }
 #rail button.active { background: var(--raised); color: var(--accent); }
 #rail .spacer { flex: 1; }
 #session { font-size: 12px; color: var(--muted); text-align: center; display: flex; flex-direction: column; gap: 4px; }
@@ -26,7 +28,7 @@ button:focus-visible, input:focus-visible, .row:focus-visible, .tile:focus-visib
 main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 header { display: flex; align-items: center; gap: var(--space); padding: calc(var(--space) * 2); }
 header h1 { margin: 0; font-size: 20px; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-header #back { font-size: 26px; padding: 0 var(--space); }
+header #back { padding: var(--space); }
 #search { flex: 1; min-width: 0; padding: var(--space) calc(var(--space) * 1.5); border-radius: var(--radius); border: 0;
   background: var(--surface); color: var(--text); font: inherit; }
 #mode { padding: var(--space); background: var(--surface); }

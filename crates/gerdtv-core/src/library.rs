@@ -985,6 +985,15 @@ impl Library {
         }))
     }
 
+    /// Xtream Codes: the streams the account plays right now and how many it may (the panel's `active_cons` and
+    /// `max_connections`, asked fresh); None for M3U, which reports neither. The web player asks when a stream won't
+    /// play, to tell "the connection is busy" from "not playable here".
+    pub async fn connections(&self) -> Result<Option<(u32, u32)>> {
+        let Some(xc) = &self.xc else { return Ok(None) };
+        let a = xc.account().await?;
+        Ok(Some((a.active_connections, a.max_connections)))
+    }
+
     /// A movie's or series' details for its page, asked from the panel each time the page opens (not stored); empty
     /// for other kinds and for M3U sources, which have none.
     pub async fn details(&self, key: &str, tmdb: Option<&tmdb::Tmdb>) -> Result<xtream::Details> {
