@@ -486,7 +486,16 @@ impl Listener {
         local: Arc<Mutex<Local>>,
         events: UnboundedSender<Event>,
     ) -> Result<Listener> {
-        let listener = TcpListener::bind(("0.0.0.0", 0)).await?;
+        Self::start_on(local, events, 0).await
+    }
+
+    /// [start] on a fixed `port` (0: any): the headless host uses one, so a firewall can allow it.
+    pub async fn start_on(
+        local: Arc<Mutex<Local>>,
+        events: UnboundedSender<Event>,
+        port: u16,
+    ) -> Result<Listener> {
+        let listener = TcpListener::bind(("0.0.0.0", port)).await?;
         let port = listener.local_addr()?.port();
         let codes = Arc::new(Mutex::new(CodeState::default()));
         let c = codes.clone();

@@ -1,7 +1,9 @@
 //! `gerdtv-host`: the headless host's command line (lib.rs explains the parts; docs/INSTALL.md the setup).
 //!
-//!   gerdtv-host pair  --dir <state>                       shows a code and QR; a gerdTV app pairs and sends its profile
+//!   gerdtv-host pair  --dir <state> [--pair-port 8791]    shows a code and QR; a gerdTV app pairs and sends its profile
 //!   gerdtv-host serve --dir <state> --front <https://…> --player <http://…> [--listen 127.0.0.1:8790] [--proxy <ip>]
+//!                     [--pair-port 8791]
+//! `--pair-port`: where paired apps reach it for syncs (TCP on every interface; allow it from the LAN only).
 //!
 //! `serve` keeps the profile in sync (at start, then every 12 h; the guide hourly when due), listens for paired apps'
 //! syncs (Sync now) and serves the web player. Logs go to stderr (the journal under systemd).
@@ -13,8 +15,8 @@ use std::time::Duration;
 
 fn usage() -> ! {
     eprintln!(
-        "usage: gerdtv-host pair --dir <state>\n       gerdtv-host serve --dir <state> --front <https://…> \
-         --player <http://…> [--listen 127.0.0.1:8790] [--proxy <tunnel ip>]"
+        "usage: gerdtv-host pair --dir <state> [--pair-port 8791]\n       gerdtv-host serve --dir <state> \
+         --front <https://…> --player <http://…> [--listen 127.0.0.1:8790] [--proxy <tunnel ip>] [--pair-port 8791]"
     );
     std::process::exit(2)
 }
@@ -40,9 +42,14 @@ async fn main() {
         eprintln!("host: can't read host.json: {e}");
         std::process::exit(1)
     });
+    let pair_port: u16 = flag("--pair-port")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8791);
     match args.first().map(String::as_str) {
-        Some("pair") => pair(cfg, file).await,
-        Some("serve") if !cfg.front.is_empty() && !cfg.player.is_empty() => serve(cfg, file).await,
+        Some("pair") => pair(cfg, file, pair_port).await,
+        Some("serve") if !cfg.front.is_empty() && !cfg.player.is_empty() => {
+            serve(cfg, file, pair_port).await
+        }
         _ => usage(),
     }
 }
@@ -51,10 +58,11 @@ async fn main() {
 async fn listen(
     host: &Arc<Host>,
     code: bool,
+    port: u16,
 ) -> (Listener, tokio::sync::mpsc::UnboundedReceiver<Event>) {
     let local = Arc::new(Mutex::new(host.local(None)));
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let l = Listener::start(local.clone(), tx)
+    let l = Listener::start_on(local.clone(), tx, port)
         .await
         .unwrap_or_else(|e| {
             eprintln!("host: can't listen for devices: {e}");
@@ -110,10 +118,10 @@ fn stored(host: &Host, e: Event) -> bool {
     }
 }
 
-async fn pair(cfg: Config, mut file: HostFile) {
+async fn pair(cfg: Config, mut file: HostFile, port: u16) {
     file.device();
     let host = Host::new(cfg, file);
-    let (_l, mut rx) = listen(&host, true).await;
+    let (_l, mut rx) = listen(&host, true, port).await;
     let _ad = pairing::advertise(&host.local(None).me, _l.port).ok();
     while let Some(e) = rx.recv().await {
         if stored(&host, e) {
@@ -123,14 +131,14 @@ async fn pair(cfg: Config, mut file: HostFile) {
     }
 }
 
-async fn serve(cfg: Config, mut file: HostFile) {
+async fn serve(cfg: Config, mut file: HostFile, port: u16) {
     file.device();
     let host = Host::new(cfg, file);
     if host.lib().is_none() {
         eprintln!("host: no profile yet: run `gerdtv-host pair` first");
         std::process::exit(1);
     }
-    let (l, mut rx) = listen(&host, false).await;
+    let (l, mut rx) = listen(&host, false, port).await;
     let _ad = pairing::advertise(&host.local(None).me, l.port).ok();
     let h = host.clone();
     tokio::spawn(async move {

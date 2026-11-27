@@ -298,3 +298,54 @@ fn links_run_out_after_10_minutes_and_sessions_after_3_hours_unless_extended() {
     // Over: no extension.
     assert_eq!(a.extend(&sid, 1000 + 2 * SESSION_TTL), None);
 }
+
+#[test]
+fn what_a_sync_brings_is_kept_with_one_profile() {
+    use gerdtv_core::library::{Profile, SourceKind};
+    use gerdtv_core::pairing::{Applied, AppliedProfile, Device};
+    let device = Device {
+        id: "phone".into(),
+        name: "Phone".into(),
+        platform: "android".into(),
+    };
+    let profile = |id: &str| Profile {
+        id: id.into(),
+        name: id.into(),
+        source: SourceKind::Xtream,
+        server: "http://xc.example.invalid".into(),
+        user_agent: String::new(),
+        max_connections: None,
+        updated_at: 1,
+    };
+    let applied = |id: &str, login: Option<&str>, key: Option<&str>| Applied {
+        peer: device.clone(),
+        peer_addr: Some("192.0.2.4:4100".into()),
+        peer_web: None,
+        new_key: key.map(String::from),
+        app_keys: Some(([("tmdb".to_string(), "t".to_string())].into(), 7)),
+        profile: Some(AppliedProfile {
+            profile: profile(id),
+            login: login.map(|l| vec![l.to_string()]),
+            services: [("trakt".to_string(), "x".to_string())].into(),
+            added: true,
+        }),
+    };
+    let mut f = gerdtv_host::HostFile::default();
+    f.store(&applied("p1", Some("one"), Some("k")));
+    assert_eq!(f.peers.len(), 1);
+    assert_eq!(f.peers[0].addr, "192.0.2.4:4100");
+    assert_eq!(
+        f.secrets.app_keys.get("tmdb").map(String::as_str),
+        Some("t")
+    );
+    assert_eq!(f.secrets.keys_updated_at, 7);
+    // The same profile again without a new login keeps it; a remembered peer isn't duplicated.
+    f.store(&applied("p1", None, None));
+    let p = f.secrets.profile.clone().unwrap();
+    assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p1", "one"));
+    assert_eq!(f.peers.len(), 1);
+    // Another profile replaces it: the host keeps one.
+    f.store(&applied("p2", Some("two"), None));
+    let p = f.secrets.profile.unwrap();
+    assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p2", "two"));
+}
