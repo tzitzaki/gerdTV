@@ -247,7 +247,10 @@ pub fn normalize(code: &str) -> String {
 /// This side's half of SPAKE2 for `code`: the state to finish with and the message for the other side.
 fn spake_start(code: &str, listener: bool) -> (spake2::Spake2<spake2::Ed25519Group>, Vec<u8>) {
     let password = spake2::Password::new(normalize(code).as_bytes());
-    let (a, b) = (spake2::Identity::new(SPAKE_A), spake2::Identity::new(SPAKE_B));
+    let (a, b) = (
+        spake2::Identity::new(SPAKE_A),
+        spake2::Identity::new(SPAKE_B),
+    );
     if listener {
         spake2::Spake2::<spake2::Ed25519Group>::start_b(&password, &a, &b)
     } else {
@@ -1152,8 +1155,9 @@ mod tests {
         assert_eq!(normalize(&format_code(&code)), code);
         assert_eq!(normalize("oil0-1"), "01101");
         // Every digit turns up (no digit is left out by the byte mapping).
-        let digits: std::collections::BTreeSet<char> =
-            (0..200).flat_map(|_| new_code().chars().collect::<Vec<_>>()).collect();
+        let digits: std::collections::BTreeSet<char> = (0..200)
+            .flat_map(|_| new_code().chars().collect::<Vec<_>>())
+            .collect();
         assert_eq!(digits.len(), 10);
         let link = qr_text("192.0.2.7:4100", &code);
         assert_eq!(
@@ -1335,7 +1339,10 @@ mod tests {
         let mut old = TcpStream::connect(&addr).await.unwrap();
         let header = br#"{"v":2,"salt":"00000000000000000000000000000000","from":null}"#;
         write_frame(&mut old, header).await.unwrap();
-        assert!(read_frame(&mut old).await.is_err(), "closed without an answer");
+        assert!(
+            read_frame(&mut old).await.is_err(),
+            "closed without an answer"
+        );
         assert!(
             matches!(rx.recv().await.unwrap(), Event::Failed(_)),
             "a failure, not a new code"
