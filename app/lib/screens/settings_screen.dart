@@ -296,7 +296,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions.
+          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions. Without one
+          // the entry still shows, saying what's needed, and opens Devices & sync (it used to be hidden: hard to find).
+          if (!session.devices.peers.value.any((p) => p.web.isNotEmpty))
+            SettingsEntry(
+              id: 'web',
+              section: l10n.devicesTitle,
+              title: l10n.webTitle,
+              keywords: l10n.settingsKeywordsWeb,
+              build: (context) => ListTile(
+                key: const Key('settings.web.none'),
+                leading: const Icon(Icons.public),
+                title: Text(l10n.webTitle),
+                subtitle: Text(l10n.webNoHost),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DevicesScreen(session: session),
+                  ),
+                ),
+              ),
+            ),
           for (final host in session.devices.peers.value.where(
             (p) => p.web.isNotEmpty,
           ))
