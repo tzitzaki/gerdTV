@@ -80,3 +80,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own groups: holding a channel → Add to a group → New group; the group sits above the provider's, also in the guide; rename and move work.
 - Next episode: an episode played to its end counts down 10 s to the next one; Cancel keeps it; the episode gets its check mark.
 - Picture format: the tune sheet's Zoom fills a 4:3 channel's black bars; it stays for that channel after a restart.
+- Simkl: Settings → Account → Simkl shows a code; approved at simkl.com/pin it links; a movie played past 80 % shows as watched on simkl.com.
