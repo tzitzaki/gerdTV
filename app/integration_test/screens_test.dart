@@ -19,6 +19,7 @@ import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 
 import 'support.dart';
 
@@ -245,8 +246,23 @@ void main() {
         );
         await tester.pump();
       }
+      // DIAG (temporary, macOS CI): the player's state around the pause, to tell lost focus from a restarted stream.
+      String diag() {
+        final w = wm.WindowManager.instance.getCurrent()?.contentSize.toSize();
+        final p = session.player.state;
+        return 'focus=${FocusManager.instance.primaryFocus} userPaused=${session.userPaused.value} '
+            'playing=${p.playing} buffering=${p.buffering} position=${p.position} '
+            'reconnecting=${session.adapter.reconnecting.value} window=$w';
+      }
+
+      debugPrint('DIAG $form before Space: ${diag()}');
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      await waitFor(tester, find.byKey(const Key('player.behind')));
+      try {
+        await waitFor(tester, find.byKey(const Key('player.behind')));
+      } catch (_) {
+        debugPrint('DIAG $form after Space: ${diag()}');
+        rethrow;
+      }
       await checkScreen(tester, form, 'player-behind', size);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
