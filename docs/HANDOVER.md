@@ -1,9 +1,9 @@
 # Handover
 
 ## State
-- Version 0.261127.68: the player window keeps the picture's ratio; TV search lists channels, then live and upcoming programmes (ended behind a tap).
-- Also in 0.261127.68: Android renders with Skia, wide TV banners, dark launch screens, the web player's busy notice and icons, webcam pairing on the Mac.
-- Before: OpenSubtitles VIP logins (.66), web player and device sync (.65), watched marks, next episode, tracks, recordings, Cast, TMDB, Simkl, own groups.
+- Version 0.261127.69: a back arrow on the provider page, Esc and the mouse's back button close any page, a desktop window minimum (960 × 540).
+- Also in 0.261127.69: 6-digit pairing codes made safe by SPAKE2, and Simkl's and Premiumize's client ids entered in Settings (none in the builds).
+- Before: the player window's ratio, TV search, Skia on Android, Mac webcam pairing (.68), OpenSubtitles VIP (.66), web player and device sync (.65).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -15,7 +15,7 @@
 - Open: reorder channels inside the provider's groups too, or only inside your own groups as now?
 
 ## Owner one-off jobs
-- Register gerdTV at premiumize.me/registerclient and simkl.com/settings/developer (TV/device type), then `gh variable set` both ids (docs/RELEASING.md).
+- Own client ids: a Simkl app (simkl.com/settings/developer, TV type) into Settings → Simkl, then link again; Premiumize's code login likewise, optional.
 - For Trakt: create your own app on trakt.tv (Settings → Your API Apps, redirect urn:ietf:wg:oauth:2.0:oob) and enter it in Settings → Account → Trakt.
 - Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Account.
 - Move the signing files from the private config folder into the password manager, then delete them there.
