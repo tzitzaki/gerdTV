@@ -153,10 +153,12 @@ impl HostFile {
                     }
                     mine.services.extend(p.services.clone());
                 }
+                // Another profile: the one that came replaces it, with the login that came (an app only stores a
+                // login for a newer or new profile, but the host has no other for this one).
                 _ => {
                     self.secrets.profile = Some(ProfileSecrets {
                         id: p.profile.id.clone(),
-                        login: p.login.clone().unwrap_or_default(),
+                        login: p.login.clone().unwrap_or_else(|| p.incoming_login.clone()),
                         services: p.services.clone(),
                     })
                 }

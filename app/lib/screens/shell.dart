@@ -67,6 +67,10 @@ class _ShellState extends State<Shell> {
   final _focus = {for (final s in SearchSection.values) s: FocusNode()};
   final _settingsFocus = FocusNode();
 
+  /// The shell's own focus: a section switch takes it back, so a field of the section left behind (Settings' search)
+  /// can't keep the keyboard outside the new section, where typing would no longer start its search.
+  final _shellFocus = FocusNode(skipTraversal: true);
+
   @override
   void dispose() {
     for (final c in _queries.values) {
@@ -76,6 +80,7 @@ class _ShellState extends State<Shell> {
       f.dispose();
     }
     _settingsFocus.dispose();
+    _shellFocus.dispose();
     super.dispose();
   }
 
@@ -157,7 +162,11 @@ class _ShellState extends State<Shell> {
     // Settings alone (no provider, nothing linked): no navigation, which needs two destinations.
     final nav = pages.length > 1;
     final index = pages.indexOf(_page);
-    void go(int i) => setState(() => _page = pages[i]);
+    void go(int i) {
+      setState(() => _page = pages[i]);
+      _shellFocus.requestFocus();
+    }
+
     final destinations = [
       for (final p in pages)
         switch (p) {
@@ -222,6 +231,7 @@ class _ShellState extends State<Shell> {
       focus: section == null ? _settingsFocus : _focus[section]!,
       field: section == null ? null : _queries[section],
       child: Focus(
+        focusNode: _shellFocus,
         autofocus: true,
         child: LayoutBuilder(
           builder: (context, c) {

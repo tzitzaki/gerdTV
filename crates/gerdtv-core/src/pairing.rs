@@ -147,8 +147,12 @@ pub struct Applied {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppliedProfile {
     pub profile: Profile,
-    /// The login to store when it changed (or the profile is new here).
+    /// The login to store: when the profile came newer or is new here, and the login differs from the open one's.
+    /// An older profile's login never overwrites one stored here (an app keeps several profiles' logins).
     pub login: Option<Vec<String>>,
+    /// The login that came, whatever its age: for a side that keeps one profile and has none stored for this one
+    /// (the host switching back to a profile it held before, HostFile::store).
+    pub incoming_login: Vec<String>,
     /// The services' tokens to store (only ones that were missing here).
     pub services: BTreeMap<String, String>,
     pub added: bool,
@@ -682,6 +686,21 @@ pub fn merge_keys(
     theirs: &BTreeMap<String, String>,
     their_at: i64,
 ) -> Option<(BTreeMap<String, String>, i64)> {
+    // A side that never stamped its keys (0: they were set before keys had a time) can't win or lose whole: the two
+    // sets are joined, the stamped side winning a key both have, so no key is dropped on either side.
+    if local_at == 0 || their_at == 0 {
+        let (first, second) = if their_at > local_at {
+            (theirs, local)
+        } else {
+            (local, theirs)
+        };
+        let mut m = first.clone();
+        for (k, v) in second {
+            m.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        let at = local_at.max(their_at);
+        return (m != *local || at != local_at).then_some((m, at));
+    }
     let merged = if their_at > local_at {
         (theirs.clone(), their_at)
     } else if their_at < local_at {
@@ -742,10 +761,10 @@ pub fn apply(
             let added = here.is_none();
             Some(AppliedProfile {
                 profile: if newer { b.profile } else { here.unwrap() },
-                // The login to store: a newer profile's, or any profile that isn't this side's open one (its stored
-                // login is unknown here, e.g. the host switched profiles and back); unchanged ones aren't rewritten.
-                login: ((newer || known.is_none()) && known.is_none_or(|p| p.login != b.login))
-                    .then_some(b.login),
+                // A newer or new profile's login, unless it is the open one's already.
+                login: ((newer || added) && known.is_none_or(|p| p.login != b.login))
+                    .then_some(b.login.clone()),
+                incoming_login: b.login,
                 services,
                 added,
             })
@@ -1114,6 +1133,21 @@ mod tests {
                 Some((m(&[("tmdb", "a"), ("os", "c")]), 20)),
             ),
             (m(&[]), 0, m(&[]), 0, None),
+            // Never stamped here (keys set before they had a time): joined, the stamped side winning a shared key.
+            (
+                m(&[("tmdb", "a"), ("os", "x")]),
+                0,
+                m(&[("os", "c")]),
+                30,
+                Some((m(&[("tmdb", "a"), ("os", "c")]), 30)),
+            ),
+            (
+                m(&[("os", "c")]),
+                30,
+                m(&[("tmdb", "a"), ("os", "x")]),
+                0,
+                Some((m(&[("tmdb", "a"), ("os", "c")]), 30)),
+            ),
             // Removed there later: removed here too.
             (m(&[("tmdb", "a")]), 10, m(&[]), 20, Some((m(&[]), 20))),
         ];
@@ -1415,17 +1449,19 @@ mod tests {
         let lib = Library::open(&here.dir, "p1", vec!["u".into(), "p".into()]).unwrap();
         let data = lib.export_user_data().unwrap();
         assert!(data.contains("live:1") && data.contains("live:2"));
-        // Here another profile is open (the host switched and comes back to p1): its stored login is unknown here, so
-        // the one that came is returned to be stored, older or not.
+        // Here another profile is open: an older p1's login still isn't stored (this side may have a newer one for
+        // it), but it is handed along for a side that keeps one profile (the host switching back to p1).
         let mut switched = here.clone();
         switched.secrets.profile = Some(ProfileSecrets {
             id: "p2".into(),
             ..Default::default()
         });
         let a = apply(&switched, &there.me, None, snapshot(&there).unwrap()).unwrap();
+        let p = a.profile.unwrap();
+        assert_eq!(p.login, None);
         assert_eq!(
-            a.profile.unwrap().login,
-            Some(vec!["user-there".to_string(), "pass-there".to_string()])
+            p.incoming_login,
+            vec!["user-there".to_string(), "pass-there".to_string()]
         );
         for d in [&here.dir, &there.dir] {
             std::fs::remove_dir_all(d).unwrap();

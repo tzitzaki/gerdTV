@@ -449,7 +449,8 @@ async function closePlayer(refresh = true) {
   video.load();
   playing = null;
   $('player').hidden = true;
-  if (!refresh) return;
+  // Only the groups view shows positions (Continue watching): a list keeps its loaded pages and scroll.
+  if (!refresh || current().type !== 'groups') return;
   await saved;
   render();
 }

@@ -99,6 +99,9 @@ void main() {
     await tester.enterText(find.byKey(const Key('setup.server')), mockXc);
     await tester.enterText(find.byKey(const Key('setup.username')), 'testuser');
     await tester.enterText(find.byKey(const Key('setup.password')), 'testpass');
+    // Below the form (with its Name field): outside a small window until scrolled to.
+    await tester.ensureVisible(find.byKey(const Key('setup.connect')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('setup.connect')));
     await waitFor(tester, find.byType(NavigationRail));
     // The catalogue syncs in the background once the new login is saved.

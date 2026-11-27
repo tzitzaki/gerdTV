@@ -336,6 +336,7 @@ fn what_a_sync_brings_is_kept_with_one_profile() {
         profile: Some(AppliedProfile {
             profile: profile(id),
             login: login.map(|l| vec![l.to_string()]),
+            incoming_login: vec![format!("came-{id}")],
             services: [("trakt".to_string(), "x".to_string())].into(),
             added: true,
         }),
@@ -356,6 +357,10 @@ fn what_a_sync_brings_is_kept_with_one_profile() {
     assert_eq!(f.peers.len(), 1);
     // Another profile replaces it: the host keeps one.
     f.store(&applied("p2", Some("two"), None));
-    let p = f.secrets.profile.unwrap();
+    let p = f.secrets.profile.clone().unwrap();
     assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p2", "two"));
+    // Back to p1, which came older (no login to store for an app): the host takes the login that came.
+    f.store(&applied("p1", None, None));
+    let p = f.secrets.profile.unwrap();
+    assert_eq!((p.id.as_str(), p.login[0].as_str()), ("p1", "came-p1"));
 }
