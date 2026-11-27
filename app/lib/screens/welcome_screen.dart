@@ -1,13 +1,11 @@
 // First run: bring the provider over from a device that already has gerdTV, nothing to type (owner decision: no
-// provider form on first run). This device listens at once and shows its QR and code (PairCodeView), three numbered
-// steps say what to do on the other device, and NearbyDevices pairs from this side with a device that shows a code;
-// both are the Devices & sync page's own widgets (devices_screen.dart). A finished sync opens the provider that came
-// (Session's apply path), which replaces this screen with the app. Skip to the app opens gerdTV without a provider
-// (Session.skipSetup); the login is then added in Settings → Account (the setup form). On a TV or computer a second
-// part offers this version's phone files as QRs (Android APK, iPhone IPA), so a phone without gerdTV gets the build
-// that pairs with this one.
-// Remote: Skip takes the focus first; Up/Down walk the page (fieldDpadKeys in theme.dart), the scroll view follows,
-// so nothing that can't take focus sits below the last control (the nearby list).
+// provider form, and a calm screen: one instruction, the QR, Skip). This device listens at once and shows its QR and
+// code (PairCodeView, the Devices & sync page's own widget, devices_screen.dart). A finished sync opens the provider
+// that came (Session's apply path), which replaces this screen with the app. Skip to the app opens gerdTV without a
+// provider (Session.skipSetup); the login is then added in Settings → Account. Two quiet extras: "Get gerdTV for your
+// phone" unfolds this version's phone files as QRs (not on phones), and the devices found nearby (NearbyDevices) stay
+// faded until the remote or the pointer reaches them.
+// Remote: Skip takes the focus first; Up/Down walk the page (fieldDpadKeys in theme.dart), the scroll view follows.
 // Debugging: no QR means Devices.startPairing failed or no local IP was found (pairLocalIp); the status line shows a
 // failed sync's reason.
 
@@ -33,6 +31,12 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   String? _qr;
   String? _status;
+
+  /// The phone files' QRs, unfolded by their button.
+  bool _apps = false;
+
+  /// The nearby list has the focus or the pointer: shown fully, else faded.
+  bool _nearby = false;
 
   @override
   void initState() {
@@ -79,25 +83,29 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final phone = isPhone(context);
     final s = widget.session;
 
-    // The three steps on the other device; the path names the same labels Settings shows.
-    final steps = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final title = Row(
       children: [
-        _Step(n: 1, text: l10n.welcomeStep1),
-        _Step(
-          n: 2,
-          text: l10n.welcomeStep2(
-            '${l10n.navSettings} → ${l10n.settingsAccount} → ${l10n.devicesTitle}',
-          ),
+        AppLogoMark(logo: s.logo, size: 56),
+        const SizedBox(width: Tokens.space * 2),
+        Expanded(
+          child: Text(l10n.welcomeTitle, style: theme.textTheme.headlineMedium),
         ),
-        _Step(n: 3, text: l10n.welcomeStep3(s.devices.me.name)),
       ],
+    );
+
+    // The one instruction; the path names the same labels Settings shows.
+    final instruction = Text(
+      l10n.welcomeScan(
+        '${l10n.navSettings} → ${l10n.settingsAccount} → ${l10n.devicesTitle}',
+      ),
+      style: theme.textTheme.titleMedium,
     );
 
     // This device's QR and code on an accent-tinted card (the user's accent: the scheme is seeded from it).
     final codeCard = Card(
       key: const Key('welcome.code'),
       elevation: 0,
+      margin: EdgeInsets.zero,
       color: scheme.primaryContainer.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Tokens.radius * 1.5),
@@ -118,97 +126,111 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       ),
     );
 
-    final nearby = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Skip takes the focus first (the remote's start); the line under it says where a login goes instead.
+    final skip = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Heading(l10n.welcomeFromHere),
-        NearbyDevices(session: s, onStatus: (m) => setState(() => _status = m)),
-      ],
-    );
-
-    // A phone doesn't need a QR for a phone. Right under the steps (step 1 needs gerdTV on the phone), in one compact
-    // row: nothing that can't take focus may sit below the last focusable control, or a remote never scrolls to it.
-    final downloads = phone
-        ? const SizedBox.shrink()
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Heading(l10n.welcomeGetApp),
-              Wrap(
-                spacing: Tokens.space * 3,
-                runSpacing: Tokens.space * 2,
-                children: [
-                  for (final (platform, label) in [
-                    ('android', l10n.welcomeAndroid),
-                    ('ios', l10n.welcomeIphone),
-                  ])
-                    if (phoneFile(platform: platform) case final url?)
-                      Row(
-                        key: Key('welcome.get.$platform'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          QrView(text: url, size: 96),
-                          const SizedBox(width: Tokens.space),
-                          Flexible(
-                            child: Text(
-                              label,
-                              style: theme.textTheme.labelLarge,
-                            ),
-                          ),
-                        ],
-                      ),
-                ],
-              ),
-            ],
-          );
-
-    // Skip takes the focus first (the remote's start) and stays in view: in the header when wide, under the code
-    // card on narrow screens.
-    final skipButton = FilledButton.tonalIcon(
-      key: const Key('welcome.skip'),
-      autofocus: true,
-      icon: const Icon(Icons.arrow_forward),
-      label: Text(l10n.welcomeSkip),
-      onPressed: () => s.skipSetup(l10n.setupNoProvider),
-    );
-    final noDevice = Padding(
-      padding: const EdgeInsets.only(top: Tokens.space * 2),
-      child: Text(l10n.welcomeNoDevice, style: theme.textTheme.bodyMedium),
-    );
-
-    final header = Row(
-      children: [
-        AppLogoMark(logo: s.logo, size: 64),
-        const SizedBox(width: Tokens.space * 2),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.welcomeTitle, style: theme.textTheme.headlineMedium),
-              const SizedBox(height: Tokens.space / 2),
-              Text(
-                l10n.welcomeIntro,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        FilledButton.tonalIcon(
+          key: const Key('welcome.skip'),
+          autofocus: true,
+          icon: const Icon(Icons.arrow_forward),
+          label: Text(l10n.welcomeSkip),
+          onPressed: () => s.skipSetup(l10n.setupNoProvider),
+        ),
+        const SizedBox(height: Tokens.space),
+        Text(
+          l10n.welcomeNoDevice,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
         ),
-        if (wide) ...[const SizedBox(width: Tokens.space * 2), skipButton],
-      ],
-    );
-
-    final status = _status == null
-        ? const SizedBox.shrink()
-        : Padding(
-            padding: const EdgeInsets.only(top: Tokens.space * 2),
+        if (_status != null)
+          Padding(
+            padding: const EdgeInsets.only(top: Tokens.space),
             child: Text(
               _status!,
               key: const Key('welcome.status'),
               style: TextStyle(color: scheme.error),
             ),
+          ),
+      ],
+    );
+
+    // A phone doesn't need a QR for a phone. Folded behind one quiet button.
+    final apps = phone
+        ? const SizedBox.shrink()
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextButton.icon(
+                key: const Key('welcome.apps'),
+                icon: Icon(_apps ? Icons.expand_less : Icons.phone_iphone),
+                label: Text(l10n.welcomeGetApp),
+                onPressed: () => setState(() => _apps = !_apps),
+              ),
+              if (_apps)
+                Wrap(
+                  spacing: Tokens.space * 3,
+                  runSpacing: Tokens.space * 2,
+                  children: [
+                    for (final (platform, label) in [
+                      ('android', l10n.welcomeAndroid),
+                      ('ios', l10n.welcomeIphone),
+                    ])
+                      if (phoneFile(platform: platform) case final url?)
+                        Row(
+                          key: Key('welcome.get.$platform'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            QrView(text: url, size: 96),
+                            const SizedBox(width: Tokens.space),
+                            Flexible(
+                              child: Text(
+                                label,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                            ),
+                          ],
+                        ),
+                  ],
+                ),
+            ],
           );
+
+    // The devices found nearby, faded until the remote's focus or the pointer is in them (owner decision: a calm
+    // first screen); a Focus that takes no focus itself hears when any tile inside gains or loses it.
+    final nearby = MouseRegion(
+      onEnter: (_) => setState(() => _nearby = true),
+      onExit: (_) => setState(() => _nearby = false),
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (f) => setState(() => _nearby = f),
+        child: AnimatedOpacity(
+          key: const Key('welcome.nearby'),
+          opacity: _nearby ? 1 : 0.4,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : Tokens.motion,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: Tokens.space * 2),
+                child: Text(
+                  l10n.welcomeFromHere,
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              NearbyDevices(
+                session: s,
+                onStatus: (m) => setState(() => _status = m),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
     const gap = SizedBox(height: Tokens.space * 3);
     return Scaffold(
@@ -227,24 +249,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(Tokens.space * 3),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    header,
-                    gap,
-                    if (wide)
-                      Row(
+                constraints: BoxConstraints(maxWidth: wide ? 900 : 480),
+                child: wide
+                    ? Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                steps,
-                                downloads,
-                                noDevice,
-                                status,
+                                title,
+                                gap,
+                                instruction,
+                                gap,
+                                skip,
+                                apps,
                                 nearby,
                               ],
                             ),
@@ -253,19 +272,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           codeCard,
                         ],
                       )
-                    else ...[
-                      steps,
-                      const SizedBox(height: Tokens.space * 2),
-                      Align(alignment: Alignment.centerLeft, child: codeCard),
-                      downloads,
-                      noDevice,
-                      const SizedBox(height: Tokens.space * 1.5),
-                      Align(alignment: Alignment.centerLeft, child: skipButton),
-                      status,
-                      nearby,
-                    ],
-                  ],
-                ),
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          title,
+                          gap,
+                          instruction,
+                          const SizedBox(height: Tokens.space * 2),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: codeCard,
+                          ),
+                          gap,
+                          skip,
+                          apps,
+                          nearby,
+                        ],
+                      ),
               ),
             ),
           ),
@@ -273,56 +296,4 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       ),
     );
   }
-}
-
-/// One numbered step: the number in an accent circle, the text beside it.
-class _Step extends StatelessWidget {
-  const _Step({required this.n, required this.text});
-  final int n;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Tokens.space * 1.5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: scheme.primary,
-            foregroundColor: scheme.onPrimary,
-            child: Text(
-              '$n',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(width: Tokens.space * 1.5),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(text, style: theme.textTheme.titleMedium),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: Tokens.space * 3, bottom: Tokens.space),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.titleMedium
-          ?.copyWith(color: Theme.of(context).colorScheme.primary),
-    ),
-  );
 }

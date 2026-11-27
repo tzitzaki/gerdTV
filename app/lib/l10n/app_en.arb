@@ -736,28 +736,18 @@
     }
   },
   "welcomeAndroid": "Android",
-  "welcomeFromHere": "Or connect from here to a device that shows a code",
-  "welcomeGetApp": "No gerdTV on the phone yet? Scan to download it",
-  "welcomeIntro": "Bring your provider over from a device that already has gerdTV: nothing to type here.",
+  "welcomeFromHere": "Devices nearby",
+  "welcomeGetApp": "Get gerdTV for your phone",
   "welcomeIphone": "iPhone (re-sign it first)",
-  "welcomeNoDevice": "No other device? Skip to the app and add your provider's login in Settings → Account.",
-  "welcomeSkip": "Skip to the app",
-  "welcomeStep1": "Open gerdTV on your phone, tablet or computer, on the same network as this device.",
-  "welcomeStep2": "Go to {path}.",
-  "@welcomeStep2": {
+  "welcomeNoDevice": "No other device? Add your login later in Settings → Account.",
+  "welcomeScan": "On your phone: gerdTV → {path}, then scan this code.",
+  "@welcomeScan": {
     "placeholders": {
       "path": {
         "type": "String"
       }
     }
   },
-  "welcomeStep3": "Scan this QR with the phone's camera, or pick {name} there and type the code.",
-  "@welcomeStep3": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "welcomeSkip": "Skip to the app",
   "welcomeTitle": "Welcome to gerdTV"
 }

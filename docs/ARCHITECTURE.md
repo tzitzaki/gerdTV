@@ -38,7 +38,7 @@
 
 ## The app (Flutter)
 - `app/lib/services/session.dart`: the app's state (`ChangeNotifier`): the open profile's `Library`, sync status, and the one player the whole app listens to (`app/lib/player/switch_player.dart`, forwarding mpv's media_kit player or, for live on Apple platforms, the AVPlayer engine) and the `WatchdogAdapter` that drives mpv. `app/lib/services/secrets.dart`: profile secrets in `flutter_secure_storage` (macOS: the legacy keychain, which needs no provisioning profile). `app/lib/services/search_model.dart`: numbered search queries per search field (a section or a group), stale answers dropped.
-- Screens in `app/lib/screens`: setup (first run), shell (rail/bottom bar), browse/items/episodes, the section search, player, settings.
+- Screens in `app/lib/screens`: welcome (first run: pairing), setup (the provider form), shell (rail/bottom bar), browse/items/episodes, the section search, player, settings.
 - Cleartext HTTP (providers use plain HTTP on a user-entered host): allowed in ATS on iOS/macOS for AVPlayer (the core's local HLS on 127.0.0.1, or a provider's own HLS played directly). Android needs no setting: the core (sync, guide, logo cache, updater) and libmpv use their own networking, and Flutter itself fetches nothing.
 
 ## Playback pipeline

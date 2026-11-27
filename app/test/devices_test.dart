@@ -2,10 +2,12 @@
 // found device shows who answered before anything is sent ("pair as you scan"); Sync then sends. Also the web player's
 // screen: a login link with its QR, and ending a web session. And a start without paired devices leaves secure
 // storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused; extended:
-// the first run's welcome screen listens at once (QR and code), offers the phone files on a computer and Skip opens
+// the first run's welcome screen listens at once (QR and code), folds the phone files (computer only) and fades the
+// nearby list until it has the focus, and Skip opens
 // the app without a provider. The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
 import 'package:gerdtv/platform/platform_bridge.dart';
@@ -276,9 +278,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('482 913'), findsOneWidget, reason: 'no tap needed');
     expect(find.byKey(const Key('devices.found.tv1')), findsOneWidget);
-    // The test runs as a computer: both phone files, as QRs.
+    // Calm: the nearby list faded, the phone files folded. The test runs as a computer: both files, as QRs.
+    double nearby() => tester
+        .widget<AnimatedOpacity>(find.byKey(const Key('welcome.nearby')))
+        .opacity;
+    expect(nearby(), lessThan(1));
+    expect(find.byKey(const Key('welcome.get.android')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('welcome.apps')));
+    await tester.tap(find.byKey(const Key('welcome.apps')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('welcome.get.android')), findsOneWidget);
     expect(find.byKey(const Key('welcome.get.ios')), findsOneWidget);
+    // Down from Skip (the first focus) passes the button and reaches the nearby list, which comes forward.
+    for (final shown in [false, true]) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(nearby() == 1, shown);
+    }
     await tester.ensureVisible(find.byKey(const Key('welcome.skip')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('welcome.skip')));
