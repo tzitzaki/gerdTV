@@ -180,7 +180,8 @@ class VideoWindow {
     required bool animate,
   }) async {
     final from = w.size.toSize();
-    if (animate) {
+    // TEMP experiment B (macOS CI): one plain resize on the Mac, to see whether the 8 steps break the pause there.
+    if (animate && !Platform.isMacOS) {
       for (var i = 1; i < 8; i++) {
         w.setSize(ui.Size.lerp(from, size, i / 8)!.toNative(), false);
         await Future<void>.delayed(const Duration(milliseconds: 20));
