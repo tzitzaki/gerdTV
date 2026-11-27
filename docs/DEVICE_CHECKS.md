@@ -11,6 +11,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Back: Settings → Account → Edit the provider closes with its back arrow, Esc and the mouse's side button; an open dialog closes first.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
+- Window minimum: outside the player the window can't be dragged smaller than about 960 × 540 (the rail stays); the player and P still go smaller.
 - Player window: no black bars, resizing keeps the ratio, 4:3 channels re-fit, back returns to the list size (also after a restart); P floats it at that ratio.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
