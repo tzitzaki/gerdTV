@@ -344,6 +344,8 @@
   "playerTracks": "Audio and subtitles",
   "playerZapHint": "↑ ↓ channels · OK channel list",
   "premiumize": "Premiumize",
+  "premiumizeClientId": "Client ID for the code login (optional)",
+  "premiumizeClientIdHint": "Register your own at premiumize.me/registerclient; then Sign in with a code appears.",
   "premiumizeCloud": "Premiumize cloud",
   "premiumizeCode": "Sign in with a code",
   "premiumizeEmpty": "Nothing here yet.",
@@ -574,6 +576,7 @@
       }
     }
   },
+  "simklOwnAppHint": "Simkl needs your own Simkl app (no client ID ships with gerdTV): on simkl.com/settings/developer create one of the type TV and devices; enter its client ID here.",
   "sortAdded": "Recently added",
   "sortNameAsc": "Name A–Z",
   "sortNameDesc": "Name Z–A",
@@ -646,7 +649,6 @@
     }
   },
   "trackOwnAppHint": "Trakt needs your own Trakt app (no secret ships with gerdTV): on trakt.tv under Settings → Your API Apps → New Application, with the redirect URI urn:ietf:wg:oauth:2.0:oob; enter its client ID and secret here.",
-  "trackUnavailable": "Not in this build: it needs gerdTV's registration with the service.",
   "trailer": "Trailer",
   "trailerOnYouTube": "Watch on YouTube",
   "tvList": "Channel list",

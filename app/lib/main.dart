@@ -92,13 +92,15 @@ class GerdTvApp extends StatelessWidget {
   Widget _app(ThemePrefs prefs) {
     return MaterialApp(
       navigatorKey: session.navigatorKey,
-      // The now-playing bar below every screen (playback continues until Stop or another stream), and one focus
-      // policy for every route, sheet and menu (see revealFocus).
+      // The now-playing bar below every screen (playback continues until Stop or another stream), one focus policy
+      // for every route, sheet and menu (see revealFocus), and Esc or the mouse's back button closing the top page.
       builder: (context, child) => FocusTraversalGroup(
         policy: ReadingOrderTraversalPolicy(requestFocusCallback: revealFocus),
         child: Column(
           children: [
-            Expanded(child: child!),
+            Expanded(
+              child: BackKeys(navigator: session.navigatorKey, child: child!),
+            ),
             NowPlayingBar(session: session),
             CastBar(session: session),
           ],

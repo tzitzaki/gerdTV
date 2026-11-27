@@ -59,6 +59,17 @@ void main() {
         home: Scaffold(body: PremiumizeSettings(session: session)),
       ),
     );
+    // The code login needs the user's own client id (none ships with gerdTV): it shows once one is typed.
+    final code = find.byKey(const Key('premiumize.code'));
+    expect(code, findsNothing);
+    await tester.enterText(find.byKey(const Key('premiumize.clientId')), 'id');
+    await tester.pump();
+    expect(code, findsOneWidget);
+    await tester.runAsync(() => session.setPremiumizeApp(' my-id '));
+    expect(secrets.services, {'premiumize-app.p1': 'my-id'});
+    await tester.runAsync(() => session.setPremiumizeApp(''));
+    expect(secrets.services, isEmpty);
+
     final key = find.byKey(const Key('premiumize.key'));
     await tester.enterText(key, 'bad');
     await tester.tap(find.byKey(const Key('premiumize.link')));
@@ -84,12 +95,6 @@ void main() {
       shellPages(provider: true, premiumize: false),
       isNot(contains(ShellPage.premiumize)),
     );
-    expect(
-      find.byKey(const Key('premiumize.code')),
-      findsNothing,
-      reason: 'no client id in test builds: the key only',
-    );
-
     await tester.tap(find.byKey(const Key('premiumize.unlink')));
     await tester.pumpAndSettle();
     expect(secrets.services, isEmpty);

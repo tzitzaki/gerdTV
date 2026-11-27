@@ -2,10 +2,10 @@
 // then every movie and episode is scrobbled: start when it starts or resumes, pause on a pause, stop with the
 // progress when it ends or another starts. The core cleans the titles and talks to the services
 // (gerdtv_core::tracking); this holds the tokens (secure storage, as JSON with their refresh token) and calls it.
-// No secret is in the repository or the app (owner decision: the repo is public and an app's secrets can be
-// extracted): Simkl's device login needs only gerdTV's client id, a public identifier, given to release builds as
-// --dart-define=GERDTV_SIMKL_CLIENT_ID; Trakt's needs a client secret too, so each user links their own Trakt app
-// (its id and secret typed in Settings, kept in the device's secure storage like the tokens).
+// No client id or secret is in the repository or the builds (owner decision: the repo is public, an app's secrets
+// can be extracted, and a shared id could be suspended for everyone): each user links their own app per service
+// (Trakt: client id and secret; Simkl: client id only, its device login needs no secret), typed in Settings and kept
+// in the device's secure storage like the tokens.
 // From Simkl, watched marks and paused positions also come in (importSimkl), and marks made by hand go out (history).
 // Debugging: a failed scrobble only prints "tracking: <service> <action>: <reason>" to the debug log; playback
 // never waits for it.
@@ -18,28 +18,25 @@ import '../src/rust/api/library.dart';
 import '../src/rust/api/tracking.dart';
 import 'secrets.dart';
 
-const _simklId = String.fromEnvironment('GERDTV_SIMKL_CLIENT_ID');
-
-/// A tracking service gerdTV knows: its storage and core name, what the user sees, and gerdTV's registration
-/// ([clientId] empty with [ownApp]: the user brings their own app's id and secret).
+/// A tracking service gerdTV knows: its storage and core name, what the user sees, and whether the user's own app
+/// needs a client secret besides its id.
 class TrackService {
-  const TrackService(this.id, this.label, this.clientId, {this.ownApp = false});
+  const TrackService(this.id, this.label, {this.needsSecret = false});
   final String id;
   final String label;
-  final String clientId;
-  final bool ownApp;
+  final bool needsSecret;
 }
 
 const trackServices = [
-  TrackService('trakt', 'Trakt', '', ownApp: true),
-  TrackService('simkl', 'Simkl', _simklId),
+  TrackService('trakt', 'Trakt', needsSecret: true),
+  TrackService('simkl', 'Simkl'),
 ];
 
 class Tracking extends ChangeNotifier {
   Tracking(this._secrets, {this.services = trackServices});
   final Secrets _secrets;
 
-  /// The services offered (tests pass their own with client ids; release builds get them from the defines).
+  /// The services offered (tests pass their own).
   final List<TrackService> services;
 
   String? _profile;
@@ -47,17 +44,13 @@ class Tracking extends ChangeNotifier {
   /// Token JSON per linked service id.
   final Map<String, String> tokens = {};
 
-  /// The user's own app per service ([TrackService.ownApp]): (client id, client secret).
+  /// The user's own app per service: (client id, client secret; '' where none is needed).
   final Map<String, (String, String)> apps = {};
 
   bool linked(TrackService s) => tokens.containsKey(s.id);
 
-  /// The client id and secret to use for [s]: gerdTV's registration, or the user's own app (null: none yet).
-  (String, String)? client(TrackService s) => s.ownApp
-      ? apps[s.id]
-      : s.clientId.isEmpty
-      ? null
-      : (s.clientId, '');
+  /// The client id and secret to use for [s]: the user's own app (null: none yet).
+  (String, String)? client(TrackService s) => apps[s.id];
 
   /// Stores the user's own app for [s] (or forgets it with null).
   Future<void> setApp(TrackService s, (String, String)? app) async {
@@ -82,7 +75,6 @@ class Tracking extends ChangeNotifier {
     for (final s in services) {
       final t = await _secrets.readService(profileId, s.id);
       if (t != null) tokens[s.id] = t;
-      if (!s.ownApp) continue;
       final app = await _secrets.readService(profileId, '${s.id}-app');
       if (app == null) continue;
       final pair = (jsonDecode(app) as List).cast<String>();

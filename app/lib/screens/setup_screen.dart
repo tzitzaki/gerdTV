@@ -122,170 +122,183 @@ class _SetupScreenState extends State<SetupScreen> {
     final l10n = AppLocalizations.of(context);
     String? required(String? v) =>
         (v == null || v.trim().isEmpty) ? l10n.setupRequired : null;
-    return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Tokens.space * 3),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Form(
-              key: _form,
-              child: AutofillGroup(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: AppLogoMark(logo: widget.session.logo, size: 64),
-                    ),
-                    const SizedBox(height: Tokens.space * 2),
-                    Text(
-                      widget.edit == null ||
-                              widget.edit!.source == SourceKind.none
-                          ? l10n.setupTitle
-                          : l10n.setupEditTitle,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: Tokens.space),
-                    Text(l10n.setupIntro),
-                    const SizedBox(height: Tokens.space * 3),
-                    if (widget.edit != null) ...[
-                      TextFormField(
-                        key: const Key('setup.name'),
-                        controller: _name,
-                        decoration: InputDecoration(labelText: l10n.setupName),
+    // Opened from Settings (add or edit): a back arrow, since desktop has no swipe-back; not while a login is being
+    // tested (PopScope also holds Esc and the system back then). The first run has nothing to go back to.
+    return PopScope(
+      canPop: !_busy,
+      child: Scaffold(
+        appBar: Navigator.of(context).canPop() ? AppBar() : null,
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(Tokens.space * 3),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Form(
+                key: _form,
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: AppLogoMark(logo: widget.session.logo, size: 64),
+                      ),
+                      const SizedBox(height: Tokens.space * 2),
+                      Text(
+                        widget.edit == null ||
+                                widget.edit!.source == SourceKind.none
+                            ? l10n.setupTitle
+                            : l10n.setupEditTitle,
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: Tokens.space),
+                      Text(l10n.setupIntro),
+                      const SizedBox(height: Tokens.space * 3),
+                      if (widget.edit != null) ...[
+                        TextFormField(
+                          key: const Key('setup.name'),
+                          controller: _name,
+                          decoration: InputDecoration(
+                            labelText: l10n.setupName,
+                          ),
+                        ),
+                        const SizedBox(height: Tokens.space * 3),
+                      ],
+                      SegmentedButton<bool>(
+                        segments: [
+                          ButtonSegment(
+                            value: true,
+                            label: Text(l10n.setupXtream),
+                          ),
+                          ButtonSegment(
+                            value: false,
+                            label: Text(l10n.setupM3u),
+                          ),
+                        ],
+                        selected: {_xtream},
+                        onSelectionChanged: _busy
+                            ? null
+                            : (s) => setState(() => _xtream = s.first),
                       ),
                       const SizedBox(height: Tokens.space * 3),
-                    ],
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(
-                          value: true,
-                          label: Text(l10n.setupXtream),
+                      if (_xtream) ...[
+                        TextFormField(
+                          key: const Key('setup.server'),
+                          controller: _server,
+                          decoration: InputDecoration(
+                            labelText: l10n.setupServer,
+                            hintText: 'http://example.com:8080',
+                          ),
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          validator: (v) => checkUrl(v, l10n),
                         ),
-                        ButtonSegment(value: false, label: Text(l10n.setupM3u)),
-                      ],
-                      selected: {_xtream},
-                      onSelectionChanged: _busy
-                          ? null
-                          : (s) => setState(() => _xtream = s.first),
-                    ),
-                    const SizedBox(height: Tokens.space * 3),
-                    if (_xtream) ...[
-                      TextFormField(
-                        key: const Key('setup.server'),
-                        controller: _server,
-                        decoration: InputDecoration(
-                          labelText: l10n.setupServer,
-                          hintText: 'http://example.com:8080',
+                        const SizedBox(height: Tokens.space * 2),
+                        TextFormField(
+                          key: const Key('setup.username'),
+                          controller: _user,
+                          decoration: InputDecoration(
+                            labelText: l10n.setupUsername,
+                          ),
+                          autocorrect: false,
+                          autofillHints: const [AutofillHints.username],
+                          validator: required,
                         ),
-                        keyboardType: TextInputType.url,
-                        autocorrect: false,
-                        validator: (v) => checkUrl(v, l10n),
-                      ),
-                      const SizedBox(height: Tokens.space * 2),
-                      TextFormField(
-                        key: const Key('setup.username'),
-                        controller: _user,
-                        decoration: InputDecoration(
-                          labelText: l10n.setupUsername,
+                        const SizedBox(height: Tokens.space * 2),
+                        TextFormField(
+                          key: const Key('setup.password'),
+                          controller: _pass,
+                          decoration: InputDecoration(
+                            labelText: l10n.setupPassword,
+                          ),
+                          obscureText: true,
+                          autofillHints: const [AutofillHints.password],
+                          validator: required,
+                          onFieldSubmitted: (_) => _connect(),
                         ),
-                        autocorrect: false,
-                        autofillHints: const [AutofillHints.username],
-                        validator: required,
-                      ),
-                      const SizedBox(height: Tokens.space * 2),
-                      TextFormField(
-                        key: const Key('setup.password'),
-                        controller: _pass,
-                        decoration: InputDecoration(
-                          labelText: l10n.setupPassword,
+                      ] else
+                        TextFormField(
+                          key: const Key('setup.m3u'),
+                          controller: _m3u,
+                          decoration: InputDecoration(
+                            labelText: l10n.setupM3uUrl,
+                          ),
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          validator: (v) => checkUrl(v, l10n),
+                          onFieldSubmitted: (_) => _connect(),
                         ),
-                        obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        validator: required,
-                        onFieldSubmitted: (_) => _connect(),
-                      ),
-                    ] else
-                      TextFormField(
-                        key: const Key('setup.m3u'),
-                        controller: _m3u,
-                        decoration: InputDecoration(
-                          labelText: l10n.setupM3uUrl,
-                        ),
-                        keyboardType: TextInputType.url,
-                        autocorrect: false,
-                        validator: (v) => checkUrl(v, l10n),
-                        onFieldSubmitted: (_) => _connect(),
-                      ),
-                    const SizedBox(height: Tokens.space * 3),
-                    FilledButton(
-                      key: const Key('setup.connect'),
-                      onPressed: _busy ? null : _connect,
-                      child: Padding(
-                        padding: const EdgeInsets.all(Tokens.space * 1.5),
-                        child: Text(
-                          _busy
-                              ? l10n.setupConnecting
-                              : widget.edit == null
-                              ? l10n.setupConnect
-                              : l10n.setupSave,
-                        ),
-                      ),
-                    ),
-                    // First run only (not when added from Settings): from another device, or Settings without a provider.
-                    if (widget.edit == null && !Navigator.of(context).canPop())
-                      TextButton(
-                        key: const Key('setup.fromDevice'),
-                        onPressed: _busy
-                            ? null
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      DevicesScreen(session: widget.session),
-                                ),
-                              ),
-                        child: Text(l10n.setupFromDevice),
-                      ),
-                    if (widget.edit == null && !Navigator.of(context).canPop())
-                      TextButton(
-                        key: const Key('setup.skip'),
-                        onPressed: _busy
-                            ? null
-                            : () => widget.session.skipSetup(
-                                l10n.setupNoProvider,
-                              ),
-                        child: Text(l10n.setupSkip),
-                      ),
-                    if (_busy)
-                      const Padding(
-                        padding: EdgeInsets.only(top: Tokens.space * 2),
-                        child: LinearProgressIndicator(),
-                      ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: Tokens.space * 2),
-                        child: Text(
-                          l10n.setupFailed(_error!),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+                      const SizedBox(height: Tokens.space * 3),
+                      FilledButton(
+                        key: const Key('setup.connect'),
+                        onPressed: _busy ? null : _connect,
+                        child: Padding(
+                          padding: const EdgeInsets.all(Tokens.space * 1.5),
+                          child: Text(
+                            _busy
+                                ? l10n.setupConnecting
+                                : widget.edit == null
+                                ? l10n.setupConnect
+                                : l10n.setupSave,
                           ),
                         ),
                       ),
-                    const SizedBox(height: Tokens.space * 3),
-                    // Optional (some providers only answer players they know), so below Connect, which must stay in view.
-                    TextFormField(
-                      key: const Key('setup.userAgent'),
-                      controller: _userAgent,
-                      decoration: InputDecoration(
-                        labelText: l10n.userAgent,
-                        helperText: l10n.setupUserAgentHint,
-                        helperMaxLines: 2,
+                      // First run only (not when added from Settings): from another device, or Settings without a provider.
+                      if (widget.edit == null &&
+                          !Navigator.of(context).canPop())
+                        TextButton(
+                          key: const Key('setup.fromDevice'),
+                          onPressed: _busy
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        DevicesScreen(session: widget.session),
+                                  ),
+                                ),
+                          child: Text(l10n.setupFromDevice),
+                        ),
+                      if (widget.edit == null &&
+                          !Navigator.of(context).canPop())
+                        TextButton(
+                          key: const Key('setup.skip'),
+                          onPressed: _busy
+                              ? null
+                              : () => widget.session.skipSetup(
+                                  l10n.setupNoProvider,
+                                ),
+                          child: Text(l10n.setupSkip),
+                        ),
+                      if (_busy)
+                        const Padding(
+                          padding: EdgeInsets.only(top: Tokens.space * 2),
+                          child: LinearProgressIndicator(),
+                        ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: Tokens.space * 2),
+                          child: Text(
+                            l10n.setupFailed(_error!),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: Tokens.space * 3),
+                      // Optional (some providers only answer players they know), so below Connect, which must stay in view.
+                      TextFormField(
+                        key: const Key('setup.userAgent'),
+                        controller: _userAgent,
+                        decoration: InputDecoration(
+                          labelText: l10n.userAgent,
+                          helperText: l10n.setupUserAgentHint,
+                          helperMaxLines: 2,
+                        ),
+                        autocorrect: false,
+                        onFieldSubmitted: (_) => _connect(),
                       ),
-                      autocorrect: false,
-                      onFieldSubmitted: (_) => _connect(),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

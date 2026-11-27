@@ -2,7 +2,7 @@
 //! its transfers; files play from their direct `link`. API: https://www.premiumize.me/api (v1, JSON).
 //!
 //! Sign-in: the account's API key (premiumize.me/account), or the OAuth device flow (premiumize.me/device, a code
-//! typed on another device) once gerdTV has a registered client id (`--dart-define=GERDTV_PREMIUMIZE_CLIENT_ID`).
+//! typed on another device) with the user's own client id (premiumize.me/registerclient, entered in Settings).
 //! Both give a token sent as `Authorization: Bearer`; it is a secret: kept in the app's secure storage, held only
 //! in memory here, never logged.
 //!

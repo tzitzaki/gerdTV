@@ -66,7 +66,7 @@ class _Listener extends Fake implements PairListener {
   int port() => 4100;
 
   @override
-  String newCode() => 'ABCD-EFGH-JKMN';
+  String newCode() => '482 913';
 
   @override
   void clearCode() {}
@@ -134,7 +134,7 @@ class _PairingCore extends FakeCore {
   @override
   PairLink? crateApiPairingPairParseLink({required String link}) =>
       link.startsWith('gerdtv://pair?')
-      ? const PairLink(addr: '192.0.2.5:4100', code: 'ABCD-EFGH-JKMN')
+      ? const PairLink(addr: '192.0.2.5:4100', code: '482 913')
       : null;
 
   @override
@@ -225,7 +225,7 @@ void main() {
   ) async {
     PlatformBridge.canScanQr = true;
     addTearDown(() => PlatformBridge.canScanQr = false);
-    var scanned = 'gerdtv://pair?a=192.0.2.5:4100&c=ABCD-EFGH-JKMN';
+    var scanned = 'gerdtv://pair?a=192.0.2.5:4100&c=482913';
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       PlatformBridge.channel,
       (call) async => call.method == 'scanQr' ? scanned : null,
@@ -241,7 +241,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       session.devices.link.value,
-      const PairLink(addr: '192.0.2.5:4100', code: 'ABCD-EFGH-JKMN'),
+      const PairLink(addr: '192.0.2.5:4100', code: '482 913'),
     );
     session.devices.link.value = null;
     scanned = 'https://example.invalid/menu';
@@ -261,7 +261,7 @@ void main() {
     await tester.tap(find.byKey(const Key('devices.showCode')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('devices.qr')), findsOneWidget);
-    expect(find.text('ABCD-EFGH-JKMN'), findsOneWidget);
+    expect(find.text('482 913'), findsOneWidget);
   });
 
   testWidgets('pair with a found device: who answered first, Sync sends', (
@@ -272,11 +272,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('devices.codeField')),
-      'abcd efgh jkmn',
+      '482 913',
     );
     await tester.tap(find.byKey(const Key('devices.connect')));
     await tester.pumpAndSettle();
-    expect(core.typedCode, 'abcd efgh jkmn', reason: 'the core normalizes');
+    expect(core.typedCode, '482 913', reason: 'the core normalizes');
     expect(find.text('Sync with Living room TV (android)?'), findsOneWidget);
     expect(core.connection.sent, 0, reason: 'nothing sent before Sync');
     await tester.tap(find.byKey(const Key('devices.sync')));

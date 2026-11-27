@@ -18,6 +18,9 @@ class MiniWindow {
   // Flutter geometry here; window_manager's extensions convert to and from nativeapi's (toNative/toRect).
   ui.Rect? _restore;
 
+  /// The window's minimum before mini mode (the player's or the browsing one, VideoWindow), put back on [exit].
+  ui.Size? _minimum;
+
   bool get isMini => _restore != null;
 
   wm.Window get _window {
@@ -32,6 +35,7 @@ class MiniWindow {
     if (isMini) return;
     final w = _window;
     _restore = w.bounds.toRect();
+    _minimum = w.minimumSize.toSize();
     w.titleBarStyle = wm.TitleBarStyle.hidden;
     w.isAlwaysOnTop = true;
     w.isVisibleOnAllWorkspaces = true; // macOS: follows the user across Spaces
@@ -51,6 +55,8 @@ class MiniWindow {
     w.isAlwaysOnTop = false;
     w.isVisibleOnAllWorkspaces = false;
     w.titleBarStyle = wm.TitleBarStyle.normal;
+    // The old minimum back before the old bounds, which already meet it.
+    if (_minimum != null) w.minimumSize = _minimum!.toNative();
     w.bounds = restore.toNative();
     _restore = null;
   }

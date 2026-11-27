@@ -5,16 +5,19 @@
 //! How it fits together:
 //! - One side **listens** (`Listener`, a TCP port on all interfaces, announced by mDNS as `_gerdtv._tcp` with the
 //!   device's name and platform); the other **connects** (`connect_code` / `connect_peer`).
-//! - First time: the listener shows a one-time **code** (12 Crockford base32 characters, 60 bits; also as a QR
-//!   `gerdtv://pair?a=<addr:port>&c=<code>`). Both derive the key from it; a wrong code fails the first sealed frame
-//!   and burns the code (one attempt), and a code is good for 10 minutes. The connector sends a fresh random 32-byte
-//!   key along, which both keep for later syncs: from then on the peers are **remembered** and connect by device id.
+//! - First time: the listener shows a one-time **code** (6 digits, owner decision; also as a QR
+//!   `gerdtv://pair?a=<addr:port>&c=<code>`). The code isn't the key: both sides run SPAKE2 with it (a password-
+//!   authenticated key exchange, the RustCrypto `spake2` crate) and get a strong shared key only when both typed the
+//!   same code. Someone who recorded the traffic can't try the million codes offline; someone who joins in gets one
+//!   guess: a wrong code fails the first sealed frame and burns the code (one attempt), and a code is good for 10
+//!   minutes. The connector sends a fresh random 32-byte key along, which both keep for later syncs: from then on the
+//!   peers are **remembered** and connect by device id (no code, no SPAKE2).
 //! - Every connection gets its own key: SHA-256 over the base key (code or peer key) and two random salts sent in
 //!   clear, one from each side. The listener's salt means a recorded connection replayed later gets another key (its
 //!   frames don't open, and the listener never seals twice under one key and nonce). Frames are sealed with
 //!   ChaCha20-Poly1305; the nonce is the direction plus a counter.
-//! - Order: connector → header (clear: version, salt, its device id for a remembered peer), listener → its salt
-//!   (clear), then sealed: connector's
+//! - Order: connector → header (clear: version, salt, its device id for a remembered peer, or its SPAKE2 message
+//!   for a code), listener → its salt and, for a code, its SPAKE2 message (clear), then sealed: connector's
 //!   hello (device, new key), listener's hello (device; the connector can ask its user "send to X?" now), connector's
 //!   bundle, listener's bundle. Both then merge the other's bundle (`apply`): a two-way sync, newer wins.
 //!
@@ -42,16 +45,21 @@ use tokio::sync::mpsc::UnboundedSender;
 
 /// The mDNS service type the listener announces.
 pub const SERVICE: &str = "_gerdtv._tcp.local.";
-/// Crockford's base32: no I, L, O or U, so a typed code can't be misread (typing those still works, see `normalize`).
-const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const CODE_LEN: usize = 12;
+/// Digits only (owner decision: easy on a TV remote's number pad); with SPAKE2 one guess per code is all anyone gets.
+const CODE_LEN: usize = 6;
+/// SPAKE2's roles: the connector is side A, the listener side B (both must name them the same way).
+const SPAKE_A: &[u8] = b"gerdtv-connector";
+const SPAKE_B: &[u8] = b"gerdtv-listener";
+/// A SPAKE2 message (Ed25519 group): a side byte and a point.
+const SPAKE_MSG: usize = 33;
 /// How long a code works.
 pub const CODE_TTL: Duration = Duration::from_secs(10 * 60);
 /// The largest frame accepted (user data of a big profile is a few hundred KB).
 const MAX_FRAME: usize = 32 << 20;
 /// How long either side waits for the other's next frame; the connector's user may be confirming meanwhile.
 const STEP_TIMEOUT: Duration = Duration::from_secs(120);
-const VERSION: u32 = 2;
+/// 3: codes go through SPAKE2 (2 hashed the code itself into the key).
+const VERSION: u32 = 3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PairError {
@@ -61,7 +69,7 @@ pub enum PairError {
     Auth,
     #[error("this device is not paired with the other one")]
     UnknownPeer,
-    #[error("the other device answered something unexpected")]
+    #[error("the other device answered something unexpected (is gerdTV up to date on both?)")]
     Protocol,
     #[error("the other device took too long")]
     Timeout,
@@ -202,24 +210,29 @@ pub fn new_device_id() -> String {
     hex(&random::<8>())
 }
 
-/// A fresh code (12 characters, shown as `ABCD-EFGH-JKMN`).
+/// A fresh code (6 digits, shown as `482 913`). Each digit comes from a byte below 250, so all ten are equally likely.
 pub fn new_code() -> String {
-    random::<CODE_LEN>()
-        .iter()
-        .map(|b| ALPHABET[(b & 31) as usize] as char)
-        .collect()
+    let mut code = String::with_capacity(CODE_LEN);
+    while code.len() < CODE_LEN {
+        for b in random::<16>() {
+            if b < 250 && code.len() < CODE_LEN {
+                code.push(char::from(b'0' + b % 10));
+            }
+        }
+    }
+    code
 }
 
-/// Shown and printed in groups of four.
+/// Shown and printed in two groups of three.
 pub fn format_code(code: &str) -> String {
     code.as_bytes()
-        .chunks(4)
+        .chunks(3)
         .map(|c| String::from_utf8_lossy(c).into_owned())
         .collect::<Vec<_>>()
-        .join("-")
+        .join(" ")
 }
 
-/// A typed or scanned code as the key needs it: case, dashes and spaces don't matter, O/I/L read as 0/1/1.
+/// A typed or scanned code as SPAKE2 needs it: spaces and dashes don't matter, O/I/L read as 0/1/1.
 pub fn normalize(code: &str) -> String {
     code.chars()
         .filter(|c| c.is_ascii_alphanumeric())
@@ -231,11 +244,24 @@ pub fn normalize(code: &str) -> String {
         .collect()
 }
 
-fn code_key(code: &str) -> [u8; 32] {
-    let mut h = Sha256::new();
-    h.update(b"gerdtv-pair-v1");
-    h.update(normalize(code).as_bytes());
-    h.finalize().into()
+/// This side's half of SPAKE2 for `code`: the state to finish with and the message for the other side.
+fn spake_start(code: &str, listener: bool) -> (spake2::Spake2<spake2::Ed25519Group>, Vec<u8>) {
+    let password = spake2::Password::new(normalize(code).as_bytes());
+    let (a, b) = (
+        spake2::Identity::new(SPAKE_A),
+        spake2::Identity::new(SPAKE_B),
+    );
+    if listener {
+        spake2::Spake2::<spake2::Ed25519Group>::start_b(&password, &a, &b)
+    } else {
+        spake2::Spake2::<spake2::Ed25519Group>::start_a(&password, &a, &b)
+    }
+}
+
+/// The shared key from the other side's SPAKE2 message (another code gives another key: the first sealed frame
+/// then fails, which is the Auth error); a malformed message is a protocol error.
+fn spake_finish(state: spake2::Spake2<spake2::Ed25519Group>, theirs: &[u8]) -> Result<Vec<u8>> {
+    state.finish(theirs).map_err(|_| PairError::Protocol)
 }
 
 /// The connection's key: the base key and both sides' salts (the connector's first, then the listener's).
@@ -360,6 +386,9 @@ struct Header {
     salt: String,
     /// A remembered peer's device id; absent = a code.
     from: Option<String>,
+    /// A code: the connector's SPAKE2 message, hex.
+    #[serde(default)]
+    spake: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -393,7 +422,7 @@ pub async fn connect_code(
     port: Option<u16>,
 ) -> Result<Connection> {
     let new_key = hex(&random::<32>());
-    connect(addr, code_key(code).to_vec(), None, me, port, Some(new_key)).await
+    connect(addr, Base::Code(code), me, port, Some(new_key)).await
 }
 
 /// Connects to a remembered device.
@@ -404,13 +433,20 @@ pub async fn connect_peer(
     peer: &Peer,
 ) -> Result<Connection> {
     let key = unhex(&peer.key).ok_or(PairError::UnknownPeer)?;
-    connect(addr, key, Some(me.id.clone()), me, port, None).await
+    connect(addr, Base::Peer(key), me, port, None).await
+}
+
+/// Where the connection's base key comes from.
+enum Base<'a> {
+    /// A typed or scanned code: SPAKE2 with the listener.
+    Code(&'a str),
+    /// A remembered peer's key.
+    Peer(Vec<u8>),
 }
 
 async fn connect(
     addr: &str,
-    base: Vec<u8>,
-    from: Option<String>,
+    base: Base<'_>,
     me: &Device,
     port: Option<u16>,
     new_key: Option<String>,
@@ -419,17 +455,30 @@ async fn connect(
         .await
         .map_err(|_| PairError::Timeout)??;
     let salt = random::<16>();
+    let (spake, from) = match &base {
+        Base::Code(code) => (Some(spake_start(code, false)), None),
+        Base::Peer(_) => (None, Some(me.id.clone())),
+    };
     let header = Header {
         v: VERSION,
         salt: hex(&salt),
         from,
+        spake: spake.as_ref().map(|(_, msg)| hex(msg)),
     };
     write_frame(&mut stream, &serde_json::to_vec(&header).unwrap()).await?;
-    let theirs = read_frame(&mut stream).await?;
-    if theirs.len() != 16 {
+    // The listener's salt, and its SPAKE2 message for a code.
+    let reply = read_frame(&mut stream).await?;
+    let expected = 16 + if spake.is_some() { SPAKE_MSG } else { 0 };
+    if reply.len() != expected {
         return Err(PairError::Protocol);
     }
-    let mut channel = Channel::new(stream, session_key(&base, &salt, &theirs), false);
+    let (theirs, their_spake) = reply.split_at(16);
+    let base = match (base, spake) {
+        (Base::Peer(key), _) => key,
+        (Base::Code(_), Some((state, _))) => spake_finish(state, their_spake)?,
+        (Base::Code(_), None) => unreachable!("a code always starts SPAKE2"),
+    };
+    let mut channel = Channel::new(stream, session_key(&base, &salt, theirs), false);
     channel
         .send(&Hello {
             device: me.clone(),
@@ -593,6 +642,8 @@ async fn answer(
         return Err(PairError::Protocol);
     }
     let salt = unhex(&header.salt).ok_or(PairError::Protocol)?;
+    // A code's SPAKE2 answer, sent with this side's salt.
+    let mut spake_reply = Vec::new();
     let base = match &header.from {
         Some(id) => {
             let l = local.lock().unwrap();
@@ -609,13 +660,20 @@ async fn answer(
             if made.elapsed() > CODE_TTL {
                 return Err(PairError::Auth);
             }
-            code_key(&code).to_vec()
+            let theirs = header
+                .spake
+                .as_deref()
+                .and_then(unhex)
+                .ok_or(PairError::Protocol)?;
+            let (state, msg) = spake_start(&code, true);
+            spake_reply = msg;
+            spake_finish(state, &theirs)?
         }
     };
     // This side's salt: a replayed recording gets another key, so it neither opens nor makes this side seal twice
     // under one key and nonce.
     let mine = random::<16>();
-    write_frame(&mut stream, &mine).await?;
+    write_frame(&mut stream, &[&mine[..], &spake_reply].concat()).await?;
     let mut channel = Channel::new(stream, session_key(&base, &salt, &mine), true);
     let hello: Hello = channel.receive().await?;
     // A remembered peer must say who it claimed to be in clear.
@@ -1091,10 +1149,16 @@ mod tests {
     #[test]
     fn codes_read_forgivingly_and_links_parse() {
         let code = new_code();
-        assert_eq!(code.len(), 12);
-        assert!(code.bytes().all(|b| ALPHABET.contains(&b)));
-        assert_eq!(normalize(&format_code(&code).to_lowercase()), code);
+        assert_eq!(code.len(), 6);
+        assert!(code.bytes().all(|b| b.is_ascii_digit()));
+        assert_eq!(format_code("482913"), "482 913");
+        assert_eq!(normalize(&format_code(&code)), code);
         assert_eq!(normalize("oil0-1"), "01101");
+        // Every digit turns up (no digit is left out by the byte mapping).
+        let digits: std::collections::BTreeSet<char> = (0..200)
+            .flat_map(|_| new_code().chars().collect::<Vec<_>>())
+            .collect();
+        assert_eq!(digits.len(), 10);
         let link = qr_text("192.0.2.7:4100", &code);
         assert_eq!(
             parse_pair_link(&link),
@@ -1271,7 +1335,19 @@ mod tests {
         let code = listener.new_code();
         let phone = side("phone", Some("p1"), None, 1);
         let addr = format!("127.0.0.1:{}", listener.port);
-        let wrong = if code.starts_with('A') { "B" } else { "A" }.to_string() + &code[1..];
+        // An older gerdTV (protocol 2: the code hashed into the key, no SPAKE2) is refused without using up the code.
+        let mut old = TcpStream::connect(&addr).await.unwrap();
+        let header = br#"{"v":2,"salt":"00000000000000000000000000000000","from":null}"#;
+        write_frame(&mut old, header).await.unwrap();
+        assert!(
+            read_frame(&mut old).await.is_err(),
+            "closed without an answer"
+        );
+        assert!(
+            matches!(rx.recv().await.unwrap(), Event::Failed(_)),
+            "a failure, not a new code"
+        );
+        let wrong = if code.starts_with('1') { "2" } else { "1" }.to_string() + &code[1..];
         assert!(matches!(
             connect_code(&addr, &wrong, &phone.me, None).await,
             Err(PairError::Auth | PairError::Io(_))

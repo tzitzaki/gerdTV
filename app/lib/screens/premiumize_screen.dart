@@ -3,8 +3,8 @@
 // progress (a finished one opens its folder). The core talks to Premiumize (gerdtv_core::premiumize); the token is
 // in the secure storage (Session.linkPremiumize).
 // Linking: the account's API key (premiumize.me/account) works for everyone; the code login (premiumize.me/device)
-// shows only when the build has gerdTV's registered client id (--dart-define=GERDTV_PREMIUMIZE_CLIENT_ID=…, a
-// public identifier from a repository variable; no secret ships in the app).
+// needs the user's own client id (premiumize.me/registerclient, typed below the key; owner decision: no client id
+// ships with gerdTV) and shows once one is typed.
 // Debugging: "authentication_failed" in an error line means Premiumize no longer accepts the key or token: link it
 // again.
 
@@ -19,11 +19,6 @@ import '../src/rust/api/premiumize.dart';
 import '../theme.dart';
 import 'player_screen.dart';
 import 'link_dialog.dart';
-
-/// gerdTV's client id at Premiumize, given to release builds; empty: only the API key links.
-const premiumizeClientId = String.fromEnvironment(
-  'GERDTV_PREMIUMIZE_CLIENT_ID',
-);
 
 /// "1.4 GB", "820 MB" (metric, as the rest of the app).
 String sizeLabel(int bytes) => bytes >= 1000000000
@@ -197,7 +192,7 @@ class _TransfersScreen extends StatelessWidget {
   }
 }
 
-/// Settings → Account → Premiumize: link with the API key (or a code, where the build can), or unlink.
+/// Settings → Account → Premiumize: link with the API key (or a code, with the user's own client id), or unlink.
 class PremiumizeSettings extends StatefulWidget {
   const PremiumizeSettings({super.key, required this.session});
   final Session session;
@@ -208,12 +203,16 @@ class PremiumizeSettings extends StatefulWidget {
 
 class _PremiumizeSettingsState extends State<PremiumizeSettings> {
   final _key = TextEditingController();
+  late final _clientId = TextEditingController(
+    text: widget.session.premiumizeApp ?? '',
+  );
   String? _error;
   bool _busy = false;
 
   @override
   void dispose() {
     _key.dispose();
+    _clientId.dispose();
     super.dispose();
   }
 
@@ -275,15 +274,30 @@ class _PremiumizeSettingsState extends State<PremiumizeSettings> {
                 onPressed: _busy ? null : () => _link(() async => _key.text),
                 child: Text(l10n.premiumizeLink),
               ),
-              if (premiumizeClientId.isNotEmpty)
+              if (_clientId.text.trim().isNotEmpty)
                 OutlinedButton(
                   key: const Key('premiumize.code'),
                   onPressed: _busy
                       ? null
-                      : () => _link(() => _deviceLogin(context)),
+                      : () => _link(() async {
+                          await s.setPremiumizeApp(_clientId.text);
+                          if (!context.mounted) return null;
+                          return _deviceLogin(context, s.premiumizeApp!);
+                        }),
                   child: Text(l10n.premiumizeCode),
                 ),
             ],
+          ),
+          // The code login's own client id (optional; the key above works without it).
+          TextField(
+            key: const Key('premiumize.clientId'),
+            controller: _clientId,
+            decoration: InputDecoration(
+              labelText: l10n.premiumizeClientId,
+              helperText: l10n.premiumizeClientIdHint,
+              helperMaxLines: 2,
+            ),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: Tokens.space),
         ],
@@ -293,8 +307,8 @@ class _PremiumizeSettingsState extends State<PremiumizeSettings> {
 }
 
 /// The code login at premiumize.me/device (link_dialog.dart).
-Future<String?> _deviceLogin(BuildContext context) async {
-  final code = await pmDeviceStart(clientId: premiumizeClientId);
+Future<String?> _deviceLogin(BuildContext context, String clientId) async {
+  final code = await pmDeviceStart(clientId: clientId);
   if (!context.mounted) return null;
   return deviceCodeLogin(
     context,
@@ -305,7 +319,7 @@ Future<String?> _deviceLogin(BuildContext context) async {
     expiresIn: code.expiresIn,
     poll: () async {
       final p = await pmDevicePoll(
-        clientId: premiumizeClientId,
+        clientId: clientId,
         deviceCode: code.deviceCode,
       );
       return (token: p.token, failed: p.failed, slowDown: p.slowDown);

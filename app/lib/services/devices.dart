@@ -48,9 +48,10 @@ class Devices {
   /// The app keys that travel, by their secure-storage name.
   static const appKeyNames = ['tmdb', 'opensubtitles', 'opensubtitles-login'];
 
-  /// A profile's linked services' secrets that travel: the tokens, and Trakt's/Simkl's own app (tracking.dart).
+  /// A profile's linked services' secrets that travel: the tokens, and the own apps (tracking.dart, Premiumize's).
   static const serviceNames = [
     'premiumize',
+    'premiumize-app',
     'trakt',
     'trakt-app',
     'simkl',

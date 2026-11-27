@@ -8,8 +8,10 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Search: in TV lists and guide "tnt 4"-style queries list the channel first, then Live now and Upcoming; Show earlier; the guide's group chip limits it.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
 - Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
+- Back: Settings → Account → Edit the provider closes with its back arrow, Esc and the mouse's side button; an open dialog closes first.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
+- Window minimum: outside the player the window can't be dragged smaller than about 960 × 540 (the rail stays); the player and P still go smaller.
 - Player window: no black bars, resizing keeps the ratio, 4:3 channels re-fit, back returns to the list size (also after a restart); P floats it at that ratio.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
@@ -28,7 +30,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Subtitles online (with your OpenSubtitles key): Find subtitles online lists German ones for a movie; a tap shows them in the picture.
 
 - Web player (host paired): a link from Settings → Web player opens in Safari and Chrome; a channel and a movie play, +3 h extends.
-- Devices & sync: Show a code; on the Shield pick the Mac and type it; the Shield names the Mac first, Sync moves the login and favourites.
+- Devices & sync (both on this release): Show a code (6 digits); the Shield picks the Mac, takes it on the number pad, names the Mac; Sync moves the login.
 - Pair by webcam: Devices & sync → Scan a code with the camera asks for the camera once; the TV's QR opens the confirmation; closing the window cancels.
 - Web player in Safari: a busy account (a channel playing in the app) says the provider's connection is in use; back, close and stars are Material icons.
 

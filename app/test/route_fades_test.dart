@@ -1,7 +1,10 @@
 // New, because nothing owned screen-change motion: every route takes Tokens.motion (docs/DESIGN.md) and is fully
 // shown right after; wide windows fade on every platform, phones (iOS, Android below the wide layout) slide and close
-// with a swipe from the left edge (owner decision), and reduced motion shows the page without a transition.
+// with a swipe from the left edge (owner decision), reduced motion shows the page without a transition, and Esc or the
+// mouse's back button close the top page (owner decision; a dialog first, never the first page).
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/theme.dart';
 import 'package:material_ui/material_ui.dart';
@@ -98,5 +101,59 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.byType(FadeTransition), findsNothing);
+  });
+
+  testWidgets('Esc and the mouse back button close the top page', (
+    tester,
+  ) async {
+    final nav = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: nav,
+        theme: gerdTheme(Brightness.dark),
+        builder: (context, child) => BackKeys(navigator: nav, child: child!),
+        home: const Scaffold(body: Text('home')),
+      ),
+    );
+    void push() => nav.currentState!.push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Center(child: Text('next'))),
+      ),
+    );
+
+    // The first page stays: there is nothing to go back to.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('home'), findsOneWidget);
+
+    push();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('next'), findsNothing, reason: 'Esc closed the page');
+
+    push();
+    await tester.pumpAndSettle();
+    final mouse = await tester.createGesture(
+      kind: PointerDeviceKind.mouse,
+      buttons: kBackMouseButton,
+    );
+    await mouse.down(const Offset(100, 100));
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(find.text('next'), findsNothing, reason: 'mouse back closed it');
+
+    // A dialog on top: Esc closes the dialog, not the page below it.
+    push();
+    await tester.pumpAndSettle();
+    showDialog<void>(
+      context: nav.currentContext!,
+      builder: (_) => const AlertDialog(content: Text('dialog')),
+    );
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('dialog'), findsNothing);
+    expect(find.text('next'), findsOneWidget);
   });
 }

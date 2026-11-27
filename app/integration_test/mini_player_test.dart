@@ -1,6 +1,7 @@
 // Spike B journey: switching the desktop window into mini-player mode and back keeps the stream running: the
 // position keeps advancing and the fault server never sees a second request for the stream. Also the player window's
-// sizes (VideoWindow): it takes the picture's ratio and returns to the browsing size.
+// sizes (VideoWindow): it takes the picture's ratio and returns to the browsing size, and the browsing window can't
+// shrink below VideoWindow.browseMin (the player's and the mini window's minimums are smaller, and are given back).
 // Needs the fault server: `just test-integration` starts it and passes its URL as GERDTV_FAULT_SERVER.
 import 'dart:io';
 
@@ -44,6 +45,18 @@ Future<void> playsOn(Player player, String phase) async {
     advanced,
     greaterThan(const Duration(seconds: 2)),
     reason: 'still playing $phase',
+  );
+}
+
+/// The window's minimum as a content size (the system's minimum is the frame's).
+({double width, double height}) minContent() {
+  final w = wm.WindowManager.instance.getCurrent()!;
+  final min = w.minimumSize.toSize();
+  final frame = w.size.toSize();
+  final content = w.contentSize.toSize();
+  return (
+    width: min.width - (frame.width - content.width),
+    height: min.height - (frame.height - content.height),
   );
 }
 
@@ -110,14 +123,20 @@ void main() {
         read: (k) async => settings[k],
         write: (k, v) async => settings[k] = v,
       );
+      // The browsing minimum from the start; the player allows smaller windows.
+      await window.restoreBrowse();
+      expect(minContent().width, closeTo(VideoWindow.browseMin.width, 1));
+      expect(minContent().height, closeTo(VideoWindow.browseMin.height, 1));
       // Content sizes: macOS's frame adds the title bar.
       await window.follow(4 / 3);
       await Future<void>.delayed(const Duration(milliseconds: 200));
       final inPlayer = await settledContent();
       expect(inPlayer.width, closeTo(640, 1));
       expect(inPlayer.height, closeTo(480, 1));
+      expect(minContent().width, closeTo(VideoWindow.playerMin.width, 1));
       await window.leave();
       await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(minContent().width, closeTo(VideoWindow.browseMin.width, 1));
       final back = await settledContent();
       expect(back.width, closeTo(normalContent.width, 1));
       expect(back.height, closeTo(normalContent.height, 1));
@@ -132,6 +151,11 @@ void main() {
       mini.exit();
       await Future<void>.delayed(const Duration(milliseconds: 500));
       expect(mini.size.width, closeTo(normal.width, 1));
+      expect(
+        minContent().width,
+        closeTo(VideoWindow.browseMin.width, 1),
+        reason: 'mini mode gives the minimum back',
+      );
       await playsOn(player, 'after leaving mini mode');
 
       expect(

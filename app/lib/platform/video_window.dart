@@ -5,6 +5,8 @@
 // Two sizes are remembered across restarts (app-wide settings): the browsing size (the window outside the player) and
 // the player's width (its height follows each picture's ratio). Opening the player animates to the player size,
 // leaving it animates back (stepped in Dart on Linux, instant on macOS, see _resizeTo). Fullscreen and the mini player have their own sizes: [unlock] while they show.
+// Outside the player the window can't shrink below [VideoWindow.browseMin] (owner decision: the desktop layout stays);
+// the player allows smaller windows, so any picture ratio fits.
 //
 // Debug hints: bars despite the lock usually mean the ratio came from a stream whose width/height mpv reported before
 // the first frame (zapping re-fits on the next report); a window that doesn't move at all means getCurrent() returned
@@ -51,6 +53,13 @@ class VideoWindow {
   final Future<String?> Function(String key) read;
   final Future<void> Function(String key, String value) write;
 
+  /// The smallest browsing content: the TV form factor, which the screen check proves (wide layout with the rail,
+  /// nothing overlapping, texts readable); below Tokens.wideLayout the phone layout would take over.
+  static const browseMin = ui.Size(960, 540);
+
+  /// The smallest player content: room for media_kit's controls, any picture ratio still fits.
+  static const playerMin = ui.Size(320, 180);
+
   static const browseKey = 'window_browse';
   static const playerKey = 'window_player';
 
@@ -65,11 +74,35 @@ class VideoWindow {
   wm.Window? get _window =>
       supported ? wm.WindowManager.instance.getCurrent() : null;
 
-  /// At start: the browsing size of the last run.
+  /// At start: the browsing minimum, and the browsing size of the last run (at least the minimum: a size stored
+  /// before the minimum existed may be smaller).
   Future<void> restoreBrowse() async {
     final size = parseWindowSize(await read(browseKey));
     final w = _window;
-    if (size != null && w != null) w.setSize(size.toNative(), false);
+    if (w == null) return;
+    final min = _minimum(w, browseMin);
+    if (size != null) {
+      w.setSize(
+        ui.Size(
+          size.width.clamp(min.width, double.infinity),
+          size.height.clamp(min.height, double.infinity),
+        ).toNative(),
+        false,
+      );
+    }
+  }
+
+  /// Sets the window's minimum for [content] and returns it as a frame size. The system's minimum is the frame's
+  /// (title bar and Linux's decorations included), so the content's minimum is grown by them.
+  ui.Size _minimum(wm.Window w, ui.Size content) {
+    final frame = w.size.toSize();
+    final inner = w.contentSize.toSize();
+    final min = ui.Size(
+      content.width + frame.width - inner.width,
+      content.height + frame.height - inner.height,
+    );
+    w.minimumSize = min.toNative();
+    return min;
   }
 
   /// The player shows a picture of [ratio] (width / height): the first call remembers the browsing size and moves to
@@ -81,6 +114,7 @@ class VideoWindow {
     _ratio = ratio; // set before the awaits: a second report meanwhile is the same ratio
     var width = w.contentSize.toSize().width;
     if (first) {
+      _minimum(w, playerMin);
       await write(browseKey, formatWindowSize(w.size.toSize()));
       width = parseWindowSize(await read(playerKey))?.width ?? width;
     }
@@ -131,6 +165,7 @@ class VideoWindow {
     _unlockedFor.clear();
     w.aspectRatio = 0;
     await write(playerKey, formatWindowSize(w.contentSize.toSize()));
+    _minimum(w, browseMin);
     final browse = parseWindowSize(await read(browseKey));
     if (browse != null) await _resizeTo(w, browse, animate: true);
   }
