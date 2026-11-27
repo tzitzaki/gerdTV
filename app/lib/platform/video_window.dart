@@ -4,7 +4,7 @@
 //
 // Two sizes are remembered across restarts (app-wide settings): the browsing size (the window outside the player) and
 // the player's width (its height follows each picture's ratio). Opening the player animates to the player size,
-// leaving it animates back (stepped in Dart, see _resizeTo). Fullscreen and the mini player have their own sizes: [unlock] while they show.
+// leaving it animates back (stepped in Dart on Linux, instant on macOS, see _resizeTo). Fullscreen and the mini player have their own sizes: [unlock] while they show.
 //
 // Debug hints: bars despite the lock usually mean the ratio came from a stream whose width/height mpv reported before
 // the first frame (zapping re-fits on the next report); a window that doesn't move at all means getCurrent() returned
@@ -171,16 +171,17 @@ class VideoWindow {
     w.aspectRatio = ratio;
   }
 
-  /// Resizes the frame to [size]; animated in 8 steps of 20 ms. Not nativeapi's own animation: on macOS it goes
-  /// through NSWindow's animator proxy, and called this way the window didn't move at all (CI: 780 px stayed 780).
-  /// Debugging a window that ends between sizes: something else resized it during the 160 ms.
+  /// Resizes the frame to [size]; on Linux animated in 8 steps of 20 ms, on macOS in one step. Not nativeapi's own
+  /// animation: on macOS it goes through NSWindow's animator proxy, and called this way the window didn't move at all
+  /// (CI: 780 px stayed 780). Debugging a window that ends between sizes: something else resized it during the 160 ms.
   Future<void> _resizeTo(
     wm.Window w,
     ui.Size size, {
     required bool animate,
   }) async {
     final from = w.size.toSize();
-    // TEMP experiment B (macOS CI): one plain resize on the Mac, to see whether the 8 steps break the pause there.
+    // Not stepped on macOS: quick successive resizes there kept mpv's pause from applying while the player opened
+    // (CI: userPaused true, playback ran on). One resize keeps it working; the switch is instant instead of animated.
     if (animate && !Platform.isMacOS) {
       for (var i = 1; i < 8; i++) {
         w.setSize(ui.Size.lerp(from, size, i / 8)!.toNative(), false);
