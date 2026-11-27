@@ -834,15 +834,13 @@ async fn api(
 /// provider usually answers with a redirect to a tokenised address: that one goes to the browser, so the login stays
 /// here. A provider that serves the stream itself (no redirect) gets its plain address; one that refuses it (a dead
 /// channel, the account's limit) gets a 502, so a refused stream never hands out the login. `plain` (`?plain=1`, the
-/// page's retry when a tokenised address is refused, e.g. bound to this host's IP) skips the lookup.
+/// page's retry when a tokenised address is refused, e.g. bound to this host's IP) gets the plain address instead of
+/// the tokenised one, still only for a stream the provider serves.
 async fn stream(host: &Host, lib: &Library, key: &str, plain: bool) -> Result<Response, String> {
     let url = lib.stream_url(key, "m3u8").map_err(|e| e.to_string())?;
-    if plain {
-        return Ok(Response::redirect(&url));
-    }
     Ok(match resolve(&host.http, &url).await {
-        Answer::Redirect(to) => Response::redirect(&to),
-        Answer::Direct => Response::redirect(&url),
+        Answer::Redirect(to) if !plain => Response::redirect(&to),
+        Answer::Redirect(_) | Answer::Direct => Response::redirect(&url),
         Answer::Refused(why) => {
             eprintln!("host: the provider refused a stream: {why}");
             Response::new(502, "text/plain", "refused by the provider")
