@@ -3,6 +3,7 @@
 
 use crate::api::library::ProfileInfo;
 use gerdtv_core::pairing as core;
+use gerdtv_core::relay as core_relay;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -78,6 +79,8 @@ pub struct PairEvent {
 pub struct FoundDevice {
     pub device: DeviceInfo,
     pub addr: String,
+    /// A host's public front address (its relay), from its announcement.
+    pub web: Option<String>,
 }
 
 pub struct QrInfo {
@@ -89,6 +92,19 @@ pub struct QrInfo {
 pub struct PairLink {
     pub addr: String,
     pub code: String,
+    /// Where to meet the listener when its LAN address doesn't answer (relay.rs), and its doorbell.
+    pub relay_web: Option<String>,
+    pub bell: Option<String>,
+}
+
+/// A relay from its parts (both needed).
+fn relay(web: Option<String>, bell: Option<String>) -> Option<core_relay::Relay> {
+    match (web, bell) {
+        (Some(web), Some(bell)) if !web.is_empty() && !bell.is_empty() => {
+            Some(core_relay::Relay { web, bell })
+        }
+        _ => None,
+    }
 }
 
 impl From<DeviceInfo> for core::Device {
@@ -180,16 +196,31 @@ pub fn pair_new_device_id() -> String {
     core::new_device_id()
 }
 
-/// The QR's text for this device's listener (`addr` = "ip:port") and code.
+/// The QR's text for this device's listener (`addr` = "ip:port") and code; with `relay_web`, this device's doorbell
+/// (`me_id`) at that relay too.
 #[flutter_rust_bridge::frb(sync)]
-pub fn pair_link_text(addr: String, code: String) -> String {
-    core::qr_text(&addr, &core::normalize(&code))
+pub fn pair_link_text(
+    addr: String,
+    code: String,
+    relay_web: Option<String>,
+    me_id: String,
+) -> String {
+    core::qr_text(
+        &addr,
+        &core::normalize(&code),
+        relay(relay_web, Some(me_id)).as_ref(),
+    )
 }
 
 /// A `gerdtv://pair?…` link (the system camera opened gerdTV with it), or None.
 #[flutter_rust_bridge::frb(sync)]
 pub fn pair_parse_link(link: String) -> Option<PairLink> {
-    core::parse_pair_link(&link).map(|(addr, code)| PairLink { addr, code })
+    core::parse_pair_link(&link).map(|l| PairLink {
+        addr: l.addr,
+        code: l.code,
+        relay_web: l.relay.as_ref().map(|r| r.web.clone()),
+        bell: l.relay.map(|r| r.bell),
+    })
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -275,6 +306,7 @@ pub async fn pair_discover(me_id: String, wait_ms: u32) -> Result<Vec<FoundDevic
         .map(|f| FoundDevice {
             device: f.device.into(),
             addr: f.addr,
+            web: f.web,
         })
         .collect())
 }
@@ -299,7 +331,7 @@ impl PairListener {
             .await
             .map_err(err)?;
         let advertiser = if announce {
-            core::advertise(&me, inner.port).ok()
+            core::advertise(&me, inner.port, None).ok()
         } else {
             None
         };
@@ -325,6 +357,13 @@ impl PairListener {
     #[flutter_rust_bridge::frb(sync)]
     pub fn clear_code(&self) {
         self.inner.clear_code()
+    }
+
+    /// Also listen at the relay `web` (this device's doorbell; None: the LAN only). Same relay again: no change.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_relay(&self, web: Option<String>) {
+        let me = self.local.lock().unwrap().me.id.clone();
+        self.inner.set_relay(relay(web, Some(me)));
     }
 
     /// The open profile, secrets or remembered devices changed.
@@ -384,29 +423,35 @@ fn connection(c: core::Connection) -> PairConnection {
     }
 }
 
-/// Connects with the code another device shows (typed, or from its QR).
+/// Connects with the code another device shows (typed, or from its QR): on the LAN at `addr` (empty: unknown), else
+/// through the relay its QR named (`relay_web`, `bell`).
 pub async fn pair_connect_code(
     addr: String,
     code: String,
     me: DeviceInfo,
     port: Option<u16>,
+    relay_web: Option<String>,
+    bell: Option<String>,
 ) -> Result<PairConnection, String> {
+    let relay = relay(relay_web, bell);
     Ok(connection(
-        core::connect_code(&addr, &code, &me.into(), port)
+        core::connect_code(&addr, &code, &me.into(), port, relay.as_ref())
             .await
             .map_err(err)?,
     ))
 }
 
-/// Connects to a remembered device.
+/// Connects to a remembered device: on the LAN at `addr` (empty: unknown), else at its doorbell on `relay_web`.
 pub async fn pair_connect_peer(
     addr: String,
     me: DeviceInfo,
     port: Option<u16>,
     peer: PeerInfo,
+    relay_web: Option<String>,
 ) -> Result<PairConnection, String> {
+    let relay = relay(relay_web, Some(peer.device.id.clone()));
     Ok(connection(
-        core::connect_peer(&addr, &me.into(), port, &peer.into())
+        core::connect_peer(&addr, &me.into(), port, &peer.into(), relay.as_ref())
             .await
             .map_err(err)?,
     ))

@@ -16,6 +16,7 @@ pub mod pairing;
 pub mod playback;
 pub mod premiumize;
 pub mod recorder;
+pub mod relay;
 pub mod tmdb;
 pub mod tracking;
 pub mod update;

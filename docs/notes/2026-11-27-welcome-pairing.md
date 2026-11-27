@@ -8,3 +8,4 @@ app-wide, shared pairing widgets, direct APK/IPA links (welcome QR, iPhone updat
 2. Shared pairing widgets: 23:41
 4. Direct phone files (before 3): 23:42
 3. Welcome screen: 23:43
+4b. Relay via own host: 00:08

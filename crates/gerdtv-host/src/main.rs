@@ -94,7 +94,8 @@ async fn listen(
     if code {
         let c = l.new_code();
         let ip = pairing::local_ip().unwrap_or_else(|| "127.0.0.1".into());
-        let link = pairing::qr_text(&format!("{ip}:{}", l.port), &c);
+        // The host pairs on its own network only (it is the relay; it does not ring itself).
+        let link = pairing::qr_text(&format!("{ip}:{}", l.port), &c, None);
         println!("{}", qr_text_art(&link));
         println!(
             "Code: {}  (gerdTV: Settings → Account → Devices & sync)",
@@ -144,7 +145,7 @@ async fn pair(cfg: Config, mut file: HostFile, port: u16) {
     file.device();
     let host = Host::new(cfg, file);
     let (_l, mut rx) = listen(&host, true, port).await;
-    let _ad = pairing::advertise(&host.local(None).me, _l.port).ok();
+    let _ad = pairing::advertise(&host.local(None).me, _l.port, Some(&host.cfg.front)).ok();
     while let Some(e) = rx.recv().await {
         if stored(&host, e) {
             println!("Paired. Start the service now.");
@@ -163,7 +164,7 @@ async fn serve(cfg: Config, mut file: HostFile, port: u16) {
         std::process::exit(1);
     }
     let (l, mut rx) = listen(&host, false, port).await;
-    let _ad = pairing::advertise(&host.local(None).me, l.port).ok();
+    let _ad = pairing::advertise(&host.local(None).me, l.port, Some(&host.cfg.front)).ok();
     let h = host.clone();
     tokio::spawn(async move {
         while let Some(e) = rx.recv().await {

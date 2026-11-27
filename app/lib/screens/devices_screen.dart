@@ -17,6 +17,7 @@ import '../platform/platform_bridge.dart';
 import '../services/session.dart';
 import '../src/rust/api/pairing.dart';
 import '../theme.dart';
+import 'setup_screen.dart' show checkUrl;
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key, required this.session});
@@ -274,7 +275,8 @@ class _PairConfirmScreenState extends State<PairConfirmScreen> {
 }
 
 /// This device's pairing code while it listens ([Devices.startPairing] gave [qr]): the QR for a phone's camera, the
-/// code to type on the other device, and this device's name. A new code (the old one was used) changes the QR too.
+/// code to type on the other device, and this device's name. A new code (the old one was used) or a relay found later
+/// (a host announced itself) changes the QR too.
 class PairCodeView extends StatelessWidget {
   const PairCodeView({super.key, required this.session, required this.qr});
   final Session session;
@@ -285,15 +287,15 @@ class PairCodeView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final d = session.devices;
     final theme = Theme.of(context);
-    return ValueListenableBuilder<String?>(
-      valueListenable: d.code,
-      builder: (context, code, _) => Column(
+    return ListenableBuilder(
+      listenable: Listenable.merge([d.code, d.relay]),
+      builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           QrView(text: d.qrText() ?? qr, size: 220),
           const SizedBox(height: Tokens.space * 2),
           SelectableText(
-            code ?? '',
+            d.code.value ?? '',
             key: const Key('devices.code'),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -309,7 +311,8 @@ class PairCodeView extends StatelessWidget {
 
 /// The gerdTV devices this one finds on the network (searched on open), the Mac's webcam scan, and for a picked
 /// device its code field; Next connects and opens [PairConfirmScreen], which shows who answered before anything is
-/// sent. Errors go to [onStatus] (the page shows them on top).
+/// sent. Errors go to [onStatus] (the page shows them on top). Last, the relay address ([RelayField]): pairing and
+/// syncing from other networks.
 class NearbyDevices extends StatefulWidget {
   const NearbyDevices({
     super.key,
@@ -458,7 +461,73 @@ class _NearbyDevicesState extends State<NearbyDevices> {
           enabled: !_searching,
           onTap: _search,
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Tokens.space * 2,
+            Tokens.space,
+            Tokens.space * 2,
+            0,
+          ),
+          child: RelayField(session: widget.session),
+        ),
       ],
+    );
+  }
+}
+
+/// The relay address (the user's gerdTV host's front address) for pairing and syncing with devices on other
+/// networks. Usually found by itself (a paired host, or a host announcing itself at home), so the field shows the
+/// one in use; a typed one wins, empty goes back to the automatic one. Saved on Enter.
+class RelayField extends StatefulWidget {
+  const RelayField({super.key, required this.session});
+  final Session session;
+
+  @override
+  State<RelayField> createState() => _RelayFieldState();
+}
+
+class _RelayFieldState extends State<RelayField> {
+  late final _text = TextEditingController(
+    text: widget.session.devices.typedRelay,
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _save(AppLocalizations l10n) {
+    final v = _text.text.trim();
+    // The same check as the provider's server address (setup_screen.dart); empty is allowed here.
+    final error = v.isEmpty ? null : checkUrl(v, l10n);
+    setState(() => _error = error);
+    if (error == null) widget.session.devices.setTypedRelay(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final d = widget.session.devices;
+    return ValueListenableBuilder<String?>(
+      valueListenable: d.relay,
+      builder: (context, relay, _) => TextField(
+        key: const Key('devices.relay'),
+        controller: _text,
+        keyboardType: TextInputType.url,
+        autocorrect: false,
+        decoration: InputDecoration(
+          labelText: l10n.relayAddress,
+          hintText: 'https://tv.example.org',
+          helperText: relay != null && d.typedRelay.isEmpty
+              ? l10n.relayFound(relay)
+              : l10n.relayHint,
+          helperMaxLines: 3,
+          errorText: _error,
+        ),
+        onSubmitted: (_) => _save(l10n),
+      ),
     );
   }
 }
@@ -468,7 +537,12 @@ Future<void> openPairLink(Session session, PairLink link) async {
   final nav = session.navigatorKey.currentState;
   if (nav == null) return;
   try {
-    final c = await session.devices.connectCode(link.addr, link.code);
+    final c = await session.devices.connectCode(
+      link.addr,
+      link.code,
+      relayWeb: link.relayWeb,
+      bell: link.bell,
+    );
     await nav.push(
       MaterialPageRoute<void>(
         builder: (_) =>

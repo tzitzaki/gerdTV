@@ -5,7 +5,9 @@
 //! Two names, one port (the tunnel sends both here; routing is by the `Host` header):
 //! - the **front door** (`front`, HTTPS at the tunnel): `/l/<code>` (or the code typed on its page, `/go?c=`) turns a
 //!   one-time login link (8 characters, 10 minutes) into a session and hands the browser over to the player; `/app`
-//!   answers a paired app's sealed requests (a new link, the sessions, ending one; pairing.rs `app_request`).
+//!   answers a paired app's sealed requests (a new link, the sessions, ending one; pairing.rs `app_request`);
+//!   `/relay/<key>` holds the mailboxes two devices on different networks pair and sync through (relay.rs: `POST`
+//!   drops a sealed frame, `GET` waits up to 25 s for one; the host can't open them).
 //! - the **player** (`player`, plain HTTP, so the page may play the provider's http:// streams directly): `/h/<code>`
 //!   sets the session cookie, the page itself (web/), `/api/*` for the catalogue, and `/s/<key>`, which redirects to
 //!   the stream: to the provider's own redirect target where there is one (it carries a token, not the login).
@@ -46,6 +48,8 @@ const FAIL_WINDOW: i64 = 10 * 60;
 const MAX_BODY: usize = 64 << 10;
 /// How long a client may take to send its whole request.
 const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+/// A relayed frame can be a profile's user data (relay.rs MAX_MESSAGE): more time for its body through the tunnel.
+const RELAY_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
 /// The host's settings (command line).
 #[derive(Debug, Clone)]
@@ -292,6 +296,8 @@ pub struct Host {
     /// The open profile's library; replaced when a sync brings a new login.
     pub library: RwLock<Option<Arc<Library>>>,
     pub auth: Mutex<Auth>,
+    /// The relay's mailboxes (in memory; a restart drops them and the devices try again).
+    pub relay: gerdtv_core::relay::Mailboxes,
     http: reqwest::Client,
 }
 
@@ -303,6 +309,7 @@ impl Host {
             file: Mutex::new(file),
             library: RwLock::new(None),
             auth: Mutex::new(Auth::default()),
+            relay: Default::default(),
             http: reqwest::Client::builder()
                 // Only the provider's first answer is wanted (its redirect target), never the stream itself.
                 .redirect(reqwest::redirect::Policy::none())
@@ -425,6 +432,7 @@ impl Response {
 fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        204 => "No Content",
         302 => "Found",
         400 => "Bad Request",
         401 => "Unauthorized",
@@ -459,10 +467,9 @@ pub async fn serve(host: Arc<Host>) -> std::io::Result<()> {
 }
 
 async fn answer(host: Arc<Host>, mut stream: TcpStream, peer: IpAddr) -> std::io::Result<()> {
-    // One deadline for the whole request, head and body: a client that trickles bytes or stops can't hold the
+    // Deadlines for the whole request (read_request): a client that trickles bytes or stops can't hold the
     // connection open.
-    let read = tokio::time::timeout(REQUEST_TIMEOUT, read_request(&mut stream, peer));
-    let Ok(Some(req)) = read.await.map_err(|_| std::io::Error::other("timeout"))? else {
+    let Some(req) = read_request(&mut stream, peer).await? else {
         return Ok(());
     };
     let res = handle(&host, req).await;
@@ -483,11 +490,18 @@ async fn answer(host: Arc<Host>, mut stream: TcpStream, peer: IpAddr) -> std::io
     stream.flush().await
 }
 
+/// One request; None for a broken, too large or too slow one. The head must arrive within [REQUEST_TIMEOUT], and so
+/// must the body, except a relay frame's ([RELAY_REQUEST_TIMEOUT], up to relay.rs MAX_MESSAGE).
 async fn read_request(stream: &mut TcpStream, peer: IpAddr) -> std::io::Result<Option<Request>> {
+    let start = tokio::time::Instant::now();
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
     let end = loop {
-        let n = stream.read(&mut chunk).await?;
+        let Ok(n) = tokio::time::timeout_at(start + REQUEST_TIMEOUT, stream.read(&mut chunk)).await
+        else {
+            return Ok(None);
+        };
+        let n = n?;
         if n == 0 {
             return Ok(None);
         }
@@ -513,12 +527,24 @@ async fn read_request(stream: &mut TcpStream, peer: IpAddr) -> std::io::Result<O
         .get("content-length")
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
-    if len > MAX_BODY {
+    let relay = path.starts_with("/relay/");
+    let (max, deadline) = if relay {
+        (
+            gerdtv_core::relay::MAX_MESSAGE,
+            start + RELAY_REQUEST_TIMEOUT,
+        )
+    } else {
+        (MAX_BODY, start + REQUEST_TIMEOUT)
+    };
+    if len > max {
         return Ok(None);
     }
     let mut body = buf[end + 4..].to_vec();
     while body.len() < len {
-        let n = stream.read(&mut chunk).await?;
+        let Ok(n) = tokio::time::timeout_at(deadline, stream.read(&mut chunk)).await else {
+            return Ok(None);
+        };
+        let n = n?;
         if n == 0 {
             break;
         }
@@ -624,7 +650,41 @@ async fn front(host: &Host, req: Request) -> Response {
             }
         }
         ("POST", "/app") => app(host, &req, ip, now),
+        (method @ ("GET" | "POST"), p) if p.starts_with("/relay/") => {
+            relay(host, method, &p["/relay/".len()..], req.body, ip, now).await
+        }
         _ => Response::not_found(),
+    }
+}
+
+/// The relay's mailboxes (relay.rs): POST drops a frame (or a doorbell's session id), GET waits for the next.
+/// A malformed key counts as a failed attempt (the front's rate limit), a full host answers 503.
+async fn relay(
+    host: &Host,
+    method: &str,
+    key: &str,
+    body: Vec<u8>,
+    ip: IpAddr,
+    now: i64,
+) -> Response {
+    use gerdtv_core::relay::{POLL_WAIT, Refused};
+    let refused = |r: Refused| match r {
+        Refused::BadKey => {
+            host.auth.lock().unwrap().fail(ip, now);
+            Response::not_found()
+        }
+        Refused::Full => Response::new(503, "text/plain", "full"),
+    };
+    if method == "POST" {
+        return match host.relay.post(key, body) {
+            Ok(()) => Response::new(204, "text/plain", ""),
+            Err(r) => refused(r),
+        };
+    }
+    match host.relay.poll(key, POLL_WAIT).await {
+        Ok(Some(m)) => Response::new(200, "application/octet-stream", m),
+        Ok(None) => Response::new(204, "text/plain", ""),
+        Err(r) => refused(r),
     }
 }
 

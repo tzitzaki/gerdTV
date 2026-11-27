@@ -411,6 +411,16 @@
   "recordingsAppFolders": "This device has no folder picker: gerdTV's own folder on a drive (deleted when gerdTV is uninstalled).",
   "recordingsEmpty": "No recordings yet. Record from a programme in the guide, or in the player.",
   "recordingsFolder": "Recordings folder",
+  "relayAddress": "Your gerdTV host's address (optional)",
+  "relayFound": "In use: {web}. Devices on other networks pair and sync through your host.",
+  "@relayFound": {
+    "placeholders": {
+      "web": {
+        "type": "String"
+      }
+    }
+  },
+  "relayHint": "Lets devices on other networks pair and sync through your host; found by itself at home.",
   "remove": "Remove",
   "rename": "Rename",
   "renameHint": "Name (empty: the provider's)",

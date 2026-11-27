@@ -4,7 +4,7 @@
 // storage alone; extended: the Mac's webcam scan opens a pairing link's confirmation, other codes are refused; extended:
 // the first run's welcome screen listens at once (QR and code), folds the phone files (computer only) and fades the
 // nearby list until it has the focus, and Skip opens
-// the app without a provider. The protocol and the
+// the app without a provider; extended: the relay (a host found nearby, named in the QR, a typed one wins). The protocol and the
 // merge rules are the core's tests (pairing.rs).
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
@@ -80,6 +80,12 @@ class _Listener extends Fake implements PairListener {
   @override
   void update({required LocalInfo local}) => updates++;
 
+  /// The relay the app told it to wait at.
+  String? relay;
+
+  @override
+  void setRelay({String? web}) => relay = web;
+
   /// Nothing happens on this side in these tests.
   @override
   Future<PairEvent?> nextEvent() => Future.value(null);
@@ -144,7 +150,10 @@ class _PairingCore extends FakeCore {
   String crateApiPairingPairLinkText({
     required String addr,
     required String code,
-  }) => 'gerdtv://pair?a=$addr&c=$code';
+    String? relayWeb,
+    required String meId,
+  }) =>
+      'gerdtv://pair?a=$addr&c=$code${relayWeb == null ? '' : '&r=$relayWeb&m=$meId'}';
 
   final listener = _Listener();
 
@@ -154,11 +163,26 @@ class _PairingCore extends FakeCore {
     required bool announce,
   }) async => listener;
 
+  /// A host on the network announcing its front address (null: none found).
+  String? hostWeb;
+
   @override
   Future<List<FoundDevice>> crateApiPairingPairDiscover({
     required String meId,
     required int waitMs,
-  }) async => [const FoundDevice(device: _tv, addr: '192.0.2.5:4100')];
+  }) async => [
+    const FoundDevice(device: _tv, addr: '192.0.2.5:4100'),
+    if (hostWeb != null)
+      FoundDevice(
+        device: const DeviceInfo(
+          id: 'h1',
+          name: 'gerdTV host',
+          platform: 'host',
+        ),
+        addr: '192.0.2.6:8791',
+        web: hostWeb,
+      ),
+  ];
 
   @override
   Future<PairConnection> crateApiPairingPairConnectCode({
@@ -166,6 +190,8 @@ class _PairingCore extends FakeCore {
     required String code,
     required DeviceInfo me,
     int? port,
+    String? relayWeb,
+    String? bell,
   }) async {
     typedCode = code;
     return connection;
@@ -302,6 +328,38 @@ void main() {
     // Skip saved a profile without a provider (opening it is the session's part, app_test's journey).
     expect(session.profiles.single.source, SourceKind.none);
     await tester.pumpWidget(const SizedBox()); // stops pairing
+  });
+
+  testWidgets('relay: a host found nearby, named in the QR; a typed one wins', (
+    tester,
+  ) async {
+    core.hostWeb = 'https://tv.example.invalid';
+    addTearDown(() => core.hostWeb = null);
+    final session = await show(tester);
+    await tester.tap(find.byKey(const Key('devices.showCode')));
+    await tester.pumpAndSettle();
+    expect(session.devices.qrText(), contains('&r=https://tv.example.invalid'));
+    expect(core.listener.relay, 'https://tv.example.invalid');
+    final field = find.byKey(const Key('devices.relay'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'not an address');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(
+      core.listener.relay,
+      'https://tv.example.invalid',
+      reason: 'refused',
+    );
+    await tester.enterText(field, 'https://other.example.invalid');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(core.listener.relay, 'https://other.example.invalid');
+    // Empty: back to the one found.
+    await tester.enterText(field, '');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(core.listener.relay, 'https://tv.example.invalid');
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('pair with a found device: who answered first, Sync sends', (
