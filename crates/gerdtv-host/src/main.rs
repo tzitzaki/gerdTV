@@ -98,7 +98,7 @@ async fn listen(
         let link = pairing::qr_text(&format!("{ip}:{}", l.port), &c, None);
         println!("{}", qr_text_art(&link));
         println!(
-            "Code: {}  (gerdTV: Settings → Account → Devices & sync)",
+            "Code: {}  (gerdTV: Settings → Devices → Devices & sync)",
             pairing::format_code(&c)
         );
     }

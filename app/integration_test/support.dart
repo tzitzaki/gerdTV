@@ -32,12 +32,17 @@ Future<void> tapReady(WidgetTester tester, Finder found) async {
   await tester.tap(found.hitTestable().first);
 }
 
-/// Desktop: Stop sits in media_kit's bar, which shows while the mouse moves over the picture.
-Future<void> tapStop(WidgetTester tester) async {
+/// A player control: media_kit's bar and gerdTV's top bar show while the mouse moves over the picture (the top bar
+/// fades 3 s after the last activity, ActivityScope), so the mouse moves first.
+Future<void> tapControl(WidgetTester tester, Finder found) async {
   final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
   final centre = tester.getCenter(find.byType(Scaffold).last);
   await mouse.addPointer(location: centre);
   await mouse.moveTo(centre + const Offset(5, 5));
-  await tapReady(tester, find.byKey(const Key('player.stop')));
+  await tapReady(tester, found);
   await mouse.removePointer();
 }
+
+/// Desktop: Stop sits in media_kit's bar.
+Future<void> tapStop(WidgetTester tester) =>
+    tapControl(tester, find.byKey(const Key('player.stop')));

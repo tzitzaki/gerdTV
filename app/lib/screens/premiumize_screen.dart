@@ -1,4 +1,4 @@
-// Premiumize (owner request: a debrid account): linked per profile in Settings → Account, then the cloud shows as a
+// Premiumize (owner request: a debrid account): linked per profile in Settings → Streaming, then the cloud shows as a
 // row atop Movies: its folders and files, playable files play like a recording, and the transfers with their
 // progress (a finished one opens its folder). The core talks to Premiumize (gerdtv_core::premiumize); the token is
 // in the secure storage (Session.linkPremiumize).
@@ -192,7 +192,7 @@ class _TransfersScreen extends StatelessWidget {
   }
 }
 
-/// Settings → Account → Premiumize: link with the API key (or a code, with the user's own client id), or unlink.
+/// Settings → Streaming → Premiumize: link with the API key (or a code, with the user's own client id), or unlink.
 class PremiumizeSettings extends StatefulWidget {
   const PremiumizeSettings({super.key, required this.session});
   final Session session;

@@ -1,5 +1,7 @@
-// Settings, in five categories (owner decision): Account (with Your data), Playback (with Stream health), TV guide,
-// Appearance, About (with Updates) (docs/SPEC.md, "Settings").
+// Settings, in seven categories (owner decision): Streaming (the provider, Premiumize, Your data), TV guide, Services
+// (TMDB, OpenSubtitles, Trakt, Simkl), Devices (Devices & sync, web player), Playback (with Stream health),
+// Appearance, About (with Updates) (docs/SPEC.md, "Settings"). Inside a category each subcategory is a card, one
+// open at a time (_SettingsCard).
 // Wide windows (desktop, TV) show the categories on the left and the chosen one on the right; phones show the
 // categories as a list that opens a page. A search field on top filters every entry of every category as you type
 // (settings_model.dart) and shows the matches grouped by category.
@@ -110,6 +112,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok == true) await session.removeProfile();
   }
 
+  /// The setup form: a new provider profile, or [edit]'s provider pre-filled (a new login replaces the old one only
+  /// once it works).
+  void _openSetup(BuildContext context, {ProfileInfo? edit}) =>
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SetupScreen(session: session, edit: edit),
+        ),
+      );
+
+  /// The provider card's ⋮: what's needed now and then, not every day (owner decision). Keys stay the old tiles'
+  /// (`settings.profileEdit`, `settings.profileAdd`, `settings.sync`, `settings.remove`).
+  Widget _providerMenu(BuildContext context, AppLocalizations l10n) {
+    PopupMenuItem<VoidCallback> item(
+      String key,
+      IconData icon,
+      String text,
+      VoidCallback action, {
+      bool enabled = true,
+    }) => PopupMenuItem(
+      key: Key(key),
+      value: action,
+      enabled: enabled,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon),
+        title: Text(text),
+      ),
+    );
+    return PopupMenuButton<VoidCallback>(
+      key: const Key('settings.providerMenu'),
+      onSelected: (action) => action(),
+      itemBuilder: (_) => [
+        if (session.profile != null && session.hasProvider)
+          item(
+            'settings.profileEdit',
+            Icons.edit_outlined,
+            l10n.profileEdit,
+            () => _openSetup(context, edit: session.profile),
+          ),
+        item(
+          'settings.profileAdd',
+          Icons.add,
+          l10n.profileAdd,
+          () => _openSetup(context),
+        ),
+        if (session.hasProvider)
+          item(
+            'settings.sync',
+            Icons.sync,
+            l10n.settingsSyncNow,
+            session.sync,
+            enabled: !session.syncing,
+          ),
+        item(
+          'settings.remove',
+          Icons.logout,
+          l10n.settingsRemove,
+          () => _confirmRemove(context),
+        ),
+      ],
+    );
+  }
+
   /// Every category with its entries. Profile settings (playback, guide, lists) need an open library; a category
   /// left without entries is dropped.
   List<SettingsCategory> _categories(AppLocalizations l10n) {
@@ -120,39 +185,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? session.profile!.name
         : l10n.settingsProvider;
     final all = [
+      // Streaming: the services that play (the IPTV provider of the open profile, Premiumize), and the profile's
+      // data. Rare provider actions (edit, add, update now, remove) sit in the provider card's ⋮ menu (owner
+      // decision: only what's used often shows); the User-Agent is part of the edit form.
       SettingsCategory(
-        id: 'account',
-        icon: Icons.account_circle_outlined,
-        title: l10n.settingsAccount,
+        id: 'streaming',
+        icon: Icons.live_tv_outlined,
+        title: l10n.settingsStreaming,
         entries: [
           SettingsEntry(
             id: 'profile',
             section: provider,
             title: session.profile?.name ?? '',
-            keywords: l10n.settingsKeywordsAccount,
-            build: (_) => ListTile(
-              leading: const Icon(Icons.account_circle_outlined),
-              title: Text(session.profile?.name ?? ''),
-              subtitle: Text(
-                [
-                  session.syncing
-                      ? l10n.syncing
-                      : session.syncError != null
-                      ? l10n.syncFailed(session.syncError!)
-                      : last == null
-                      ? ''
-                      : l10n.settingsLastSync(last.entries, last.categories),
-                  if (lib != null)
-                    accountLine(
-                      l10n,
-                      expires: lib.setting(key: 'account_expires'),
-                      limit: lib.setting(key: 'account_limit'),
-                    ),
-                ].where((s) => s.isNotEmpty).join('\n'),
-              ),
-            ),
+            // The menu's actions are found by their words too (they have no entry of their own).
+            keywords: [
+              l10n.settingsKeywordsAccount,
+              l10n.settingsKeywordsUserAgent,
+              l10n.settingsKeywordsRemove,
+              l10n.profileEdit,
+              l10n.profileAdd,
+              l10n.settingsSyncNow,
+              l10n.settingsRemove,
+            ].join(' '),
+            actions: (context) => _providerMenu(context, l10n),
+            build: (_) {
+              // The card's title is the provider's name: the tile only says how it's doing.
+              final lines = [
+                session.syncing
+                    ? l10n.syncing
+                    : session.syncError != null
+                    ? l10n.syncFailed(session.syncError!)
+                    : last == null
+                    ? ''
+                    : l10n.settingsLastSync(last.entries, last.categories),
+                if (lib != null)
+                  accountLine(
+                    l10n,
+                    expires: lib.setting(key: 'account_expires'),
+                    limit: lib.setting(key: 'account_limit'),
+                  ),
+              ].where((s) => s.isNotEmpty).toList();
+              if (lines.isEmpty) return const SizedBox.shrink();
+              return ListTile(
+                leading: const Icon(Icons.account_circle_outlined),
+                title: Text(lines.first),
+                subtitle: lines.length > 1
+                    ? Text(lines.skip(1).join('\n'))
+                    : null,
+              );
+            },
           ),
-          // Profiles: switch to another provider account, add one, and whether this one opens without asking.
+          // Profiles: switch to another provider account and whether this one opens without asking. Without a
+          // provider, adding one is the point, so it shows here instead of only in the menu.
           SettingsEntry(
             id: 'profiles',
             section: provider,
@@ -162,6 +246,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               builder: (context, setState) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (!session.hasProvider)
+                    ListTile(
+                      key: const Key('settings.profileEdit'),
+                      leading: const Icon(Icons.add),
+                      title: Text(l10n.profileAddProvider),
+                      onTap: () => _openSetup(context, edit: session.profile),
+                    ),
                   for (final p in session.profiles)
                     if (p.id != session.profile?.id)
                       ListTile(
@@ -183,160 +274,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         );
                       }),
                     ),
-                  // Edit the open profile's provider: the setup form, pre-filled; a new login replaces the old one only
-                  // once it works.
-                  if (session.profile != null)
-                    ListTile(
-                      key: const Key('settings.profileEdit'),
-                      leading: const Icon(Icons.edit_outlined),
-                      title: Text(
-                        session.hasProvider
-                            ? l10n.profileEdit
-                            : l10n.profileAddProvider,
-                      ),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => SetupScreen(
-                            session: session,
-                            edit: session.profile,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ListTile(
-                    key: const Key('settings.profileAdd'),
-                    leading: const Icon(Icons.add),
-                    title: Text(l10n.profileAdd),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SetupScreen(session: session),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
-          if (session.hasProvider)
-            SettingsEntry(
-              id: 'sync',
-              section: provider,
-              title: l10n.settingsSyncNow,
-              keywords: l10n.settingsKeywordsAccount,
-              build: (_) => ListTile(
-                key: const Key('settings.sync'),
-                leading: const Icon(Icons.sync),
-                title: Text(l10n.settingsSyncNow),
-                enabled: !session.syncing,
-                onTap: session.sync,
-              ),
-            ),
-          // What the provider sees as the player; some only serve players they know.
-          if (lib != null && session.hasProvider)
-            SettingsEntry(
-              id: 'userAgent',
-              section: provider,
-              title: l10n.userAgent,
-              keywords: l10n.settingsKeywordsUserAgent,
-              build: (_) => Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Tokens.space * 2,
-                  vertical: Tokens.space,
-                ),
-                // A new profile gets a new field, or the old one's text would stay in it.
-                child: TextFormField(
-                  key: Key('settings.userAgent.${session.profile?.id}'),
-                  initialValue: session.profile?.userAgent ?? '',
-                  decoration: InputDecoration(
-                    labelText: l10n.userAgent,
-                    helperText: l10n.userAgentHint,
-                    helperMaxLines: 3,
-                  ),
-                  autocorrect: false,
-                  onFieldSubmitted: session.setUserAgent,
-                ),
-              ),
-            ),
-          // Your data: export and import the profile's user data (one JSON file).
-          if (lib != null)
-            SettingsEntry(
-              id: 'userData',
-              section: provider,
-              title: l10n.userDataExport,
-              keywords: l10n.settingsKeywordsData,
-              build: (_) => UserDataSettings(session: session),
-            ),
-          SettingsEntry(
-            id: 'remove',
-            section: provider,
-            title: l10n.settingsRemove,
-            keywords: l10n.settingsKeywordsRemove,
-            build: (context) => ListTile(
-              key: const Key('settings.remove'),
-              leading: const Icon(Icons.logout),
-              title: Text(l10n.settingsRemove),
-              onTap: () => _confirmRemove(context),
-            ),
-          ),
-          // Devices & sync: pair with and sync to other gerdTV installs (also without a provider: getting one is the
-          // point then).
-          SettingsEntry(
-            id: 'devices',
-            section: l10n.devicesTitle,
-            title: l10n.devicesTitle,
-            keywords: l10n.settingsKeywordsDevices,
-            build: (context) => ListTile(
-              key: const Key('settings.devices'),
-              leading: const Icon(Icons.devices),
-              title: Text(l10n.devicesTitle),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => DevicesScreen(session: session),
-                ),
-              ),
-            ),
-          ),
-          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions. Without one
-          // the entry still shows, saying what's needed, and opens Devices & sync (it used to be hidden: hard to find).
-          if (!session.devices.peers.value.any((p) => p.web.isNotEmpty))
-            SettingsEntry(
-              id: 'web',
-              section: l10n.devicesTitle,
-              title: l10n.webTitle,
-              keywords: l10n.settingsKeywordsWeb,
-              build: (context) => ListTile(
-                key: const Key('settings.web.none'),
-                leading: const Icon(Icons.public),
-                title: Text(l10n.webTitle),
-                subtitle: Text(l10n.webNoHost),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DevicesScreen(session: session),
-                  ),
-                ),
-              ),
-            ),
-          for (final host in session.devices.peers.value.where(
-            (p) => p.web.isNotEmpty,
-          ))
-            SettingsEntry(
-              id: 'web.${host.device.id}',
-              section: l10n.devicesTitle,
-              title: l10n.webTitle,
-              keywords: l10n.settingsKeywordsWeb,
-              build: (context) => ListTile(
-                key: Key('settings.web.${host.device.id}'),
-                leading: const Icon(Icons.public),
-                title: Text(l10n.webTitle),
-                subtitle: Text(host.web),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        WebPlayerScreen(session: session, host: host),
-                  ),
-                ),
-              ),
-            ),
           if (lib != null)
             SettingsEntry(
               id: 'premiumize',
@@ -345,6 +286,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keywords: l10n.settingsKeywordsPremiumize,
               build: (_) => PremiumizeSettings(session: session),
             ),
+          // Your data: export and import the profile's user data (one JSON file).
+          if (lib != null)
+            SettingsEntry(
+              id: 'userData',
+              section: l10n.settingsYourData,
+              title: l10n.userDataExport,
+              keywords: l10n.settingsKeywordsData,
+              build: (_) => UserDataSettings(session: session),
+            ),
+        ],
+      ),
+      SettingsCategory(
+        id: 'guide',
+        icon: Icons.calendar_view_week,
+        title: l10n.settingsGuide,
+        entries: [
+          if (lib != null) ...[
+            SettingsEntry(
+              id: 'guideSources',
+              section: l10n.settingsGuideSources,
+              title: l10n.settingsGuideSources,
+              keywords: l10n.settingsKeywordsGuideSources,
+              build: (_) => GuideSources(session: session),
+            ),
+            SettingsEntry(
+              id: 'guideOffset',
+              section: l10n.guideOffset,
+              title: l10n.guideOffset,
+              keywords: l10n.settingsKeywordsOffset,
+              build: (_) => GuideOffset(session: session),
+            ),
+            SettingsEntry(
+              id: 'guideRefresh',
+              section: l10n.settingsGuideSources,
+              title: l10n.guideRefresh,
+              build: (_) => GuideRefresh(session: session),
+            ),
+            SettingsEntry(
+              id: 'guideUnmatched',
+              section: l10n.guideUnmatched,
+              title: l10n.guideUnmatched,
+              keywords: l10n.settingsKeywordsUnmatched,
+              build: (_) => GuideUnmatched(session: session),
+            ),
+          ],
+        ],
+      ),
+      // Services that support playback: metadata, subtitles, watch tracking (each its own card).
+      SettingsCategory(
+        id: 'services',
+        icon: Icons.extension_outlined,
+        title: l10n.settingsServices,
+        entries: [
           SettingsEntry(
             id: 'tmdb',
             section: 'TMDB',
@@ -387,6 +381,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
         ],
       ),
+      // Everything between gerdTV installs: pairing and sync, the web player, and on macOS the menu bar mode.
+      SettingsCategory(
+        id: 'devices',
+        icon: Icons.devices_outlined,
+        title: l10n.settingsDevices,
+        entries: [
+          // Devices & sync: pair with and sync to other gerdTV installs (also without a provider: getting one is the
+          // point then).
+          SettingsEntry(
+            id: 'devices',
+            title: l10n.devicesTitle,
+            keywords: l10n.settingsKeywordsDevices,
+            build: (context) => ListTile(
+              key: const Key('settings.devices'),
+              leading: const Icon(Icons.devices),
+              title: Text(l10n.devicesTitle),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DevicesScreen(session: session),
+                ),
+              ),
+            ),
+          ),
+          // Web player: with a paired gerdTV host, login links for browsers and the open web sessions. Without one
+          // the entry still shows, saying what's needed, and opens Devices & sync (it used to be hidden: hard to find).
+          if (!session.devices.peers.value.any((p) => p.web.isNotEmpty))
+            SettingsEntry(
+              id: 'web',
+              title: l10n.webTitle,
+              keywords: l10n.settingsKeywordsWeb,
+              build: (context) => ListTile(
+                key: const Key('settings.web.none'),
+                leading: const Icon(Icons.public),
+                title: Text(l10n.webTitle),
+                subtitle: Text(l10n.webNoHost),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DevicesScreen(session: session),
+                  ),
+                ),
+              ),
+            ),
+          for (final host in session.devices.peers.value.where(
+            (p) => p.web.isNotEmpty,
+          ))
+            SettingsEntry(
+              id: 'web.${host.device.id}',
+              title: l10n.webTitle,
+              keywords: l10n.settingsKeywordsWeb,
+              build: (context) => ListTile(
+                key: Key('settings.web.${host.device.id}'),
+                leading: const Icon(Icons.public),
+                title: Text(l10n.webTitle),
+                subtitle: Text(host.web),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        WebPlayerScreen(session: session, host: host),
+                  ),
+                ),
+              ),
+            ),
+          if (defaultTargetPlatform == TargetPlatform.macOS)
+            SettingsEntry(
+              id: 'menuBar',
+              title: l10n.menuBar,
+              keywords: l10n.menuBarHint,
+              build: (_) => StatefulBuilder(
+                builder: (context, setState) => SwitchListTile(
+                  key: const Key('settings.menuBar'),
+                  title: Text(l10n.menuBar),
+                  subtitle: Text(l10n.menuBarHint),
+                  value: widget.session.menuBar,
+                  onChanged: (on) async {
+                    await widget.session.setMenuBar(on);
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
       SettingsCategory(
         id: 'playback',
         icon: Icons.play_circle_outline,
@@ -396,6 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (ownLibmpv() != null || PlayerSettings.hasLivePlayer)
             SettingsEntry(
               id: 'player',
+              section: l10n.settingsPlayer,
               title: PlayerSettings.hasLivePlayer
                   ? l10n.livePlayer
                   : l10n.playerEngine,
@@ -407,6 +484,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null && !isDesktop)
             SettingsEntry(
               id: 'gestures',
+              section: l10n.settingsPlayer,
               title: l10n.playerGestures,
               keywords: l10n.settingsKeywordsGestures,
               build: (_) => StatefulBuilder(
@@ -428,6 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'autoplayNext',
+              section: l10n.settingsPlayer,
               title: l10n.autoplayNext,
               keywords: l10n.settingsKeywordsAutoplayNext,
               build: (_) => StatefulBuilder(
@@ -450,6 +529,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null && defaultTargetPlatform == TargetPlatform.android)
             SettingsEntry(
               id: 'matchFrameRate',
+              section: l10n.settingsPlayer,
               title: l10n.matchFrameRate,
               keywords: l10n.settingsKeywordsFrameRate,
               build: (_) => StatefulBuilder(
@@ -471,6 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'deinterlace',
+              section: l10n.settingsPlayer,
               title: l10n.deinterlace,
               keywords: l10n.settingsKeywordsDeinterlace,
               build: (_) => StatefulBuilder(
@@ -492,6 +573,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null && canRecord)
             SettingsEntry(
               id: 'recordingsFolder',
+              section: l10n.recordings,
               title: l10n.recordingsFolder,
               keywords: l10n.settingsKeywordsRecordings,
               build: (_) => RecordingsFolderSetting(session: session),
@@ -499,6 +581,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'tracks',
+              section: l10n.playerTracks,
               title: l10n.playerTracks,
               keywords: l10n.settingsKeywordsTracks,
               build: (_) => TrackPrefsSettings(library: lib),
@@ -506,6 +589,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'bufferReadout',
+              section: l10n.settingsBuffer,
               title: l10n.bufferReadoutShow,
               keywords: l10n.settingsKeywordsBuffer,
               build: (_) => StatefulBuilder(
@@ -524,62 +608,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-          if (defaultTargetPlatform == TargetPlatform.macOS)
-            SettingsEntry(
-              id: 'menuBar',
-              title: l10n.menuBar,
-              keywords: l10n.menuBarHint,
-              build: (_) => StatefulBuilder(
-                builder: (context, setState) => SwitchListTile(
-                  key: const Key('settings.menuBar'),
-                  title: Text(l10n.menuBar),
-                  subtitle: Text(l10n.menuBarHint),
-                  value: widget.session.menuBar,
-                  onChanged: (on) async {
-                    await widget.session.setMenuBar(on);
-                    setState(() {});
-                  },
-                ),
-              ),
-            ),
           SettingsEntry(
             id: 'health',
+            section: l10n.settingsHealth,
             title: l10n.settingsHealth,
             keywords: l10n.settingsKeywordsHealth,
             build: (_) => _HealthList(library: lib),
           ),
-        ],
-      ),
-      SettingsCategory(
-        id: 'guide',
-        icon: Icons.calendar_view_week,
-        title: l10n.settingsGuide,
-        entries: [
-          if (lib != null) ...[
-            SettingsEntry(
-              id: 'guideSources',
-              title: l10n.settingsGuideSources,
-              keywords: l10n.settingsKeywordsGuideSources,
-              build: (_) => GuideSources(session: session),
-            ),
-            SettingsEntry(
-              id: 'guideOffset',
-              title: l10n.guideOffset,
-              keywords: l10n.settingsKeywordsOffset,
-              build: (_) => GuideOffset(session: session),
-            ),
-            SettingsEntry(
-              id: 'guideRefresh',
-              title: l10n.guideRefresh,
-              build: (_) => GuideRefresh(session: session),
-            ),
-            SettingsEntry(
-              id: 'guideUnmatched',
-              title: l10n.guideUnmatched,
-              keywords: l10n.settingsKeywordsUnmatched,
-              build: (_) => GuideUnmatched(session: session),
-            ),
-          ],
         ],
       ),
       SettingsCategory(
@@ -589,18 +624,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         entries: [
           SettingsEntry(
             id: 'theme',
+            section: l10n.settingsTheme,
             title: l10n.settingsTheme,
             keywords: l10n.settingsKeywordsTheme,
             build: (_) => _ThemeSettings(session: session),
           ),
           SettingsEntry(
             id: 'overlay',
+            section:
+                l10n.settingsTheme, // the banner's look belongs with the theme
             title: l10n.settingsOverlay,
             keywords: l10n.settingsKeywordsOverlay,
             build: (_) => _OverlaySettings(session: session),
           ),
           SettingsEntry(
             id: 'logo',
+            section: l10n.settingsLogo,
             title: l10n.settingsLogo,
             keywords: l10n.settingsKeywordsLogo,
             build: (_) => _LogoPicker(session: session),
@@ -608,6 +647,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'lists',
+              section: l10n.settingsLists,
               title: l10n.settingsLists,
               keywords: l10n.settingsKeywordsLists,
               build: (_) => _ListSettings(session: session),
@@ -615,6 +655,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (lib != null)
             SettingsEntry(
               id: 'hidden',
+              section: l10n.settingsLists,
               title: l10n.hiddenGroups,
               keywords: l10n.settingsKeywordsHidden,
               build: (context) => ListTile(
@@ -693,6 +734,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<SettingsEntry> _playbackEntries(AppLocalizations l10n, Library lib) => [
     SettingsEntry(
       id: 'buffer',
+      section: l10n.settingsBuffer,
       title: l10n.settingsBuffer,
       keywords: l10n.settingsKeywordsBuffer,
       build: (_) => StatefulBuilder(
@@ -703,10 +745,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                title: Text(l10n.settingsBuffer),
-                subtitle: Text(l10n.bufferHint),
-              ),
+              // The card's title says "Buffer": only the hint here.
+              ListTile(subtitle: Text(l10n.bufferHint)),
               BufferPicker(
                 value: preset,
                 onChanged: (c) => setState(() {
@@ -726,6 +766,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ),
     SettingsEntry(
       id: 'adaptive',
+      section: l10n.settingsBuffer,
       title: l10n.adaptiveBuffer,
       keywords: l10n.settingsKeywordsAdaptive,
       build: (_) => StatefulBuilder(
@@ -742,6 +783,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ),
     SettingsEntry(
       id: 'timeshift',
+      section: l10n.settingsBuffer,
       title: l10n.timeshift,
       keywords: l10n.settingsKeywordsTimeshift,
       build: (_) => StatefulBuilder(
@@ -841,7 +883,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: searching
                         ? _results(context, l10n, matches)
-                        : _CategoryContent(category: selected),
+                        : _CategoryContent(
+                            key: ValueKey(selected.id),
+                            category: selected,
+                          ),
                   ),
                 ],
               );
@@ -908,7 +953,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// The search results: matching entries under their category's title, or a line saying nothing matched.
+  /// The search results: matching entries under their category's label, every card open (nothing to fold while
+  /// searching), or a line saying nothing matched.
   Widget _results(
     BuildContext context,
     AppLocalizations l10n,
@@ -922,60 +968,198 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     return ListView(
       key: const Key('settings.content'),
-      padding: const EdgeInsets.symmetric(vertical: Tokens.space),
+      padding: const EdgeInsets.only(bottom: Tokens.space * 2),
       children: [
         for (final cat in matches) ...[
-          _header(context, cat.title),
-          ..._entries(context, cat.entries),
+          SectionLabel(cat.title),
+          ..._cards(context, cat.entries, allOpen: true),
         ],
       ],
     );
   }
 }
 
-Widget _header(BuildContext context, String title) => ListTile(
-  title: Text(title, style: Theme.of(context).textTheme.titleMedium),
-);
-
-/// A category's entries, with a subcategory heading wherever the section changes.
-List<Widget> _entries(BuildContext context, List<SettingsEntry> entries) {
-  String? section;
+/// A category's entries: those without a section as they are, the others as one card per section, placed where the
+/// section first appears. [open]: the open card's section; [allOpen]: the search's view, nothing folds.
+List<Widget> _cards(
+  BuildContext context,
+  List<SettingsEntry> entries, {
+  String? open,
+  bool allOpen = false,
+  ValueChanged<String>? onToggle,
+}) {
+  final bySection = <String, List<SettingsEntry>>{};
+  for (final e in entries) {
+    if (e.section != null) bySection.putIfAbsent(e.section!, () => []).add(e);
+  }
+  Widget entry(SettingsEntry e) =>
+      KeyedSubtree(key: Key('settings.entry.${e.id}'), child: e.build(context));
   return [
-    for (final e in entries) ...[
-      if (e.section != null && e.section != section)
-        Padding(
-          key: Key('settings.section.${e.section}'),
-          padding: const EdgeInsets.fromLTRB(
-            Tokens.space * 2,
-            Tokens.space * 2,
-            Tokens.space * 2,
-            Tokens.space / 2,
-          ),
-          child: Text(
-            (section = e.section)!,
-            style: Theme.of(context).textTheme.labelLarge
-                ?.copyWith(color: Theme.of(context).colorScheme.primary),
-          ),
+    for (final e in entries)
+      if (e.section == null)
+        entry(e)
+      else if (identical(bySection[e.section]!.first, e))
+        _SettingsCard(
+          title: e.section!,
+          open: allOpen || e.section == open,
+          onToggle: allOpen ? null : () => onToggle?.call(e.section!),
+          actions: bySection[e.section]!
+              .map((x) => x.actions)
+              .nonNulls
+              .firstOrNull
+              ?.call(context),
+          children: [for (final x in bySection[e.section]!) entry(x)],
         ),
-      KeyedSubtree(key: Key('settings.entry.${e.id}'), child: e.build(context)),
-    ],
   ];
 }
 
-/// One category's entries, scrollable (key `settings.content`, which the integration tests scroll).
-class _CategoryContent extends StatelessWidget {
-  const _CategoryContent({required this.category, this.header = true});
+/// One subcategory as a card: a header (its title, the section's actions, the fold arrow) and its entries. One card
+/// is open at a time (owner decision), so the open one stands out: a raised surface and the title in the accent.
+/// The header is one focusable tap target (Enter/OK folds it), so a remote walks card by card.
+/// Debugging a card that doesn't open in a test: its header's key is `settings.section.<title>`.
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.title,
+    required this.open,
+    required this.onToggle,
+    required this.actions,
+    required this.children,
+  });
+  final String title;
+  final bool open;
+  final VoidCallback? onToggle; // null: always open (search results)
+  final Widget? actions;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : Tokens.motion;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Tokens.space,
+        Tokens.space / 2,
+        Tokens.space,
+        Tokens.space / 2,
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        color: open ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Tokens.radius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              key: Key('settings.section.$title'),
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.space * 2,
+                  Tokens.space,
+                  Tokens.space,
+                  Tokens.space,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: open ? scheme.primary : null,
+                        ),
+                      ),
+                    ),
+                    ?actions,
+                    // Keeps the header's height when there's no arrow (search results).
+                    SizedBox(
+                      height: 40,
+                      width: onToggle == null ? 0 : 40,
+                      child: onToggle == null
+                          ? null
+                          : AnimatedRotation(
+                              turns: open ? 0.5 : 0,
+                              duration: motion,
+                              child: const Icon(Icons.expand_more),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: motion,
+              alignment: Alignment.topCenter,
+              child: open
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: children,
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One category's entries, scrollable (key `settings.content`, which the integration tests scroll). The first card
+/// starts open; opening another closes it, tapping the open one closes it too.
+class _CategoryContent extends StatefulWidget {
+  const _CategoryContent({
+    super.key,
+    required this.category,
+    this.header = true,
+  });
   final SettingsCategory category;
   final bool header; // the phone page has the title in its app bar
+
   @override
-  Widget build(BuildContext context) => ListView(
-    key: const Key('settings.content'),
-    padding: const EdgeInsets.symmetric(vertical: Tokens.space),
-    children: [
-      if (header) _header(context, category.title),
-      ..._entries(context, category.entries),
-    ],
-  );
+  State<_CategoryContent> createState() => _CategoryContentState();
+}
+
+class _CategoryContentState extends State<_CategoryContent> {
+  String? _open; // the open card's section; null: the first one; '': none
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = widget.category.entries;
+    final open = _open ?? entries.map((e) => e.section).nonNulls.firstOrNull;
+    return ListView(
+      key: const Key('settings.content'),
+      padding: const EdgeInsets.only(bottom: Tokens.space * 2),
+      children: [
+        if (widget.header)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Tokens.space * 2,
+              Tokens.space * 2,
+              Tokens.space * 2,
+              Tokens.space,
+            ),
+            child: Text(
+              widget.category.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          )
+        else
+          const SizedBox(height: Tokens.space / 2),
+        ..._cards(
+          context,
+          entries,
+          open: open,
+          onToggle: (s) => setState(() => _open = s == open ? '' : s),
+        ),
+      ],
+    );
+  }
 }
 
 /// Settings → Playback → Stream health: the last 50 recoveries the watchdog made or gave up on.

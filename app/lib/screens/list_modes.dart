@@ -1,7 +1,8 @@
 // How a section's items are shown (owner decision): compact list, list (logo, number, name, what's on now with its
 // progress, what's next), tiles, large tiles. Chosen per section in Settings → Lists, switched with the list bar's
 // toggle; stored as the profile setting `list_mode_<kind>`. These widgets take plain data, so tests need no core.
-// Favourites: a star on every row and tile, a long press, or a long OK on the remote (LongOk) toggles one.
+// Favourites: a star marks one on its row or tile; the item's menu (a right click, the row's ⋮ on desktop), a long
+// press, or a long OK on the remote (LongOk) toggles it.
 // On a channel the long press or long OK opens its menu instead (showChannelMenu).
 
 import 'dart:async';
@@ -10,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../services/session.dart' show isDesktop;
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 import 'group_menus.dart' show MenuEntry;
@@ -182,7 +184,7 @@ class ItemsView extends StatelessWidget {
   final List<Widget> trailing;
   final String? highlight;
 
-  /// The favourites' keys (filled stars); [onFavourite] toggles one (null: no stars).
+  /// The favourites' keys (a star mark); [onFavourite] toggles one (null: no menu, no hold).
   final Set<String> favourites;
   final void Function(ItemInfo)? onFavourite;
 
@@ -204,16 +206,20 @@ class ItemsView extends StatelessWidget {
       final it = items[i];
       final nn = nowNext[it.key];
       final fav = onFavourite == null ? null : () => onFavourite!(it);
-      final hold = fav == null || (it.kind != ItemKind.live && menu == null)
-          ? fav
+      // The item's menu (the row's ⋮ on desktop, a right click): favourite, watch for a channel, the extras.
+      final itemMenu = fav == null
+          ? null
           : () => showChannelMenu(
               context,
               it,
               favourite: favourites.contains(it.key),
-              onWatch: () => onTap(it),
+              onWatch: it.kind == ItemKind.live ? () => onTap(it) : null,
               onFavourite: fav,
               extra: menu?.call(it) ?? const [],
             );
+      // A long press or held OK: the menu on a channel (or with extras), else it toggles the favourite (owner
+      // decision: holding OK on a movie or series favourites it).
+      final hold = it.kind != ItemKind.live && menu == null ? fav : itemMenu;
       final cellWidget = switch (mode) {
         ListMode.compact || ListMode.list => ItemRow(
           item: it,
@@ -223,9 +229,9 @@ class ItemsView extends StatelessWidget {
           onTap: () => onTap(it),
           highlight: highlight,
           favourite: favourites.contains(it.key),
-          onFavourite: fav,
           watched: watched.contains(it.key),
           onHold: hold,
+          onMenu: itemMenu,
         ),
         _ => ItemCard(
           item: it,
@@ -234,9 +240,9 @@ class ItemsView extends StatelessWidget {
           onTap: () => onTap(it),
           highlight: highlight,
           favourite: favourites.contains(it.key),
-          onFavourite: fav,
           watched: watched.contains(it.key),
           onHold: hold,
+          onMenu: itemMenu,
         ),
       };
       return hold == null
@@ -279,7 +285,7 @@ class ItemsView extends StatelessWidget {
 }
 
 /// A row: compact (small logo, number, name) or list (logo, number, name, now + progress, next).
-class ItemRow extends StatelessWidget {
+class ItemRow extends StatefulWidget {
   const ItemRow({
     super.key,
     required this.item,
@@ -289,19 +295,22 @@ class ItemRow extends StatelessWidget {
     required this.onTap,
     this.highlight,
     this.favourite = false,
-    this.onFavourite,
     this.watched = false,
     this.onHold,
+    this.onMenu,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool compact;
   final bool favourite;
-  final VoidCallback? onFavourite;
   final bool watched;
 
   /// A long press.
   final VoidCallback? onHold;
+
+  /// The item's menu: a right click, and on desktop the ⋮ that shows while the pointer is over the row (owner
+  /// decision: actions used now and then aren't a button on every row).
+  final VoidCallback? onMenu;
   final DateTime now;
   final VoidCallback onTap;
 
@@ -309,7 +318,15 @@ class ItemRow extends StatelessWidget {
   final String? highlight;
 
   @override
+  State<ItemRow> createState() => _ItemRowState();
+}
+
+class _ItemRowState extends State<ItemRow> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
+    final ItemRow(:item, :nowNext, :compact, :highlight, :onMenu) = widget;
     final text = Theme.of(context).textTheme;
     final current = nowNext?.now;
     final next = nowNext?.next;
@@ -323,7 +340,7 @@ class ItemRow extends StatelessWidget {
             style: text.bodySmall,
           )
         : null;
-    return ListTile(
+    final tile = ListTile(
       key: Key('item.${item.key}'),
       dense: compact,
       leading: Logo(
@@ -334,7 +351,7 @@ class ItemRow extends StatelessWidget {
       title: highlight == null
           ? Text(name, maxLines: 1, overflow: TextOverflow.ellipsis)
           : Text.rich(
-              highlightSpan(name, highlight!, null),
+              highlightSpan(name, highlight, null),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -353,7 +370,7 @@ class ItemRow extends StatelessWidget {
                   ),
                   const SizedBox(height: Tokens.space / 2),
                   LinearProgressIndicator(
-                    value: progressOf(current, now),
+                    value: progressOf(current, widget.now),
                     minHeight: 3,
                   ),
                 ],
@@ -369,33 +386,53 @@ class ItemRow extends StatelessWidget {
                   ),
               ],
             ),
-      trailing: onFavourite == null && !watched
-          ? null
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (watched) const WatchedMark(),
-                if (onFavourite != null)
-                  FavouriteStar(
-                    item: item,
-                    on: favourite,
-                    onPressed: onFavourite!,
-                  ),
-              ],
+      // State marks only (favourite, watched); the ⋮ keeps its room on desktop so the texts don't move on hover.
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.watched) const WatchedMark(),
+          if (widget.favourite) const FavouriteMark(),
+          if (onMenu != null && isDesktop)
+            Visibility.maintain(
+              visible: _hover,
+              child: IconButton(
+                key: Key('item.menu.${item.key}'),
+                tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+                icon: const Icon(Icons.more_vert),
+                // The row is the tab stop; the menu is reached by held OK or the context menu key from it.
+                focusNode: _menuFocus,
+                onPressed: onMenu,
+              ),
             ),
-      onTap: onTap,
-      onLongPress: onHold,
+        ],
+      ),
+      onTap: widget.onTap,
+      onLongPress: widget.onHold,
     );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(onSecondaryTap: onMenu, child: tile),
+    );
+  }
+
+  final _menuFocus = FocusNode(skipTraversal: true);
+
+  @override
+  void dispose() {
+    _menuFocus.dispose();
+    super.dispose();
   }
 }
 
-/// A channel's menu (long press or long OK; in the guide also a tap on the channel): watch it, or add it to or remove
-/// it from the favourites. Nothing has the focus at first: an OK still held would press it.
+/// An item's menu (a channel's long press or long OK, a right click, the row's ⋮; in the guide also a tap on the
+/// channel): watch it (channels), or add it to or remove it from the favourites, then the caller's extras. Nothing has the focus at first: an OK still held would press it.
 Future<void> showChannelMenu(
   BuildContext context,
   ItemInfo channel, {
   required bool favourite,
-  required VoidCallback onWatch,
+  required VoidCallback?
+  onWatch, // null: no Watch entry (movies and series open on a tap)
   required VoidCallback onFavourite,
   List<MenuEntry> extra = const [],
 }) => showModalBottomSheet<void>(
@@ -426,7 +463,8 @@ Future<void> showChannelMenu(
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            entry('watch', Icons.play_arrow, l10n.guideWatch, onWatch),
+            if (onWatch != null)
+              entry('watch', Icons.play_arrow, l10n.guideWatch, onWatch),
             entry(
               'favourite',
               favourite ? Icons.star : Icons.star_border,
@@ -441,29 +479,27 @@ Future<void> showChannelMenu(
   },
 );
 
-/// The star on a row or tile: filled for a favourite.
-class FavouriteStar extends StatelessWidget {
-  const FavouriteStar({
-    super.key,
-    required this.item,
-    required this.on,
-    required this.onPressed,
-  });
-  final ItemInfo item;
-  final bool on;
-  final VoidCallback onPressed;
+/// A favourite's star on a row or tile: a mark, not a button (owner decision); toggled from the item's menu, a
+/// long press, or held OK. On a dark disc like [WatchedMark], so it reads on any poster.
+class FavouriteMark extends StatelessWidget {
+  const FavouriteMark({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return IconButton(
-      key: Key('item.star.${item.key}'),
-      tooltip: on ? l10n.favouriteRemove : l10n.favouriteAdd,
-      icon: Icon(on ? Icons.star : Icons.star_border),
-      color: on ? Theme.of(context).colorScheme.primary : null,
-      onPressed: onPressed,
-    );
-  }
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: Color(0x99000000),
+      shape: BoxShape.circle,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(2),
+      child: Icon(
+        Icons.star,
+        size: 16,
+        color: Theme.of(context).colorScheme.primary,
+        semanticLabel: AppLocalizations.of(context).favourites,
+      ),
+    ),
+  );
 }
 
 /// OK on a remote (Enter, Select): a short press opens, holding it half a second toggles the favourite. Ahead of the
@@ -539,19 +575,21 @@ class ItemCard extends StatefulWidget {
     required this.onTap,
     this.highlight,
     this.favourite = false,
-    this.onFavourite,
     this.watched = false,
     this.onHold,
+    this.onMenu,
   });
   final ItemInfo item;
   final NowNext? nowNext;
   final bool large;
   final bool favourite;
-  final VoidCallback? onFavourite;
   final bool watched;
 
   /// A long press.
   final VoidCallback? onHold;
+
+  /// The item's menu, on a right click.
+  final VoidCallback? onMenu;
   final VoidCallback onTap;
 
   /// A search result: the query to bold; the group's name shows too.
@@ -579,17 +617,13 @@ class _ItemCardState extends State<ItemCard> {
     final current = widget.nowNext?.now;
     final poster = item.kind != ItemKind.live;
     final still = MediaQuery.disableAnimationsOf(context);
-    final star = widget.onFavourite == null
-        ? null
-        : Positioned(
-            top: 0,
-            right: 0,
-            child: FavouriteStar(
-              item: item,
-              on: widget.favourite,
-              onPressed: widget.onFavourite!,
-            ),
-          );
+    final star = widget.favourite
+        ? const Positioned(
+            top: Tokens.space,
+            right: Tokens.space,
+            child: FavouriteMark(),
+          )
+        : null;
     // On a poster the texts are white on the gradient (any picture, either theme); elsewhere the theme's.
     List<Widget> lines({Color? fg, Color? soft}) => [
       Text.rich(
@@ -720,6 +754,7 @@ class _ItemCardState extends State<ItemCard> {
         child: InkWell(
           onTap: widget.onTap,
           onLongPress: widget.onHold,
+          onSecondaryTap: widget.onMenu,
           onFocusChange: _lift,
           onHover: _lift,
           child: content,

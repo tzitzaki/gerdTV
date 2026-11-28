@@ -112,19 +112,33 @@ class _ShellState extends State<Shell> {
   /// The group the guide shows: its search can be limited to it (a chip; it starts wide).
   final _guideGroup = ValueNotifier<CategoryInfo?>(null);
 
-  Widget _search(SearchSection s, Widget child, {CategoryInfo? group}) =>
-      SectionSearch(
-        key: ValueKey(s),
-        session: widget.session,
-        section: s,
-        group: group,
-        startInGroup: false,
-        controller: _queries[s]!,
-        focus: _focus[s],
-        onJump: _jump,
-        action: _page == ShellPage.tv ? _tvView() : null,
-        child: child,
-      );
+  /// [sortKind]: the section whose groups' sort sits beside the field (the lists; the guide has its own).
+  Widget _search(
+    SearchSection s,
+    Widget child, {
+    CategoryInfo? group,
+    ItemKind? sortKind,
+  }) => SectionSearch(
+    key: ValueKey(s),
+    session: widget.session,
+    section: s,
+    group: group,
+    startInGroup: false,
+    controller: _queries[s]!,
+    focus: _focus[s],
+    onJump: _jump,
+    action: _actions(sortKind),
+    child: child,
+  );
+
+  /// Beside the search field: on TV the list/guide switch, and with the lists the groups' sort.
+  Widget? _actions(ItemKind? sortKind) {
+    final sort = sortKind == null
+        ? null
+        : GroupSortButton(session: widget.session, kind: sortKind);
+    if (_page != ShellPage.tv) return sort;
+    return Row(mainAxisSize: MainAxisSize.min, children: [_tvView(), ?sort]);
+  }
 
   /// TV: the channel lists or the guide.
   Widget _tvView() {
@@ -187,6 +201,7 @@ class _ShellState extends State<Shell> {
     Widget browse(SearchSection section, ItemKind kind) => _search(
       section,
       BrowseScreen(key: ValueKey(section), session: s, kind: kind),
+      sortKind: kind,
     );
     final page = switch (_page) {
       ShellPage.tv =>

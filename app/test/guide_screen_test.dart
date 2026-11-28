@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
+import 'package:gerdtv/screens/browse_screen.dart';
 import 'package:gerdtv/screens/guide_screen.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
@@ -68,7 +69,11 @@ class _Library implements Library {
 }
 
 void main() {
-  testWidgets('the sort button reorders the guide and Live TV', (tester) async {
+  // The controls are one row (group, day, Now, ⋮), also on the narrowest phone.
+  testWidgets('the ⋮ reorders the guide and Live TV', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final lib = _Library();
     final session = Session(appDir: 'unused')..library = lib;
     await tester.pumpWidget(
@@ -79,7 +84,13 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    await tester.tap(find.byKey(const Key('list.sort')));
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+    expect(
+      tester.getTopLeft(find.byKey(const Key('guide.more'))).dy,
+      tester.getTopLeft(find.byKey(const Key('guide.now'))).dy,
+      reason: 'one row',
+    );
+    await tester.tap(find.byKey(const Key('guide.more')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('sort.name_desc')));
     await tester.pumpAndSettle();
@@ -90,6 +101,30 @@ void main() {
       'name_desc',
     );
     await tester.pumpWidget(const SizedBox());
+  });
+
+  // The groups' sort sits beside the section's search field (no row of its own above the groups): a pick is stored
+  // per section and every list reloads.
+  testWidgets('the groups\' sort button stores the order and reloads', (
+    tester,
+  ) async {
+    final lib = _Library();
+    final session = Session(appDir: 'unused')..library = lib;
+    final before = session.generation;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: GroupSortButton(session: session, kind: ItemKind.movie),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('list.sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sort.name_asc')));
+    await tester.pumpAndSettle();
+    expect(lib.settings[sortSetting(ItemKind.movie, groups: true)], 'name_asc');
+    expect(session.generation, greaterThan(before));
   });
 
   testWidgets('a running title sticks to the left edge of the view', (

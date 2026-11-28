@@ -237,9 +237,12 @@ void main() {
       await tapReady(tester, find.byType(ItemRow));
       await waitFor(tester, find.byKey(const Key('player.banner')));
       await checkScreen(tester, form, 'player', size);
-      // The fullest top bar: a last channel to go back to, and behind live with its Live button.
+      // The fullest top bar and tune sheet: a last channel to go back to, and behind live with its Live button.
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await waitFor(tester, find.byKey(const Key('player.last')));
+      await waitFor(
+        tester,
+        find.byWidgetPredicate((_) => session.lastChannel != null),
+      );
       // Pausing a channel that hasn't started leaves nothing to be behind.
       final started = DateTime.now().add(const Duration(seconds: 30));
       while (session.player.state.position < const Duration(seconds: 1) ||
@@ -338,22 +341,25 @@ void main() {
       // Each category (wide: beside the list; phone: its own page), then a search across all of them.
       final wide = size.width >= Tokens.wideLayout;
       for (final cat in [
-        'account',
-        'playback',
+        'streaming',
         'guide',
+        'services',
+        'devices',
+        'playback',
         'appearance',
         'about',
       ]) {
         await tapReady(tester, find.byKey(Key('settings.cat.$cat')));
         await settle(tester);
         await checkScreen(tester, form, 'settings-$cat', size);
-        if (cat == 'account') {
-          // The provider's edit page closes by its back arrow and by Esc (it was a dead end on desktop).
-          final edit = find.byKey(const Key('settings.profileEdit'));
+        if (cat == 'streaming') {
+          // The provider's edit page (in the provider card's ⋮) closes by its back arrow and by Esc (it was a dead
+          // end on desktop).
+          final menu = find.byKey(const Key('settings.providerMenu'));
           for (final close in ['arrow', 'esc']) {
             // Up: the screen check's Tab sweep left the list at its end.
             await tester.scrollUntilVisible(
-              edit,
+              menu,
               -300,
               scrollable: find
                   .descendant(
@@ -362,7 +368,11 @@ void main() {
                   )
                   .first,
             );
-            await tapReady(tester, edit);
+            await tapReady(tester, menu);
+            await tapReady(
+              tester,
+              find.byKey(const Key('settings.profileEdit')),
+            );
             await waitFor(tester, find.byKey(const Key('setup.connect')));
             if (close == 'arrow') {
               await checkScreen(tester, form, 'settings-edit-provider', size);
@@ -389,6 +399,11 @@ void main() {
       await tapReady(tester, find.byTooltip('Clear'));
       await settle(tester);
       await tapReady(tester, find.byKey(const Key('settings.cat.guide')));
+      await settle(tester);
+      await tapReady(
+        tester,
+        find.byKey(const Key('settings.section.Channels without guide')),
+      );
       await settle(tester);
       final list = find
           .descendant(

@@ -142,7 +142,9 @@ ThemeData gerdTheme(
   return ThemeData(
     colorScheme: scheme,
     brightness: brightness,
-    visualDensity: VisualDensity.standard,
+    // Compact rows and controls on desktop (mouse and keyboard: about 8 px less per row, owner decision), touch size
+    // on phones, tablets and the TV (Android TV is Android: standard, its 10-foot layout needs the size).
+    visualDensity: VisualDensity.adaptivePlatformDensity,
     // A clearly visible focus ring for keyboard and remote navigation.
     focusColor: scheme.primary.withValues(alpha: 0.35),
     // Screen changes (docs/DESIGN.md, motion): a short fade, or on phones the iOS-style slide with edge swipe-back.
@@ -277,3 +279,30 @@ const fieldDpadKeys = <ShortcutActivator, Intent>{
     ignoreTextFields: false,
   ),
 };
+
+/// A small heading above a group of rows (owner decision: no 56 px ListTile for one word): the label style in the
+/// accent. One widget for every such heading (settings search results, recent searches, live now, continue
+/// watching, Devices & sync), so they look and space alike.
+class SectionLabel extends StatelessWidget {
+  const SectionLabel(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Tokens.space * 2,
+        Tokens.space * 2,
+        Tokens.space * 2,
+        Tokens.space / 2,
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}

@@ -1,8 +1,8 @@
 # Handover
 
 ## State
-- Version 0.261128.71: first run is a welcome screen that pairs (no form), sync across networks and auto-sync via the own host, updates by themselves.
-- Before: host self-update and 8-character login codes (.70), back arrow and Esc on pages, SPAKE2 pairing codes (.69), web player (.65).
+- Version 0.261128.72: a compact look: Settings in seven categories of one-open cards, rare actions behind ⋮, a fading player top bar, big login codes.
+- Before: welcome screen that pairs and auto-sync via the own host (.71), host self-update and 8-character login codes (.70), web player (.65).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -15,10 +15,10 @@
 
 ## Owner one-off jobs
 - Own client ids into Settings: a Simkl app (simkl.com/settings/developer, TV type), a Trakt app (trakt.tv API Apps, redirect urn:ietf:wg:oauth:2.0:oob).
-- Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Account.
+- Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Services.
 - Move the signing files from the private config folder into the password manager, then delete them there.
-- Web player host: update it to 0.261128.71 by hand once (relaying starts with it), then enable the nightly timer (runbook, section 9).
-- Install this release on the Mac (DMG), iPhone and Shield once, then docs/DEVICE_CHECKS.md; later versions announce themselves in the update bar.
+- Web player host: update it to 0.261128.72 by hand once (relaying needs .71 or newer), then enable the nightly timer (runbook, section 9).
+- Install this release on the Mac (DMG), iPhone and Shield once, then docs/DEVICE_CHECKS.md (new: the compact look); later versions announce themselves.
 
 ## Open work
 - [MAC] AirPlay: on AVPlayer's external playback, restart live with the local HLS on the network address (back to 127.0.0.1 after); needs a video receiver.
@@ -28,7 +28,6 @@
 - The own engine as default once it passed the owner's device checks on every platform (DECISIONS: Own libmpv).
 - [DEVICE] iPhone/iPad/Mac: the AVPlayer and PiP checks in docs/DEVICE_CHECKS.md; black or a long freeze: send the log ("TextureHW: first picture").
 - The TV-layout focus polish; lazy VOD details; the menu bar's tray on Linux.
-- [DEVICE] Devices & sync and the web player: the new lines in docs/DEVICE_CHECKS.md (camera link on the phone, Safari and Chrome).
 
 ## Things to watch
 - The Linux integration test app_test sometimes doesn't complete (seen once locally in #70, green on rerun; the nightly's integration job failed too).
@@ -57,4 +56,5 @@
 - Apple Developer ID (99 USD a year): Keychain tied to the team ID, notarized; possible later step (docs/RELEASING.md).
 - The provider's short EPG per channel, an own iptv-org grabber, and seamless reconnect by a second player (costs a second connection).
 - A persistent macOS Finder icon for the chosen logo (changing the app bundle breaks its code signature).
+- Compact, later: an Advanced fold for Setup's User-Agent and the relay field, state summaries in Settings card headers.
 - A Vulkan render path for mpv (mpv 0.42 has no Vulkan render API, mpv#18343; it would be our own mpv patch).

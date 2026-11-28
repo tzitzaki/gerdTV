@@ -29,7 +29,7 @@ pub enum SourceKind {
     M3uUrl,
     /// M3U from a local file: `server` is the file path; no secrets.
     M3uFile,
-    /// No provider yet (setup skipped): Settings works, sync has nothing to fetch; Settings → Account adds one.
+    /// No provider yet (setup skipped): Settings works, sync has nothing to fetch; Settings → Streaming adds one.
     None,
 }
 
@@ -190,7 +190,7 @@ pub fn delete_profile(dir: &Path, id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Tests a login before it replaces a profile's working one (Settings → Account → Edit): Xtream Codes asks for the
+/// Tests a login before it replaces a profile's working one (Settings → Streaming → Edit): Xtream Codes asks for the
 /// account info (a refused or expired login fails), an M3U URL must answer with a playlist (only its first bytes are
 /// read, so a big list costs nothing here; the sync after saving downloads it). Nothing is stored.
 pub async fn check_login(p: &Profile, secrets: &[String]) -> Result<()> {
@@ -1512,7 +1512,7 @@ impl Library {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The profile's user data as JSON (Settings → Account → Your data; crate::userdata).
+    /// The profile's user data as JSON (Settings → Streaming → Your data; crate::userdata).
     pub fn export_user_data(&self) -> Result<String> {
         Ok(crate::userdata::export(&self.conn.lock().unwrap())?)
     }

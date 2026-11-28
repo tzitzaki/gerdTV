@@ -122,7 +122,7 @@ pub fn save_profile(dir: String, profile: ProfileInfo) -> Result<ProfileInfo, St
         .into())
 }
 
-/// Tests a login without storing anything (Settings → Account → Edit saves only a working one).
+/// Tests a login without storing anything (Settings → Streaming → Edit saves only a working one).
 pub async fn check_login(profile: ProfileInfo, secrets: Vec<String>) -> Result<(), String> {
     core::check_login(&profile.into(), &secrets)
         .await

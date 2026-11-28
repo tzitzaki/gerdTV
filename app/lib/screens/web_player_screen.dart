@@ -1,11 +1,10 @@
-// Settings → Account → Web player (with a paired gerdTV host; gerdtv-host serves the page): a one-time login link
+// Settings → Devices → Web player (with a paired gerdTV host; gerdtv-host serves the page): a one-time login link
 // for any browser (QR and copy; it works once, for 10 minutes), and the open web sessions with End. The requests are
 // sealed with the pairing key and go to the host's front door (core: pairing.rs app_request), so this works away
 // from home too.
 
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -88,25 +87,16 @@ class _WebPlayerScreenState extends State<WebPlayerScreen> {
           ),
           const SizedBox(height: Tokens.space),
           Text(l10n.webLinkHint),
-          if (_link != null) ...[
+          // The code is what gets typed on the front door's page, so it's the big text; Copy takes the whole link
+          // (to paste in a browser), shown small under it.
+          if (_link case final link?) ...[
             const SizedBox(height: Tokens.space * 2),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: QrView(text: _link!, size: 220),
-            ),
-            const SizedBox(height: Tokens.space),
-            Row(
-              children: [
-                Expanded(
-                  child: SelectableText(_link!, key: const Key('web.link')),
-                ),
-                IconButton(
-                  tooltip: l10n.webCopy,
-                  icon: const Icon(Icons.copy),
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: _link!)),
-                ),
-              ],
+            CodeCard(
+              qr: link,
+              code: Uri.tryParse(link)?.pathSegments.lastOrNull,
+              codeKey: const Key('web.code'),
+              copyText: link,
+              caption: link,
             ),
           ],
           if (_busy) const LinearProgressIndicator(),

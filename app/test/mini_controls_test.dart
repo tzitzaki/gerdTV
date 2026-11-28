@@ -1,5 +1,6 @@
 // New, because nothing owned picture mode's buttons: the desktop mini player shows only the picture until a tap, the
-// mouse or Tab asks for Mute, Restore and Stop, and 3 s later only the picture again.
+// mouse or Tab asks for Mute, Restore and Stop, and 3 s later only the picture again. The full player's top bar
+// (ActivityScope) hides and returns the same way.
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -112,5 +113,34 @@ void main() {
     await tester.pump();
     expect(pressed, ['mute']);
     await tester.pump(const Duration(seconds: 4)); // Mute's timer
+  });
+
+  // The full player's top bar follows the same rhythm: shown at the start and after any touch, mouse movement or
+  // key, gone 3 s later.
+  testWidgets('activity: shown, hidden after 3 s, back on a key or the mouse', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ActivityScope(
+          builder: (context, active) =>
+              SizedBox.expand(child: Text(active ? 'on' : 'off')),
+        ),
+      ),
+    );
+    expect(find.text('on'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('off'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(find.text('on'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(10, 10));
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(const Offset(40, 40));
+    await tester.pump();
+    expect(find.text('on'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
   });
 }

@@ -39,7 +39,7 @@ Future<ProfileInfo> saveProfile({
 }) =>
     RustLib.instance.api.crateApiLibrarySaveProfile(dir: dir, profile: profile);
 
-/// Tests a login without storing anything (Settings → Account → Edit saves only a working one).
+/// Tests a login without storing anything (Settings → Streaming → Edit saves only a working one).
 Future<void> checkLogin({
   required ProfileInfo profile,
   required List<String> secrets,

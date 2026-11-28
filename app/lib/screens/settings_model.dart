@@ -12,6 +12,7 @@ class SettingsEntry {
     required this.title,
     this.keywords = '',
     this.section,
+    this.actions,
     required this.build,
   });
 
@@ -24,9 +25,13 @@ class SettingsEntry {
   /// Extra words the search matches (localized, space-separated), e.g. "cache" for the buffer.
   final String keywords;
 
-  /// The subcategory heading it sits under (Account: the provider, Premiumize, Trakt, Simkl); consecutive entries
-  /// with the same one share it. The search matches it too.
+  /// The subcategory it sits in: one card per section (Streaming: the provider, Premiumize, Your data), holding every
+  /// entry of the category with that section, in the order the first one appears. Null: shown without a card (pages
+  /// that open from a tile, like Devices & sync). The search matches it too.
   final String? section;
+
+  /// Shown in its card's header, e.g. the provider's ⋮ menu (the first entry of a section that has one).
+  final WidgetBuilder? actions;
   final WidgetBuilder build;
 }
 

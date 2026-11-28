@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
@@ -121,8 +122,10 @@ void main() {
     await tester.pump();
     // Settings → Appearance: another logo, stored app-wide and sent to the Linux window as its icon.
     await tapReady(tester, find.byKey(const Key('settings.cat.appearance')));
-    // The theme comes first in Appearance: the logos may be below the window (built only when scrolled to).
+    // The theme's card is open first in Appearance; the logos are in their own card, below it.
     await waitFor(tester, find.byKey(const Key('settings.themeMode')));
+    await tapReady(tester, find.byKey(const Key('settings.section.Logo')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings.logo.signal')),
       200,
@@ -186,7 +189,7 @@ void main() {
                 '0',
           );
     expect(await pauseWait(), 2);
-    await tester.tap(find.byKey(const Key('player.buffer')));
+    await tapControl(tester, find.byKey(const Key('player.buffer')));
     await tapReady(tester, find.byKey(const Key('buffer.smooth')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
@@ -212,7 +215,9 @@ void main() {
     // Desktop mini player: the window shrinks to the floating player, playback continues, Restore brings it back.
     final mini = MiniWindow();
     final fullWidth = mini.size.width;
-    await tester.tap(find.byKey(const Key('player.mini')));
+    // In the tune sheet (the top bar keeps only what's used often).
+    await tapControl(tester, find.byKey(const Key('player.buffer')));
+    await tapReady(tester, find.byKey(const Key('player.mini')));
     await waitFor(tester, find.byKey(const Key('player.picture')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 800)),
@@ -309,7 +314,7 @@ void main() {
     expect(session.player.state.playing, isTrue);
 
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     // While Apple's window floats the stream, the bar shows the logo, not a second picture.
     session.floating.value = true;
@@ -350,7 +355,7 @@ void main() {
       greaterThanOrEqualTo(atLeave),
       reason: 'reopening does not restart',
     );
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     await tester.pageBack();
     await tester.pump(const Duration(milliseconds: 500));
@@ -397,7 +402,7 @@ void main() {
     ); // the field has the focus since typing started
     await tester.pump();
     await waitFor(tester, find.byKey(const Key('player.back')));
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     // Stop is the way playback ends: the bar goes away.
     await tester.tap(find.byKey(const Key('nowPlaying.stop')));
@@ -687,20 +692,22 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search in sections, groups and the guide');
-    // Favourites: the star on a channel puts it into a Favourites group on top of Live TV.
+    // Favourites: a channel's menu (a right click) puts it into a Favourites group on top of Live TV.
     await tapReady(
       tester,
       find.byWidgetPredicate(
         (w) => w is ListTile && w.trailing is Text && w.onTap != null,
       ),
     );
-    final star = find.byWidgetPredicate(
-      (w) =>
-          w.key is ValueKey<String> &&
-          (w.key! as ValueKey<String>).value.startsWith('item.star.'),
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
+    await tester.tap(
+      find.byType(ItemRow).hitTestable().first,
+      buttons: kSecondaryButton,
     );
-    await tapReady(tester, star);
+    await tapReady(tester, find.byKey(const Key('channel.favourite')));
     // A channel's menu puts it into a new group of the user's own, which then shows above the provider's.
+    // (The favourite's menu is still sliding out: its rows once they take taps again.)
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
     await tester.longPress(find.byType(ItemRow).hitTestable().first);
     await tapReady(tester, find.byKey(const Key('channel.addToGroup')));
     await tapReady(tester, find.byKey(const Key('menu.group.new')));
@@ -783,9 +790,9 @@ void main() {
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));
-    // The sort button: the order is Live TV's too; back to the provider's.
+    // The order, in the ⋮: it is Live TV's too; back to the provider's.
     for (final order in ['name_desc', 'provider']) {
-      await tapReady(tester, find.byKey(const Key('list.sort')));
+      await tapReady(tester, find.byKey(const Key('guide.more')));
       await tapReady(tester, find.byKey(Key('sort.$order')));
       await tester.pumpAndSettle();
       expect(lib.setting(key: 'sort_live_items'), order);
@@ -821,11 +828,7 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('guide.unmatched')),
-      200,
-      scrollable: settingsList,
-    );
+    // The sources' card is the first one, open.
     expect(
       find.descendant(
         of: find.byKey(const Key('guide.source.builtin')),
@@ -859,7 +862,12 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Remove'));
     await tester.pump(const Duration(milliseconds: 300));
-    // Mapping by hand: a channel without a guide id gets a guide channel and leaves the list.
+    // Mapping by hand: a channel without a guide id gets a guide channel and leaves the list (its card first).
+    await tapReady(
+      tester,
+      find.byKey(const Key('settings.section.Channels without guide')),
+    );
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('guide.unmatched')),
       200,
@@ -890,6 +898,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('settings.search')), 'remove');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('guide.unmatched')), findsNothing);
+    await tapReady(tester, find.byKey(const Key('settings.providerMenu')));
     await tapReady(tester, find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));

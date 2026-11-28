@@ -445,6 +445,14 @@ void main() {
     // Remembered, with where it listens.
     expect(session.devices.peers.value.single.addr, '192.0.2.5:4100');
     expect(find.byKey(const Key('devices.peer.tv1')), findsOneWidget);
+    // Forget sits in the row's ⋮.
+    await tester.tap(find.byKey(const Key('devices.peerMenu.tv1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('devices.forget.tv1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Forget')); // confirmed
+    await tester.pumpAndSettle();
+    expect(session.devices.peers.value, isEmpty);
   });
 
   testWidgets('web player: a login link with its QR; End ends a session', (
@@ -469,7 +477,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('https://tv.example.invalid/l/abc'), findsOneWidget);
     expect(find.byKey(const Key('devices.qr')), findsOneWidget);
-    await tester.ensureVisible(find.text('End')); // below the QR
+    // The code is the big text (typed on the front door's page); Copy takes the whole link.
+    expect(
+      tester.widget<SelectableText>(find.byKey(const Key('web.code'))).data,
+      'abc',
+    );
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    await tester.tap(find.byKey(const Key('code.copy')));
+    expect(copied, 'https://tv.example.invalid/l/abc');
+    // Below the code card (the page's list is the first scrollable; selectable texts have their own).
+    await tester.scrollUntilVisible(
+      find.text('End'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('End'));
     await tester.pumpAndSettle();

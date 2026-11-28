@@ -6,6 +6,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/platform/engine.dart';
 import 'package:gerdtv/theme.dart';
@@ -148,39 +149,52 @@ void main() {
       tester,
     ) async {
       await pump(tester, const Size(1280, 800));
-      // Five categories (owner decision): Your data sits in Account, Stream health in Playback, Updates in About.
-      for (final id in ['account', 'playback', 'about']) {
-        expect(find.byKey(Key('settings.cat.$id')), findsOneWidget);
-      }
-      // The guide needs an open library (none here); the merged categories are gone.
-      for (final id in ['guide', 'data', 'updates', 'health']) {
-        expect(find.byKey(Key('settings.cat.$id')), findsNothing);
-      }
-      // The first category shows; another one replaces it. Account's entries sit under their subcategory: the
-      // provider's (its name, "Provider" without one) once, however many entries it has.
-      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
+      // Seven categories (owner decision), in this order; the guide needs an open library (none here).
+      final ids = [
+        for (final w in tester.widgetList<ListTile>(find.byType(ListTile)))
+          if ((w.key as ValueKey<String>?)?.value.startsWith('settings.cat.') ??
+              false)
+            (w.key! as ValueKey<String>).value.substring(13),
+      ];
+      expect(ids, [
+        'streaming',
+        'services',
+        'devices',
+        'playback',
+        'appearance',
+        'about',
+      ]);
+      // The first category shows: the provider's card ("Provider" without one) once, its rare actions in a menu.
       expect(
         find.byKey(const Key('settings.section.Provider')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('settings.remove')), findsNothing);
+      await tester.tap(find.byKey(const Key('settings.providerMenu')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings.profileAdd')), findsOneWidget);
+      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
       // Web player shows without a paired host too, saying what it needs (it was hidden, so hard to find).
+      await tester.tap(find.byKey(const Key('settings.cat.devices')));
+      await tester.pump();
       expect(find.byKey(const Key('settings.web.none')), findsOneWidget);
       expect(find.textContaining('Needs a gerdTV host'), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings.cat.about')));
       await tester.pump();
-      expect(find.byKey(const Key('settings.remove')), findsNothing);
+      expect(find.byKey(const Key('settings.providerMenu')), findsNothing);
       expect(find.text('Licences'), findsOneWidget);
       expect(find.text('Check for updates'), findsOneWidget);
 
-      // Search across categories: only the matching entry, under its category.
+      // Search across categories: the menu's actions are found through their card, which shows open.
       await tester.enterText(
         find.byKey(const Key('settings.search')),
         'logout',
       );
       await tester.pump();
-      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
+      expect(find.byKey(const Key('settings.providerMenu')), findsOneWidget);
       expect(find.text('Licences'), findsNothing);
-      expect(find.byKey(const Key('settings.sync')), findsNothing);
 
       await tester.enterText(find.byKey(const Key('settings.search')), 'zzz');
       await tester.pump();
@@ -195,29 +209,48 @@ void main() {
       ); // back to the chosen category
     });
 
+    // Owner decision: one card open at a time, the first one to start with; the open one closes again on a tap.
+    testWidgets('cards: opening one closes the other', (tester) async {
+      await pump(tester, const Size(1280, 800));
+      await tester.tap(find.byKey(const Key('settings.cat.appearance')));
+      await tester.pumpAndSettle();
+      final theme = find.byKey(const Key('settings.themeMode'));
+      final logo = find.byKey(const Key('settings.logo.signal'));
+      expect(theme, findsOneWidget);
+      expect(logo, findsNothing);
+      await tester.tap(find.byKey(const Key('settings.section.Logo')));
+      await tester.pumpAndSettle();
+      expect(theme, findsNothing);
+      expect(logo, findsOneWidget);
+      await tester.tap(find.byKey(const Key('settings.section.Logo')));
+      await tester.pumpAndSettle();
+      expect(theme, findsNothing);
+      expect(logo, findsNothing);
+    });
+
     // Regression (macOS CI, 800 px window): the shell shows its rail, so Settings must be wide too, though it gets
     // less than 720 px beside the rail; it opened full pages over the rail instead.
     testWidgets('wide window with the rail: categories beside the content', (
       tester,
     ) async {
       await pump(tester, const Size(800, 600), beside: 81);
-      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
+      expect(find.byKey(const Key('settings.providerMenu')), findsOneWidget);
     });
 
     testWidgets('phone: a category list that opens a page', (tester) async {
       await pump(tester, const Size(390, 844));
-      expect(find.byKey(const Key('settings.remove')), findsNothing);
-      await tester.tap(find.byKey(const Key('settings.cat.account')));
+      expect(find.byKey(const Key('settings.providerMenu')), findsNothing);
+      await tester.tap(find.byKey(const Key('settings.cat.streaming')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('settings.remove')), findsOneWidget);
-      expect(find.widgetWithText(AppBar, 'Account'), findsOneWidget);
+      expect(find.byKey(const Key('settings.providerMenu')), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Streaming'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byKey(const Key('settings.search')), 'licen');
       await tester.pump();
       expect(find.text('Licences'), findsOneWidget);
-      expect(find.byKey(const Key('settings.cat.account')), findsNothing);
+      expect(find.byKey(const Key('settings.cat.streaming')), findsNothing);
     });
 
     testWidgets('Appearance: picking a logo stores it app-wide', (
@@ -227,6 +260,8 @@ void main() {
       final session = await pump(tester, const Size(1280, 800));
       await tester.tap(find.byKey(const Key('settings.cat.appearance')));
       await tester.pump();
+      await tester.tap(find.byKey(const Key('settings.section.Logo')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('settings.logo.signal')));
       await tester.pump();
       expect(session.logo, AppLogo.signal);

@@ -7,15 +7,15 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Look: posters fill movie tiles and lift under the pointer; Settings → Appearance → Theme switches light, accent and black at once.
 - Search: in TV lists and guide "tnt 4"-style queries list the channel first, then Live now and Upcoming; Show earlier; the guide's group chip limits it.
 - Movie page: plot and Play, after 2 s the trailer muted (Trailer: with sound); several languages: the subtitles button switches.
-- Favourites and hidden groups: a star adds a channel to Favourites atop TV (hold: menu); a group ticked in Settings → Hidden groups leaves lists and search.
-- Back: Settings → Account → Edit the provider closes with its back arrow, Esc and the mouse's side button; an open dialog closes first.
+- Favourites and hidden groups: a right click or a row's ⋮ adds a channel to Favourites atop TV (starred); a group ticked in Hidden groups leaves lists.
+- Back: Settings → Streaming → the provider's ⋮ → Edit the provider closes with its back arrow, Esc and the mouse's side button; an open dialog closes first.
 - Keep playing: Esc keeps the channel in the bottom bar; closing the window keeps it in the menu bar (its menu: Open, Stop, Quit).
 - Buffer: Settings → Playback → Smooth makes channels start later but play without stutters; with the buffer shown (Playback): "Buffer x / 30 s".
 - Window minimum: outside the player the window can't be dragged smaller than about 960 × 540 (the rail stays); the player and P still go smaller.
 - Player window: no black bars, resizing keeps the ratio, 4:3 channels re-fit, back returns to the list size (also after a restart); P floats it at that ratio.
 - Catch-up: a past programme on a catch-up channel starts at its first minute (not an hour early or late), and seeking works.
 - Guide: Settings → Guide: each source shows your matched channels; an open-epg guide loads; suggestions map; Stop beside pause.
-- Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the PiP button floats it.
+- Live (also Apple's player, Settings → Playback): zap, Space then −1:00 and Live, seek bar; Apple's: the tune sheet's picture-in-picture floats it.
 - Guide grid: Now shows the running programmes under the now line; scrolling sideways keeps channel names and the time ruler aligned.
 - Lists: a group shows logos, now with progress and next; the toggle cycles four modes; after a restart logos appear at once, even offline.
 - Updates: on an older release the bar under the app appears within a minute; quitting gerdTV installs it (the next start is new), or Install and restart.
@@ -28,14 +28,13 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Cast: tune sheet → Cast to a device lists the Shield; a channel and a movie play there; the bar's play/pause and Stop work.
 - Deinterlacing on: an interlaced HD channel shows no combed edges and still plays smoothly; off again: as before.
 - Subtitles online (with your OpenSubtitles key): Find subtitles online lists German ones for a movie; a tap shows them in the picture.
-
-- Web player (host paired): a link from Settings → Web player opens in Safari and Chrome; a channel and a movie play, +3 h extends.
+- Compact look: Settings shows seven categories with one card open; the provider's ⋮ edits it; rows are tighter; the player's top bar fades after 3 s.
+- Web player (host paired): a link from Settings → Devices → Web player opens in Safari and Chrome; a channel and a movie play; +3 h extends.
 - Devices & sync (both on this release): Show a code (6 digits); the Shield picks the Mac, takes it on the number pad, names the Mac; Sync moves the login.
 - Pair by webcam: Devices & sync → Scan a code with the camera asks for the camera once; the TV's QR opens the confirmation; closing the window cancels.
-- Web player in Safari: a busy account (a channel playing in the app) says the provider's connection is in use; back, close and stars are Material icons.
 
 ## iPhone and iPad
-- Web player: the link's QR opens the page in Safari away from home; channels play; Add to Home Screen opens it full screen.
+- Web player: the link's QR opens the page in Safari away from home (or type its big code there); channels play; Add to Home Screen opens it full screen.
 - Devices & sync: scanning the Mac's or Shield's pairing QR with the camera opens gerdTV, names the device, Sync moves the profile.
 - Own engine: Player engine gerdTV, restart; a movie plays with picture and sound, also in PiP.
 - Setup: the login connects and the catalogue appears; after closing and reopening the app it is still logged in.
@@ -64,7 +63,7 @@ Things for the owner to look at on a real device; one line each, deleted once se
 
 ## Shield
 - Welcome (fresh install): QR, code and Skip on one screen, Skip focused; the phone's camera pairs (Wi-Fi, then mobile data via the host).
-- Provider form (Settings → Account → add provider): Up/Down move between all fields and the keyboard's Next goes on.
+- Provider form (Settings → Streaming → the provider's ⋮ → Add a provider): Up/Down move between all fields and the keyboard's Next goes on.
 - Own engine: Player engine gerdTV, restart; HD channels play smoothly; the D-pad lifts tiles and reaches the sort button.
 - Install and remote: dark start (no white flash), sharp text (no grid or colour fringes), the wide logo banner on Home; D-pad reaches every field.
 - Movie page: OK on a movie opens its page with the muted trailer; OK plays, Trailer plays it with sound, Back returns.
@@ -88,3 +87,4 @@ Things for the owner to look at on a real device; one line each, deleted once se
 - Own groups: holding a channel → Add to a group → New group; the group sits above the provider's, also in the guide; rename and move work.
 - Next episode: an episode played to its end counts down 10 s to the next one; Cancel keeps it; the episode gets its check mark.
 - Picture format: the tune sheet's Zoom fills a 4:3 channel's black bars; it stays for that channel after a restart.
+- Compact look: the D-pad opens each Settings card and the provider's ⋮; the player's top bar fades after 3 s and any key brings it back.

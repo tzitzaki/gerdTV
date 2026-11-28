@@ -422,12 +422,7 @@ class _SectionSearchState extends State<SectionSearch> {
 
   Widget _recentList(AppLocalizations l10n) => ListView(
     children: [
-      ListTile(
-        title: Text(
-          l10n.searchRecent,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-      ),
+      SectionLabel(l10n.searchRecent),
       for (final (i, r) in _recent.indexed)
         ListTile(
           key: Key('search.recent.$i'),
@@ -591,7 +586,6 @@ List<Widget> programmeSlivers(
   VoidCallback? onEarlier,
 }) {
   final locale = Localizations.localeOf(context).toLanguageTag();
-  final text = Theme.of(context).textTheme;
   Widget row(ProgrammeHit h) => ItemTile(
     key: Key('search.programme.${h.programme.id}'),
     item: h.item,
@@ -601,12 +595,7 @@ List<Widget> programmeSlivers(
   );
   List<Widget> group(String key, String header, List<ProgrammeHit> hits) => [
     if (hits.isNotEmpty) ...[
-      SliverToBoxAdapter(
-        child: ListTile(
-          key: Key('search.$key'),
-          title: Text(header, style: text.titleSmall),
-        ),
-      ),
+      SliverToBoxAdapter(child: SectionLabel(header, key: Key('search.$key'))),
       SliverList.list(
         children: [for (final h in hits.take(inline ?? hits.length)) row(h)],
       ),
