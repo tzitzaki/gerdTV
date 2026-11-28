@@ -443,6 +443,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // One-tap actions first (a small window shows them without scrolling): used now and then, so
+                    // here instead of the top bar (owner decision); P and the remote's last-channel key (or
+                    // Backspace) still work directly.
+                    if (_current.kind == ItemKind.live &&
+                        widget.session.lastChannel != null)
+                      ListTile(
+                        key: const Key('player.last'),
+                        leading: const Icon(Icons.swap_horiz),
+                        title: Text(l10n.lastChannel),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _lastChannel();
+                        },
+                      ),
+                    if (isDesktop)
+                      ListTile(
+                        key: const Key('player.mini'),
+                        leading: const Icon(Icons.picture_in_picture_alt),
+                        title: Text(l10n.miniPlayer),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _toggleMini();
+                        },
+                      ),
+                    // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
+                    if (isApple || widget.session.onAvPlayer.value)
+                      ListTile(
+                        key: const Key('player.applePip'),
+                        leading: const Icon(Icons.picture_in_picture_alt),
+                        title: Text(l10n.miniPlayer),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _startPip();
+                        },
+                      ),
                     ListTile(
                       title: Text(
                         l10n.bufferThisChannel,
@@ -487,40 +522,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         onTap: () {
                           Navigator.of(context).pop();
                           showCastSheet(context, widget.session, _current);
-                        },
-                      ),
-                    // Used now and then, so here instead of the top bar (owner decision); P and the remote's
-                    // last-channel key (or Backspace) still work directly.
-                    if (_current.kind == ItemKind.live &&
-                        widget.session.lastChannel != null)
-                      ListTile(
-                        key: const Key('player.last'),
-                        leading: const Icon(Icons.swap_horiz),
-                        title: Text(l10n.lastChannel),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          _lastChannel();
-                        },
-                      ),
-                    if (isDesktop)
-                      ListTile(
-                        key: const Key('player.mini'),
-                        leading: const Icon(Icons.picture_in_picture_alt),
-                        title: Text(l10n.miniPlayer),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          _toggleMini();
-                        },
-                      ),
-                    // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
-                    if (isApple || widget.session.onAvPlayer.value)
-                      ListTile(
-                        key: const Key('player.applePip'),
-                        leading: const Icon(Icons.picture_in_picture_alt),
-                        title: Text(l10n.miniPlayer),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          _startPip();
                         },
                       ),
                     if (canRecord && _current.kind == ItemKind.live)
