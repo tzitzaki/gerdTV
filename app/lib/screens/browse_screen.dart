@@ -252,15 +252,7 @@ class ContinueRow extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Tokens.space * 2,
-                Tokens.space,
-                Tokens.space * 2,
-                0,
-              ),
-              child: Text(l10n.continueWatching, style: text.titleSmall),
-            ),
+            SectionLabel(l10n.continueWatching),
             SizedBox(
               height: 200,
               child: ListView(

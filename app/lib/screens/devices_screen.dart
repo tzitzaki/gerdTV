@@ -104,15 +104,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final l10n = AppLocalizations.of(context);
     final d = widget.session.devices;
     final theme = Theme.of(context);
-    Widget heading(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Tokens.space * 2,
-        Tokens.space * 3,
-        Tokens.space * 2,
-        Tokens.space,
-      ),
-      child: Text(text, style: theme.textTheme.titleMedium),
-    );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.devicesTitle)),
       body: ListView(
@@ -128,7 +119,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
               ),
             ),
           // This device receives: QR and code.
-          heading(l10n.devicesShowCode),
+          SectionLabel(l10n.devicesShowCode),
           if (_qr == null)
             ListTile(
               key: const Key('devices.showCode'),
@@ -150,7 +141,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
               ),
             ),
           // This device connects to one it finds.
-          heading(l10n.devicesNearby),
+          SectionLabel(l10n.devicesNearby),
           NearbyDevices(
             session: widget.session,
             onStatus: (m) => setState(() => _status = m),
@@ -161,7 +152,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
             builder: (context, peers, _) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (peers.isNotEmpty) heading(l10n.devicesPaired),
+                if (peers.isNotEmpty) SectionLabel(l10n.devicesPaired),
                 for (final p in peers)
                   ListTile(
                     key: Key('devices.peer.${p.device.id}'),

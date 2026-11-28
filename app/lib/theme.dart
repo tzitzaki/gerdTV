@@ -142,7 +142,9 @@ ThemeData gerdTheme(
   return ThemeData(
     colorScheme: scheme,
     brightness: brightness,
-    visualDensity: VisualDensity.standard,
+    // Compact rows and controls on desktop (mouse and keyboard: about 8 px less per row, owner decision), touch size
+    // on phones, tablets and the TV (Android TV is Android: standard, its 10-foot layout needs the size).
+    visualDensity: VisualDensity.adaptivePlatformDensity,
     // A clearly visible focus ring for keyboard and remote navigation.
     focusColor: scheme.primary.withValues(alpha: 0.35),
     // Screen changes (docs/DESIGN.md, motion): a short fade, or on phones the iOS-style slide with edge swipe-back.

@@ -631,7 +631,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           SettingsEntry(
             id: 'overlay',
-            section: l10n.settingsTheme, // the banner's look belongs with the theme
+            section:
+                l10n.settingsTheme, // the banner's look belongs with the theme
             title: l10n.settingsOverlay,
             keywords: l10n.settingsKeywordsOverlay,
             build: (_) => _OverlaySettings(session: session),
