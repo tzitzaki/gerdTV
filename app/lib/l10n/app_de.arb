@@ -408,7 +408,7 @@
   "welcomeFromHere": "Geräte in der Nähe",
   "welcomeGetApp": "gerdTV fürs Handy holen",
   "welcomeIphone": "iPhone (vorher neu signieren)",
-  "welcomeNoDevice": "Kein anderes Gerät? Den Login später unter Einstellungen → Konto eintragen.",
+  "welcomeNoDevice": "Kein anderes Gerät? Den Login später unter Einstellungen → Streaming eintragen.",
   "welcomeScan": "Auf dem Handy: gerdTV → {path}, dann diesen Code scannen.",
   "welcomeSkip": "Weiter zur App",
   "welcomeTitle": "Willkommen bei gerdTV"

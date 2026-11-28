@@ -1,4 +1,4 @@
-// Settings → Account → OpenSubtitles: the user's own API key, and optionally the account's login, whose download
+// Settings → Services → OpenSubtitles: the user's own API key, and optionally the account's login, whose download
 // quota then applies (without one a free key allows 5 a day). The login is checked with OpenSubtitles when saved.
 
 import 'package:material_ui/material_ui.dart';

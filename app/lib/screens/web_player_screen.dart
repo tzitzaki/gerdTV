@@ -1,4 +1,4 @@
-// Settings → Account → Web player (with a paired gerdTV host; gerdtv-host serves the page): a one-time login link
+// Settings → Devices → Web player (with a paired gerdTV host; gerdtv-host serves the page): a one-time login link
 // for any browser (QR and copy; it works once, for 10 minutes), and the open web sessions with End. The requests are
 // sealed with the pairing key and go to the host's front door (core: pairing.rs app_request), so this works away
 // from home too.

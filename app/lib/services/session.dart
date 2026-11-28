@@ -72,7 +72,7 @@ class Session extends ChangeNotifier {
   SessionState state = SessionState.loading;
   ProfileInfo? profile;
 
-  /// Every saved profile (one provider account each), for the start picker and Settings → Account.
+  /// Every saved profile (one provider account each), for the start picker and Settings → Streaming.
   List<ProfileInfo> profiles = const [];
 
   /// App-wide settings (app.json): the profile opened last (the picker lists it first) and the one that opens without
@@ -549,7 +549,7 @@ class Session extends ChangeNotifier {
     await openProfile(saved);
   }
 
-  /// Replaces the open profile's provider login (Settings → Account → Edit) only once the new one works: tested first
+  /// Replaces the open profile's provider login (Settings → Streaming → Edit) only once the new one works: tested first
   /// (nothing stored), then saved with its secrets and the profile reopened, which syncs the new catalogue; the user
   /// data stays, it lives in the same profile database. Returns why it failed, or null; on failure the old login is
   /// untouched and keeps working.
@@ -574,7 +574,7 @@ class Session extends ChangeNotifier {
   bool get hasProvider => profile != null && profile!.source != SourceKind.none;
 
   /// Setup's Skip: a profile without a provider, named [name], so all of Settings works (keys, look, Premiumize, a
-  /// profile from another device) before any provider is entered; Settings → Account adds one later (the edit form).
+  /// profile from another device) before any provider is entered; Settings → Streaming adds one later (the edit form).
   Future<void> skipSetup(String name) async {
     final dir = await _dir();
     final saved = await saveProfile(

@@ -761,7 +761,7 @@
   "welcomeFromHere": "Devices nearby",
   "welcomeGetApp": "Get gerdTV for your phone",
   "welcomeIphone": "iPhone (re-sign it first)",
-  "welcomeNoDevice": "No other device? Add your login later in Settings → Account.",
+  "welcomeNoDevice": "No other device? Add your login later in Settings → Streaming.",
   "welcomeScan": "On your phone: gerdTV → {path}, then scan this code.",
   "@welcomeScan": {
     "placeholders": {

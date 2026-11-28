@@ -2,7 +2,7 @@
 // provider form, and a calm screen: one instruction, the QR, Skip). This device listens at once and shows its QR and
 // code (PairCodeView, the Devices & sync page's own widget, devices_screen.dart). A finished sync opens the provider
 // that came (Session's apply path), which replaces this screen with the app. Skip to the app opens gerdTV without a
-// provider (Session.skipSetup); the login is then added in Settings → Account. Two quiet extras: "Get gerdTV for your
+// provider (Session.skipSetup); the login is then added in Settings → Streaming. Two quiet extras: "Get gerdTV for your
 // phone" unfolds this version's phone files as QRs (not on phones), and the devices found nearby (NearbyDevices) stay
 // faded until the remote or the pointer reaches them.
 // Remote: Skip takes the focus first; Up/Down walk the page (fieldDpadKeys in theme.dart), the scroll view follows.

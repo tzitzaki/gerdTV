@@ -1,7 +1,7 @@
-// Adding a provider (Settings → Account, the profile picker): the provider's login (Xtream Codes) or a playlist URL
+// Adding a provider (Settings → Streaming, the profile picker): the provider's login (Xtream Codes) or a playlist URL
 // (M3U). The first run has no form (welcome_screen.dart: pairing, or Skip and add it here later). Connecting runs the
 // first sync; a refused login or an unreachable server is shown under the button and the form stays filled.
-// With [SetupScreen.edit] the same form edits the open profile's provider (Settings → Account): pre-filled, with a
+// With [SetupScreen.edit] the same form edits the open profile's provider (Settings → Streaming): pre-filled, with a
 // name field, and Save replaces the login only once the new one works (Session.updateProfile).
 
 import 'package:material_ui/material_ui.dart';

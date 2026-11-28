@@ -1,4 +1,4 @@
-// Settings → Account → Trakt / Simkl: link the profile with a device code (link_dialog.dart), or unlink. Both first
+// Settings → Services → Trakt / Simkl: link the profile with a device code (link_dialog.dart), or unlink. Both first
 // ask for the user's own app (no client id or secret ships with gerdTV): Trakt's id and secret, Simkl's id.
 
 import 'package:material_ui/material_ui.dart';

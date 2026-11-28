@@ -1,4 +1,4 @@
-// Watch tracking with Trakt and Simkl (owner request): linked per profile in Settings → Account (a device code),
+// Watch tracking with Trakt and Simkl (owner request): linked per profile in Settings → Services (a device code),
 // then every movie and episode is scrobbled: start when it starts or resumes, pause on a pause, stop with the
 // progress when it ends or another starts. The core cleans the titles and talks to the services
 // (gerdtv_core::tracking); this holds the tokens (secure storage, as JSON with their refresh token) and calls it.
