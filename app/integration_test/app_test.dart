@@ -706,6 +706,8 @@ void main() {
     );
     await tapReady(tester, find.byKey(const Key('channel.favourite')));
     // A channel's menu puts it into a new group of the user's own, which then shows above the provider's.
+    // (The favourite's menu is still sliding out: its rows once they take taps again.)
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
     await tester.longPress(find.byType(ItemRow).hitTestable().first);
     await tapReady(tester, find.byKey(const Key('channel.addToGroup')));
     await tapReady(tester, find.byKey(const Key('menu.group.new')));

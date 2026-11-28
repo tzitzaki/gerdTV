@@ -745,10 +745,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                title: Text(l10n.settingsBuffer),
-                subtitle: Text(l10n.bufferHint),
-              ),
+              // The card's title says "Buffer": only the hint here.
+              ListTile(subtitle: Text(l10n.bufferHint)),
               BufferPicker(
                 value: preset,
                 onChanged: (c) => setState(() {
