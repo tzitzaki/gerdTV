@@ -2,7 +2,7 @@ name: gerdtv
 description: "gerdTV: a multi-platform IPTV player (Flutter + Rust + libmpv)."
 publish_to: 'none'
 # Set by each wrap-up release: 0.YYMMDD.<PR#>+<PR#> (docs/RELEASING.md).
-version: 0.261128.71+71
+version: 0.261128.72+72
 
 environment:
   sdk: ^3.14.0
