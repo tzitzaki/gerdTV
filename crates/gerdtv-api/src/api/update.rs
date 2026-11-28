@@ -35,6 +35,12 @@ pub fn release_page() -> String {
     core::RELEASE_PAGE.to_string()
 }
 
+/// This version's install file for `platform` ("android", "ios"), for the welcome screen's QR; None elsewhere.
+#[flutter_rust_bridge::frb(sync)]
+pub fn phone_file(platform: String) -> Option<String> {
+    core::phone_file(&platform, gerdtv_core::version())
+}
+
 /// A newer, correctly signed release with a build for `platform` ("macos", "ios", "android", "linux"), or None.
 pub async fn check_update(platform: String) -> Result<Option<UpdateInfo>, String> {
     core::check(

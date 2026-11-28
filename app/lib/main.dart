@@ -19,8 +19,9 @@ import 'screens/now_playing_bar.dart';
 import 'screens/player_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/profile_picker.dart';
-import 'screens/setup_screen.dart';
 import 'screens/shell.dart';
+import 'screens/update_bar.dart';
+import 'screens/welcome_screen.dart';
 import 'services/reminders.dart';
 import 'services/tv_home.dart';
 import 'services/session.dart';
@@ -99,8 +100,13 @@ class GerdTvApp extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: BackKeys(navigator: session.navigatorKey, child: child!),
+              // Up/Down leave text fields in every form (theme.dart, fieldDpadKeys).
+              child: Shortcuts(
+                shortcuts: fieldDpadKeys,
+                child: BackKeys(navigator: session.navigatorKey, child: child!),
+              ),
             ),
+            UpdateBar(session: session),
             NowPlayingBar(session: session),
             CastBar(session: session),
           ],
@@ -124,7 +130,7 @@ class GerdTvApp extends StatelessWidget {
           SessionState.loading => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           ),
-          SessionState.needsSetup => SetupScreen(session: session),
+          SessionState.needsSetup => WelcomeScreen(session: session),
           SessionState.choosing => ProfilePicker(session: session),
           SessionState.ready => Shell(session: session),
         },

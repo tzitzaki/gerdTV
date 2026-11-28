@@ -8,6 +8,7 @@ Private context for the owner's own machines (missing elsewhere, which is fine):
 ## Owner preferences
 - Code: simple, lean, easy to read, heavily commented (the why, and debugging hints). English in code and docs; metric units; 24 h time; Europe/Berlin.
 - Make the smallest change that solves the task. No features, options or abstractions nobody asked for, and no handling of cases that can't happen (input from outside, meaning the provider, TMDB, the network, cast devices or files, always can). State assumptions. Say so when a request can be read two ways or a simpler way exists.
+- Shared logic and values live once: a named function, widget or constant reused everywhere (standing owner rule); when touching copies, merge them.
 - Surgical diffs: every changed line traces to the task. No drive-by refactors or reformatting; match the surrounding style. Remove only what the change itself left unused. Unrelated dead code goes into the improvement ideas.
 - Before starting work (a session, or a task handed over), ask every costly or ambiguous design decision in one batch, with a recommendation each, grouped by topic so it can be answered from a phone. Decide small things yourself and say so. Explain mechanisms briefly.
 - Before answering, list what you'd need to know that the owner hasn't said. Then ask one extensive question round covering design, improvements and how to run unattended (what comes next, blockers; never ask for a stop time, the owner types one in chat when needed), so the work can continue unattended afterwards.

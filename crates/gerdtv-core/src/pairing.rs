@@ -1,12 +1,13 @@
 //! Device pairing and sync (owner decision): two gerdTV installs (apps, or the headless host) exchange the open
 //! profile, its login, linked services' tokens, the app-wide keys and the user data, directly on the local network,
-//! with no server in between.
+//! with no server in between; across networks they meet at the user's own host, which only forwards the sealed
+//! frames (relay.rs; the LAN is always tried first).
 //!
 //! How it fits together:
 //! - One side **listens** (`Listener`, a TCP port on all interfaces, announced by mDNS as `_gerdtv._tcp` with the
 //!   device's name and platform); the other **connects** (`connect_code` / `connect_peer`).
 //! - First time: the listener shows a one-time **code** (6 digits, owner decision; also as a QR
-//!   `gerdtv://pair?a=<addr:port>&c=<code>`). The code isn't the key: both sides run SPAKE2 with it (a password-
+//!   `gerdtv://pair?a=<addr:port>&c=<code>`, plus `&r=<host's front address>&m=<doorbell>` when a relay is known). The code isn't the key: both sides run SPAKE2 with it (a password-
 //!   authenticated key exchange, the RustCrypto `spake2` crate) and get a strong shared key only when both typed the
 //!   same code. Someone who recorded the traffic can't try the million codes offline; someone who joins in gets one
 //!   guess: a wrong code fails the first sealed frame and burns the code (one attempt), and a code is good for 10
@@ -28,9 +29,11 @@
 //!
 //! Debugging: nothing here logs a bundle (it carries logins). A "wrong or used code" with the right code means the
 //! code was burnt by an earlier attempt or ran out: the listener shows a new one. Two devices that don't find each
-//! other by mDNS (guest Wi-Fi, client isolation) still pair by the QR, which carries the address.
+//! other by mDNS (guest Wi-Fi, client isolation) still pair by the QR, which carries the address, and through the
+//! relay when the QR names one. The transport is a [Pipe]: a TCP stream on the LAN or a [RelayPipe].
 
 use crate::library::{self, Library, LibraryError, Profile, SourceKind};
+use crate::relay::{Relay, RelayPipe};
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
 use serde::{Deserialize, Serialize};
@@ -274,9 +277,34 @@ fn session_key(base: &[u8], connector: &[u8], listener: &[u8]) -> [u8; 32] {
     h.finalize().into()
 }
 
-/// The QR's text for a listener at `addr` with `code`.
-pub fn qr_text(addr: &str, code: &str) -> String {
-    format!("gerdtv://pair?a={addr}&c={code}")
+/// The QR's text for a listener at `addr` with `code`, and where to meet it when the LAN doesn't reach it.
+pub fn qr_text(addr: &str, code: &str, relay: Option<&Relay>) -> String {
+    let mut t = format!("gerdtv://pair?a={addr}&c={code}");
+    if let Some(r) = relay {
+        t.push_str(&format!("&r={}&m={}", escape(&r.web), r.bell));
+    }
+    t
+}
+
+/// Percent-escapes what would end a query value (the relay's address); the rest of a URL stays readable.
+fn escape(s: &str) -> String {
+    s.replace('%', "%25")
+        .replace('&', "%26")
+        .replace('=', "%3D")
+}
+
+fn unescape(s: &str) -> String {
+    s.replace("%3D", "=")
+        .replace("%26", "&")
+        .replace("%25", "%")
+}
+
+/// What a pairing link says: the listener's LAN address, its code, and its relay if it named one.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PairLink {
+    pub addr: String,
+    pub code: String,
+    pub relay: Option<Relay>,
 }
 
 /// The QR code's modules for `text`, row by row (true = dark), and its width (without the quiet zone).
@@ -290,26 +318,41 @@ pub fn qr_modules(text: &str) -> (usize, Vec<bool>) {
     (q.width(), dark)
 }
 
-/// `gerdtv://pair?a=…&c=…` → (address, code), from the system camera's link.
-pub fn parse_pair_link(link: &str) -> Option<(String, String)> {
+/// `gerdtv://pair?a=…&c=…[&r=…&m=…]`, from the system camera's link.
+pub fn parse_pair_link(link: &str) -> Option<PairLink> {
     let query = link.strip_prefix("gerdtv://pair?")?;
-    let mut addr = None;
-    let mut code = None;
+    let (mut addr, mut code, mut web, mut bell) = (None, None, None, None);
     for kv in query.split('&') {
         match kv.split_once('=') {
             Some(("a", v)) => addr = Some(v.to_string()),
             Some(("c", v)) => code = Some(v.to_string()),
+            Some(("r", v)) => web = Some(unescape(v)),
+            Some(("m", v)) => bell = Some(v.to_string()),
             _ => {}
         }
     }
-    Some((addr?, code?))
+    let relay = match (web, bell) {
+        (Some(web), Some(bell)) if !web.is_empty() && !bell.is_empty() => Some(Relay { web, bell }),
+        _ => None,
+    };
+    Some(PairLink {
+        addr: addr?,
+        code: code?,
+        relay,
+    })
 }
 
 // ---- sealed frames ----
 
+/// How frames travel: a TCP stream on the LAN (length-prefixed), or the host's relay (one message per frame).
+pub enum Pipe {
+    Tcp(TcpStream),
+    Relay(Box<RelayPipe>),
+}
+
 /// One connection's sealing state: the session key and a counter per direction.
 struct Channel {
-    stream: TcpStream,
+    stream: Pipe,
     cipher: ChaCha20Poly1305,
     /// 0 for the connector's frames, 1 for the listener's.
     me: u8,
@@ -318,7 +361,7 @@ struct Channel {
 }
 
 impl Channel {
-    fn new(stream: TcpStream, key: [u8; 32], listener: bool) -> Channel {
+    fn new(stream: Pipe, key: [u8; 32], listener: bool) -> Channel {
         Channel {
             stream,
             cipher: ChaCha20Poly1305::new_from_slice(&key).expect("32-byte key"),
@@ -356,22 +399,36 @@ impl Channel {
     }
 }
 
-async fn write_frame(s: &mut TcpStream, data: &[u8]) -> Result<()> {
-    s.write_all(&(data.len() as u32).to_be_bytes()).await?;
-    s.write_all(data).await?;
-    Ok(s.flush().await?)
+async fn write_frame(p: &mut Pipe, data: &[u8]) -> Result<()> {
+    match p {
+        Pipe::Tcp(s) => {
+            s.write_all(&(data.len() as u32).to_be_bytes()).await?;
+            s.write_all(data).await?;
+            Ok(s.flush().await?)
+        }
+        Pipe::Relay(r) => Ok(r.send(data).await?),
+    }
 }
 
-async fn read_frame(s: &mut TcpStream) -> Result<Vec<u8>> {
+async fn read_frame(p: &mut Pipe) -> Result<Vec<u8>> {
     let read = async {
-        let mut len = [0u8; 4];
-        s.read_exact(&mut len).await?;
-        let len = u32::from_be_bytes(len) as usize;
-        if len > MAX_FRAME {
+        let buf = match p {
+            Pipe::Tcp(s) => {
+                let mut len = [0u8; 4];
+                s.read_exact(&mut len).await?;
+                let len = u32::from_be_bytes(len) as usize;
+                if len > MAX_FRAME {
+                    return Err(PairError::Protocol);
+                }
+                let mut buf = vec![0u8; len];
+                s.read_exact(&mut buf).await?;
+                buf
+            }
+            Pipe::Relay(r) => r.receive().await?,
+        };
+        if buf.len() > MAX_FRAME {
             return Err(PairError::Protocol);
         }
-        let mut buf = vec![0u8; len];
-        s.read_exact(&mut buf).await?;
         Ok(buf)
     };
     tokio::time::timeout(STEP_TIMEOUT, read)
@@ -414,26 +471,54 @@ pub struct Connection {
     new_key: Option<String>,
 }
 
-/// Connects with a code the other device shows.
+/// Connects with a code the other device shows: at `addr` on the LAN (empty: unknown), else through `relay`.
 pub async fn connect_code(
     addr: &str,
     code: &str,
     me: &Device,
     port: Option<u16>,
+    relay: Option<&Relay>,
 ) -> Result<Connection> {
     let new_key = hex(&random::<32>());
-    connect(addr, Base::Code(code), me, port, Some(new_key)).await
+    connect(addr, relay, Base::Code(code), me, port, Some(new_key)).await
 }
 
-/// Connects to a remembered device.
+/// Connects to a remembered device: at `addr` on the LAN (empty: unknown), else through `relay`.
 pub async fn connect_peer(
     addr: &str,
     me: &Device,
     port: Option<u16>,
     peer: &Peer,
+    relay: Option<&Relay>,
 ) -> Result<Connection> {
     let key = unhex(&peer.key).ok_or(PairError::UnknownPeer)?;
-    connect(addr, Base::Peer(key), me, port, None).await
+    connect(addr, relay, Base::Peer(key), me, port, None).await
+}
+
+/// How long the LAN gets before the relay is tried (alone: the old 10 s; with a relay waiting less, so a phone away
+/// from home doesn't stall).
+const LAN_TIMEOUT: Duration = Duration::from_secs(10);
+const LAN_TIMEOUT_BEFORE_RELAY: Duration = Duration::from_secs(4);
+
+/// The LAN first, then the relay (owner decision: local sync stays the normal way). The error is the last one tried.
+async fn open_pipe(addr: &str, relay: Option<&Relay>) -> Result<Pipe> {
+    let mut last = PairError::Timeout;
+    if !addr.is_empty() {
+        let wait = if relay.is_some() {
+            LAN_TIMEOUT_BEFORE_RELAY
+        } else {
+            LAN_TIMEOUT
+        };
+        match tokio::time::timeout(wait, TcpStream::connect(addr)).await {
+            Ok(Ok(s)) => return Ok(Pipe::Tcp(s)),
+            Ok(Err(e)) => last = PairError::Io(e),
+            Err(_) => {}
+        }
+    }
+    match relay {
+        Some(r) => Ok(Pipe::Relay(Box::new(RelayPipe::ring(r).await?))),
+        None => Err(last),
+    }
 }
 
 /// Where the connection's base key comes from.
@@ -446,14 +531,15 @@ enum Base<'a> {
 
 async fn connect(
     addr: &str,
+    relay: Option<&Relay>,
     base: Base<'_>,
     me: &Device,
     port: Option<u16>,
     new_key: Option<String>,
 ) -> Result<Connection> {
-    let mut stream = tokio::time::timeout(Duration::from_secs(10), TcpStream::connect(addr))
-        .await
-        .map_err(|_| PairError::Timeout)??;
+    let mut stream = open_pipe(addr, relay).await?;
+    // Through the relay the other side's LAN address stays unknown (the next sync finds it by mDNS or the relay).
+    let lan = matches!(stream, Pipe::Tcp(_));
     let salt = random::<16>();
     let (spake, from) = match &base {
         Base::Code(code) => (Some(spake_start(code, false)), None),
@@ -492,7 +578,7 @@ async fn connect(
     Ok(Connection {
         channel,
         peer: hello.device,
-        peer_addr: hello.port.map(|p| format!("{host}:{p}")),
+        peer_addr: hello.port.filter(|_| lan).map(|p| format!("{host}:{p}")),
         peer_web: hello.web,
         new_key,
     })
@@ -530,15 +616,48 @@ pub enum Event {
 pub struct Listener {
     pub port: u16,
     codes: Arc<Mutex<CodeState>>,
+    local: Arc<Mutex<Local>>,
+    events: UnboundedSender<Event>,
     task: tokio::task::JoinHandle<()>,
     /// Replaces a shown code once it runs out, so the screen never shows one that can't work.
     rotate: tokio::task::JoinHandle<()>,
+    /// The doorbell at the relay while one is set ([Listener::set_relay]).
+    bell: Mutex<Option<(Relay, tokio::task::JoinHandle<()>)>>,
 }
 
 impl Drop for Listener {
     fn drop(&mut self) {
         self.task.abort();
         self.rotate.abort();
+        if let Some((_, t)) = self.bell.lock().unwrap().take() {
+            t.abort();
+        }
+    }
+}
+
+/// After a failed doorbell poll (the host down, no network): wait this long before the next, not a busy loop.
+const BELL_RETRY: Duration = Duration::from_secs(30);
+
+/// Answers one connection (TCP or relayed) and reports how it went; `from` is the LAN address, None when relayed.
+/// Returns whether it failed.
+async fn answer_and_report(
+    pipe: Pipe,
+    from: Option<std::net::IpAddr>,
+    local: Arc<Mutex<Local>>,
+    codes: Arc<Mutex<CodeState>>,
+    events: UnboundedSender<Event>,
+) -> bool {
+    match answer(pipe, &local, &codes, &events).await {
+        Ok((mut applied, port)) => {
+            applied.peer_addr = from.zip(port).map(|(ip, p)| format!("{ip}:{p}"));
+            applied.peer.name.truncate(64);
+            let _ = events.send(Event::Applied(Box::new(applied)));
+            false
+        }
+        Err(e) => {
+            let _ = events.send(Event::Failed(e.to_string()));
+            true
+        }
     }
 }
 
@@ -576,6 +695,7 @@ impl Listener {
     ) -> Result<Listener> {
         let listener = TcpListener::bind(("0.0.0.0", port)).await?;
         let port = listener.local_addr()?.port();
+        let (local_for_relay, events_for_relay) = (local.clone(), events.clone());
         let codes = Arc::new(Mutex::new(CodeState::default()));
         let (c, rotate_events) = (codes.clone(), events.clone());
         let rotate = tokio::spawn(async move {
@@ -594,27 +714,70 @@ impl Listener {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     continue;
                 };
-                let (local, codes, events) = (local.clone(), c.clone(), events.clone());
-                tokio::spawn(async move {
-                    match answer(stream, &local, &codes, &events).await {
-                        Ok((mut applied, port)) => {
-                            applied.peer_addr = port.map(|p| format!("{}:{p}", from.ip()));
-                            applied.peer.name.truncate(64);
-                            let _ = events.send(Event::Applied(Box::new(applied)));
-                        }
-                        Err(e) => {
-                            let _ = events.send(Event::Failed(e.to_string()));
-                        }
-                    }
-                });
+                tokio::spawn(answer_and_report(
+                    Pipe::Tcp(stream),
+                    Some(from.ip()),
+                    local.clone(),
+                    c.clone(),
+                    events.clone(),
+                ));
             }
         });
         Ok(Listener {
             port,
             codes,
+            local: local_for_relay,
+            events: events_for_relay,
             task,
             rotate,
+            bell: Mutex::new(None),
         })
+    }
+
+    /// Listens at `relay`'s doorbell too (None: the LAN only). Each ring is a session answered like a TCP connection,
+    /// so codes and remembered peers work the same way across networks. Setting the same relay again changes nothing.
+    pub fn set_relay(&self, relay: Option<Relay>) {
+        let mut bell = self.bell.lock().unwrap();
+        if bell.as_ref().map(|(r, _)| r) == relay.as_ref() {
+            return;
+        }
+        if let Some((_, t)) = bell.take() {
+            t.abort();
+        }
+        let Some(relay) = relay else { return };
+        let (local, codes, events) = (self.local.clone(), self.codes.clone(), self.events.clone());
+        let r = relay.clone();
+        let task = tokio::spawn(async move {
+            loop {
+                match crate::relay::wait_bell(&r.web, &r.bell).await {
+                    Ok(Some(session)) => match RelayPipe::answer(&r.web, &session) {
+                        Ok(pipe) => {
+                            let (local, codes, events) =
+                                (local.clone(), codes.clone(), events.clone());
+                            let (web, session) = (r.web.clone(), session.clone());
+                            tokio::spawn(async move {
+                                let failed = answer_and_report(
+                                    Pipe::Relay(Box::new(pipe)),
+                                    None,
+                                    local,
+                                    codes,
+                                    events,
+                                )
+                                .await;
+                                // A refused or broken session: tell the connector at once (no socket to close).
+                                if failed && let Ok(mut p) = RelayPipe::answer(&web, &session) {
+                                    p.close().await;
+                                }
+                            });
+                        }
+                        Err(_) => tokio::time::sleep(BELL_RETRY).await,
+                    },
+                    Ok(None) => {} // the host's wait ended: poll again
+                    Err(_) => tokio::time::sleep(BELL_RETRY).await,
+                }
+            }
+        });
+        *bell = Some((relay, task));
     }
 
     /// Starts accepting a new code (shown to the user) and returns it.
@@ -631,7 +794,7 @@ impl Listener {
 }
 
 async fn answer(
-    mut stream: TcpStream,
+    mut stream: Pipe,
     local: &Mutex<Local>,
     codes: &Mutex<CodeState>,
     events: &UnboundedSender<Event>,
@@ -996,6 +1159,8 @@ pub fn local_ip() -> Option<String> {
 pub struct Found {
     pub device: Device,
     pub addr: String,
+    /// A host's public front address (its relay), announced so a new device at home learns it without typing.
+    pub web: Option<String>,
 }
 
 /// Announces this device's listener while it lives (dropping it withdraws the announcement).
@@ -1011,13 +1176,21 @@ impl Drop for Advertiser {
     }
 }
 
-pub fn advertise(me: &Device, port: u16) -> std::result::Result<Advertiser, String> {
+/// `web`: a host's public front address (apps pass None).
+pub fn advertise(
+    me: &Device,
+    port: u16,
+    web: Option<&str>,
+) -> std::result::Result<Advertiser, String> {
     let daemon = mdns_sd::ServiceDaemon::new().map_err(|e| e.to_string())?;
-    let props = [
+    let mut props = vec![
         ("id", me.id.as_str()),
         ("name", me.name.as_str()),
         ("platform", me.platform.as_str()),
     ];
+    if let Some(w) = web {
+        props.push(("web", w));
+    }
     let info = mdns_sd::ServiceInfo::new(
         SERVICE,
         &me.id,
@@ -1059,9 +1232,11 @@ pub fn discover(me: &str, wait: Duration) -> std::result::Result<Vec<Found>, Str
                 platform: prop("platform"),
             };
             if device.id != me && !found.iter().any(|f| f.device.id == device.id) {
+                let web = Some(prop("web")).filter(|w| w.starts_with("https://"));
                 found.push(Found {
                     device,
                     addr: format!("{ip}:{}", s.port),
+                    web,
                 });
             }
         }
@@ -1159,11 +1334,22 @@ mod tests {
             .flat_map(|_| new_code().chars().collect::<Vec<_>>())
             .collect();
         assert_eq!(digits.len(), 10);
-        let link = qr_text("192.0.2.7:4100", &code);
+        let link = qr_text("192.0.2.7:4100", &code, None);
         assert_eq!(
             parse_pair_link(&link),
-            Some(("192.0.2.7:4100".into(), code))
+            Some(PairLink {
+                addr: "192.0.2.7:4100".into(),
+                code: code.clone(),
+                relay: None
+            })
         );
+        // With a relay: its address survives the query (an `&` or `=` in it is escaped).
+        let relay = Relay {
+            web: "https://tv.example.invalid/a=b&c".into(),
+            bell: "0123456789abcdef".into(),
+        };
+        let link = qr_text("192.0.2.7:4100", &code, Some(&relay));
+        assert_eq!(parse_pair_link(&link).unwrap().relay, Some(relay));
         assert_eq!(parse_pair_link("https://example.invalid/?a=1&c=2"), None);
         let (w, m) = qr_modules(&link);
         assert_eq!(m.len(), w * w);
@@ -1234,6 +1420,7 @@ mod tests {
             &format_code(&code).to_lowercase(),
             &phone.me,
             Some(4100),
+            None,
         )
         .await
         .unwrap();
@@ -1298,7 +1485,7 @@ mod tests {
             addr: addr.clone(),
             web: String::new(),
         };
-        let back = connect_peer(&addr, &phone.me, None, &peer)
+        let back = connect_peer(&addr, &phone.me, None, &peer, None)
             .await
             .unwrap()
             .exchange(&phone)
@@ -1320,7 +1507,7 @@ mod tests {
             web: String::new(),
         };
         assert!(
-            connect_peer(&addr, &device("other"), None, &stranger)
+            connect_peer(&addr, &device("other"), None, &stranger, None)
                 .await
                 .is_err()
         );
@@ -1336,7 +1523,7 @@ mod tests {
         let phone = side("phone", Some("p1"), None, 1);
         let addr = format!("127.0.0.1:{}", listener.port);
         // An older gerdTV (protocol 2: the code hashed into the key, no SPAKE2) is refused without using up the code.
-        let mut old = TcpStream::connect(&addr).await.unwrap();
+        let mut old = Pipe::Tcp(TcpStream::connect(&addr).await.unwrap());
         let header = br#"{"v":2,"salt":"00000000000000000000000000000000","from":null}"#;
         write_frame(&mut old, header).await.unwrap();
         assert!(
@@ -1349,7 +1536,7 @@ mod tests {
         );
         let wrong = if code.starts_with('1') { "2" } else { "1" }.to_string() + &code[1..];
         assert!(matches!(
-            connect_code(&addr, &wrong, &phone.me, None).await,
+            connect_code(&addr, &wrong, &phone.me, None, None).await,
             Err(PairError::Auth | PairError::Io(_))
         ));
         let Event::NewCode(fresh) = rx.recv().await.unwrap() else {
@@ -1357,10 +1544,18 @@ mod tests {
         };
         assert_ne!(fresh, code);
         // The old code doesn't work any more, even typed right.
-        assert!(connect_code(&addr, &code, &phone.me, None).await.is_err());
+        assert!(
+            connect_code(&addr, &code, &phone.me, None, None)
+                .await
+                .is_err()
+        );
         // No code at all accepted once pairing is closed.
         listener.clear_code();
-        assert!(connect_code(&addr, &fresh, &phone.me, None).await.is_err());
+        assert!(
+            connect_code(&addr, &fresh, &phone.me, None, None)
+                .await
+                .is_err()
+        );
         assert!(
             library::load_profiles(&shared.lock().unwrap().dir)
                 .unwrap()
@@ -1462,7 +1657,7 @@ mod tests {
             addr: relay_addr.clone(),
             web: String::new(),
         };
-        connect_peer(&relay_addr, &phone.me, None, &peer)
+        connect_peer(&relay_addr, &phone.me, None, &peer, None)
             .await
             .unwrap()
             .exchange(&phone)

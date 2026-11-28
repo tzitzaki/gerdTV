@@ -1,8 +1,8 @@
 # Handover
 
 ## State
-- Version 0.261127.70: host self-update (signed release, rollback), `--version`, 8-character login codes, Web player always in Settings.
-- Before: back arrow and Esc on pages, SPAKE2 pairing codes (.69), the player window's ratio, Mac webcam pairing (.68), web player (.65).
+- Version 0.261128.71: first run is a welcome screen that pairs (no form), sync across networks and auto-sync via the own host, updates by themselves.
+- Before: host self-update and 8-character login codes (.70), back arrow and Esc on pages, SPAKE2 pairing codes (.69), web player (.65).
 - media_kit_video is vendored in third_party/ (Apple: libmpv looked up at run time, MPV.swift); the Apple libs packages come from pub.dev.
 - CI: a libmpv-apple job builds GerdMpv when its script changes; the android job plays a new libgerdmpv.so on an x86_64 emulator before caching it.
 
@@ -14,12 +14,11 @@
 - Open: reorder channels inside the provider's groups too, or only inside your own groups as now?
 
 ## Owner one-off jobs
-- Own client ids: a Simkl app (simkl.com/settings/developer, TV type) into Settings → Simkl, then link again; Premiumize's code login likewise, optional.
-- For Trakt: create your own app on trakt.tv (Settings → Your API Apps, redirect urn:ietf:wg:oauth:2.0:oob) and enter it in Settings → Account → Trakt.
+- Own client ids into Settings: a Simkl app (simkl.com/settings/developer, TV type), a Trakt app (trakt.tv API Apps, redirect urn:ietf:wg:oauth:2.0:oob).
 - Enter your TMDB key and, if you want subtitles online, an OpenSubtitles key (opensubtitles.com → API consumers) in Settings → Account.
 - Move the signing files from the private config folder into the password manager, then delete them there.
-- Web player host: update it to 0.261127.70 by hand once, then enable the nightly update timer and snapshot hook (private runbook, section 9).
-- Install this release on the Mac (from the DMG), the iPhone and the Shield and go through docs/DEVICE_CHECKS.md (a housekeeping round is planned).
+- Web player host: update it to 0.261128.71 by hand once (relaying starts with it), then enable the nightly timer (runbook, section 9).
+- Install this release on the Mac (DMG), iPhone and Shield once, then docs/DEVICE_CHECKS.md; later versions announce themselves in the update bar.
 
 ## Open work
 - [MAC] AirPlay: on AVPlayer's external playback, restart live with the local HLS on the network address (back to 127.0.0.1 after); needs a video receiver.
@@ -33,7 +32,7 @@
 
 ## Things to watch
 - The Linux integration test app_test sometimes doesn't complete (seen once locally in #70, green on rerun; the nightly's integration job failed too).
-- Web sessions live in the host's memory: a restart of the host ends them all (a new link logs in again).
+- Host memory: web sessions and relay mailboxes (256 boxes, 96 MiB, 10 min; full = 503) end with a restart; a new link or pairing starts over.
 - The host hands browsers the provider's tokenised redirect; if the provider binds it to the host's IP, the page retries the plain address.
 - oxicast is pre-1.0 and pinned exactly: an update may change its API; Cast is checked by hand only (no fake receiver, owner decision).
 - Cast's live fallback serves gerdTV's local HLS on this device's network address (random token, CORS) while it casts.
@@ -53,6 +52,7 @@
 
 ## Ideas not chosen
 - Sleep timer, playback speed, search across accounts, multiview, downloads and skip intro (session 7's comparison).
+- What's new after updating: the release notes once on the first start of a new version.
 - Web player: an HTTPS relay for Firefox and .ts-only channels; a real offline PWA (needs HTTPS for the player page).
 - Apple Developer ID (99 USD a year): Keychain tied to the team ID, notarized; possible later step (docs/RELEASING.md).
 - The provider's short EPG per channel, an own iptv-org grabber, and seamless reconnect by a second player (costs a second connection).

@@ -1,162 +1,123 @@
-// Settings → About → Updates: checks the latest release (signed manifest, newer version, a build for this platform; the
-// checks are the core's, gerdtv_core::update), shows its notes and downloads the file, kept only when its SHA-256
-// matches. Installing: macOS swaps the bundle in place and restarts (platform/mac_install.dart), Android hands the APK
-// to the system's installer, Linux opens the download folder; on iPhone/iPad the IPA has to be re-signed first, so
-// there is a hint and, like everywhere, a link to the release page.
+// Settings → About → Updates: the update service's state and steps (services/updater.dart has the flow and the
+// checks: signed manifest, newer version, a build for this platform, the file kept only when its SHA-256 matches).
+// Check finds the newest release and shows its notes; then the platform's step: macOS Install and restart (an
+// update fetched in the background also goes in when gerdTV quits), Android Install (the system's installer), Linux
+// Show in folder, iPhone/iPad the IPA itself (re-signed first). The update bar under the app offers the same.
 // Debugging: a failure shows the core's reason (signature, size/SHA-256, network).
 
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../l10n/gen/app_localizations.dart';
-import '../platform/mac_install.dart';
 import '../platform/platform_bridge.dart';
 import '../services/session.dart';
+import '../services/updater.dart';
 import '../src/rust/api/update.dart';
 
-/// The manifest's platform names.
-String get updatePlatform => Platform.isMacOS
-    ? 'macos'
-    : Platform.isIOS
-    ? 'ios'
-    : Platform.isAndroid
-    ? 'android'
-    : 'linux';
-
-class UpdateSettings extends StatefulWidget {
-  const UpdateSettings({super.key});
-
-  @override
-  State<UpdateSettings> createState() => _UpdateSettingsState();
-}
-
-class _UpdateSettingsState extends State<UpdateSettings> {
-  bool _busy = false;
-  bool _checked = false;
-  UpdateInfo? _update;
-  String? _file;
-  String? _error;
-
-  Future<void> _run(Future<void> Function() step) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await step();
-    } catch (e) {
-      _error = '$e';
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _check() => _run(() async {
-    _update = await checkUpdate(platform: updatePlatform);
-    _checked = true;
-  });
-
-  Future<void> _download() => _run(() async {
-    final dir =
-        (isDesktop ? await getDownloadsDirectory() : null) ??
-        await getTemporaryDirectory();
-    _file = await downloadUpdate(update: _update!, dir: dir.path);
-  });
-
-  /// macOS: swap and restart (returns only on a refusal). Android: the system's installer asks to confirm.
-  Future<void> _install() => _run(() async {
-    if (Platform.isMacOS) {
-      final refused = await installMacUpdate(_file!);
-      if (refused != null) throw refused;
-    } else {
-      await PlatformBridge.installApk(_file!);
-    }
-  });
-
-  /// Desktop: the folder with the download, in the system's file manager.
-  void _showFolder() {
-    final folder = File(_file!).parent.path;
-    Process.run(Platform.isMacOS ? 'open' : 'xdg-open', [folder]);
-  }
+class UpdateSettings extends StatelessWidget {
+  const UpdateSettings({super.key, required this.session});
+  final Session session;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final u = _update;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // No heading: the settings category "Updates" shows it.
-        ListTile(
-          key: const Key('update.check'),
-          leading: _busy
-              ? const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.system_update_alt),
-          title: Text(
-            _busy && u == null ? l10n.updateChecking : l10n.updateCheck,
-          ),
-          subtitle: _error != null
-              ? Text(l10n.updateFailed(_error!))
-              : _checked && u == null
-              ? Text(l10n.updateNone)
-              : null,
-          enabled: !_busy,
-          onTap: _check,
-        ),
-        if (u != null) ...[
-          ListTile(
-            title: Text(l10n.updateAvailable(u.version)),
-            subtitle: u.notes.isEmpty
-                ? null
-                : Text(u.notes, maxLines: 8, overflow: TextOverflow.ellipsis),
-          ),
-          // iPhone/iPad: no download here; the release page below has the IPA.
-          if (updatePlatform == 'ios')
-            const SizedBox.shrink()
-          else if (_file == null)
+    final up = session.updater;
+    return ListenableBuilder(
+      listenable: Listenable.merge([up.available, up.file, up.busy, up.error]),
+      builder: (context, _) {
+        final u = up.available.value;
+        final file = up.file.value;
+        final busy = up.busy.value;
+        final error = up.error.value;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // No heading: the settings category "Updates" shows it.
             ListTile(
-              key: const Key('update.download'),
-              leading: const Icon(Icons.download),
-              title: Text(_busy ? l10n.updateDownloading : l10n.updateDownload),
-              enabled: !_busy,
-              onTap: _download,
-            )
-          else ...[
-            ListTile(title: Text(l10n.updateDownloaded(_file!))),
-            if (Platform.isMacOS || Platform.isAndroid)
-              ListTile(
-                key: const Key('update.install'),
-                leading: const Icon(Icons.install_desktop),
-                title: Text(
-                  Platform.isMacOS
-                      ? l10n.updateInstallRestart
-                      : l10n.updateInstall,
-                ),
-                enabled: !_busy,
-                onTap: _install,
+              key: const Key('update.check'),
+              leading: busy
+                  ? const SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.system_update_alt),
+              title: Text(
+                busy && u == null ? l10n.updateChecking : l10n.updateCheck,
               ),
-            if (isDesktop)
+              subtitle: error != null
+                  ? Text(l10n.updateFailed(error))
+                  : up.checked && u == null
+                  ? Text(l10n.updateNone)
+                  : null,
+              enabled: !busy,
+              onTap: up.check,
+            ),
+            if (u != null) ...[
               ListTile(
-                leading: const Icon(Icons.folder_open),
-                title: Text(l10n.updateShowFolder),
-                onTap: _showFolder,
+                title: Text(l10n.updateAvailable(u.version)),
+                subtitle: u.notes.isEmpty
+                    ? null
+                    : Text(
+                        u.notes,
+                        maxLines: 8,
+                        overflow: TextOverflow.ellipsis,
+                      ),
               ),
+              // iPhone/iPad: no install from inside the app; the browser downloads the IPA itself (the manifest's URL).
+              if (updatePlatform == 'ios')
+                ListTile(
+                  key: const Key('update.ipa'),
+                  leading: const Icon(Icons.download),
+                  title: Text(l10n.updateIpa),
+                  subtitle: Text(l10n.updateIosHint),
+                  onTap: () => openOrShow(context, u.url),
+                )
+              else if (file == null)
+                ListTile(
+                  key: const Key('update.download'),
+                  leading: const Icon(Icons.download),
+                  title: Text(
+                    busy ? l10n.updateDownloading : l10n.updateDownload,
+                  ),
+                  enabled: !busy,
+                  onTap: up.auto,
+                )
+              else ...[
+                ListTile(title: Text(l10n.updateDownloaded(file))),
+                if (Platform.isMacOS || Platform.isAndroid)
+                  ListTile(
+                    key: const Key('update.install'),
+                    leading: const Icon(Icons.install_desktop),
+                    title: Text(
+                      Platform.isMacOS
+                          ? l10n.updateInstallRestart
+                          : l10n.updateInstall,
+                    ),
+                    subtitle: Platform.isMacOS
+                        ? Text(l10n.updateOnQuit(u.version))
+                        : null,
+                    enabled: !busy,
+                    onTap: up.install,
+                  ),
+                if (isDesktop)
+                  ListTile(
+                    leading: const Icon(Icons.folder_open),
+                    title: Text(l10n.updateShowFolder),
+                    onTap: up.showFolder,
+                  ),
+              ],
+            ],
+            // Every platform: the newest release's page (its notes and all files).
+            ListTile(
+              key: const Key('update.page'),
+              leading: const Icon(Icons.open_in_new),
+              title: Text(l10n.updatePage),
+              onTap: () => openOrShow(context, releasePage()),
+            ),
           ],
-        ],
-        // Every platform: the newest release's page (its notes and all files); on iOS the way to the new IPA.
-        ListTile(
-          key: const Key('update.page'),
-          leading: const Icon(Icons.open_in_new),
-          title: Text(l10n.updatePage),
-          subtitle: updatePlatform == 'ios' ? Text(l10n.updateIosHint) : null,
-          onTap: () => openOrShow(context, releasePage()),
-        ),
-      ],
+        );
+      },
     );
   }
 }

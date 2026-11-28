@@ -1,5 +1,6 @@
-// First run: the provider's login (Xtream Codes) or a playlist URL (M3U), nothing else. Connecting runs the first
-// sync; a refused login or an unreachable server is shown under the button and the form stays filled.
+// Adding a provider (Settings → Account, the profile picker): the provider's login (Xtream Codes) or a playlist URL
+// (M3U). The first run has no form (welcome_screen.dart: pairing, or Skip and add it here later). Connecting runs the
+// first sync; a refused login or an unreachable server is shown under the button and the form stays filled.
 // With [SetupScreen.edit] the same form edits the open profile's provider (Settings → Account): pre-filled, with a
 // name field, and Save replaces the login only once the new one works (Session.updateProfile).
 
@@ -8,7 +9,6 @@ import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/session.dart';
 import 'app_logo.dart';
-import 'devices_screen.dart';
 import '../src/rust/api/library.dart';
 import '../theme.dart';
 
@@ -106,8 +106,8 @@ class _SetupScreenState extends State<SetupScreen> {
         ? await widget.session.addProfile(info, secrets)
         : await widget.session.updateProfile(info, secrets);
     if (!mounted) return;
-    // Added from Settings (a pushed page): back to the app, now on the new profile.
-    if (error == null && Navigator.of(context).canPop()) {
+    // Always a pushed page (Settings, the picker): back to the app, now on the new profile.
+    if (error == null) {
       Navigator.of(context).pop();
       return;
     }
@@ -122,12 +122,12 @@ class _SetupScreenState extends State<SetupScreen> {
     final l10n = AppLocalizations.of(context);
     String? required(String? v) =>
         (v == null || v.trim().isEmpty) ? l10n.setupRequired : null;
-    // Opened from Settings (add or edit): a back arrow, since desktop has no swipe-back; not while a login is being
-    // tested (PopScope also holds Esc and the system back then). The first run has nothing to go back to.
+    // A back arrow, since desktop has no swipe-back; not while a login is being tested (PopScope also holds Esc and
+    // the system back then).
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
-        appBar: Navigator.of(context).canPop() ? AppBar() : null,
+        appBar: AppBar(),
         body: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(Tokens.space * 3),
@@ -158,6 +158,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.name'),
                           controller: _name,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupName,
                           ),
@@ -185,6 +186,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.server'),
                           controller: _server,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupServer,
                             hintText: 'http://example.com:8080',
@@ -197,6 +199,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         TextFormField(
                           key: const Key('setup.username'),
                           controller: _user,
+                          textInputAction: TextInputAction.next, // the TV keyboard's Next goes on (default Done)
                           decoration: InputDecoration(
                             labelText: l10n.setupUsername,
                           ),
@@ -243,32 +246,6 @@ class _SetupScreenState extends State<SetupScreen> {
                           ),
                         ),
                       ),
-                      // First run only (not when added from Settings): from another device, or Settings without a provider.
-                      if (widget.edit == null &&
-                          !Navigator.of(context).canPop())
-                        TextButton(
-                          key: const Key('setup.fromDevice'),
-                          onPressed: _busy
-                              ? null
-                              : () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        DevicesScreen(session: widget.session),
-                                  ),
-                                ),
-                          child: Text(l10n.setupFromDevice),
-                        ),
-                      if (widget.edit == null &&
-                          !Navigator.of(context).canPop())
-                        TextButton(
-                          key: const Key('setup.skip'),
-                          onPressed: _busy
-                              ? null
-                              : () => widget.session.skipSetup(
-                                  l10n.setupNoProvider,
-                                ),
-                          child: Text(l10n.setupSkip),
-                        ),
                       if (_busy)
                         const Padding(
                           padding: EdgeInsets.only(top: Tokens.space * 2),

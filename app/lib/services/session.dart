@@ -36,6 +36,7 @@ import 'recordings.dart';
 import 'reminders.dart';
 import 'media_card.dart';
 import 'devices.dart';
+import 'updater.dart';
 import 'secrets.dart';
 import 'tracking.dart';
 
@@ -178,6 +179,9 @@ class Session extends ChangeNotifier {
 
   /// Devices & sync: pairing with and syncing to other gerdTV installs (services/devices.dart).
   late final devices = Devices(this);
+
+  /// New versions: checked by itself, fetched in the background (services/updater.dart).
+  final updater = Updater();
 
   /// The countdown to the next episode (the player shows it).
   late final nextUp = NextUp((item) => unawaited(play(item)));
@@ -473,6 +477,7 @@ class Session extends ChangeNotifier {
     unawaited(
       devices.init(),
     ); // remembered devices, a pairing link from the camera
+    updater.startAuto(); // release builds: a check in 30 s, then every 12 h
   }
 
   /// One profile, or the one set to open always: open it. Several: the picker. None that opens: setup.

@@ -17,6 +17,20 @@ pub const RELEASES: &str = "https://github.com/tzitzaki/gerdTV/releases/latest/d
 /// who wants to read more.
 pub const RELEASE_PAGE: &str = "https://github.com/tzitzaki/gerdTV/releases/latest";
 
+/// A phone's install file of release `version` itself, for a QR on a TV or computer (a phone without gerdTV gets the
+/// build that pairs with the one showing it): the Android APK, or the iPhone's unsigned IPA (re-signed first,
+/// docs/INSTALL.md). The names are the release job's (`.github/workflows/release.yml`, checked by a test).
+pub fn phone_file(platform: &str, version: &str) -> Option<String> {
+    let name = match platform {
+        "android" => format!("gerdTV-android-{version}.apk"),
+        "ios" => format!("gerdTV-ios-unsigned-{version}.ipa"),
+        _ => return None,
+    };
+    Some(format!(
+        "https://github.com/tzitzaki/gerdTV/releases/download/v{version}/{name}"
+    ))
+}
+
 /// The update key's public half, as committed (the release job signs with the secret half).
 pub const PUBLIC_KEY_HEX: &str = include_str!("../../../keys/update-public-key.hex");
 
@@ -218,5 +232,21 @@ mod tests {
             format!("{RELEASE_PAGE}/download"),
             "the release page and the files are the same release"
         );
+    }
+
+    /// The phone links name exactly the files the release job publishes, under the version's own tag.
+    #[test]
+    fn phone_files_are_the_release_assets() {
+        let workflow = include_str!("../../../.github/workflows/release.yml");
+        for (platform, asset) in [
+            ("android", "gerdTV-android-$v.apk"),
+            ("ios", "gerdTV-ios-unsigned-$v.ipa"),
+        ] {
+            assert!(workflow.contains(asset), "release.yml publishes {asset}");
+            let url = phone_file(platform, "0.261127.71").unwrap();
+            assert!(url.ends_with(&asset.replace("$v", "0.261127.71")), "{url}");
+            assert!(url.contains("/releases/download/v0.261127.71/"), "{url}");
+        }
+        assert_eq!(phone_file("linux", "0.1.1"), None);
     }
 }

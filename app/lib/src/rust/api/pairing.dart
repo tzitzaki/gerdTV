@@ -8,16 +8,26 @@ import 'library.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `btree`, `connection`, `err`, `host_call`
+// These functions are ignored because they are not marked as `pub`: `btree`, `connection`, `err`, `host_call`, `relay`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`
 
 /// A new install's device id.
 String pairNewDeviceId() =>
     RustLib.instance.api.crateApiPairingPairNewDeviceId();
 
-/// The QR's text for this device's listener (`addr` = "ip:port") and code.
-String pairLinkText({required String addr, required String code}) =>
-    RustLib.instance.api.crateApiPairingPairLinkText(addr: addr, code: code);
+/// The QR's text for this device's listener (`addr` = "ip:port") and code; with `relay_web`, this device's doorbell
+/// (`me_id`) at that relay too.
+String pairLinkText({
+  required String addr,
+  required String code,
+  String? relayWeb,
+  required String meId,
+}) => RustLib.instance.api.crateApiPairingPairLinkText(
+  addr: addr,
+  code: code,
+  relayWeb: relayWeb,
+  meId: meId,
+);
 
 /// A `gerdtv://pair?…` link (the system camera opened gerdTV with it), or None.
 PairLink? pairParseLink({required String link}) =>
@@ -59,30 +69,37 @@ Future<List<FoundDevice>> pairDiscover({
   waitMs: waitMs,
 );
 
-/// Connects with the code another device shows (typed, or from its QR).
+/// Connects with the code another device shows (typed, or from its QR): on the LAN at `addr` (empty: unknown), else
+/// through the relay its QR named (`relay_web`, `bell`).
 Future<PairConnection> pairConnectCode({
   required String addr,
   required String code,
   required DeviceInfo me,
   int? port,
+  String? relayWeb,
+  String? bell,
 }) => RustLib.instance.api.crateApiPairingPairConnectCode(
   addr: addr,
   code: code,
   me: me,
   port: port,
+  relayWeb: relayWeb,
+  bell: bell,
 );
 
-/// Connects to a remembered device.
+/// Connects to a remembered device: on the LAN at `addr` (empty: unknown), else at its doorbell on `relay_web`.
 Future<PairConnection> pairConnectPeer({
   required String addr,
   required DeviceInfo me,
   int? port,
   required PeerInfo peer,
+  String? relayWeb,
 }) => RustLib.instance.api.crateApiPairingPairConnectPeer(
   addr: addr,
   me: me,
   port: port,
   peer: peer,
+  relayWeb: relayWeb,
 );
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PairConnection>>
@@ -104,6 +121,9 @@ abstract class PairListener implements RustOpaqueInterface {
   Future<PairEvent?> nextEvent();
 
   int port();
+
+  /// Also listen at the relay `web` (this device's doorbell; None: the LAN only). Same relay again: no change.
+  void setRelay({String? web});
 
   /// `announce`: tell the network (mDNS); iOS passes false (it can't use multicast without an entitlement).
   static Future<PairListener> start({
@@ -230,10 +250,13 @@ class FoundDevice {
   final DeviceInfo device;
   final String addr;
 
-  const FoundDevice({required this.device, required this.addr});
+  /// A host's public front address (its relay), from its announcement.
+  final String? web;
+
+  const FoundDevice({required this.device, required this.addr, this.web});
 
   @override
-  int get hashCode => device.hashCode ^ addr.hashCode;
+  int get hashCode => device.hashCode ^ addr.hashCode ^ web.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -241,7 +264,8 @@ class FoundDevice {
       other is FoundDevice &&
           runtimeType == other.runtimeType &&
           device == other.device &&
-          addr == other.addr;
+          addr == other.addr &&
+          web == other.web;
 }
 
 /// This device as a sync sees it: where the profiles are, who it is, its secrets and remembered devices.
@@ -320,10 +344,20 @@ class PairLink {
   final String addr;
   final String code;
 
-  const PairLink({required this.addr, required this.code});
+  /// Where to meet the listener when its LAN address doesn't answer (relay.rs), and its doorbell.
+  final String? relayWeb;
+  final String? bell;
+
+  const PairLink({
+    required this.addr,
+    required this.code,
+    this.relayWeb,
+    this.bell,
+  });
 
   @override
-  int get hashCode => addr.hashCode ^ code.hashCode;
+  int get hashCode =>
+      addr.hashCode ^ code.hashCode ^ relayWeb.hashCode ^ bell.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -331,7 +365,9 @@ class PairLink {
       other is PairLink &&
           runtimeType == other.runtimeType &&
           addr == other.addr &&
-          code == other.code;
+          code == other.code &&
+          relayWeb == other.relayWeb &&
+          bell == other.bell;
 }
 
 /// A remembered device; `key` is secret (stored with the other secrets).

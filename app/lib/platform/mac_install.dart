@@ -1,7 +1,9 @@
 // The macOS update install (updater part 2): unpack the verified zip with ditto, accept the new bundle only if it
 // satisfies the installed app's own code signing requirement (so only builds signed with our certificate replace
-// it), then hand over to assets/update/swap-macos.sh, which waits for this process to quit, swaps the bundle and
-// starts it again. Needs the app sandbox off (owner decision).
+// it), then hand over to assets/update/swap-macos.sh, which waits for this process to quit, however it quits, and
+// swaps the bundle (owner decision: an update goes in when gerdTV quits). [armMacUpdate] does that right after the
+// download; [installMacUpdate] is Install and restart: it tells the waiting swap to start gerdTV again and quits.
+// Needs the app sandbox off (owner decision).
 // Debugging: a refused bundle reports codesign's message; the swap writes swap.log next to its script.
 
 import 'dart:io';
@@ -22,8 +24,23 @@ String? designatedRequirement(String codesignOutput) {
   return null;
 }
 
-/// Installs [zip] in place of the running app and quits; returns an error message instead when it refuses.
-Future<String?> installMacUpdate(String zip) async {
+/// The armed swap's folder (its script and the unpacked bundle), while one waits for the quit.
+String? _armed;
+
+/// Install and restart: arms [zip] unless [armed], tells the swap to start gerdTV again and quits; returns an error
+/// message instead when it refuses.
+Future<String?> installMacUpdate(String zip, {required bool armed}) async {
+  if (!armed || _armed == null) {
+    final refused = await armMacUpdate(zip);
+    if (refused != null) return refused;
+  }
+  await File('$_armed/reopen').writeAsString('');
+  exit(0); // the swap waits for this process to end
+}
+
+/// Checks [zip]'s bundle and starts the swap that installs it once gerdTV quits; returns an error message instead
+/// when it refuses.
+Future<String?> armMacUpdate(String zip) async {
   final installed = bundlePath(Platform.resolvedExecutable);
   final work = await Directory.systemTemp.createTemp('gerdtv-update');
   final unzip = await Process.run('ditto', ['-x', '-k', zip, work.path]);
@@ -53,5 +70,6 @@ Future<String?> installMacUpdate(String zip) async {
     candidate,
     zip, // deleted once installed
   ], mode: ProcessStartMode.detached);
-  exit(0); // the swap waits for this process to end
+  _armed = work.path;
+  return null;
 }

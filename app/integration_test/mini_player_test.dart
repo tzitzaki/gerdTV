@@ -14,9 +14,12 @@ import 'package:gerdtv/player/watchdog_adapter.dart';
 import 'package:gerdtv/src/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
+
 import 'package:window_manager/window_manager.dart' as wm;
 
 import 'package:gerdtv/src/rust/api/playback.dart';
+
+import 'support.dart';
 
 const faultServer = String.fromEnvironment('GERDTV_FAULT_SERVER');
 
@@ -89,8 +92,15 @@ void main() {
       isNotEmpty,
       reason: 'run through `just test-integration`',
     );
+    // The first-run screen pairs at once (welcome_screen.dart): it needs a folder for this device's id and secrets
+    // that answer without a keyring (Xvfb has none).
+    final dir = Directory.systemTemp.createTempSync('gerdtv-mini');
+    addTearDown(() => dir.deleteSync(recursive: true));
     await tester.pumpWidget(
-      GerdTvApp(session: Session()..state = SessionState.needsSetup),
+      GerdTvApp(
+        session: Session(secrets: MemorySecrets(), appDir: dir.path)
+          ..state = SessionState.needsSetup,
+      ),
     );
     await tester.pumpAndSettle();
     final player = Player(configuration: WatchdogAdapter.playerConfiguration);

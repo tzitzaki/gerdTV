@@ -648,7 +648,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             id: 'updates',
             title: l10n.updateCheck,
             keywords: l10n.settingsKeywordsUpdates,
-            build: (_) => const UpdateSettings(),
+            build: (_) => UpdateSettings(session: session),
           ),
           // TMDB's terms: its logo, less prominent than gerdTV's, and its notice word for word.
           SettingsEntry(

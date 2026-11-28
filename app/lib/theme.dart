@@ -162,6 +162,13 @@ ThemeData gerdTheme(
   );
 }
 
+/// The phone layout: iOS or Android below [Tokens.wideLayout] (a tablet or the TV is wider). One rule for the
+/// swipe-back slide and for what only a phone leaves out (the welcome screen's phone download QR).
+bool isPhone(BuildContext context) =>
+    (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android) &&
+    MediaQuery.sizeOf(context).width < Tokens.wideLayout;
+
 /// Every route's transition, in [Tokens.motion] (instead of the platform's 300–500 ms slides):
 /// - phones (iOS and Android below [Tokens.wideLayout], the shell's phone layout): the iOS slide, whose left-edge
 ///   swipe closes the page (owner decision: swipe-back on phones; Android's system back keeps working too);
@@ -177,10 +184,7 @@ class RouteTransitions extends PageTransitionsBuilder {
   Duration get transitionDuration => Tokens.motion;
 
   /// Phones get the slide with swipe-back.
-  static bool swipeBack(BuildContext context) =>
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android) &&
-      MediaQuery.sizeOf(context).width < Tokens.wideLayout;
+  static bool swipeBack(BuildContext context) => isPhone(context);
 
   @override
   Widget buildTransitions<T>(
@@ -253,3 +257,23 @@ class BackKeys extends StatelessWidget {
     ),
   );
 }
+
+/// D-pad Up/Down (and the arrow keys) leave a text field for the control above or below, in every form (owner
+/// decision: one rule for the whole app). Without this the Shield's remote was stuck in the setup form's server field:
+/// Flutter's text-editing shortcuts (DefaultTextEditingShortcuts, above the app's builder) map Up/Down to caret moves
+/// inside a single-line field, so focus never left it. A Shortcuts wrapped around the navigator (MaterialApp.builder)
+/// sits deeper and wins. `ignoreTextFields: false` is needed: the default intent does nothing while a field is
+/// focused. Focus traversal's default request scrolls the new target into view. Left/Right stay the caret's; deeper
+/// bindings (the player's zap keys, a search's own shortcuts) still win over this one.
+/// Debugging: arrows stuck in a field again usually means a page built outside the app's navigator (its own
+/// Navigator or an Overlay) or a multi-line field, which wants Up/Down for its lines.
+const fieldDpadKeys = <ShortcutActivator, Intent>{
+  SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
+    TraversalDirection.up,
+    ignoreTextFields: false,
+  ),
+  SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
+    TraversalDirection.down,
+    ignoreTextFields: false,
+  ),
+};

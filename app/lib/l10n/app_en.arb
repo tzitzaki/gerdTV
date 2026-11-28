@@ -411,6 +411,16 @@
   "recordingsAppFolders": "This device has no folder picker: gerdTV's own folder on a drive (deleted when gerdTV is uninstalled).",
   "recordingsEmpty": "No recordings yet. Record from a programme in the guide, or in the player.",
   "recordingsFolder": "Recordings folder",
+  "relayAddress": "Your gerdTV host's address (optional)",
+  "relayFound": "In use: {web}. Devices on other networks pair and sync through your host.",
+  "@relayFound": {
+    "placeholders": {
+      "web": {
+        "type": "String"
+      }
+    }
+  },
+  "relayHint": "Lets devices on other networks pair and sync through your host; found by itself at home.",
   "remove": "Remove",
   "rename": "Rename",
   "renameHint": "Name (empty: the provider's)",
@@ -547,7 +557,6 @@
       }
     }
   },
-  "setupFromDevice": "Get from another device",
   "setupIntro": "Enter the login your provider gave you. It is stored only in this device's secure storage.",
   "setupM3u": "M3U playlist",
   "setupM3uUrl": "Playlist URL",
@@ -557,7 +566,6 @@
   "setupRequired": "Required",
   "setupSave": "Test and save",
   "setupServer": "Server address",
-  "setupSkip": "Skip for now",
   "setupTitle": "Add your provider",
   "setupUserAgentHint": "Optional: only if your provider asks for a certain player.",
   "setupUsername": "Username",
@@ -683,8 +691,17 @@
   },
   "updateInstall": "Install",
   "updateInstallRestart": "Install and restart",
-  "updateIosHint": "Download the new IPA there, re-sign it with your re-signing service, then install it.",
+  "updateIosHint": "Your browser downloads the file; re-sign it with your re-signing service, then install it.",
+  "updateIpa": "Download the IPA",
   "updateNone": "gerdTV is up to date.",
+  "updateOnQuit": "Version {version} is ready and goes in when gerdTV quits.",
+  "@updateOnQuit": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "updatePage": "Release page",
   "updateShowFolder": "Show in folder",
   "userAgent": "User-Agent",
@@ -735,5 +752,20 @@
         "type": "String"
       }
     }
-  }
+  },
+  "welcomeAndroid": "Android",
+  "welcomeFromHere": "Devices nearby",
+  "welcomeGetApp": "Get gerdTV for your phone",
+  "welcomeIphone": "iPhone (re-sign it first)",
+  "welcomeNoDevice": "No other device? Add your login later in Settings → Account.",
+  "welcomeScan": "On your phone: gerdTV → {path}, then scan this code.",
+  "@welcomeScan": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "welcomeSkip": "Skip to the app",
+  "welcomeTitle": "Welcome to gerdTV"
 }

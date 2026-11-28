@@ -44,7 +44,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2145342;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2033140069;
 
 // Section: executor
 
@@ -4747,6 +4747,55 @@ fn wire__crate__api__pairing__PairListener_port_impl(
         },
     )
 }
+fn wire__crate__api__pairing__PairListener_set_relay_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PairListener_set_relay",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PairListener>,
+            >>::sse_decode(&mut deserializer);
+            let api_web = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Ok::<_, ()>({
+                    crate::api::pairing::PairListener::set_relay(&*api_that_guard, api_web);
+                })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__pairing__PairListener_start_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -5949,12 +5998,19 @@ fn wire__crate__api__pairing__pair_connect_code_impl(
             let api_code = <String>::sse_decode(&mut deserializer);
             let api_me = <crate::api::pairing::DeviceInfo>::sse_decode(&mut deserializer);
             let api_port = <Option<u16>>::sse_decode(&mut deserializer);
+            let api_relay_web = <Option<String>>::sse_decode(&mut deserializer);
+            let api_bell = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
                         let output_ok = crate::api::pairing::pair_connect_code(
-                            api_addr, api_code, api_me, api_port,
+                            api_addr,
+                            api_code,
+                            api_me,
+                            api_port,
+                            api_relay_web,
+                            api_bell,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -5991,12 +6047,17 @@ fn wire__crate__api__pairing__pair_connect_peer_impl(
             let api_me = <crate::api::pairing::DeviceInfo>::sse_decode(&mut deserializer);
             let api_port = <Option<u16>>::sse_decode(&mut deserializer);
             let api_peer = <crate::api::pairing::PeerInfo>::sse_decode(&mut deserializer);
+            let api_relay_web = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
                         let output_ok = crate::api::pairing::pair_connect_peer(
-                            api_addr, api_me, api_port, api_peer,
+                            api_addr,
+                            api_me,
+                            api_port,
+                            api_peer,
+                            api_relay_web,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -6068,10 +6129,16 @@ fn wire__crate__api__pairing__pair_link_text_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_addr = <String>::sse_decode(&mut deserializer);
             let api_code = <String>::sse_decode(&mut deserializer);
+            let api_relay_web = <Option<String>>::sse_decode(&mut deserializer);
+            let api_me_id = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
-                let output_ok =
-                    Ok::<_, ()>(crate::api::pairing::pair_link_text(api_addr, api_code))?;
+                let output_ok = Ok::<_, ()>(crate::api::pairing::pair_link_text(
+                    api_addr,
+                    api_code,
+                    api_relay_web,
+                    api_me_id,
+                ))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -6220,6 +6287,36 @@ fn wire__crate__api__playback__parse_buffer_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::playback::parse_buffer(api_key))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__update__phone_file_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "phone_file",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_platform = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::update::phone_file(api_platform))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -7199,9 +7296,11 @@ impl SseDecode for crate::api::pairing::FoundDevice {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_device = <crate::api::pairing::DeviceInfo>::sse_decode(deserializer);
         let mut var_addr = <String>::sse_decode(deserializer);
+        let mut var_web = <Option<String>>::sse_decode(deserializer);
         return crate::api::pairing::FoundDevice {
             device: var_device,
             addr: var_addr,
+            web: var_web,
         };
     }
 }
@@ -8094,9 +8193,13 @@ impl SseDecode for crate::api::pairing::PairLink {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_addr = <String>::sse_decode(deserializer);
         let mut var_code = <String>::sse_decode(deserializer);
+        let mut var_relayWeb = <Option<String>>::sse_decode(deserializer);
+        let mut var_bell = <Option<String>>::sse_decode(deserializer);
         return crate::api::pairing::PairLink {
             addr: var_addr,
             code: var_code,
+            relay_web: var_relayWeb,
+            bell: var_bell,
         };
     }
 }
@@ -8805,40 +8908,40 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        89 => wire__crate__api__pairing__PairListener_start_impl(port, ptr, rust_vec_len, data_len),
-        104 => wire__crate__api__cast__cast_discover_impl(port, ptr, rust_vec_len, data_len),
-        105 => wire__crate__api__library__check_login_impl(port, ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__update__check_update_impl(port, ptr, rust_vec_len, data_len),
-        109 => wire__crate__api__library__delete_profile_impl(port, ptr, rust_vec_len, data_len),
-        110 => wire__crate__api__update__download_update_impl(port, ptr, rust_vec_len, data_len),
-        112 => wire__crate__api__pairing__host_end_session_impl(port, ptr, rust_vec_len, data_len),
-        113 => wire__crate__api__pairing__host_link_impl(port, ptr, rust_vec_len, data_len),
-        114 => wire__crate__api__pairing__host_sessions_impl(port, ptr, rust_vec_len, data_len),
-        115 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        117 => wire__crate__api__library__list_profiles_impl(port, ptr, rust_vec_len, data_len),
-        118 => wire__crate__api__logos__logo_file_impl(port, ptr, rust_vec_len, data_len),
-        119 => wire__crate__api__pairing__pair_connect_code_impl(port, ptr, rust_vec_len, data_len),
-        120 => wire__crate__api__pairing__pair_connect_peer_impl(port, ptr, rust_vec_len, data_len),
-        121 => wire__crate__api__pairing__pair_discover_impl(port, ptr, rust_vec_len, data_len),
-        128 => wire__crate__api__premiumize__pm_check_impl(port, ptr, rust_vec_len, data_len),
-        129 => wire__crate__api__premiumize__pm_device_poll_impl(port, ptr, rust_vec_len, data_len),
-        130 => {
+        90 => wire__crate__api__pairing__PairListener_start_impl(port, ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__cast__cast_discover_impl(port, ptr, rust_vec_len, data_len),
+        106 => wire__crate__api__library__check_login_impl(port, ptr, rust_vec_len, data_len),
+        107 => wire__crate__api__update__check_update_impl(port, ptr, rust_vec_len, data_len),
+        110 => wire__crate__api__library__delete_profile_impl(port, ptr, rust_vec_len, data_len),
+        111 => wire__crate__api__update__download_update_impl(port, ptr, rust_vec_len, data_len),
+        113 => wire__crate__api__pairing__host_end_session_impl(port, ptr, rust_vec_len, data_len),
+        114 => wire__crate__api__pairing__host_link_impl(port, ptr, rust_vec_len, data_len),
+        115 => wire__crate__api__pairing__host_sessions_impl(port, ptr, rust_vec_len, data_len),
+        116 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        118 => wire__crate__api__library__list_profiles_impl(port, ptr, rust_vec_len, data_len),
+        119 => wire__crate__api__logos__logo_file_impl(port, ptr, rust_vec_len, data_len),
+        120 => wire__crate__api__pairing__pair_connect_code_impl(port, ptr, rust_vec_len, data_len),
+        121 => wire__crate__api__pairing__pair_connect_peer_impl(port, ptr, rust_vec_len, data_len),
+        122 => wire__crate__api__pairing__pair_discover_impl(port, ptr, rust_vec_len, data_len),
+        130 => wire__crate__api__premiumize__pm_check_impl(port, ptr, rust_vec_len, data_len),
+        131 => wire__crate__api__premiumize__pm_device_poll_impl(port, ptr, rust_vec_len, data_len),
+        132 => {
             wire__crate__api__premiumize__pm_device_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        131 => wire__crate__api__premiumize__pm_folder_impl(port, ptr, rust_vec_len, data_len),
-        132 => wire__crate__api__premiumize__pm_transfers_impl(port, ptr, rust_vec_len, data_len),
-        134 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
-        136 => wire__crate__api__tracking__simkl_history_impl(port, ptr, rust_vec_len, data_len),
-        137 => wire__crate__api__subtitles__subs_download_impl(port, ptr, rust_vec_len, data_len),
-        138 => wire__crate__api__subtitles__subs_login_impl(port, ptr, rust_vec_len, data_len),
-        139 => wire__crate__api__subtitles__subs_search_impl(port, ptr, rust_vec_len, data_len),
-        141 => {
+        133 => wire__crate__api__premiumize__pm_folder_impl(port, ptr, rust_vec_len, data_len),
+        134 => wire__crate__api__premiumize__pm_transfers_impl(port, ptr, rust_vec_len, data_len),
+        136 => wire__crate__api__library__save_profile_impl(port, ptr, rust_vec_len, data_len),
+        138 => wire__crate__api__tracking__simkl_history_impl(port, ptr, rust_vec_len, data_len),
+        139 => wire__crate__api__subtitles__subs_download_impl(port, ptr, rust_vec_len, data_len),
+        140 => wire__crate__api__subtitles__subs_login_impl(port, ptr, rust_vec_len, data_len),
+        141 => wire__crate__api__subtitles__subs_search_impl(port, ptr, rust_vec_len, data_len),
+        143 => {
             wire__crate__api__tracking__track_device_poll_impl(port, ptr, rust_vec_len, data_len)
         }
-        142 => {
+        144 => {
             wire__crate__api__tracking__track_device_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        143 => wire__crate__api__tracking__track_scrobble_impl(port, ptr, rust_vec_len, data_len),
+        145 => wire__crate__api__tracking__track_scrobble_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8889,39 +8992,41 @@ fn pde_ffi_dispatcher_sync_impl(
         85 => wire__crate__api__pairing__PairListener_clear_code_impl(ptr, rust_vec_len, data_len),
         86 => wire__crate__api__pairing__PairListener_new_code_impl(ptr, rust_vec_len, data_len),
         88 => wire__crate__api__pairing__PairListener_port_impl(ptr, rust_vec_len, data_len),
-        90 => wire__crate__api__pairing__PairListener_update_impl(ptr, rust_vec_len, data_len),
-        91 => wire__crate__api__playback__Watchdog_new_impl(ptr, rust_vec_len, data_len),
-        92 => wire__crate__api__playback__Watchdog_on_buffering_impl(ptr, rust_vec_len, data_len),
-        93 => wire__crate__api__playback__Watchdog_on_end_of_file_impl(ptr, rust_vec_len, data_len),
-        94 => wire__crate__api__playback__Watchdog_on_error_impl(ptr, rust_vec_len, data_len),
-        95 => wire__crate__api__playback__Watchdog_on_network_changed_impl(
+        89 => wire__crate__api__pairing__PairListener_set_relay_impl(ptr, rust_vec_len, data_len),
+        91 => wire__crate__api__pairing__PairListener_update_impl(ptr, rust_vec_len, data_len),
+        92 => wire__crate__api__playback__Watchdog_new_impl(ptr, rust_vec_len, data_len),
+        93 => wire__crate__api__playback__Watchdog_on_buffering_impl(ptr, rust_vec_len, data_len),
+        94 => wire__crate__api__playback__Watchdog_on_end_of_file_impl(ptr, rust_vec_len, data_len),
+        95 => wire__crate__api__playback__Watchdog_on_error_impl(ptr, rust_vec_len, data_len),
+        96 => wire__crate__api__playback__Watchdog_on_network_changed_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        96 => wire__crate__api__playback__Watchdog_on_position_impl(ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__playback__Watchdog_on_tick_impl(ptr, rust_vec_len, data_len),
-        98 => wire__crate__api__playback__Watchdog_on_user_pause_impl(ptr, rust_vec_len, data_len),
-        99 => wire__crate__api__playback__Watchdog_on_wake_impl(ptr, rust_vec_len, data_len),
-        100 => wire__crate__api__library__app_setting_impl(ptr, rust_vec_len, data_len),
-        101 => wire__crate__api__playback__behind_live_impl(ptr, rust_vec_len, data_len),
-        102 => wire__crate__api__playback__buffer_key_impl(ptr, rust_vec_len, data_len),
-        103 => wire__crate__api__playback__buffer_options_impl(ptr, rust_vec_len, data_len),
-        107 => wire__crate__api__simple__core_version_impl(ptr, rust_vec_len, data_len),
-        108 => {
+        97 => wire__crate__api__playback__Watchdog_on_position_impl(ptr, rust_vec_len, data_len),
+        98 => wire__crate__api__playback__Watchdog_on_tick_impl(ptr, rust_vec_len, data_len),
+        99 => wire__crate__api__playback__Watchdog_on_user_pause_impl(ptr, rust_vec_len, data_len),
+        100 => wire__crate__api__playback__Watchdog_on_wake_impl(ptr, rust_vec_len, data_len),
+        101 => wire__crate__api__library__app_setting_impl(ptr, rust_vec_len, data_len),
+        102 => wire__crate__api__playback__behind_live_impl(ptr, rust_vec_len, data_len),
+        103 => wire__crate__api__playback__buffer_key_impl(ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__playback__buffer_options_impl(ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__simple__core_version_impl(ptr, rust_vec_len, data_len),
+        109 => {
             wire__crate__api__playback__default_timeshift_seconds_impl(ptr, rust_vec_len, data_len)
         }
-        111 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        116 => wire__crate__api__logos__init_logo_cache_impl(ptr, rust_vec_len, data_len),
-        122 => wire__crate__api__pairing__pair_link_text_impl(ptr, rust_vec_len, data_len),
-        123 => wire__crate__api__pairing__pair_local_ip_impl(ptr, rust_vec_len, data_len),
-        124 => wire__crate__api__pairing__pair_new_device_id_impl(ptr, rust_vec_len, data_len),
-        125 => wire__crate__api__pairing__pair_parse_link_impl(ptr, rust_vec_len, data_len),
-        126 => wire__crate__api__pairing__pair_qr_impl(ptr, rust_vec_len, data_len),
-        127 => wire__crate__api__playback__parse_buffer_impl(ptr, rust_vec_len, data_len),
-        133 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
-        135 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
-        140 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        117 => wire__crate__api__logos__init_logo_cache_impl(ptr, rust_vec_len, data_len),
+        123 => wire__crate__api__pairing__pair_link_text_impl(ptr, rust_vec_len, data_len),
+        124 => wire__crate__api__pairing__pair_local_ip_impl(ptr, rust_vec_len, data_len),
+        125 => wire__crate__api__pairing__pair_new_device_id_impl(ptr, rust_vec_len, data_len),
+        126 => wire__crate__api__pairing__pair_parse_link_impl(ptr, rust_vec_len, data_len),
+        127 => wire__crate__api__pairing__pair_qr_impl(ptr, rust_vec_len, data_len),
+        128 => wire__crate__api__playback__parse_buffer_impl(ptr, rust_vec_len, data_len),
+        129 => wire__crate__api__update__phone_file_impl(ptr, rust_vec_len, data_len),
+        135 => wire__crate__api__update__release_page_impl(ptr, rust_vec_len, data_len),
+        137 => wire__crate__api__library__set_app_setting_impl(ptr, rust_vec_len, data_len),
+        142 => wire__crate__api__playback__timeshift_options_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -9231,6 +9336,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::pairing::FoundDevice {
         [
             self.device.into_into_dart().into_dart(),
             self.addr.into_into_dart().into_dart(),
+            self.web.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -9586,6 +9692,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::pairing::PairLink {
         [
             self.addr.into_into_dart().into_dart(),
             self.code.into_into_dart().into_dart(),
+            self.relay_web.into_into_dart().into_dart(),
+            self.bell.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -10456,6 +10564,7 @@ impl SseEncode for crate::api::pairing::FoundDevice {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::pairing::DeviceInfo>::sse_encode(self.device, serializer);
         <String>::sse_encode(self.addr, serializer);
+        <Option<String>>::sse_encode(self.web, serializer);
     }
 }
 
@@ -11143,6 +11252,8 @@ impl SseEncode for crate::api::pairing::PairLink {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.addr, serializer);
         <String>::sse_encode(self.code, serializer);
+        <Option<String>>::sse_encode(self.relay_web, serializer);
+        <Option<String>>::sse_encode(self.bell, serializer);
     }
 }
 
