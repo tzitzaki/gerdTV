@@ -189,7 +189,7 @@ void main() {
                 '0',
           );
     expect(await pauseWait(), 2);
-    await tester.tap(find.byKey(const Key('player.buffer')));
+    await tapControl(tester, find.byKey(const Key('player.buffer')));
     await tapReady(tester, find.byKey(const Key('buffer.smooth')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
@@ -215,7 +215,9 @@ void main() {
     // Desktop mini player: the window shrinks to the floating player, playback continues, Restore brings it back.
     final mini = MiniWindow();
     final fullWidth = mini.size.width;
-    await tester.tap(find.byKey(const Key('player.mini')));
+    // In the tune sheet (the top bar keeps only what's used often).
+    await tapControl(tester, find.byKey(const Key('player.buffer')));
+    await tapReady(tester, find.byKey(const Key('player.mini')));
     await waitFor(tester, find.byKey(const Key('player.picture')));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 800)),
@@ -312,7 +314,7 @@ void main() {
     expect(session.player.state.playing, isTrue);
 
     // Leaving the player keeps the stream playing in the now-playing bar; tapping the bar reopens it, no restart.
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     // While Apple's window floats the stream, the bar shows the logo, not a second picture.
     session.floating.value = true;
@@ -353,7 +355,7 @@ void main() {
       greaterThanOrEqualTo(atLeave),
       reason: 'reopening does not restart',
     );
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     await tester.pageBack();
     await tester.pump(const Duration(milliseconds: 500));
@@ -400,7 +402,7 @@ void main() {
     ); // the field has the focus since typing started
     await tester.pump();
     await waitFor(tester, find.byKey(const Key('player.back')));
-    await tester.tap(find.byKey(const Key('player.back')));
+    await tapControl(tester, find.byKey(const Key('player.back')));
     await waitFor(tester, find.byKey(const Key('nowPlaying.bar')));
     // Stop is the way playback ends: the bar goes away.
     await tester.tap(find.byKey(const Key('nowPlaying.stop')));

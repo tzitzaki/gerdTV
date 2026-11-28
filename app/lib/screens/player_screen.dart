@@ -489,6 +489,40 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           showCastSheet(context, widget.session, _current);
                         },
                       ),
+                    // Used now and then, so here instead of the top bar (owner decision); P and the remote's
+                    // last-channel key (or Backspace) still work directly.
+                    if (_current.kind == ItemKind.live &&
+                        widget.session.lastChannel != null)
+                      ListTile(
+                        key: const Key('player.last'),
+                        leading: const Icon(Icons.swap_horiz),
+                        title: Text(l10n.lastChannel),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _lastChannel();
+                        },
+                      ),
+                    if (isDesktop)
+                      ListTile(
+                        key: const Key('player.mini'),
+                        leading: const Icon(Icons.picture_in_picture_alt),
+                        title: Text(l10n.miniPlayer),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _toggleMini();
+                        },
+                      ),
+                    // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
+                    if (isApple || widget.session.onAvPlayer.value)
+                      ListTile(
+                        key: const Key('player.applePip'),
+                        leading: const Icon(Icons.picture_in_picture_alt),
+                        title: Text(l10n.miniPlayer),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _startPip();
+                        },
+                      ),
                     if (canRecord && _current.kind == ItemKind.live)
                       ListTile(
                         key: const Key('player.record'),
@@ -723,299 +757,284 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ? _pictureOnly(l10n)
               : Scaffold(
                   backgroundColor: Colors.black,
-                  body: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: MaterialVideoControlsTheme(
-                          normal: _mobileControls,
-                          fullscreen: _mobileControls,
-                          child: MaterialDesktopVideoControlsTheme(
-                            normal: _desktopControls,
-                            fullscreen: _desktopControls,
-                            child: playerVideo(
-                              widget.session.video,
-                              controls: AdaptiveVideoControls,
-                              window: widget.session.videoWindow,
-                              format: widget.session.pictureFormat.value,
-                              subtitles: subtitleLook(
-                                size: widget.session.library?.setting(
-                                  key: settingSubtitleSize,
-                                ),
-                                background: widget.session.library?.setting(
-                                  key: settingSubtitleBackground,
+                  // The top bar fades out after 3 s without a touch, mouse movement or key (owner decision: the
+                  // picture comes first); paused, with the channel list open or the focus in it, it stays.
+                  body: ActivityScope(
+                    builder: (context, active) => Stack(
+                      children: [
+                        Positioned.fill(
+                          child: MaterialVideoControlsTheme(
+                            normal: _mobileControls,
+                            fullscreen: _mobileControls,
+                            child: MaterialDesktopVideoControlsTheme(
+                              normal: _desktopControls,
+                              fullscreen: _desktopControls,
+                              child: playerVideo(
+                                widget.session.video,
+                                controls: AdaptiveVideoControls,
+                                window: widget.session.videoWindow,
+                                format: widget.session.pictureFormat.value,
+                                subtitles: subtitleLook(
+                                  size: widget.session.library?.setting(
+                                    key: settingSubtitleSize,
+                                  ),
+                                  background: widget.session.library?.setting(
+                                    key: settingSubtitleBackground,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.all(Tokens.space),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
+                        _TopBar(
+                          shown: active || _paused || _panel,
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.all(Tokens.space),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  IconButton.filledTonal(
-                                    key: const Key('player.back'),
-                                    tooltip: l10n.back,
-                                    icon: const Icon(Icons.arrow_back),
-                                    onPressed: _back,
-                                  ),
-                                  const SizedBox(width: Tokens.space),
-                                  Expanded(
-                                    child: Text(
-                                      _current.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(color: Colors.white),
-                                    ),
-                                  ),
-                                  if (!_narrow) ..._behindLive(l10n),
-                                  if (isDesktop) ...[
-                                    IconButton.filledTonal(
-                                      key: const Key('player.mini'),
-                                      tooltip: l10n.miniPlayer,
-                                      icon: const Icon(
-                                        Icons.picture_in_picture_alt,
+                                  Row(
+                                    children: [
+                                      IconButton.filledTonal(
+                                        key: const Key('player.back'),
+                                        tooltip: l10n.back,
+                                        icon: const Icon(Icons.arrow_back),
+                                        onPressed: _back,
                                       ),
-                                      onPressed: _toggleMini,
-                                    ),
-                                    const SizedBox(width: Tokens.space),
-                                  ],
-                                  // Audio and subtitles (track_sheet.dart).
-                                  StreamBuilder<Tracks>(
-                                    stream: widget.session.player.stream.tracks,
-                                    initialData:
-                                        widget.session.player.state.tracks,
-                                    builder: (context, snap) {
-                                      final p = widget.session.player;
-                                      // mpv always has the delays to set.
-                                      if (widget.session.onAvPlayer.value &&
-                                          !hasTrackChoice(snap.data!)) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: Tokens.space,
+                                      const SizedBox(width: Tokens.space),
+                                      Expanded(
+                                        child: Text(
+                                          _current.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(color: Colors.white),
                                         ),
-                                        child: IconButton.filledTonal(
-                                          key: const Key('player.tracks'),
-                                          tooltip: l10n.playerTracks,
-                                          icon: const Icon(
-                                            Icons.subtitles_outlined,
-                                          ),
-                                          onPressed: () => showTrackSheet(
-                                            context,
-                                            tracks: p.state.tracks,
-                                            current: p.state.track,
-                                            onAudio: p.setAudioTrack,
-                                            onSubtitle: p.setSubtitleTrack,
-                                            // Apple's player has no delays.
-                                            onDelay:
-                                                widget.session.onAvPlayer.value
-                                                ? null
-                                                : widget.session.setDelay,
-                                            delays: widget.session.delays,
-                                            onFind: _canFindSubtitles
-                                                ? () => showFoundSubtitles(
-                                                    context,
-                                                    found: widget.session
-                                                        .findSubtitles(
-                                                          l10n.localeName,
-                                                        ),
-                                                    onPick: widget
+                                      ),
+                                      if (!_narrow) ..._behindLive(l10n),
+                                      // Audio and subtitles (track_sheet.dart).
+                                      StreamBuilder<Tracks>(
+                                        stream:
+                                            widget.session.player.stream.tracks,
+                                        initialData:
+                                            widget.session.player.state.tracks,
+                                        builder: (context, snap) {
+                                          final p = widget.session.player;
+                                          // mpv always has the delays to set.
+                                          if (widget.session.onAvPlayer.value &&
+                                              !hasTrackChoice(snap.data!)) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: Tokens.space,
+                                            ),
+                                            child: IconButton.filledTonal(
+                                              key: const Key('player.tracks'),
+                                              tooltip: l10n.playerTracks,
+                                              icon: const Icon(
+                                                Icons.subtitles_outlined,
+                                              ),
+                                              onPressed: () => showTrackSheet(
+                                                context,
+                                                tracks: p.state.tracks,
+                                                current: p.state.track,
+                                                onAudio: p.setAudioTrack,
+                                                onSubtitle: p.setSubtitleTrack,
+                                                // Apple's player has no delays.
+                                                onDelay:
+                                                    widget
                                                         .session
-                                                        .loadSubtitle,
-                                                  )
-                                                : null,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  if (_current.kind == ItemKind.live &&
-                                      widget.session.lastChannel != null) ...[
-                                    IconButton.filledTonal(
-                                      key: const Key('player.last'),
-                                      tooltip: l10n.lastChannel,
-                                      icon: const Icon(Icons.swap_horiz),
-                                      onPressed: _lastChannel,
-                                    ),
-                                    const SizedBox(width: Tokens.space),
-                                  ],
-                                  IconButton.filledTonal(
-                                    key: const Key('player.buffer'),
-                                    tooltip: l10n.bufferThisChannel,
-                                    icon: const Icon(Icons.tune),
-                                    onPressed: _bufferSheet,
-                                  ),
-                                  const SizedBox(width: Tokens.space),
-                                  // iOS always; the Mac for a live channel in AVPlayer (Apple's own floating window).
-                                  if (isApple ||
-                                      widget.session.onAvPlayer.value) ...[
-                                    IconButton.filledTonal(
-                                      key: const Key('player.applePip'),
-                                      tooltip: l10n.miniPlayer,
-                                      icon: const Icon(
-                                        Icons.picture_in_picture_alt,
+                                                        .onAvPlayer
+                                                        .value
+                                                    ? null
+                                                    : widget.session.setDelay,
+                                                delays: widget.session.delays,
+                                                onFind: _canFindSubtitles
+                                                    ? () => showFoundSubtitles(
+                                                        context,
+                                                        found: widget.session
+                                                            .findSubtitles(
+                                                              l10n.localeName,
+                                                            ),
+                                                        onPick: widget
+                                                            .session
+                                                            .loadSubtitle,
+                                                      )
+                                                    : null,
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
-                                      onPressed: _startPip,
+                                      IconButton.filledTonal(
+                                        key: const Key('player.buffer'),
+                                        tooltip: l10n.bufferThisChannel,
+                                        icon: const Icon(Icons.tune),
+                                        onPressed: _bufferSheet,
+                                      ),
+                                      const SizedBox(width: Tokens.space),
+                                    ],
+                                  ),
+                                  // Phones: no room beside the buttons.
+                                  if (_narrow)
+                                    const SizedBox(height: Tokens.space),
+                                  if (_narrow)
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: _behindLive(l10n),
                                     ),
-                                    const SizedBox(width: Tokens.space),
-                                  ],
                                 ],
                               ),
-                              // Phones: no room beside the buttons.
-                              if (_narrow) const SizedBox(height: Tokens.space),
-                              if (_narrow)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: _behindLive(l10n),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // A D-pad can't bring media_kit's bar up (it takes a tap): play/pause and Stop stay visible.
-                      // With the channel list open, Left from it gets here.
-                      if (!isDesktop)
-                        Positioned(
-                          left: Tokens.space * 2,
-                          bottom:
-                              Tokens.space * 2 +
-                              MediaQuery.paddingOf(context).bottom,
-                          child: DpadControls(
-                            paused: _paused,
-                            onPause: _togglePause,
-                            onStop: _stop,
-                            onLeave: _dpad ? _leaveDpad : null,
-                          ),
-                        ),
-                      if (widget.session.nextUp.value case final next?)
-                        Positioned(
-                          right: Tokens.space * 2,
-                          bottom:
-                              _controlsHeight +
-                              MediaQuery.paddingOf(context).bottom,
-                          child: NextUpCard(
-                            next: next,
-                            onPlay: widget.session.nextUp.playNow,
-                            onCancel: widget.session.nextUp.cancel,
-                          ),
-                        ),
-                      if (_banner && !_panel)
-                        Positioned(
-                          // Above the controls and the buffer readout, so all can show at once.
-                          bottom:
-                              _controlsHeight +
-                              (_readout ? Tokens.space * 3 : 0) +
-                              MediaQuery.paddingOf(context).bottom,
-                          left: Tokens.space * 2,
-                          right: Tokens.space * 2,
-                          child: ValueListenableBuilder<int>(
-                            valueListenable: widget.session.overlayTranslucency,
-                            builder: (context, percent, _) => NowNextBanner(
-                              channel: _current,
-                              nowNext: _nowNext[_current.key],
-                              showHint: _channels.length > 1,
-                              translucency: percent,
                             ),
                           ),
                         ),
-                      if (_panel)
-                        Positioned(
-                          top: 72,
-                          bottom: Tokens.space * 2,
-                          right: Tokens.space * 2,
-                          width: 360,
-                          child: _ChannelPanel(
-                            channels: _channels,
-                            current: _current,
-                            nowNext: _nowNext,
-                            onPick: (c) {
-                              setState(() => _panel = false);
-                              _switchTo(c);
-                            },
+                        // A D-pad can't bring media_kit's bar up (it takes a tap): play/pause and Stop stay visible.
+                        // With the channel list open, Left from it gets here.
+                        if (!isDesktop)
+                          Positioned(
+                            left: Tokens.space * 2,
+                            bottom:
+                                Tokens.space * 2 +
+                                MediaQuery.paddingOf(context).bottom,
+                            child: DpadControls(
+                              paused: _paused,
+                              onPause: _togglePause,
+                              onStop: _stop,
+                              onLeave: _dpad ? _leaveDpad : null,
+                            ),
                           ),
-                        ),
-                      // If switched on: buffered seconds vs. the target (above the controls: on them it took Stop's clicks). Hidden under the
-                      // channel list, which reaches that corner on a phone (the screen check found them overlapping).
-                      if (_readout && !_panel)
-                        Positioned(
-                          left: Tokens.space * 2,
-                          bottom:
-                              _controlsHeight +
-                              MediaQuery.paddingOf(context).bottom,
-                          child: StreamBuilder<Duration>(
-                            stream: widget.session.player.stream.buffer,
-                            builder: (context, snap) {
-                              final buffered =
-                                  ((snap.data ?? Duration.zero) -
-                                          widget.session.player.state.position)
-                                      .inSeconds;
-                              return ValueListenableBuilder<int>(
-                                valueListenable: adapter.target,
-                                builder: (context, target, _) => Text(
-                                  l10n.bufferReadout(
-                                    buffered < 0 ? 0 : buffered,
-                                    target,
-                                  ),
-                                  key: const Key('player.bufferReadout'),
-                                  style: Theme.of(context).textTheme.labelMedium
-                                      ?.copyWith(color: Colors.white70),
-                                ),
-                              );
-                            },
+                        if (widget.session.nextUp.value case final next?)
+                          Positioned(
+                            right: Tokens.space * 2,
+                            bottom:
+                                _controlsHeight +
+                                MediaQuery.paddingOf(context).bottom,
+                            child: NextUpCard(
+                              next: next,
+                              onPlay: widget.session.nextUp.playNow,
+                              onCancel: widget.session.nextUp.cancel,
+                            ),
                           ),
-                        ),
-                      // Centred: the banner is at the bottom (both show when a channel fails right after zapping).
-                      Align(
-                        child: Padding(
-                          padding: const EdgeInsets.all(Tokens.space * 4),
-                          child: ListenableBuilder(
-                            listenable: Listenable.merge([
-                              adapter.failure,
-                              adapter.reconnecting,
-                              widget.session.bufferRaisedTo,
-                            ]),
-                            builder: (context, _) {
-                              final failure = adapter.failure.value;
-                              final attempt = adapter.reconnecting.value;
-                              final raised =
-                                  widget.session.bufferRaisedTo.value;
-                              return Builder(
-                                builder: (context) {
-                                  final text =
-                                      failure ??
-                                      (attempt > 0
-                                          ? l10n.playerReconnecting(attempt)
-                                          : raised != null
-                                          ? l10n.bufferRaised(raised)
-                                          : null);
-                                  if (text == null) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Card(
-                                    key: const Key('player.notice'),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(
-                                        Tokens.space * 2,
-                                      ),
-                                      child: Text(text),
+                        if (_banner && !_panel)
+                          Positioned(
+                            // Above the controls and the buffer readout, so all can show at once.
+                            bottom:
+                                _controlsHeight +
+                                (_readout ? Tokens.space * 3 : 0) +
+                                MediaQuery.paddingOf(context).bottom,
+                            left: Tokens.space * 2,
+                            right: Tokens.space * 2,
+                            child: ValueListenableBuilder<int>(
+                              valueListenable:
+                                  widget.session.overlayTranslucency,
+                              builder: (context, percent, _) => NowNextBanner(
+                                channel: _current,
+                                nowNext: _nowNext[_current.key],
+                                showHint: _channels.length > 1,
+                                translucency: percent,
+                              ),
+                            ),
+                          ),
+                        if (_panel)
+                          Positioned(
+                            top: 72,
+                            bottom: Tokens.space * 2,
+                            right: Tokens.space * 2,
+                            width: 360,
+                            child: _ChannelPanel(
+                              channels: _channels,
+                              current: _current,
+                              nowNext: _nowNext,
+                              onPick: (c) {
+                                setState(() => _panel = false);
+                                _switchTo(c);
+                              },
+                            ),
+                          ),
+                        // If switched on: buffered seconds vs. the target (above the controls: on them it took Stop's clicks). Hidden under the
+                        // channel list, which reaches that corner on a phone (the screen check found them overlapping).
+                        if (_readout && !_panel)
+                          Positioned(
+                            left: Tokens.space * 2,
+                            bottom:
+                                _controlsHeight +
+                                MediaQuery.paddingOf(context).bottom,
+                            child: StreamBuilder<Duration>(
+                              stream: widget.session.player.stream.buffer,
+                              builder: (context, snap) {
+                                final buffered =
+                                    ((snap.data ?? Duration.zero) -
+                                            widget
+                                                .session
+                                                .player
+                                                .state
+                                                .position)
+                                        .inSeconds;
+                                return ValueListenableBuilder<int>(
+                                  valueListenable: adapter.target,
+                                  builder: (context, target, _) => Text(
+                                    l10n.bufferReadout(
+                                      buffered < 0 ? 0 : buffered,
+                                      target,
                                     ),
-                                  );
-                                },
-                              );
-                            },
+                                    key: const Key('player.bufferReadout'),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(color: Colors.white70),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        // Centred: the banner is at the bottom (both show when a channel fails right after zapping).
+                        Align(
+                          child: Padding(
+                            padding: const EdgeInsets.all(Tokens.space * 4),
+                            child: ListenableBuilder(
+                              listenable: Listenable.merge([
+                                adapter.failure,
+                                adapter.reconnecting,
+                                widget.session.bufferRaisedTo,
+                              ]),
+                              builder: (context, _) {
+                                final failure = adapter.failure.value;
+                                final attempt = adapter.reconnecting.value;
+                                final raised =
+                                    widget.session.bufferRaisedTo.value;
+                                return Builder(
+                                  builder: (context) {
+                                    final text =
+                                        failure ??
+                                        (attempt > 0
+                                            ? l10n.playerReconnecting(attempt)
+                                            : raised != null
+                                            ? l10n.bufferRaised(raised)
+                                            : null);
+                                    if (text == null) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Card(
+                                      key: const Key('player.notice'),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(
+                                          Tokens.space * 2,
+                                        ),
+                                        child: Text(text),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
         ),
@@ -1071,6 +1090,98 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: video,
               ),
             ),
+    );
+  }
+}
+
+/// Whether the user is doing something in the player: true at the start and for [hideAfter] after every pointer
+/// event (touch, click, mouse movement) or key, anywhere below it (pointers) or anywhere at all (keys: the hardware
+/// keyboard's handler sees them before the player's shortcuts take them). Nothing is consumed.
+/// Debugging a bar that never hides: something keeps sending pointer moves (a trackpad resting) or key repeats.
+class ActivityScope extends StatefulWidget {
+  const ActivityScope({
+    super.key,
+    required this.builder,
+    this.hideAfter = const Duration(seconds: 3),
+  });
+  final Widget Function(BuildContext context, bool active) builder;
+  final Duration hideAfter;
+
+  @override
+  State<ActivityScope> createState() => _ActivityScopeState();
+}
+
+class _ActivityScopeState extends State<ActivityScope> {
+  bool _active = true;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_key);
+    _wake();
+  }
+
+  bool _key(KeyEvent _) {
+    _wake();
+    return false; // not handled: the key goes on to whoever wants it
+  }
+
+  void _wake() {
+    _timer?.cancel();
+    _timer = Timer(widget.hideAfter, () {
+      if (mounted) setState(() => _active = false);
+    });
+    if (!_active) setState(() => _active = true);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_key);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: (_) => _wake(),
+    onPointerMove: (_) => _wake(),
+    onPointerHover: (_) => _wake(),
+    child: widget.builder(context, _active),
+  );
+}
+
+/// The player's top bar, faded out and untouchable while not [shown]; the keyboard's focus inside it keeps it.
+class _TopBar extends StatefulWidget {
+  const _TopBar({required this.shown, required this.child});
+  final bool shown;
+  final Widget child;
+
+  @override
+  State<_TopBar> createState() => _TopBarState();
+}
+
+class _TopBarState extends State<_TopBar> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = widget.shown || _focused;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : Tokens.motion,
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (on) => setState(() => _focused = on),
+          child: widget.child,
+        ),
+      ),
     );
   }
 }
