@@ -328,6 +328,11 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('482 913'), findsOneWidget, reason: 'no tap needed');
+    // The code card keeps its width whatever this device is called (a long host name overflowed CI's 800 px window).
+    expect(
+      tester.getSize(find.byKey(const Key('welcome.code'))).width,
+      lessThanOrEqualTo(260),
+    );
     expect(find.byKey(const Key('devices.found.tv1')), findsOneWidget);
     // Calm: the nearby list faded, the phone files folded. The test runs as a computer: both files, as QRs.
     double nearby() => tester
