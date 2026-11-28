@@ -121,8 +121,10 @@ void main() {
     await tester.pump();
     // Settings → Appearance: another logo, stored app-wide and sent to the Linux window as its icon.
     await tapReady(tester, find.byKey(const Key('settings.cat.appearance')));
-    // The theme comes first in Appearance: the logos may be below the window (built only when scrolled to).
+    // The theme's card is open first in Appearance; the logos are in their own card, below it.
     await waitFor(tester, find.byKey(const Key('settings.themeMode')));
+    await tapReady(tester, find.byKey(const Key('settings.section.Logo')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('settings.logo.signal')),
       200,
@@ -821,11 +823,7 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('guide.unmatched')),
-      200,
-      scrollable: settingsList,
-    );
+    // The sources' card is the first one, open.
     expect(
       find.descendant(
         of: find.byKey(const Key('guide.source.builtin')),
@@ -859,7 +857,12 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Remove'));
     await tester.pump(const Duration(milliseconds: 300));
-    // Mapping by hand: a channel without a guide id gets a guide channel and leaves the list.
+    // Mapping by hand: a channel without a guide id gets a guide channel and leaves the list (its card first).
+    await tapReady(
+      tester,
+      find.byKey(const Key('settings.section.Channels without guide')),
+    );
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('guide.unmatched')),
       200,
@@ -890,6 +893,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('settings.search')), 'remove');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('guide.unmatched')), findsNothing);
+    await tapReady(tester, find.byKey(const Key('settings.providerMenu')));
     await tapReady(tester, find.byKey(const Key('settings.remove')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));

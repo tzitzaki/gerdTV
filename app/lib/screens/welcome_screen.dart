@@ -96,7 +96,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     // The one instruction; the path names the same labels Settings shows.
     final instruction = Text(
       l10n.welcomeScan(
-        '${l10n.navSettings} → ${l10n.settingsAccount} → ${l10n.devicesTitle}',
+        '${l10n.navSettings} → ${l10n.settingsDevices} → ${l10n.devicesTitle}',
       ),
       style: theme.textTheme.titleMedium,
     );
