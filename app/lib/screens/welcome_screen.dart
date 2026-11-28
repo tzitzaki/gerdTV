@@ -101,33 +101,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       style: theme.textTheme.titleMedium,
     );
 
-    // This device's QR and code on an accent-tinted card (the user's accent: the scheme is seeded from it). Fixed to
-    // the QR's width: its text (this device's name) wraps instead of widening the card (a long host name overflowed).
-    final codeCard = SizedBox(
-      width: 220 + Tokens.space * 4,
-      child: Card(
-        key: const Key('welcome.code'),
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        color: scheme.primaryContainer.withValues(alpha: 0.35),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Tokens.radius * 1.5),
-          side: BorderSide(color: scheme.primary.withValues(alpha: 0.6)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(Tokens.space * 2),
-          child: _qr != null
-              ? PairCodeView(session: s, qr: _qr!)
-              : SizedBox.square(
-                  dimension: 220,
-                  child: Center(
-                    child: _status == null
-                        ? const CircularProgressIndicator()
-                        : const Icon(Icons.wifi_off, size: 48),
-                  ),
-                ),
-        ),
-      ),
+    // This device's QR and code on the shared code card (devices_screen.dart), a spinner until there is a code.
+    final codeCard = KeyedSubtree(
+      key: const Key('welcome.code'),
+      child: _qr != null
+          ? PairCodeView(session: s, qr: _qr!)
+          : CodeCard(
+              placeholder: _status == null
+                  ? const CircularProgressIndicator()
+                  : const Icon(Icons.wifi_off, size: 48),
+            ),
     );
 
     // Skip takes the focus first (the remote's start); the line under it says where a login goes instead.

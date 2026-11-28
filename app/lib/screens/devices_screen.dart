@@ -10,6 +10,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -119,7 +120,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
               ),
             ),
           // This device receives: QR and code.
-          SectionLabel(l10n.devicesShowCode),
+          // The tile says what it does; the heading only once the code shows instead of it.
           if (_qr == null)
             ListTile(
               key: const Key('devices.showCode'),
@@ -128,7 +129,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
               subtitle: Text(l10n.devicesShowCodeHint),
               onTap: _showCode,
             )
-          else
+          else ...[
+            SectionLabel(l10n.devicesShowCode),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Tokens.space * 2),
               child: Column(
@@ -140,6 +142,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                 ],
               ),
             ),
+          ],
           // This device connects to one it finds.
           SectionLabel(l10n.devicesNearby),
           NearbyDevices(
@@ -266,8 +269,8 @@ class _PairConfirmScreenState extends State<PairConfirmScreen> {
 }
 
 /// This device's pairing code while it listens ([Devices.startPairing] gave [qr]): the QR for a phone's camera, the
-/// code to type on the other device, and this device's name. A new code (the old one was used) or a relay found later
-/// (a host announced itself) changes the QR too.
+/// code to type on the other device, and this device's name, on a [CodeCard]. A new code (the old one was used) or a
+/// relay found later (a host announced itself) changes the QR too.
 class PairCodeView extends StatelessWidget {
   const PairCodeView({super.key, required this.session, required this.qr});
   final Session session;
@@ -277,24 +280,111 @@ class PairCodeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final d = session.devices;
-    final theme = Theme.of(context);
     return ListenableBuilder(
       listenable: Listenable.merge([d.code, d.relay]),
-      builder: (context, _) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          QrView(text: d.qrText() ?? qr, size: 220),
-          const SizedBox(height: Tokens.space * 2),
-          SelectableText(
-            d.code.value ?? '',
-            key: const Key('devices.code'),
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-              letterSpacing: 2,
-            ),
+      builder: (context, _) => CodeCard(
+        qr: d.qrText() ?? qr,
+        code: d.code.value ?? '',
+        codeKey: const Key('devices.code'),
+        caption: '${d.me.name} · ${l10n.devicesWaiting}',
+      ),
+    );
+  }
+}
+
+/// A code to type on another device as the page's main thing (owner decision: what gets typed is the biggest text):
+/// an accent-tinted card (the user's accent; the scheme is seeded from it) with the QR for a phone's camera, the code
+/// large with Copy, and a caption. One widget for the pairing code (welcome, Devices & sync) and the web player's
+/// login code. Fixed to the QR's width: the caption wraps instead of widening the card (a long host name overflowed
+/// CI's 800 px window). [placeholder] stands in for QR and code until there is one (the welcome screen's spinner).
+class CodeCard extends StatelessWidget {
+  const CodeCard({
+    super.key,
+    this.qr,
+    this.code,
+    this.codeKey,
+    this.copyText,
+    this.caption,
+    this.placeholder,
+  });
+  final String? qr;
+  final String? code;
+  final Key? codeKey; // the code's text, for tests
+  final String?
+  copyText; // what Copy puts on the clipboard; the code by default
+  final String? caption;
+  final Widget? placeholder;
+
+  /// The QR's side; the card is this plus its padding wide.
+  static const qrSize = 220.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final code = this.code;
+    return SizedBox(
+      width: qrSize + Tokens.space * 4,
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: scheme.primaryContainer.withValues(alpha: 0.35),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Tokens.radius * 1.5),
+          side: BorderSide(color: scheme.primary.withValues(alpha: 0.6)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Tokens.space * 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (qr case final qr?)
+                QrView(text: qr, size: qrSize)
+              else if (placeholder case final p?)
+                SizedBox.square(
+                  dimension: qrSize,
+                  child: Center(child: p),
+                ),
+              if (code != null && code.isNotEmpty) ...[
+                const SizedBox(height: Tokens.space * 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(
+                        code,
+                        key: codeKey,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('code.copy'),
+                      tooltip: l10n.webCopy,
+                      icon: const Icon(Icons.copy),
+                      onPressed: () => Clipboard.setData(
+                        ClipboardData(text: copyText ?? code),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (caption case final c?)
+                Padding(
+                  padding: const EdgeInsets.only(top: Tokens.space / 2),
+                  child: Text(
+                    c,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          Text('${d.me.name} · ${l10n.devicesWaiting}'),
-        ],
+        ),
       ),
     );
   }
