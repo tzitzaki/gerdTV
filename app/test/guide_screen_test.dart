@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
+import 'package:gerdtv/screens/browse_screen.dart';
 import 'package:gerdtv/screens/guide_screen.dart';
 import 'package:gerdtv/screens/list_modes.dart';
 import 'package:gerdtv/services/session.dart';
@@ -90,6 +91,30 @@ void main() {
       'name_desc',
     );
     await tester.pumpWidget(const SizedBox());
+  });
+
+  // The groups' sort sits beside the section's search field (no row of its own above the groups): a pick is stored
+  // per section and every list reloads.
+  testWidgets('the groups\' sort button stores the order and reloads', (
+    tester,
+  ) async {
+    final lib = _Library();
+    final session = Session(appDir: 'unused')..library = lib;
+    final before = session.generation;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: GroupSortButton(session: session, kind: ItemKind.movie),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('list.sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sort.name_asc')));
+    await tester.pumpAndSettle();
+    expect(lib.settings[sortSetting(ItemKind.movie, groups: true)], 'name_asc');
+    expect(session.generation, greaterThan(before));
   });
 
   testWidgets('a running title sticks to the left edge of the view', (

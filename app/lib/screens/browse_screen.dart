@@ -72,22 +72,37 @@ class BrowseScreen extends StatefulWidget {
   State<BrowseScreen> createState() => _BrowseScreenState();
 }
 
+/// The groups' order of [kind]'s section (provider order or by name), remembered per section.
+ListSort groupSort(Session session, ItemKind kind) =>
+    parseSort(session.library!.setting(key: sortSetting(kind, groups: true)));
+
+/// The groups' sort, beside the section's search field (owner decision: no row of its own above the groups). A pick
+/// is stored and every list reloads (Session.groupsChanged), so the BrowseScreen below shows the new order.
+class GroupSortButton extends StatelessWidget {
+  const GroupSortButton({super.key, required this.session, required this.kind});
+  final Session session;
+  final ItemKind kind;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: session,
+    builder: (context, _) => SortButton(
+      value: groupSort(session, kind),
+      options: sortOptions(kind, groups: true, xtream: false),
+      onSelected: (s) {
+        session.library!.setSetting(
+          key: sortSetting(kind, groups: true),
+          value: s.value,
+        );
+        session.groupsChanged();
+      },
+    ),
+  );
+}
+
 class _BrowseScreenState extends State<BrowseScreen> {
   Session get session => widget.session;
   ItemKind get kind => widget.kind;
-
-  /// The groups' order (provider order or by name), remembered per section.
-  late ListSort _sort = parseSort(
-    session.library!.setting(key: sortSetting(kind, groups: true)),
-  );
-
-  void _setSort(ListSort s) {
-    session.library!.setSetting(
-      key: sortSetting(kind, groups: true),
-      value: s.value,
-    );
-    setState(() => _sort = s);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,9 +111,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
       listenable: session,
       builder: (context, _) {
         final lib = session.library!;
-        final groups = lib.categories(kind: kind, sort: _sort.value);
+        final sort = groupSort(session, kind);
+        final groups = lib.categories(kind: kind, sort: sort.value);
         return FutureBuilder<List<CategoryInfo>>(
-          key: ValueKey((session.generation, _sort)),
+          key: ValueKey((session.generation, sort)),
           future: groups,
           builder: (context, snap) {
             if (snap.hasError) {
@@ -140,44 +156,30 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   final resume = kind == ItemKind.live
                       ? null
                       : ContinueRow(session: session, kind: kind);
-                  // Row 0: the groups' sort button (right-aligned), then continue watching, then the groups.
-                  final sort = Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: SortButton(
-                      value: _sort,
-                      options: sortOptions(kind, groups: true, xtream: false),
-                      onSelected: _setSort,
-                    ),
-                  );
-                  // TV: the recordings, once there are any, above the groups.
+                  // TV: the recordings, once there are any, above the groups; movies and series: continue watching.
+                  // (The groups' sort sits beside the search field: GroupSortButton.)
                   final recordings =
                       kind == ItemKind.live &&
                       canRecord &&
                       session.recordings.list().isNotEmpty;
-                  final header = !recordings
-                      ? sort
-                      : Column(
-                          children: [
-                            sort,
-                            ListTile(
-                              key: const Key('browse.recordings'),
-                              leading: const Icon(Icons.video_library_outlined),
-                              title: Text(l10n.recordings),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      RecordingsScreen(session: session),
-                                ),
-                              ),
+                  final header = recordings
+                      ? ListTile(
+                          key: const Key('browse.recordings'),
+                          leading: const Icon(Icons.video_library_outlined),
+                          title: Text(l10n.recordings),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  RecordingsScreen(session: session),
                             ),
-                          ],
-                        );
-                  final skip = resume == null ? 1 : 2;
+                          ),
+                        )
+                      : resume;
+                  final skip = header == null ? 0 : 1;
                   return ListView.builder(
                     itemCount: all.length + skip,
                     itemBuilder: (context, row) {
-                      if (row == 0) return header;
-                      if (resume != null && row == 1) return resume;
+                      if (header != null && row == 0) return header;
                       final i = row - skip;
                       void open() => Navigator.of(context).push(
                         MaterialPageRoute<void>(
