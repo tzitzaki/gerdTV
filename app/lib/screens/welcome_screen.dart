@@ -241,7 +241,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             stops: const [0, 0.6],
-            colors: [scheme.primary.withValues(alpha: 0.18), scheme.surface],
+            // Opaque: the accent blended onto the surface here, so nothing below shines through.
+            colors: [
+              Color.alphaBlend(
+                scheme.primary.withValues(alpha: 0.18),
+                scheme.surface,
+              ),
+              scheme.surface,
+            ],
           ),
         ),
         child: SafeArea(
