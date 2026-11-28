@@ -445,6 +445,14 @@ void main() {
     // Remembered, with where it listens.
     expect(session.devices.peers.value.single.addr, '192.0.2.5:4100');
     expect(find.byKey(const Key('devices.peer.tv1')), findsOneWidget);
+    // Forget sits in the row's ⋮.
+    await tester.tap(find.byKey(const Key('devices.peerMenu.tv1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('devices.forget.tv1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Forget')); // confirmed
+    await tester.pumpAndSettle();
+    expect(session.devices.peers.value, isEmpty);
   });
 
   testWidgets('web player: a login link with its QR; End ends a session', (

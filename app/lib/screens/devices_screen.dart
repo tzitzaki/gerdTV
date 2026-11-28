@@ -163,10 +163,21 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     title: Text(p.device.name),
                     subtitle: Text(p.device.platform),
                     onTap: () => _syncNow(p),
-                    trailing: IconButton(
-                      tooltip: l10n.devicesForget,
-                      icon: const Icon(Icons.link_off),
-                      onPressed: () => _forget(p),
+                    // Forget is rare: in the row's ⋮ (owner decision), beside Sync, which a tap does too.
+                    trailing: PopupMenuButton<VoidCallback>(
+                      key: Key('devices.peerMenu.${p.device.id}'),
+                      onSelected: (action) => action(),
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: () => _syncNow(p),
+                          child: Text(l10n.devicesSync),
+                        ),
+                        PopupMenuItem(
+                          key: Key('devices.forget.${p.device.id}'),
+                          value: () => _forget(p),
+                          child: Text(l10n.devicesForget),
+                        ),
+                      ],
                     ),
                   ),
               ],

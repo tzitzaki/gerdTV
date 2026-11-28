@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/main.dart';
@@ -689,19 +690,19 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('JOURNEY: search in sections, groups and the guide');
-    // Favourites: the star on a channel puts it into a Favourites group on top of Live TV.
+    // Favourites: a channel's menu (a right click) puts it into a Favourites group on top of Live TV.
     await tapReady(
       tester,
       find.byWidgetPredicate(
         (w) => w is ListTile && w.trailing is Text && w.onTap != null,
       ),
     );
-    final star = find.byWidgetPredicate(
-      (w) =>
-          w.key is ValueKey<String> &&
-          (w.key! as ValueKey<String>).value.startsWith('item.star.'),
+    await waitFor(tester, find.byType(ItemRow).hitTestable());
+    await tester.tap(
+      find.byType(ItemRow).hitTestable().first,
+      buttons: kSecondaryButton,
     );
-    await tapReady(tester, star);
+    await tapReady(tester, find.byKey(const Key('channel.favourite')));
     // A channel's menu puts it into a new group of the user's own, which then shows above the provider's.
     await tester.longPress(find.byType(ItemRow).hitTestable().first);
     await tapReady(tester, find.byKey(const Key('channel.addToGroup')));

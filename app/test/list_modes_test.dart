@@ -1,6 +1,8 @@
 // New, because nothing owns how the list modes render: every mode at phone and desktop width lays out without
 // overflow (stars included), shows the name (without the channel number), and shows what's on now where the mode has room for it (list and tiles,
-// not compact). Favourites: the star toggles one; a long press or long OK opens the channel's menu; a short OK opens.
+// not compact). Favourites: a star marks one; a right click, the hover ⋮, a long press or long OK opens the menu; a
+// short OK opens.
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gerdtv/l10n/gen/app_localizations.dart';
@@ -100,7 +102,7 @@ void main() {
   }
 
   testWidgets(
-    'the star toggles a favourite, long press and long OK open the channel menu; short OK opens',
+    'a right click or the hover ⋮ opens the menu, long press and long OK too; short OK opens; the star only marks',
     (tester) async {
       final opened = <String>[], starred = <String>[];
       await tester.pumpWidget(
@@ -113,18 +115,48 @@ void main() {
               nowNext: const {},
               now: now,
               onTap: (it) => opened.add(it.key),
+              favourites: const {'live:2'},
               onFavourite: (it) => starred.add(it.key),
             ),
           ),
         ),
       );
-      await tester.tap(find.byKey(const Key('item.star.live:1')));
-      await tester.longPress(find.byKey(const Key('item.live:2')));
+      // The star is a mark on the favourite's row, not a button.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('item.live:2')),
+          matching: find.byType(FavouriteMark),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(FavouriteMark), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('item.live:1')),
+        buttons: kSecondaryButton,
+      );
       await tester.pumpAndSettle();
-      expect(starred, ['live:1'], reason: 'a hold opens the menu');
       await tester.tap(find.byKey(const Key('channel.favourite')));
       await tester.pumpAndSettle();
-      expect(starred, ['live:1', 'live:2']);
+      expect(starred, ['live:1'], reason: 'a right click opens the menu');
+      // Desktop (tests run on one): the ⋮ shows while the pointer is over the row.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(
+        tester.getCenter(find.byKey(const Key('item.live:1'))),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('item.menu.live:1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('channel.watch')), findsOneWidget);
+      await tester.tapAt(Offset.zero); // closes the sheet
+      await tester.pumpAndSettle();
+      await mouse.moveTo(Offset.zero);
+      await tester.longPress(find.byKey(const Key('item.live:2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('channel.favourite')));
+      await tester.pumpAndSettle();
+      expect(starred, ['live:1', 'live:2'], reason: 'a hold opens the menu');
       expect(opened, isEmpty);
       await tester.longPress(find.byKey(const Key('item.live:2')));
       await tester.pumpAndSettle();
