@@ -247,28 +247,54 @@ class _GuideScreenState extends State<GuideScreen> {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final nowX = now >= _from && now < _to ? (now - _from) / 60 * px : null;
 
-    final controls = Wrap(
-      spacing: Tokens.space,
-      runSpacing: Tokens.space,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    // One row on every form factor (owner decision: the grid starts higher on a phone): group, day and Now; the
+    // channels' order and the 20:15 jump, used now and then, sit in the ⋮.
+    final sort = parseSort(
+      _lib.setting(key: sortSetting(ItemKind.live, groups: false)),
+    );
+    final controls = Row(
       children: [
         if (_groups.isNotEmpty)
-          DropdownButton<CategoryInfo>(
-            key: const Key('guide.group'),
-            value: _group,
+          Flexible(
+            flex: 3,
+            child: DropdownButton<CategoryInfo>(
+              key: const Key('guide.group'),
+              value: _group,
+              isExpanded: true,
+              items: [
+                for (final g in _groups)
+                  DropdownMenuItem(
+                    value: g,
+                    child: Text(g.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (g) => g == null ? null : _selectGroup(g),
+            ),
+          )
+        else
+          const Spacer(),
+        const SizedBox(width: Tokens.space),
+        // Both pickers give way on a narrow phone (a dropdown is as wide as its widest entry otherwise).
+        Flexible(
+          flex: 2,
+          child: DropdownButton<DateTime>(
+            key: const Key('guide.day'),
+            value: _day,
+            isExpanded: true,
             items: [
-              for (final g in _groups)
-                DropdownMenuItem(value: g, child: Text(g.name)),
+              for (final d in days)
+                DropdownMenuItem(
+                  value: d,
+                  child: Text(
+                    _dayLabel(l10n, locale, d),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             ],
-            onChanged: (g) => g == null ? null : _selectGroup(g),
+            onChanged: (d) => d == null ? null : _setDay(d),
           ),
-        SortButton(
-          value: parseSort(
-            _lib.setting(key: sortSetting(ItemKind.live, groups: false)),
-          ),
-          options: sortOptions(ItemKind.live, groups: false, xtream: true),
-          onSelected: _setSort,
         ),
+        const SizedBox(width: Tokens.space),
         OutlinedButton(
           key: const Key('guide.now'),
           onPressed: () => _setDay(
@@ -277,22 +303,28 @@ class _GuideScreenState extends State<GuideScreen> {
           ),
           child: Text(l10n.programmeNow),
         ),
-        OutlinedButton(
-          key: const Key('guide.prime'),
-          onPressed: () => _jumpTo(_at(20, 15)),
-          child: const Text('20:15'),
-        ),
-        DropdownButton<DateTime>(
-          key: const Key('guide.day'),
-          value: _day,
-          items: [
-            for (final d in days)
-              DropdownMenuItem(
-                value: d,
-                child: Text(_dayLabel(l10n, locale, d)),
+        PopupMenuButton<VoidCallback>(
+          key: const Key('guide.more'),
+          onSelected: (action) => action(),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              key: const Key('guide.prime'),
+              value: () => _jumpTo(_at(20, 15)),
+              child: const Text('20:15'),
+            ),
+            const PopupMenuDivider(),
+            for (final o in sortOptions(
+              ItemKind.live,
+              groups: false,
+              xtream: true,
+            ))
+              CheckedPopupMenuItem(
+                key: Key('sort.${o.value}'),
+                value: () => _setSort(o),
+                checked: o == sort,
+                child: Text(sortLabel(l10n, o)),
               ),
           ],
-          onChanged: (d) => d == null ? null : _setDay(d),
         ),
       ],
     );
@@ -454,7 +486,14 @@ class _GuideScreenState extends State<GuideScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          controls,
+          // Wide windows: the pickers stop at a readable width instead of stretching across.
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: controls,
+            ),
+          ),
           const SizedBox(height: Tokens.space),
           header,
           ruler,

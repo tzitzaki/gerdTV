@@ -69,7 +69,11 @@ class _Library implements Library {
 }
 
 void main() {
-  testWidgets('the sort button reorders the guide and Live TV', (tester) async {
+  // The controls are one row (group, day, Now, ⋮), also on the narrowest phone.
+  testWidgets('the ⋮ reorders the guide and Live TV', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final lib = _Library();
     final session = Session(appDir: 'unused')..library = lib;
     await tester.pumpWidget(
@@ -80,7 +84,13 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    await tester.tap(find.byKey(const Key('list.sort')));
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+    expect(
+      tester.getTopLeft(find.byKey(const Key('guide.more'))).dy,
+      tester.getTopLeft(find.byKey(const Key('guide.now'))).dy,
+      reason: 'one row',
+    );
+    await tester.tap(find.byKey(const Key('guide.more')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('sort.name_desc')));
     await tester.pumpAndSettle();

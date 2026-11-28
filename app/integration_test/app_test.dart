@@ -786,9 +786,9 @@ void main() {
     // The guide grid: Now, a running programme's sheet, Watch plays its channel.
     await tapReady(tester, find.byKey(const Key('tv.guide')));
     await tapReady(tester, find.byKey(const Key('guide.now')));
-    // The sort button: the order is Live TV's too; back to the provider's.
+    // The order, in the ⋮: it is Live TV's too; back to the provider's.
     for (final order in ['name_desc', 'provider']) {
-      await tapReady(tester, find.byKey(const Key('list.sort')));
+      await tapReady(tester, find.byKey(const Key('guide.more')));
       await tapReady(tester, find.byKey(Key('sort.$order')));
       await tester.pumpAndSettle();
       expect(lib.setting(key: 'sort_live_items'), order);
