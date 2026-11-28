@@ -1,4 +1,4 @@
-//! Export and import of a profile's user data (Settings → Account → Your data): favourites, recents, where movies and
+//! Export and import of a profile's user data (Settings → Streaming → Your data): favourites, recents, where movies and
 //! episodes were left (resume), hidden groups, search history, manual guide mapping, reminders, profile settings,
 //! per-channel buffer choices and extra guide URLs, as one JSON file. No secrets (guide
 //! URLs keep their `{secret0}` placeholders) and no catalogue or guide: a sync brings those back.

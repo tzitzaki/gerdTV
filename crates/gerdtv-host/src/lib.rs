@@ -620,7 +620,7 @@ async fn front(host: &Host, req: Request) -> Response {
         // The code field sends GET /go?c=<code>: the same as opening /l/<code>.
         ("GET", "/") => Response::page(
             200,
-            "Open a login link from the gerdTV app (Settings → Account → Web player), or type its code:</p>\
+            "Open a login link from the gerdTV app (Settings → Devices → Web player), or type its code:</p>\
              <form action=/go><input name=c required autocomplete=off autocapitalize=characters spellcheck=false \
              placeholder=XXXX-XXXX style='font:inherit;padding:.4em;width:9em'> <button style='font:inherit;padding:.4em'>\
              Log in</button></form><p>",
