@@ -14,7 +14,12 @@ zip="$4"
 copy="${GERDTV_COPY:-ditto}"
 open="${GERDTV_OPEN:-open}"
 exec >>"$(dirname "$0")/swap.log" 2>&1
-while kill -0 "$pid" 2>/dev/null; do
+# Running = the process exists and isn't a zombie (ended, not yet reaped by its parent): kill -0 alone still
+# succeeds for a zombie, and with no time limit on this wait it would never end.
+running() {
+  kill -0 "$pid" 2>/dev/null && [[ "$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ')" != Z* ]]
+}
+while running; do
   sleep 0.5
 done
 backup="${old%.app}.previous.app"
